@@ -80,30 +80,11 @@ return [
         'email' => 'office@tabelander.co.at',
         'serviceArea' => 'Telfs, Tirol und Umgebung sowie Fernwartung nach Absprache',
         'businessHours' => 'Montag bis Freitag nach Vereinbarung',
-        // Google-Bewertungen: leer lassen, wenn der Bereich manuell gepflegt werden soll.
+        // Google-Bewertungen leer lassen, wenn der Bereich mit private/data/reviews.json gepflegt wird.
         'googlePlaceId' => config_env_value('GOOGLE_PLACE_ID'),
         'googleApiKey' => config_env_secret('GOOGLE_PLACES_API_KEY'),
         'reviewCacheTtl' => 43200,
-        'manualTestimonials' => [
-            [
-                'author' => 'Reparatur-Anliegen aus Telfs',
-                'rating' => '5',
-                'text' => 'Der Laptop wurde geprüft, aufgerüstet und sauber neu eingerichtet. Vorab war klar, welche Arbeiten sinnvoll sind und welche Kosten zu erwarten sind.',
-                'relativeTime' => 'Typisches Feedback',
-            ],
-            [
-                'author' => 'Kleine IT-Umgebung in Tirol',
-                'rating' => '5',
-                'text' => 'Arbeitsplätze, Freigaben und Netzwerk wurden strukturiert eingerichtet. Die Dokumentation macht spätere Anpassungen einfacher.',
-                'relativeTime' => 'Typisches Feedback',
-            ],
-            [
-                'author' => 'Reparatur und Technikservice',
-                'rating' => '5',
-                'text' => 'Controller und PC wurden nachvollziehbar beurteilt. Vor der Umsetzung war klar, ob sich eine Reparatur lohnt oder ein Austausch sinnvoller ist.',
-                'relativeTime' => 'Typisches Feedback',
-            ],
-        ],
+        'manualTestimonials' => [],
         'uid' => '',
         'vatId' => '',
         'supervisoryAuthority' => 'Bezirkshauptmannschaft Innsbruck',

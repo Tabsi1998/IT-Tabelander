@@ -1,0 +1,5 @@
+{
+  "_hinweis": "Neue Rezensionen in reviews eintragen. Benötigt werden author und text. Optional sind rating, date und url.",
+  "reviews": [
+  ]
+}

@@ -219,6 +219,11 @@ function review_cache_path(): string
     return dirname(__DIR__) . '/private/cache/google-reviews.json';
 }
 
+function manual_reviews_path(): string
+{
+    return dirname(__DIR__) . '/private/data/reviews.json';
+}
+
 function append_contact_log(array $payload): void
 {
     ensure_runtime_directory(dirname(contact_log_path()));
@@ -741,26 +746,68 @@ function ensure_runtime_directory(string $directory): void
     @mkdir($directory, 0775, true);
 }
 
+function normalize_manual_review(mixed $entry): ?array
+{
+    if (!is_array($entry)) {
+        return null;
+    }
+
+    $author = trim((string) ($entry['author'] ?? $entry['name'] ?? ''));
+    $text = trim((string) ($entry['text'] ?? $entry['message'] ?? ''));
+
+    if ($author === '' || $text === '') {
+        return null;
+    }
+
+    $rating = trim((string) ($entry['rating'] ?? '5'));
+    $ratingNumber = (float) str_replace(',', '.', $rating);
+
+    if ($ratingNumber < 1 || $ratingNumber > 5) {
+        $rating = '';
+    }
+
+    return [
+        'author' => $author,
+        'rating' => $rating,
+        'text' => $text,
+        'relativeTime' => trim((string) ($entry['relativeTime'] ?? $entry['date'] ?? 'Kundenrezension')),
+        'url' => trim((string) ($entry['url'] ?? '')),
+        'source' => 'Manuell gepflegte Rezension',
+    ];
+}
+
+function read_manual_reviews_file(): array
+{
+    $reviewsFile = manual_reviews_path();
+
+    if (!is_file($reviewsFile)) {
+        return [];
+    }
+
+    $decoded = json_decode((string) file_get_contents($reviewsFile), true);
+
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    $entries = is_array($decoded['reviews'] ?? null) ? $decoded['reviews'] : $decoded;
+
+    return array_values(array_filter(array_map('normalize_manual_review', $entries)));
+}
+
 function manual_reviews_payload(array $company): array
 {
-    $reviews = array_values(array_filter(array_map(static function (mixed $entry): ?array {
-        if (!is_array($entry)) {
-            return null;
-        }
+    $reviews = read_manual_reviews_file();
 
-        return [
-            'author' => trim((string) ($entry['author'] ?? 'Kundenstimme')),
-            'rating' => trim((string) ($entry['rating'] ?? '')),
-            'text' => trim((string) ($entry['text'] ?? '')),
-            'relativeTime' => trim((string) ($entry['relativeTime'] ?? '')),
-            'url' => trim((string) ($entry['url'] ?? '')),
-            'source' => 'Manuell gepflegte Referenz',
-        ];
-    }, $company['manualTestimonials'] ?? [])));
+    if ($reviews === [] && !empty($company['manualTestimonials']) && is_array($company['manualTestimonials'])) {
+        $reviews = array_values(array_filter(array_map('normalize_manual_review', $company['manualTestimonials'])));
+    }
 
     return [
         'source' => 'manual',
-        'message' => 'Aktuell werden gepflegte Rückmeldungen und Referenzen angezeigt.',
+        'message' => $reviews === []
+            ? 'Noch keine Kundenrezensionen veröffentlicht.'
+            : 'Aktuell werden gepflegte Kundenrezensionen angezeigt.',
         'reviews' => $reviews,
     ];
 }
@@ -859,13 +906,5 @@ function load_reviews_payload(array $company): array
         return google_reviews_payload($company);
     }
 
-    if (company_has_manual_reviews($company)) {
-        return manual_reviews_payload($company);
-    }
-
-    return [
-        'source' => 'setup',
-        'message' => 'API noch nicht konfiguriert. Tragen Sie GOOGLE_PLACE_ID und GOOGLE_PLACES_API_KEY in der Konfiguration oder als Umgebungsvariablen ein.',
-        'reviews' => [],
-    ];
+    return manual_reviews_payload($company);
 }
