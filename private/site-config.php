@@ -34,8 +34,8 @@ return [
         'siteName' => 'IT-Tabelander',
         'language' => 'de-AT',
         'title' => 'IT-Tabelander | IT-Service in Tirol',
-        'description' => 'IT-Service in Telfs für Privatkunden und Unternehmen: Reparatur, Einrichtung, Server, Netzwerk und WLAN in Tirol.',
-        'canonicalBaseUrl' => config_env_value('CANONICAL_BASE_URL', 'https://www.tabelander.co.at'),
+        'description' => 'IT-Service in Telfs: Reparatur, Einrichtung, Server, Netzwerk, WLAN und Sicherheitsprüfung in Tirol.',
+        'canonicalBaseUrl' => config_env_value('CANONICAL_BASE_URL', 'https://it.tabelander.co.at'),
     ],
     'company' => [
         'name' => 'IT-Tabelander',
@@ -55,13 +55,13 @@ return [
         'reviewCacheTtl' => 43200,
         'manualTestimonials' => [
             [
-                'author' => 'Privatkunden-Anliegen aus Telfs',
+                'author' => 'Reparatur-Anliegen aus Telfs',
                 'rating' => '5',
                 'text' => 'Der Laptop wurde geprüft, aufgerüstet und sauber neu eingerichtet. Vorab war klar, welche Arbeiten sinnvoll sind und welche Kosten zu erwarten sind.',
                 'relativeTime' => 'Typisches Feedback',
             ],
             [
-                'author' => 'Kleines Unternehmen in Tirol',
+                'author' => 'Kleine IT-Umgebung in Tirol',
                 'rating' => '5',
                 'text' => 'Arbeitsplätze, Freigaben und Netzwerk wurden strukturiert eingerichtet. Die Dokumentation macht spätere Anpassungen einfacher.',
                 'relativeTime' => 'Typisches Feedback',
@@ -85,7 +85,7 @@ return [
         'tradeRegulationLabel' => 'Gewerbeordnung (GewO)',
         'tradeRegulationUrl' => 'https://www.ris.bka.gv.at/',
         'mediaLine' => 'Information über IT-Dienstleistungen, Reparatur, Systembetreuung und Infrastrukturleistungen von IT-Tabelander.',
-        'websitePurpose' => 'IT-Reparatur, Systemkonfiguration, Server-, Netzwerk- und Infrastrukturbetreuung',
+        'websitePurpose' => 'IT-Reparatur, Systemkonfiguration, Server-, Netzwerk-, WLAN- und Sicherheitsbetreuung',
         'privacyAuthorityName' => 'Österreichische Datenschutzbehörde',
         'privacyAuthorityUrl' => 'https://www.dsb.gv.at/',
         'wkoProfileUrl' => '',
@@ -121,12 +121,12 @@ return [
     ],
     'hero' => [
         'eyebrow' => 'IT-Dienstleistungen in Tirol',
-        'headline' => 'IT-Service für Privatkunden und Unternehmen.',
-        'lead' => 'Reparatur, Einrichtung und Betreuung von PCs, Arbeitsplätzen, Servern und Netzwerken in Tirol.',
+        'headline' => 'IT-Service für Geräte, Systeme und Netzwerke.',
+        'lead' => 'Reparatur, Einrichtung und Betreuung von PCs, Arbeitsplätzen, Servern, WLAN und Netzwerken in Tirol.',
         'highlights' => [
-            'PC, Laptop und Konsole',
-            'Windows, Linux und Server',
-            'Netzwerk, WLAN und Benutzerverwaltung',
+            'PC, Laptop, Konsole und Controller',
+            'Windows, Linux, Server und Benutzerverwaltung',
+            'WLAN-Konzept, Messung und Sicherheitsprüfung',
         ],
         'primaryCta' => 'Anfrage senden',
         'secondaryCta' => 'Leistungsbereiche',
@@ -137,12 +137,12 @@ return [
             'text' => 'Vor Ort in Telfs, Tirol und Umgebung sowie per Fernwartung, wenn es technisch sinnvoll ist.',
         ],
         [
-            'title' => 'Privatkunden und Unternehmen',
+            'title' => 'Ein Ansprechpartner',
             'text' => 'Vom einzelnen Gerät bis zur laufenden Betreuung kleiner und mittlerer IT-Umgebungen.',
         ],
         [
-            'title' => 'Nachvollziehbare Umsetzung',
-            'text' => 'Änderungen, Konfigurationen und Empfehlungen bleiben verständlich dokumentiert.',
+            'title' => 'Sicherheit mitgedacht',
+            'text' => 'Virenprüfung, Basisschutz, Updates und saubere Konfiguration werden bei Bedarf direkt mitgeprüft.',
         ],
     ],
     'processSteps' => [
@@ -165,14 +165,14 @@ return [
     ],
     'audiences' => [
         [
-            'label' => 'Für Privatkunden',
-            'headline' => 'Reparatur und Aufrüstung für Zuhause.',
-            'copy' => 'PCs, Laptops, Konsolen und Controller werden geprüft, repariert, neu eingerichtet oder gezielt aufgerüstet.',
+            'label' => 'Geräte und Systeme',
+            'headline' => 'Reparieren, einrichten und sinnvoll verbessern.',
+            'copy' => 'PCs, Laptops, Konsolen, Controller und Arbeitsplätze werden geprüft, repariert, neu eingerichtet oder gezielt aufgerüstet.',
         ],
         [
-            'label' => 'Für Unternehmen',
-            'headline' => 'Systeme und Infrastruktur für den Betrieb.',
-            'copy' => 'Windows, Linux, Server, WLAN und Benutzerverwaltung werden stabil, nachvollziehbar und wartbar eingerichtet.',
+            'label' => 'Netzwerk und Sicherheit',
+            'headline' => 'Stabile Verbindung, saubere Struktur und Basisschutz.',
+            'copy' => 'WLAN, Netzwerk, Server, Benutzerverwaltung und Sicherheitsprüfung werden nachvollziehbar geplant, umgesetzt und dokumentiert.',
         ],
     ],
     'serviceBands' => [
@@ -185,7 +185,8 @@ return [
                 'Austausch von SSD, RAM, Netzteil, Kühlern, Displays und weiteren Komponenten nach Befund',
                 'Reinigung, Wartung und Vorbereitung für den weiteren Einsatz',
             ],
-            'audience' => 'Privatkunden und Unternehmen',
+            'audience' => 'Reparatur und Diagnose',
+            'groups' => ['reparatur', 'systeme'],
         ],
         [
             'title' => 'Upgrades und Systempflege',
@@ -196,7 +197,8 @@ return [
                 'Neuaufsetzung, Treiberpflege und strukturierte Grundkonfiguration',
                 'Abstimmung von Hardware und Software für Office, Homeoffice, Gaming oder gemischte Nutzung',
             ],
-            'audience' => 'Privatkunden und Unternehmen',
+            'audience' => 'Systempflege und Einrichtung',
+            'groups' => ['reparatur', 'systeme'],
         ],
         [
             'title' => 'Windows und Windows Server',
@@ -207,18 +209,20 @@ return [
                 'Grundkonfiguration, Rollenplanung und laufende Betreuung von Windows-Server-Systemen',
                 'Benutzer, Freigaben, Updates, Basis-Sicherheit und strukturierte Dokumentation',
             ],
-            'audience' => 'Privatkunden und Unternehmen',
+            'audience' => 'Windows und Server',
+            'groups' => ['systeme', 'sicherheit'],
         ],
         [
             'title' => 'Netzwerk und WLAN',
             'image' => 'netzwerk-wlan.png',
-            'intro' => 'Netzwerk- und WLAN-Strukturen werden geplant, eingerichtet und bei Bedarf gezielt verbessert.',
+            'intro' => 'Netzwerk- und WLAN-Strukturen werden geplant, gemessen, eingerichtet und bei Bedarf gezielt verbessert.',
             'items' => [
-                'Planung, Erweiterung und Verbesserung von Netzwerk- und WLAN-Strukturen',
-                'Segmentierung, Basisschutz und nachvollziehbare Dokumentation',
-                'Unterstützung bei Umstellungen, Störungen und Kapazitätserweiterungen',
+                'WLAN- beziehungsweise WiFi-Konzept mit sinnvoller Platzierung von Router, Access Points und Repeatern',
+                'WLAN-Messung, Störungsanalyse, Kanalprüfung und Einschätzung von Abdeckung und Stabilität',
+                'Netzwerkstruktur, Segmentierung, Basisschutz und nachvollziehbare Dokumentation',
             ],
-            'audience' => 'Privatkunden und Unternehmen',
+            'audience' => 'Netzwerk, WLAN und Messung',
+            'groups' => ['netzwerk', 'sicherheit'],
         ],
         [
             'title' => 'Linux und Open-Source-Server',
@@ -229,7 +233,8 @@ return [
                 'Aufbau und Betreuung von Open-Source-Serverdiensten je nach Einsatzbereich',
                 'Unterstützung bei Updates, Diensten, Zugriffen, Basis-Härtung und sauberer Strukturierung',
             ],
-            'audience' => 'Unternehmen',
+            'audience' => 'Linux und Serverdienste',
+            'groups' => ['systeme', 'sicherheit'],
         ],
         [
             'title' => 'Active Directory und Konzeption',
@@ -240,7 +245,20 @@ return [
                 'Strukturierung von Benutzer-, Gruppen- und Rechtekonzepten',
                 'Begleitung beim Aufbau, bei Modernisierung und laufender Pflege kleiner IT-Landschaften',
             ],
-            'audience' => 'Unternehmen',
+            'audience' => 'Benutzerverwaltung und Struktur',
+            'groups' => ['systeme', 'netzwerk', 'sicherheit'],
+        ],
+        [
+            'title' => 'IT-Sicherheit und Virenprüfung',
+            'image' => 'service-overview.png',
+            'intro' => 'Systeme werden auf offensichtliche Risiken, Schadsoftware, unsichere Einstellungen und fehlende Schutzmaßnahmen geprüft.',
+            'items' => [
+                'Viren-, Malware- und Adware-Prüfung mit sauberer Einschätzung statt blinder Schnellreparatur',
+                'Prüfung von Updates, Benutzerrechten, Autostart, Browser-Erweiterungen und typischen Schwachstellen',
+                'Empfehlungen zu Backup, Passwortschutz, Gerätehärtung, Fernzugriff und sicherer Grundkonfiguration',
+            ],
+            'audience' => 'Sicherheits- und Virenprüfung',
+            'groups' => ['sicherheit', 'systeme'],
         ],
         [
             'title' => 'Konsolen und Controller',
@@ -251,13 +269,14 @@ return [
                 'PS5-Controller-Reparatur, sofern Fehlerbild und Ersatzteilsituation dies sinnvoll zulassen',
                 'Transparente Einschätzung, ob sich eine Reparatur wirtschaftlich lohnt',
             ],
-            'audience' => 'Privatkunden',
+            'audience' => 'Gaming-Hardware und Reparatur',
+            'groups' => ['reparatur'],
         ],
     ],
     'faq' => [
         [
-            'question' => 'Arbeitet IT-Tabelander nur für Unternehmen?',
-            'answer' => 'Nein. IT-Tabelander unterstützt Privatkunden bei Reparaturen und Upgrades ebenso wie Unternehmen bei System-, Server- und Infrastrukturthemen.',
+            'question' => 'Arbeitet IT-Tabelander nur für bestimmte Kundengruppen?',
+            'answer' => 'Nein. Entscheidend ist das IT-Thema: Reparatur, Einrichtung, Netzwerk, WLAN, Server, Sicherheit oder laufende Betreuung werden je nach Bedarf umgesetzt.',
         ],
         [
             'question' => 'Erfolgt die Betreuung nur vor Ort?',
@@ -269,7 +288,11 @@ return [
         ],
         [
             'question' => 'Werden auch Windows-, Linux- und Server-Systeme betreut?',
-            'answer' => 'Ja. Neben Endgeräten umfasst das Leistungsbild auch Windows-Betriebssysteme, Windows-Server, Linux-Systeme und Open-Source-Serverdienste.',
+            'answer' => 'Ja. Neben Endgeräten umfasst das Leistungsbild auch Windows-Betriebssysteme, Windows-Server, Linux-Systeme, Open-Source-Serverdienste und Benutzerverwaltung.',
+        ],
+        [
+            'question' => 'Sind WLAN-Messung und Sicherheitsprüfung möglich?',
+            'answer' => 'Ja. WLAN-Abdeckung, Störungen, Router- oder Access-Point-Platzierung sowie grundlegende Sicherheits- und Virenprüfungen können gemeinsam beurteilt werden.',
         ],
         [
             'question' => 'Sind laufende Wartung und Betreuung möglich?',

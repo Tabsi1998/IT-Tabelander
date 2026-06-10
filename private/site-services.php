@@ -313,7 +313,7 @@ function build_owner_notification_message(array $siteConfig, array $submission):
         'Name' => $submission['name'],
         'E-Mail' => $submission['email'],
         'Telefon' => $submission['phone'] !== '' ? $submission['phone'] : 'nicht angegeben',
-        'Bereich' => $submission['audience'],
+        'Anliegen' => $submission['audience'],
         'Leistung' => $submission['service'],
         'Eingang' => date('d.m.Y H:i'),
         'IP-Adresse' => (string) ($_SERVER['REMOTE_ADDR'] ?? 'unbekannt'),
@@ -333,7 +333,7 @@ function build_owner_notification_message(array $siteConfig, array $submission):
         'Name: ' . $submission['name'],
         'E-Mail: ' . $submission['email'],
         'Telefon: ' . ($submission['phone'] !== '' ? $submission['phone'] : 'nicht angegeben'),
-        'Bereich: ' . $submission['audience'],
+        'Anliegen: ' . $submission['audience'],
         'Leistung: ' . $submission['service'],
         'Eingang: ' . date('d.m.Y H:i'),
         'IP-Adresse: ' . (string) ($_SERVER['REMOTE_ADDR'] ?? 'unbekannt'),
@@ -360,7 +360,7 @@ function build_customer_confirmation_message(array $siteConfig, array $submissio
 
     $subject = (string) ($mailConfig['customerConfirmationSubject'] ?? 'Ihre Anfrage bei ' . $company['name']);
     $summaryRows = [
-        'Angefragter Bereich' => $submission['audience'],
+        'Anliegen' => $submission['audience'],
         'Leistung' => $submission['service'],
         'Eingang' => date('d.m.Y H:i'),
         'Kontaktadresse' => $company['email'],
@@ -382,7 +382,7 @@ function build_customer_confirmation_message(array $siteConfig, array $submissio
         '',
         'Ihre Nachricht wurde erfolgreich übermittelt.',
         'Leistung: ' . $submission['service'],
-        'Bereich: ' . $submission['audience'],
+        'Anliegen: ' . $submission['audience'],
         'Eingang: ' . date('d.m.Y H:i'),
         '',
         'Ihre Nachricht:',

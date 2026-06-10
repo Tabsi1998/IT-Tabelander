@@ -40,6 +40,7 @@ $formMessage = match ($formStatus) {
     <meta property="og:type" content="website">
     <meta property="og:url" content="<?= e(canonical_url()); ?>">
     <meta property="og:image" content="<?= e(canonical_url(asset_url('img/hero-it-tabelander.png'))); ?>">
+    <meta name="google-site-verification" content="ZQiRDZwcqyQ1si_x_Wxw5NBKlLvHH0_AIsGCbK9xSrc">
     <meta name="theme-color" content="#08141d">
     <script><?= theme_bootstrap_script(); ?></script>
     <?= site_favicon_markup(); ?>
@@ -71,7 +72,9 @@ $formMessage = match ($formStatus) {
                 'Konfiguration und Betreuung von Windows Server',
                 'Einrichtung von Linux-Distributionen und Open-Source-Servern',
                 'Netzwerk- und WLAN-Konzeption',
+                'WLAN-Messung und Störungsanalyse',
                 'Active-Directory-Betreuung',
+                'IT-Sicherheits- und Virenprüfung',
             ],
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT); ?>
     </script>
@@ -142,8 +145,8 @@ $formMessage = match ($formStatus) {
             <section class="audience-section section">
                 <div class="section-heading" data-reveal>
                     <p class="section-eyebrow">Leistungsfokus</p>
-                    <h2>IT für Zuhause und Betrieb.</h2>
-                    <p>Der Fokus liegt auf Reparatur, Einrichtung, Betreuung und sauber strukturierten IT-Umgebungen.</p>
+                    <h2>IT ohne unnötige Schubladen.</h2>
+                    <p>Der Fokus liegt auf dem Problem und der passenden Lösung: Reparatur, Einrichtung, Netzwerk, WLAN, Server oder Sicherheit.</p>
                 </div>
                 <div class="audience-grid">
                     <?php foreach ($audiences as $audience): ?>
@@ -166,12 +169,14 @@ $formMessage = match ($formStatus) {
                     <div class="services-carousel-head">
                         <div class="services-carousel-copy">
                             <p class="reviews-label">Ausgewählte Bereiche</p>
-                            <p>Reparatur, Systempflege und Infrastrukturthemen klar nach Zielgruppe gebündelt.</p>
+                            <p>Reparatur, Systempflege, Netzwerk, WLAN und Sicherheit nach Themen gebündelt.</p>
                         </div>
                         <div class="service-filter" aria-label="Leistungen filtern">
                             <button class="service-filter-button is-active" type="button" data-service-filter="all" aria-pressed="true">Alle</button>
-                            <button class="service-filter-button" type="button" data-service-filter="privat" aria-pressed="false">Privatkunden</button>
-                            <button class="service-filter-button" type="button" data-service-filter="unternehmen" aria-pressed="false">Unternehmen</button>
+                            <button class="service-filter-button" type="button" data-service-filter="reparatur" aria-pressed="false">Reparatur</button>
+                            <button class="service-filter-button" type="button" data-service-filter="systeme" aria-pressed="false">Systeme</button>
+                            <button class="service-filter-button" type="button" data-service-filter="netzwerk" aria-pressed="false">Netzwerk/WLAN</button>
+                            <button class="service-filter-button" type="button" data-service-filter="sicherheit" aria-pressed="false">Sicherheit</button>
                         </div>
                         <div class="reviews-controls">
                             <button class="slider-button" type="button" data-service-slide="prev" aria-label="Vorherige Leistung">&#8592;</button>
@@ -182,14 +187,7 @@ $formMessage = match ($formStatus) {
                         <div class="services-track" data-service-track>
                         <?php foreach ($serviceBands as $band): ?>
                             <?php
-                                $serviceGroups = ['all'];
-                                $audience = strtolower((string) ($band['audience'] ?? ''));
-                                if (str_contains($audience, 'privat')) {
-                                    $serviceGroups[] = 'privat';
-                                }
-                                if (str_contains($audience, 'unternehmen')) {
-                                    $serviceGroups[] = 'unternehmen';
-                                }
+                                $serviceGroups = array_merge(['all'], is_array($band['groups'] ?? null) ? $band['groups'] : []);
                             ?>
                             <article class="service-card" data-service-card data-service-groups="<?= e(implode(' ', array_unique($serviceGroups))); ?>" tabindex="0">
                                 <?php if (!empty($band['image'])): ?>
@@ -335,11 +333,15 @@ $formMessage = match ($formStatus) {
                                 <input type="text" name="phone" value="<?= e($formValue('phone')); ?>">
                             </label>
                             <label>
-                                <span>Bereich</span>
+                                <span>Anliegen</span>
                                 <select name="audience" <?= $formHasError('audience') ? 'aria-invalid="true"' : ''; ?> required>
                                     <option value="">Bitte wählen</option>
-                                    <option value="Privat" <?= $formValue('audience') === 'Privat' ? 'selected' : ''; ?>>Privatkunden</option>
-                                    <option value="Unternehmen" <?= $formValue('audience') === 'Unternehmen' ? 'selected' : ''; ?>>Unternehmen</option>
+                                    <option value="Reparatur und Diagnose" <?= $formValue('audience') === 'Reparatur und Diagnose' ? 'selected' : ''; ?>>Reparatur und Diagnose</option>
+                                    <option value="Einrichtung und Systempflege" <?= $formValue('audience') === 'Einrichtung und Systempflege' ? 'selected' : ''; ?>>Einrichtung und Systempflege</option>
+                                    <option value="Netzwerk und WLAN" <?= $formValue('audience') === 'Netzwerk und WLAN' ? 'selected' : ''; ?>>Netzwerk und WLAN</option>
+                                    <option value="Sicherheit und Virenprüfung" <?= $formValue('audience') === 'Sicherheit und Virenprüfung' ? 'selected' : ''; ?>>Sicherheit und Virenprüfung</option>
+                                    <option value="Server und Betreuung" <?= $formValue('audience') === 'Server und Betreuung' ? 'selected' : ''; ?>>Server und Betreuung</option>
+                                    <option value="Sonstiges IT-Anliegen" <?= $formValue('audience') === 'Sonstiges IT-Anliegen' ? 'selected' : ''; ?>>Sonstiges IT-Anliegen</option>
                                 </select>
                             </label>
                         </div>
@@ -348,7 +350,8 @@ $formMessage = match ($formStatus) {
                             <select name="service" <?= $formHasError('service') ? 'aria-invalid="true"' : ''; ?> required>
                                 <option value="">Bitte wählen</option>
                                 <?php foreach ($serviceBands as $band): ?>
-                                    <option value="<?= e($band['title']); ?>" <?= $formValue('service') === $band['title'] ? 'selected' : ''; ?>><?= e($band['title']); ?></option>
+                                    <?php $optionGroups = is_array($band['groups'] ?? null) ? $band['groups'] : []; ?>
+                                    <option value="<?= e($band['title']); ?>" data-service-groups="<?= e(implode(' ', array_unique($optionGroups))); ?>" <?= $formValue('service') === $band['title'] ? 'selected' : ''; ?>><?= e($band['title']); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </label>
