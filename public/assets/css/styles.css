@@ -774,6 +774,8 @@ html[data-resolved-theme="light"] .theme-glyph-sun {
 }
 
 .service-card {
+    position: relative;
+    overflow: hidden;
     flex: 0 0 calc((100% - (var(--cards-per-view) - 1) * 1rem) / var(--cards-per-view));
     display: grid;
     grid-template-rows: 13rem 1fr;
@@ -790,6 +792,18 @@ html[data-resolved-theme="light"] .theme-glyph-sun {
     transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
 }
 
+.service-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255, 142, 90, 0.82), transparent);
+    opacity: 0;
+    transform: translateX(-55%);
+    transition: opacity 220ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+}
+
 .service-card[hidden] {
     display: none;
 }
@@ -799,6 +813,12 @@ html[data-resolved-theme="light"] .theme-glyph-sun {
     transform: translateY(-4px);
     border-color: rgba(240, 90, 40, 0.26);
     box-shadow: 0 26px 56px rgba(4, 11, 17, 0.24);
+}
+
+.service-card:hover::before,
+.service-card:focus-within::before {
+    opacity: 1;
+    transform: translateX(55%);
 }
 
 .service-card-media {
@@ -887,6 +907,7 @@ html[data-resolved-theme="light"] .theme-glyph-sun {
         linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025)),
         rgba(7, 21, 31, 0.76);
     box-shadow: 0 18px 46px rgba(4, 11, 17, 0.16);
+    transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
 }
 
 .process-step::before {
@@ -894,7 +915,28 @@ html[data-resolved-theme="light"] .theme-glyph-sun {
     position: absolute;
     inset: 0 0 auto;
     height: 3px;
-    background: linear-gradient(90deg, var(--accent), rgba(255, 177, 135, 0));
+    background: linear-gradient(90deg, var(--accent), rgba(255, 177, 135, 0.92), rgba(255, 177, 135, 0), var(--accent));
+    background-size: 210% 100%;
+    animation: accent-drift 7s ease-in-out infinite;
+}
+
+.process-step:nth-child(2)::before {
+    animation-delay: 0.8s;
+}
+
+.process-step:nth-child(3)::before {
+    animation-delay: 1.6s;
+}
+
+.process-step:nth-child(4)::before {
+    animation-delay: 2.4s;
+}
+
+.process-step:hover,
+.process-step:focus-within {
+    transform: translateY(-4px);
+    border-color: rgba(240, 90, 40, 0.24);
+    box-shadow: 0 24px 58px rgba(4, 11, 17, 0.22);
 }
 
 .process-step h3 {
@@ -1933,6 +1975,19 @@ html[data-theme="light"] .footer-links a:focus-visible {
 .hero [data-reveal] {
     opacity: 1;
     transform: none;
+}
+
+@keyframes accent-drift {
+    0%,
+    100% {
+        background-position: 0% 50%;
+        opacity: 0.78;
+    }
+
+    50% {
+        background-position: 100% 50%;
+        opacity: 1;
+    }
 }
 
 @media (min-width: 1180px) {
