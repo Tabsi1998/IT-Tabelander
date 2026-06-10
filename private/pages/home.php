@@ -18,6 +18,8 @@ $formValues = is_array($contactFlash['values'] ?? null) ? $contactFlash['values'
 $formErrors = is_array($contactFlash['errors'] ?? null) ? $contactFlash['errors'] : [];
 $formValue = static fn (string $field): string => (string) ($formValues[$field] ?? '');
 $formHasError = static fn (string $field): bool => in_array($field, $formErrors, true);
+$initialReviews = manual_reviews_payload($company);
+$hasPublishedReviews = !empty($initialReviews['reviews']) && is_array($initialReviews['reviews']);
 
 $formStatus = $_GET['contact'] ?? '';
 $formMessage = match ($formStatus) {
@@ -96,7 +98,9 @@ $formMessage = match ($formStatus) {
                 <nav class="site-nav" id="site-navigation" aria-label="Hauptnavigation">
                     <a href="#leistungen">Leistungen</a>
                     <a href="#ablauf">Ablauf</a>
-                    <a href="#bewertungen">Bewertungen</a>
+                    <?php if ($hasPublishedReviews): ?>
+                        <a href="#bewertungen">Bewertungen</a>
+                    <?php endif; ?>
                     <a href="#faq">FAQ</a>
                     <a href="#kontakt" class="nav-cta">Kontakt</a>
                 </nav>
@@ -234,11 +238,12 @@ $formMessage = match ($formStatus) {
                 </div>
             </section>
 
+            <?php if ($hasPublishedReviews): ?>
             <section class="reviews-section section" id="bewertungen">
                 <div class="section-heading" data-reveal>
                     <p class="section-eyebrow">Bewertungen</p>
                     <h2>Kundenstimmen.</h2>
-                    <p>Freigegebene Rückmeldungen werden hier veröffentlicht, sobald echte Kundenrezensionen gepflegt sind.</p>
+                    <p>Rückmeldungen aus abgeschlossenen IT-Service-, Reparatur- und Betreuungsterminen.</p>
                 </div>
                 <div class="reviews-shell" data-reveal>
                     <div class="reviews-meta">
@@ -250,18 +255,27 @@ $formMessage = match ($formStatus) {
                     </div>
                     <div class="reviews-slider" aria-live="polite">
                         <div class="reviews-track" id="reviews-track">
-                            <article class="review-slide review-placeholder">
-                                <p class="review-rating">In Vorbereitung</p>
-                                <h3>Noch keine Kundenrezensionen veröffentlicht.</h3>
-                                <p>Freigegebene Rückmeldungen können später einfach in der JSON-Datei ergänzt werden.</p>
-                            </article>
+                            <?php foreach ($initialReviews['reviews'] as $review): ?>
+                                <article class="review-slide">
+                                    <p class="review-rating"><?= e((string) ($review['rating'] ?? 'Bewertung')); ?><?= !empty($review['rating']) ? ' / 5' : ''; ?></p>
+                                    <h3><?= e((string) ($review['author'] ?? 'Kundenrezension')); ?></h3>
+                                    <p><?= e((string) ($review['text'] ?? '')); ?></p>
+                                    <div class="review-meta">
+                                        <span><?= e((string) ($review['relativeTime'] ?? 'Kundenrezension')); ?></span>
+                                        <?php if (!empty($review['url'])): ?>
+                                            <a href="<?= e((string) $review['url']); ?>" target="_blank" rel="noreferrer">Auf Google ansehen</a>
+                                        <?php endif; ?>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                     <p class="reviews-footnote" id="reviews-footnote">
-                        Noch keine Kundenrezensionen veröffentlicht.
+                        <?= e((string) $initialReviews['message']); ?>
                     </p>
                 </div>
             </section>
+            <?php endif; ?>
 
             <section class="faq-section section" id="faq">
                 <div class="section-heading" data-reveal>
