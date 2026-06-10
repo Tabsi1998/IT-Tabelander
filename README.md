@@ -84,13 +84,13 @@ Verwendet werden außerdem:
 
 - technisch notwendige Sitzungs-Cookies für Formularschutz und Spam-Abwehr
 - eine lokale Speicherung der Theme-Auswahl erst nach aktiver Benutzeraktion
-- eine lokale Speicherung der Analytics-Zustimmung oder Ablehnung
+- eine lokale Speicherung der Analytics-Zustimmung oder Ablehnung für 30 Tage
 
 Die Google-Analytics-Mess-ID steht in `private/site-config.php` unter `analytics.googleMeasurementId` und kann alternativ per Umgebungsvariable gesetzt werden:
 
 - `GOOGLE_ANALYTICS_MEASUREMENT_ID`
 
-Die Auswahl kann in der Datenschutzerklärung über „Cookie-Auswahl ändern“ zurückgesetzt werden. Wenn später Google Maps, Meta Pixel, YouTube-Einbettungen oder andere nicht technisch notwendige Dienste ergänzt werden, sollte die Consent-Verwaltung entsprechend erweitert werden.
+Die Auswahl kann in der Datenschutzerklärung über „Cookie-Einstellungen ändern“ zurückgesetzt werden. Wenn später Google Maps, Meta Pixel, YouTube-Einbettungen oder andere nicht technisch notwendige Dienste ergänzt werden, sollte die Consent-Verwaltung entsprechend erweitert werden.
 
 ## Google-Bewertungen
 

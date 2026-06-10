@@ -65,8 +65,8 @@ $company = $siteConfig['company'];
                 <h2>5. Cookies und ähnliche Technologien</h2>
                 <p>Verwendet werden technisch notwendige Sitzungs-Cookies für Formularschutz und Spam-Abwehr. Die Darstellungs-Einstellung für Hell oder Dunkel wird erst nach aktiver Auswahl lokal im Browser gespeichert.</p>
                 <p>Google Analytics wird nur geladen, wenn Sie über den Hinweis auf der Website aktiv zustimmen. Vor einer Zustimmung wird kein Analytics-Skript von Google geladen und keine Analytics-Konfiguration ausgeführt.</p>
-                <p>Die Zustimmung oder Ablehnung wird lokal im Browser gespeichert. Sie können die Auswahl jederzeit zurücksetzen und neu treffen.</p>
-                <p><button class="button button-secondary button-compact" type="button" data-cookie-reset>Cookie-Auswahl ändern</button></p>
+                <p>Die Zustimmung oder Ablehnung wird für 30 Tage lokal im Browser gespeichert. Danach wird die Auswahl erneut abgefragt. Sie können die Auswahl jederzeit zurücksetzen und neu treffen.</p>
+                <p><button class="button button-secondary button-compact" type="button" data-cookie-reset>Cookie-Einstellungen ändern</button></p>
             </article>
 
             <article class="legal-panel">
