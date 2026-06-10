@@ -263,6 +263,7 @@ function send_contact_mail(array $siteConfig, array $submission): array
         append_mail_log([
             'type' => 'configuration',
             'message' => 'SMTP ist nicht vollständig konfiguriert.',
+            'diagnostics' => smtp_configuration_diagnostics($mailConfig),
         ]);
 
         append_contact_log([
@@ -320,6 +321,27 @@ function smtp_configured(array $mailConfig): bool
         && (int) ($smtp['port'] ?? 0) > 0
         && trim((string) ($smtp['username'] ?? '')) !== ''
         && trim((string) ($smtp['password'] ?? '')) !== '';
+}
+
+function smtp_configuration_diagnostics(array $mailConfig): array
+{
+    $smtp = $mailConfig['smtp'] ?? [];
+    $passwordFile = function_exists('config_sibling_secret_file')
+        ? config_sibling_secret_file('smtp-password.txt')
+        : '';
+
+    return [
+        'enabled' => (bool) ($smtp['enabled'] ?? false),
+        'recipientSet' => trim((string) ($mailConfig['recipient'] ?? '')) !== '',
+        'fromEmailValid' => filter_var((string) ($mailConfig['fromEmail'] ?? ''), FILTER_VALIDATE_EMAIL) !== false,
+        'hostSet' => trim((string) ($smtp['host'] ?? '')) !== '',
+        'portSet' => (int) ($smtp['port'] ?? 0) > 0,
+        'usernameSet' => trim((string) ($smtp['username'] ?? '')) !== '',
+        'passwordLoaded' => trim((string) ($smtp['password'] ?? '')) !== '',
+        'passwordFileExists' => $passwordFile !== '' && is_file($passwordFile),
+        'passwordFileReadable' => $passwordFile !== '' && is_readable($passwordFile),
+        'passwordFile' => $passwordFile,
+    ];
 }
 
 function build_owner_notification_message(array $siteConfig, array $submission): array
@@ -526,7 +548,7 @@ function smtp_send_message(array $mailConfig, array $message): bool
         if (strtolower((string) ($smtp['encryption'] ?? '')) === 'tls') {
             smtp_command($socket, 'STARTTLS', [220]);
 
-            $cryptoEnabled = stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+            $cryptoEnabled = stream_socket_enable_crypto($socket, true, smtp_crypto_method());
             if ($cryptoEnabled !== true) {
                 throw new RuntimeException('TLS konnte nicht aktiviert werden.');
             }
@@ -612,6 +634,7 @@ function smtp_open_connection(array $smtp)
             'verify_peer_name' => $verifyPeerName,
             'allow_self_signed' => $allowSelfSigned,
             'SNI_enabled' => $verifyPeerName,
+            'capture_peer_cert' => false,
         ],
     ]);
 
@@ -631,6 +654,24 @@ function smtp_open_connection(array $smtp)
     stream_set_timeout($socket, $timeout);
 
     return $socket;
+}
+
+function smtp_crypto_method(): int
+{
+    $method = 0;
+
+    foreach ([
+        'STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT',
+        'STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT',
+        'STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT',
+        'STREAM_CRYPTO_METHOD_TLSv1_0_CLIENT',
+    ] as $constantName) {
+        if (defined($constantName)) {
+            $method |= constant($constantName);
+        }
+    }
+
+    return $method !== 0 ? $method : STREAM_CRYPTO_METHOD_TLS_CLIENT;
 }
 
 function smtp_command($socket, string $command, array $expectedCodes): string
