@@ -839,7 +839,7 @@ function manual_reviews_payload(array $company): array
     return [
         'source' => 'manual',
         'message' => $reviews === []
-            ? 'Noch keine Kundenrezensionen veröffentlicht.'
+            ? ''
             : 'Aktuell werden gepflegte Kundenrezensionen angezeigt.',
         'reviews' => $reviews,
     ];
