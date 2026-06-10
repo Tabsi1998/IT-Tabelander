@@ -1353,55 +1353,117 @@ html[data-resolved-theme="light"] .theme-glyph-sun {
 
 .cookie-notice {
     position: fixed;
-    left: max(1.2rem, calc((100vw - var(--content-width)) / 2));
-    bottom: 1.2rem;
-    z-index: 40;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    inset: 0;
+    z-index: 80;
+    display: flex;
     align-items: center;
-    gap: 0.9rem;
-    width: min(42rem, calc(100vw - 2.4rem));
-    padding: 0.9rem 0.95rem;
-    border: 1px solid var(--line);
-    border-radius: 22px;
-    background: rgba(8, 20, 29, 0.94);
-    box-shadow: 0 24px 60px rgba(4, 11, 17, 0.32);
-    backdrop-filter: blur(16px);
+    justify-content: center;
+    padding: 1.2rem;
+    background: rgba(4, 11, 17, 0.66);
+    backdrop-filter: blur(10px);
     opacity: 0;
     visibility: hidden;
-    transform: translateY(18px);
-    transition: opacity 180ms ease, transform 220ms ease, visibility 180ms ease;
+    transition: opacity 180ms ease, visibility 180ms ease;
 }
 
 .cookie-notice.is-visible {
     opacity: 1;
     visibility: visible;
-    transform: translateY(0);
+}
+
+.cookie-notice-panel {
+    width: min(46rem, 100%);
+    max-height: min(44rem, calc(100vh - 2.4rem));
+    overflow: auto;
+    padding: 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(8, 20, 29, 0.94);
+    box-shadow: 0 24px 60px rgba(4, 11, 17, 0.32);
+    transform: translateY(14px) scale(0.98);
+    transition: transform 220ms ease;
+}
+
+.cookie-notice.is-visible .cookie-notice-panel {
+    transform: translateY(0) scale(1);
+}
+
+.cookie-notice-kicker {
+    margin: 0 0 0.25rem;
+    color: var(--accent-soft);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .cookie-notice-title {
-    margin: 0 0 0.45rem;
+    margin: 0 0 0.55rem;
     font-family: "Space Grotesk", sans-serif;
-    font-size: 1rem;
+    font-size: clamp(1.35rem, 2vw, 1.85rem);
 }
 
 .cookie-notice-copy p:last-child {
     margin: 0;
     color: var(--text-soft);
-    font-size: 0.91rem;
+    font-size: 0.96rem;
     line-height: 1.5;
+}
+
+.cookie-choice-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 1.1rem 0;
+}
+
+.cookie-choice {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.cookie-choice-main {
+    display: grid;
+    gap: 0.22rem;
+}
+
+.cookie-choice-main strong {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1rem;
+}
+
+.cookie-choice-main span {
+    color: var(--text-soft);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.cookie-choice input {
+    width: 1.35rem;
+    height: 1.35rem;
+    accent-color: var(--accent);
+}
+
+.cookie-choice.is-required {
+    opacity: 0.82;
 }
 
 .cookie-notice-actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.9rem;
+    justify-content: flex-end;
+    gap: 0.7rem;
     margin-top: 0;
 }
 
 .cookie-notice-actions a {
+    margin-right: auto;
     color: var(--accent-soft);
     text-decoration-thickness: 1px;
     text-underline-offset: 0.18em;
@@ -2019,14 +2081,14 @@ html[data-theme="light"] .footer-links a:focus-visible {
     }
 
     .cookie-notice {
-        left: 0.8rem;
-        right: auto;
-        display: grid;
-        width: min(34rem, calc(100vw - 1.6rem));
+        padding: 1rem;
+    }
+
+    .cookie-notice-panel {
+        width: min(38rem, 100%);
     }
 
     .cookie-notice-actions {
-        justify-content: flex-start;
         margin-top: 0.8rem;
     }
 
@@ -2166,20 +2228,33 @@ html[data-theme="light"] .footer-links a:focus-visible {
     }
 
     .cookie-notice {
-        bottom: 0.8rem;
-        display: block;
-        width: min(22rem, calc(100vw - 1.2rem));
-        padding: 0.82rem;
+        align-items: flex-end;
+        padding: 0.7rem;
+    }
+
+    .cookie-notice-panel {
+        max-height: calc(100vh - 1.4rem);
+        padding: 0.9rem;
+        border-radius: 16px;
     }
 
     .cookie-notice-title {
         margin-bottom: 0.35rem;
-        font-size: 0.95rem;
+        font-size: 1.22rem;
     }
 
     .cookie-notice-copy p:last-child {
         font-size: 0.86rem;
         line-height: 1.38;
+    }
+
+    .cookie-choice {
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: 0.72rem;
+    }
+
+    .cookie-choice-main span {
+        font-size: 0.84rem;
     }
 
     .form-row-captcha {
@@ -2199,6 +2274,8 @@ html[data-theme="light"] .footer-links a:focus-visible {
 
     .cookie-notice-actions .button,
     .cookie-notice-actions a {
+        justify-content: center;
+        margin-right: 0;
         width: 100%;
     }
 }
@@ -2318,7 +2395,21 @@ html[data-resolved-theme="light"] .process-step {
 }
 
 html[data-resolved-theme="light"] .cookie-notice {
-    background: rgba(255, 255, 255, 0.97);
+    background: rgba(18, 33, 47, 0.46);
+}
+
+html[data-resolved-theme="light"] .cookie-notice-panel {
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 24px 70px rgba(31, 54, 76, 0.24);
+}
+
+html[data-resolved-theme="light"] .cookie-choice {
+    background: rgba(244, 247, 251, 0.92);
+}
+
+html[data-resolved-theme="light"] .cookie-choice-main span,
+html[data-resolved-theme="light"] .cookie-notice-copy p:last-child {
+    color: #435869;
 }
 
 html[data-resolved-theme="light"] .contact-form select option {
