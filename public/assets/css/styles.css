@@ -1394,6 +1394,7 @@ html[data-resolved-theme="light"] .theme-glyph-sun {
 
 .cookie-notice-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 0.9rem;
@@ -2025,6 +2026,7 @@ html[data-theme="light"] .footer-links a:focus-visible {
     }
 
     .cookie-notice-actions {
+        justify-content: flex-start;
         margin-top: 0.8rem;
     }
 
@@ -2190,9 +2192,14 @@ html[data-theme="light"] .footer-links a:focus-visible {
     }
 
     .cookie-notice-actions {
-        align-items: center;
-        flex-direction: row;
+        align-items: stretch;
+        flex-direction: column;
         margin-top: 0.55rem;
+    }
+
+    .cookie-notice-actions .button,
+    .cookie-notice-actions a {
+        width: 100%;
     }
 }
 

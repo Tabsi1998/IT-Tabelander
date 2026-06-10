@@ -159,14 +159,31 @@ function cookie_notice_markup(): string
 {
     return '<aside class="cookie-notice" data-cookie-notice hidden>'
         . '<div class="cookie-notice-copy">'
-        . '<p class="cookie-notice-title">Hinweis zu Cookies</p>'
-        . '<p>Technisch notwendige Cookies schützen das Formular. Die Theme-Auswahl wird nur nach aktiver Eingabe lokal gespeichert.</p>'
+        . '<p class="cookie-notice-title">Datenschutz-Einstellungen</p>'
+        . '<p>Technisch notwendige Cookies schützen das Formular. Google Analytics wird nur nach aktiver Zustimmung geladen und kann später wieder abgelehnt werden.</p>'
         . '</div>'
         . '<div class="cookie-notice-actions">'
         . '<a href="' . e(page_url('datenschutz.php')) . '">Datenschutz</a>'
-        . '<button class="button button-primary button-compact" type="button" data-cookie-ack>Verstanden</button>'
+        . '<button class="button button-secondary button-compact" type="button" data-cookie-reject>Ablehnen</button>'
+        . '<button class="button button-primary button-compact" type="button" data-cookie-accept>Analytics akzeptieren</button>'
         . '</div>'
         . '</aside>';
+}
+
+function analytics_bootstrap_script(): string
+{
+    $measurementId = trim((string) config('analytics.googleMeasurementId', ''));
+
+    if ($measurementId === '') {
+        return '';
+    }
+
+    return '<script>'
+        . 'window.IT_TABELANDER_ANALYTICS_ID=' . json_encode($measurementId, JSON_UNESCAPED_SLASHES) . ';'
+        . 'window.dataLayer=window.dataLayer||[];'
+        . 'window.gtag=window.gtag||function(){window.dataLayer.push(arguments);};'
+        . 'window.gtag("consent","default",{analytics_storage:"denied",ad_storage:"denied",ad_user_data:"denied",ad_personalization:"denied",functionality_storage:"granted",security_storage:"granted"});'
+        . '</script>';
 }
 
 function theme_bootstrap_script(): string
