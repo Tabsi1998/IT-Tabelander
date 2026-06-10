@@ -8,7 +8,7 @@ function config_env_value(string $key, string $default = ''): string
     return is_string($value) && $value !== '' ? $value : $default;
 }
 
-function config_env_secret(string $key, string $default = ''): string
+function config_env_secret(string $key, string $default = '', array $fileCandidates = []): string
 {
     $value = getenv($key);
     if (is_string($value) && $value !== '') {
@@ -24,7 +24,24 @@ function config_env_secret(string $key, string $default = ''): string
         }
     }
 
+    foreach ($fileCandidates as $candidatePath) {
+        if (!is_string($candidatePath) || $candidatePath === '' || !is_file($candidatePath)) {
+            continue;
+        }
+
+        $secret = trim((string) file_get_contents($candidatePath));
+
+        if ($secret !== '') {
+            return $secret;
+        }
+    }
+
     return $default;
+}
+
+function config_sibling_secret_file(string $filename): string
+{
+    return dirname(__DIR__, 2) . '/it-tabelander-secrets/' . ltrim($filename, '/\\');
 }
 
 // Zentrale Pflege: Google-Place-ID, Google-API-Key, Analytics und SMTP-Zugangsdaten
@@ -109,7 +126,9 @@ return [
             'port' => (int) config_env_value('SMTP_PORT', '587'),
             'encryption' => config_env_value('SMTP_ENCRYPTION', 'tls'),
             'username' => config_env_value('SMTP_USERNAME', 'office@tabelander.co.at'),
-            'password' => config_env_secret('SMTP_PASSWORD'),
+            'password' => config_env_secret('SMTP_PASSWORD', '', [
+                config_sibling_secret_file('smtp-password.txt'),
+            ]),
             'timeout' => 12,
             'ehloDomain' => config_env_value('SMTP_EHLO_DOMAIN', 'tabelander.co.at'),
         ],

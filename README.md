@@ -67,6 +67,8 @@ Wichtiger Hinweis zu SMTP-Passwörtern:
 - Ein SMTP-Server akzeptiert bei Standard-Authentifizierung kein gehashtes Passwort, sondern das echte Passwort oder ein separates App-Passwort.
 - Das Passwort sollte daher nicht im Klartext in `site-config.php` hinterlegt werden.
 - Empfohlen ist `SMTP_PASSWORD` als Umgebungsvariable oder `SMTP_PASSWORD_FILE` mit einem Dateipfad außerhalb des Webroots.
+- Auf dem aktuellen Server wird zusätzlich automatisch `/var/www/it-tabelander-secrets/smtp-password.txt` gelesen, weil der Ordner als Geschwisterordner neben `/var/www/it-tabelander` liegt.
+- Die Passwortdatei sollte nur das SMTP-Passwort enthalten und nicht im Git-Repository liegen. Sinnvolle Rechte sind z.B. `chmod 640 smtp-password.txt` und ein Owner bzw. eine Gruppe, die der Webserver lesen darf.
 - Der Versand erfolgt verschlüsselt über TLS oder SSL, wenn dies im Mailserver so konfiguriert ist.
 
 Zusätzliche Formular-Schutzmechanismen:
