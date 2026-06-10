@@ -23,6 +23,7 @@ $formStatus = $_GET['contact'] ?? '';
 $formMessage = match ($formStatus) {
     'success' => 'Ihre Anfrage wurde gesendet. Ich melde mich so bald wie möglich zurück.',
     'partial' => 'Ihre Anfrage wurde übermittelt. Die automatische Bestätigungs-E-Mail konnte jedoch nicht zugestellt werden.',
+    'mail_error' => 'Die Formularangaben wurden angenommen, aber der Mailserver konnte die Anfrage nicht versenden. Bitte versuchen Sie es später erneut oder schreiben Sie direkt an office@tabelander.co.at.',
     'error' => contact_error_message($formErrors),
     default => '',
 };

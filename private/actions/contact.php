@@ -34,8 +34,14 @@ if (!$validation['valid']) {
 
 $mailResult = send_contact_mail($siteConfig, $submission);
 
-redirect_home(match (true) {
+$status = match (true) {
     $mailResult['ownerSent'] && $mailResult['customerSent'] => 'success',
     $mailResult['ownerSent'] => 'partial',
-    default => 'error',
-});
+    default => 'mail_error',
+};
+
+if ($status === 'mail_error') {
+    store_contact_form_flash(contact_submission_values($submission), []);
+}
+
+redirect_home($status);

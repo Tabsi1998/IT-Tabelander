@@ -60,6 +60,9 @@ Alternativ können diese Umgebungsvariablen gesetzt werden:
 - `SMTP_ENCRYPTION`
 - `SMTP_USERNAME`
 - `SMTP_PASSWORD`
+- `SMTP_ALLOW_SELF_SIGNED`
+- `SMTP_VERIFY_PEER`
+- `SMTP_VERIFY_PEER_NAME`
 - `SMTP_EHLO_DOMAIN`
 
 Wichtiger Hinweis zu SMTP-Passwörtern:
@@ -70,6 +73,7 @@ Wichtiger Hinweis zu SMTP-Passwörtern:
 - Auf dem aktuellen Server wird zusätzlich automatisch `/var/www/it-tabelander-secrets/smtp-password.txt` gelesen, weil der Ordner als Geschwisterordner neben `/var/www/it-tabelander` liegt.
 - Die Passwortdatei sollte nur das SMTP-Passwort enthalten und nicht im Git-Repository liegen. Sinnvolle Rechte sind z.B. `chmod 640 smtp-password.txt` und ein Owner bzw. eine Gruppe, die der Webserver lesen darf.
 - Der Versand erfolgt verschlüsselt über TLS oder SSL, wenn dies im Mailserver so konfiguriert ist.
+- Der aktuelle Standard ist auf den lokalen Mailserver abgestimmt: Host `192.168.2.106`, Port `587`, STARTTLS, selbstsignierte Zertifikate erlaubt und Peer-Prüfung deaktiviert. Für öffentliche Zertifikate sollte `SMTP_VERIFY_PEER=true` und `SMTP_VERIFY_PEER_NAME=true` gesetzt werden.
 
 Zusätzliche Formular-Schutzmechanismen:
 

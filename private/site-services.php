@@ -68,6 +68,14 @@ function contact_submission_values(array $submission): array
 
 function contact_error_message(array $errors): string
 {
+    $fieldLabels = [
+        'name' => 'Name',
+        'email' => 'E-Mail-Adresse',
+        'audience' => 'Anliegen',
+        'service' => 'Leistung',
+        'message' => 'Nachricht mit mindestens 12 Zeichen',
+    ];
+
     if (in_array('privacyConfirmation', $errors, true)) {
         return 'Bitte bestätigen Sie die Datenschutzerklärung, bevor die Anfrage gesendet wird.';
     }
@@ -78,6 +86,12 @@ function contact_error_message(array $errors): string
 
     if (in_array('token', $errors, true) || in_array('timing', $errors, true)) {
         return 'Das Formular wurde ungültig übermittelt. Bitte laden Sie die Seite kurz neu und senden Sie die Anfrage erneut.';
+    }
+
+    $missingFields = array_values(array_intersect_key($fieldLabels, array_flip($errors)));
+
+    if ($missingFields !== []) {
+        return 'Bitte prüfen Sie folgende Angaben: ' . implode(', ', $missingFields) . '.';
     }
 
     return 'Bitte prüfen Sie die Pflichtfelder und die E-Mail-Adresse. Die Anfrage konnte noch nicht übermittelt werden.';
@@ -520,10 +534,18 @@ function smtp_send_message(array $mailConfig, array $message): bool
 
         return true;
     } catch (Throwable $exception) {
+        $smtp = $mailConfig['smtp'] ?? [];
+
         append_mail_log([
             'type' => 'smtp',
             'to' => $message['toEmail'] ?? '',
             'subject' => $message['subject'] ?? '',
+            'host' => $smtp['host'] ?? '',
+            'port' => $smtp['port'] ?? '',
+            'encryption' => $smtp['encryption'] ?? '',
+            'allowSelfSigned' => $smtp['allowSelfSigned'] ?? null,
+            'verifyPeer' => $smtp['verifyPeer'] ?? null,
+            'verifyPeerName' => $smtp['verifyPeerName'] ?? null,
             'message' => $exception->getMessage(),
         ]);
 
@@ -542,12 +564,16 @@ function smtp_open_connection(array $smtp)
     $timeout = max(3, (int) ($smtp['timeout'] ?? 12));
     $encryption = strtolower((string) ($smtp['encryption'] ?? ''));
     $transport = $encryption === 'ssl' ? 'ssl://' : '';
+    $verifyPeer = (bool) ($smtp['verifyPeer'] ?? true);
+    $verifyPeerName = (bool) ($smtp['verifyPeerName'] ?? $verifyPeer);
+    $allowSelfSigned = (bool) ($smtp['allowSelfSigned'] ?? false);
 
     $context = stream_context_create([
         'ssl' => [
-            'verify_peer' => true,
-            'verify_peer_name' => true,
-            'allow_self_signed' => false,
+            'verify_peer' => $verifyPeer,
+            'verify_peer_name' => $verifyPeerName,
+            'allow_self_signed' => $allowSelfSigned,
+            'SNI_enabled' => $verifyPeerName,
         ],
     ]);
 

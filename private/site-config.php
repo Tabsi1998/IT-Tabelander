@@ -8,6 +8,17 @@ function config_env_value(string $key, string $default = ''): string
     return is_string($value) && $value !== '' ? $value : $default;
 }
 
+function config_env_bool(string $key, bool $default = false): bool
+{
+    $value = getenv($key);
+
+    if (!is_string($value) || $value === '') {
+        return $default;
+    }
+
+    return in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true);
+}
+
 function config_env_secret(string $key, string $default = '', array $fileCandidates = []): string
 {
     $value = getenv($key);
@@ -129,6 +140,9 @@ return [
             'password' => config_env_secret('SMTP_PASSWORD', '', [
                 config_sibling_secret_file('smtp-password.txt'),
             ]),
+            'allowSelfSigned' => config_env_bool('SMTP_ALLOW_SELF_SIGNED', true),
+            'verifyPeer' => config_env_bool('SMTP_VERIFY_PEER', false),
+            'verifyPeerName' => config_env_bool('SMTP_VERIFY_PEER_NAME', false),
             'timeout' => 12,
             'ehloDomain' => config_env_value('SMTP_EHLO_DOMAIN', 'tabelander.co.at'),
         ],
