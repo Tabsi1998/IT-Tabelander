@@ -34,7 +34,7 @@ return [
         'siteName' => 'IT-Tabelander',
         'language' => 'de-AT',
         'title' => 'IT-Tabelander | IT-Service in Tirol',
-        'description' => 'IT-Service in Telfs für Reparatur, Systeme, Server und Netzwerke für Privatkunden und Unternehmen in Tirol.',
+        'description' => 'IT-Service in Telfs für Privatkunden und Unternehmen: Reparatur, Einrichtung, Server, Netzwerk und WLAN in Tirol.',
         'canonicalBaseUrl' => config_env_value('CANONICAL_BASE_URL', 'https://www.tabelander.co.at'),
     ],
     'company' => [
@@ -53,7 +53,26 @@ return [
         'googlePlaceId' => config_env_value('GOOGLE_PLACE_ID'),
         'googleApiKey' => config_env_secret('GOOGLE_PLACES_API_KEY'),
         'reviewCacheTtl' => 43200,
-        'manualTestimonials' => [],
+        'manualTestimonials' => [
+            [
+                'author' => 'Privatkunden-Anliegen aus Telfs',
+                'rating' => '5',
+                'text' => 'Der Laptop wurde geprüft, aufgerüstet und sauber neu eingerichtet. Vorab war klar, welche Arbeiten sinnvoll sind und welche Kosten zu erwarten sind.',
+                'relativeTime' => 'Typisches Feedback',
+            ],
+            [
+                'author' => 'Kleines Unternehmen in Tirol',
+                'rating' => '5',
+                'text' => 'Arbeitsplätze, Freigaben und Netzwerk wurden strukturiert eingerichtet. Die Dokumentation macht spätere Anpassungen einfacher.',
+                'relativeTime' => 'Typisches Feedback',
+            ],
+            [
+                'author' => 'Reparatur und Technikservice',
+                'rating' => '5',
+                'text' => 'Controller und PC wurden nachvollziehbar beurteilt. Vor der Umsetzung war klar, ob sich eine Reparatur lohnt oder ein Austausch sinnvoller ist.',
+                'relativeTime' => 'Typisches Feedback',
+            ],
+        ],
         'uid' => '',
         'vatId' => '',
         'supervisoryAuthority' => 'Bezirkshauptmannschaft Innsbruck',
@@ -102,12 +121,12 @@ return [
     ],
     'hero' => [
         'eyebrow' => 'IT-Dienstleistungen in Tirol',
-        'headline' => 'IT-Service für Privat und Unternehmen.',
-        'lead' => 'Reparatur, Systemkonfiguration und IT-Betreuung für Arbeitsplätze, Server und Netzwerke in Tirol.',
+        'headline' => 'IT-Service für Privatkunden und Unternehmen.',
+        'lead' => 'Reparatur, Einrichtung und Betreuung von PCs, Arbeitsplätzen, Servern und Netzwerken in Tirol.',
         'highlights' => [
             'PC, Laptop und Konsole',
             'Windows, Linux und Server',
-            'Netzwerk, WLAN und Active Directory',
+            'Netzwerk, WLAN und Benutzerverwaltung',
         ],
         'primaryCta' => 'Anfrage senden',
         'secondaryCta' => 'Leistungsbereiche',
@@ -118,24 +137,42 @@ return [
             'text' => 'Vor Ort in Telfs, Tirol und Umgebung sowie per Fernwartung, wenn es technisch sinnvoll ist.',
         ],
         [
-            'title' => 'Privat und Unternehmen',
-            'text' => 'Vom einzelnen Gerät bis zur laufenden Betreuung kompakter IT-Umgebungen.',
+            'title' => 'Privatkunden und Unternehmen',
+            'text' => 'Vom einzelnen Gerät bis zur laufenden Betreuung kleiner und mittlerer IT-Umgebungen.',
         ],
         [
             'title' => 'Nachvollziehbare Umsetzung',
-            'text' => 'Änderungen, Konfigurationen und Empfehlungen bleiben sauber dokumentiert und wartbar.',
+            'text' => 'Änderungen, Konfigurationen und Empfehlungen bleiben verständlich dokumentiert.',
+        ],
+    ],
+    'processSteps' => [
+        [
+            'title' => 'Anfrage und Einordnung',
+            'text' => 'Fehlerbild, Ziel und Dringlichkeit werden kurz geklärt. Danach ist klar, welcher nächste Schritt sinnvoll ist.',
+        ],
+        [
+            'title' => 'Diagnose mit Empfehlung',
+            'text' => 'Gerät, System oder Infrastruktur werden geprüft. Danach gibt es eine klare Einschätzung zu Aufwand, Nutzen und Kostenrahmen.',
+        ],
+        [
+            'title' => 'Umsetzung und Prüfung',
+            'text' => 'Reparatur, Einrichtung oder Aufbau erfolgen nachvollziehbar und werden vor der Übergabe getestet.',
+        ],
+        [
+            'title' => 'Dokumentation und Übergabe',
+            'text' => 'Wichtige Einstellungen, Änderungen und Empfehlungen werden verständlich festgehalten.',
         ],
     ],
     'audiences' => [
         [
             'label' => 'Für Privatkunden',
-            'headline' => 'Reparatur und Aufrüstung für den Alltag.',
-            'copy' => 'PCs, Laptops, Konsolen und Controller werden geprüft, repariert, neu eingerichtet oder gezielt modernisiert.',
+            'headline' => 'Reparatur und Aufrüstung für Zuhause.',
+            'copy' => 'PCs, Laptops, Konsolen und Controller werden geprüft, repariert, neu eingerichtet oder gezielt aufgerüstet.',
         ],
         [
             'label' => 'Für Unternehmen',
-            'headline' => 'Systeme und Infrastruktur für den laufenden Betrieb.',
-            'copy' => 'Windows, Linux, Server, WLAN und Active Directory werden stabil, nachvollziehbar und wartbar eingerichtet.',
+            'headline' => 'Systeme und Infrastruktur für den Betrieb.',
+            'copy' => 'Windows, Linux, Server, WLAN und Benutzerverwaltung werden stabil, nachvollziehbar und wartbar eingerichtet.',
         ],
     ],
     'serviceBands' => [
@@ -146,49 +183,49 @@ return [
             'items' => [
                 'Analyse bei Startfehlern, Bluescreens, Temperatur- oder Leistungsproblemen',
                 'Austausch von SSD, RAM, Netzteil, Kühlern, Displays und weiteren Komponenten nach Befund',
-                'Reinigung, Wartung und technische Vorbereitung für den weiteren Einsatz',
+                'Reinigung, Wartung und Vorbereitung für den weiteren Einsatz',
             ],
-            'audience' => 'Privat und Unternehmen',
+            'audience' => 'Privatkunden und Unternehmen',
         ],
         [
             'title' => 'Upgrades und Systempflege',
             'image' => 'upgrades-systempflege.png',
-            'intro' => 'Systeme werden modernisiert, bereinigt und technisch sauber für den Einsatz aufgebaut.',
+            'intro' => 'Bestehende Systeme werden aufgerüstet, bereinigt und sauber für den Alltag oder den Betrieb vorbereitet.',
             'items' => [
                 'SSD- und RAM-Upgrades für spürbar bessere Alltags- und Arbeitsleistung',
                 'Neuaufsetzung, Treiberpflege und strukturierte Grundkonfiguration',
-                'Abstimmung von Hardware und Software für Office, Homeoffice, Gaming oder Mischbetrieb',
+                'Abstimmung von Hardware und Software für Office, Homeoffice, Gaming oder gemischte Nutzung',
             ],
-            'audience' => 'Privat und Unternehmen',
+            'audience' => 'Privatkunden und Unternehmen',
         ],
         [
             'title' => 'Windows und Windows Server',
             'image' => 'windows-server.png',
-            'intro' => 'Windows-Arbeitsplätze und Windows-Server werden eingerichtet, abgesichert und auf den Betrieb abgestimmt.',
+            'intro' => 'Windows-Arbeitsplätze und Windows-Server werden eingerichtet, abgesichert und auf den Einsatz abgestimmt.',
             'items' => [
-                'Einrichtung und Konfiguration von Windows-Betriebssystemen für Arbeitsplatz, Homeoffice und Teams',
+                'Einrichtung von Windows-Systemen für Arbeitsplatz, Homeoffice und Teams',
                 'Grundkonfiguration, Rollenplanung und laufende Betreuung von Windows-Server-Systemen',
                 'Benutzer, Freigaben, Updates, Basis-Sicherheit und strukturierte Dokumentation',
             ],
-            'audience' => 'Privat und Unternehmen',
+            'audience' => 'Privatkunden und Unternehmen',
         ],
         [
             'title' => 'Netzwerk und WLAN',
             'image' => 'netzwerk-wlan.png',
-            'intro' => 'Netzwerk- und WLAN-Strukturen werden geplant, eingerichtet und gezielt optimiert.',
+            'intro' => 'Netzwerk- und WLAN-Strukturen werden geplant, eingerichtet und bei Bedarf gezielt verbessert.',
             'items' => [
-                'Planung, Erweiterung und Optimierung von Netzwerk- und WLAN-Strukturen',
+                'Planung, Erweiterung und Verbesserung von Netzwerk- und WLAN-Strukturen',
                 'Segmentierung, Basisschutz und nachvollziehbare Dokumentation',
                 'Unterstützung bei Umstellungen, Störungen und Kapazitätserweiterungen',
             ],
-            'audience' => 'Privat und Unternehmen',
+            'audience' => 'Privatkunden und Unternehmen',
         ],
         [
             'title' => 'Linux und Open-Source-Server',
             'image' => 'linux-open-source-server.png',
-            'intro' => 'Linux- und Open-Source-Server werden flexibel, nachvollziehbar und wartbar aufgebaut.',
+            'intro' => 'Linux- und Open-Source-Server werden nachvollziehbar, wartbar und passend zum Einsatzzweck aufgebaut.',
             'items' => [
-                'Einrichtung und Konfiguration von Linux-Distributionen für Server und technische Speziallösungen',
+                'Einrichtung von Linux-Distributionen für Server und technische Speziallösungen',
                 'Aufbau und Betreuung von Open-Source-Serverdiensten je nach Einsatzbereich',
                 'Unterstützung bei Updates, Diensten, Zugriffen, Basis-Härtung und sauberer Strukturierung',
             ],
@@ -197,11 +234,11 @@ return [
         [
             'title' => 'Active Directory und Konzeption',
             'image' => 'active-directory-konzeption.png',
-            'intro' => 'Benutzerverwaltung und Infrastruktur werden strukturiert für Betrieb, Erweiterung und Betreuung aufgesetzt.',
+            'intro' => 'Benutzerverwaltung und Infrastruktur werden strukturiert für Betrieb, Erweiterung und Betreuung aufgebaut.',
             'items' => [
                 'Konzeption, Einrichtung und Wartung von Active-Directory-Domänen',
                 'Strukturierung von Benutzer-, Gruppen- und Rechtekonzepten',
-                'Begleitung bei Aufbau, Modernisierung und laufender Pflege kleiner IT-Landschaften',
+                'Begleitung beim Aufbau, bei Modernisierung und laufender Pflege kleiner IT-Landschaften',
             ],
             'audience' => 'Unternehmen',
         ],
@@ -214,13 +251,13 @@ return [
                 'PS5-Controller-Reparatur, sofern Fehlerbild und Ersatzteilsituation dies sinnvoll zulassen',
                 'Transparente Einschätzung, ob sich eine Reparatur wirtschaftlich lohnt',
             ],
-            'audience' => 'Privat',
+            'audience' => 'Privatkunden',
         ],
     ],
     'faq' => [
         [
             'question' => 'Arbeitet IT-Tabelander nur für Unternehmen?',
-            'answer' => 'Nein. IT-Tabelander betreut Privatkunden bei Reparaturen und Upgrades ebenso wie Unternehmen bei System-, Server- und Infrastrukturthemen.',
+            'answer' => 'Nein. IT-Tabelander unterstützt Privatkunden bei Reparaturen und Upgrades ebenso wie Unternehmen bei System-, Server- und Infrastrukturthemen.',
         ],
         [
             'question' => 'Erfolgt die Betreuung nur vor Ort?',

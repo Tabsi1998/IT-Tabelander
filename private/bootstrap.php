@@ -160,7 +160,7 @@ function cookie_notice_markup(): string
     return '<aside class="cookie-notice" data-cookie-notice hidden>'
         . '<div class="cookie-notice-copy">'
         . '<p class="cookie-notice-title">Hinweis zu Cookies</p>'
-        . '<p>Es werden nur technisch notwendige Cookies für Formularschutz verwendet. Eine Theme-Auswahl wird erst nach Ihrer aktiven Eingabe lokal gespeichert.</p>'
+        . '<p>Technisch notwendige Cookies schützen das Formular. Die Theme-Auswahl wird nur nach aktiver Eingabe lokal gespeichert.</p>'
         . '</div>'
         . '<div class="cookie-notice-actions">'
         . '<a href="' . e(page_url('datenschutz.php')) . '">Datenschutz</a>'

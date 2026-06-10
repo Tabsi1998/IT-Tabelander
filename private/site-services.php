@@ -734,7 +734,7 @@ function manual_reviews_payload(array $company): array
 
     return [
         'source' => 'manual',
-        'message' => 'Derzeit werden manuell gepflegte Referenzen aus der Konfiguration angezeigt.',
+        'message' => 'Aktuell werden gepflegte Rückmeldungen und Referenzen angezeigt.',
         'reviews' => $reviews,
     ];
 }

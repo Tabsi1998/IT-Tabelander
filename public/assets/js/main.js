@@ -3,6 +3,7 @@ const siteNav = document.querySelector(".site-nav");
 const themeRoot = document.documentElement;
 const themeToggle = document.querySelector("[data-theme-toggle]");
 const themeMeta = document.querySelector('meta[name="theme-color"]');
+const themeLogos = document.querySelectorAll("[data-theme-logo]");
 const themeStorageKey = "it-tabelander-theme";
 const darkThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
 const cookieNotice = document.querySelector("[data-cookie-notice]");
@@ -26,6 +27,13 @@ const updateThemeUi = (choice) => {
     if (themeMeta) {
         themeMeta.setAttribute("content", resolved === "dark" ? "#08141d" : "#f4f7fb");
     }
+
+    themeLogos.forEach((logo) => {
+        const nextSource = resolved === "dark" ? logo.dataset.logoDarkSrc : logo.dataset.logoLightSrc;
+        if (nextSource && logo.getAttribute("src") !== nextSource) {
+            logo.setAttribute("src", nextSource);
+        }
+    });
 
     if (themeToggle) {
         const nextMode = resolved === "dark" ? "helles" : "dunkles";
@@ -129,6 +137,7 @@ const serviceCarousel = document.querySelector("[data-service-carousel]");
 const serviceTrack = document.querySelector("[data-service-track]");
 const serviceCards = serviceTrack ? Array.from(serviceTrack.querySelectorAll("[data-service-card]")) : [];
 const serviceSliderButtons = document.querySelectorAll("[data-service-slide]");
+const serviceFilterButtons = document.querySelectorAll("[data-service-filter]");
 
 let serviceIndex = 0;
 let serviceCardsPerView = 4;
@@ -146,14 +155,19 @@ const getServiceCardsPerView = () => {
     return 4;
 };
 
-const serviceMaxIndex = () => Math.max(0, serviceCards.length - serviceCardsPerView);
+const visibleServiceCards = () => serviceCards.filter((card) => !card.hidden);
+
+const serviceMaxIndex = () => Math.max(0, visibleServiceCards().length - serviceCardsPerView);
 
 const updateServiceSlider = () => {
-    if (!serviceTrack || serviceCards.length === 0) {
+    const visibleCards = visibleServiceCards();
+
+    if (!serviceTrack || visibleCards.length === 0) {
         return;
     }
 
     serviceCardsPerView = getServiceCardsPerView();
+    serviceCardsPerView = Math.min(serviceCardsPerView, visibleCards.length);
     serviceTrack.style.setProperty("--cards-per-view", String(serviceCardsPerView));
 
     const maxIndex = serviceMaxIndex();
@@ -161,7 +175,7 @@ const updateServiceSlider = () => {
         serviceIndex = 0;
     }
 
-    const firstCard = serviceCards[0];
+    const firstCard = visibleCards[0];
     const trackStyles = window.getComputedStyle(serviceTrack);
     const gap = Number.parseFloat(trackStyles.columnGap || trackStyles.gap || "16");
     const cardWidth = firstCard.getBoundingClientRect().width;
@@ -171,6 +185,24 @@ const updateServiceSlider = () => {
     serviceSliderButtons.forEach((button) => {
         button.disabled = maxIndex === 0;
     });
+};
+
+const applyServiceFilter = (filter) => {
+    serviceCards.forEach((card) => {
+        const groups = String(card.dataset.serviceGroups || "all").split(/\s+/);
+        const isVisible = filter === "all" || groups.includes(filter);
+        card.hidden = !isVisible;
+        card.tabIndex = isVisible ? 0 : -1;
+    });
+
+    serviceFilterButtons.forEach((button) => {
+        const isActive = button.dataset.serviceFilter === filter;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-pressed", String(isActive));
+    });
+
+    serviceIndex = 0;
+    updateServiceSlider();
 };
 
 const stepServiceSlider = (direction) => {
@@ -212,6 +244,14 @@ if (serviceCarousel && serviceTrack && serviceCards.length > 0) {
         button.addEventListener("click", () => {
             stopServiceSlider();
             stepServiceSlider(button.dataset.serviceSlide === "next" ? 1 : -1);
+            startServiceSlider();
+        });
+    });
+
+    serviceFilterButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            stopServiceSlider();
+            applyServiceFilter(button.dataset.serviceFilter || "all");
             startServiceSlider();
         });
     });

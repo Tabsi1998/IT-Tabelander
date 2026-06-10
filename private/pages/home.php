@@ -10,6 +10,7 @@ $hero = $siteConfig['hero'];
 $trustSignals = $siteConfig['trustSignals'];
 $audiences = $siteConfig['audiences'];
 $serviceBands = $siteConfig['serviceBands'];
+$processSteps = $siteConfig['processSteps'];
 $faq = $siteConfig['faq'];
 $contactForm = build_contact_form_view_model($siteConfig);
 $contactFlash = consume_contact_form_flash();
@@ -80,15 +81,16 @@ $formMessage = match ($formStatus) {
         <header class="site-header">
             <a class="brand-lockup" href="#start" aria-label="Zur Startseite">
                 <span class="brand-mobile-mark" aria-hidden="true">
-                    <img src="<?= e(asset_url('img/it-tabelander-mark.png')); ?>" alt="" width="1024" height="1024" loading="eager">
+                    <img class="brand-logo-image" src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" data-theme-logo data-logo-dark-src="<?= e(asset_url('img/logo/IT-Tabelander Logo Hell Transparent.png')); ?>" data-logo-light-src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" alt="" width="560" height="616" loading="eager">
                 </span>
                 <span class="brand-banner-shell" aria-hidden="true">
-                    <img class="brand-banner-image" src="<?= e(asset_url('img/it-tabelander-banner.png')); ?>" alt="" width="1536" height="1024" loading="eager">
+                    <img class="brand-banner-image" src="<?= e(asset_url('img/logo/IT-Tabelander Banner Dunkel Transparent.png')); ?>" data-theme-logo data-logo-dark-src="<?= e(asset_url('img/logo/IT-Tabelander Banner Hell Transparent.png')); ?>" data-logo-light-src="<?= e(asset_url('img/logo/IT-Tabelander Banner Dunkel Transparent.png')); ?>" alt="" width="1317" height="254" loading="eager">
                 </span>
             </a>
             <div class="header-actions">
                 <nav class="site-nav" id="site-navigation" aria-label="Hauptnavigation">
                     <a href="#leistungen">Leistungen</a>
+                    <a href="#ablauf">Ablauf</a>
                     <a href="#bewertungen">Bewertungen</a>
                     <a href="#faq">FAQ</a>
                     <a href="#kontakt" class="nav-cta">Kontakt</a>
@@ -140,8 +142,8 @@ $formMessage = match ($formStatus) {
             <section class="audience-section section">
                 <div class="section-heading" data-reveal>
                     <p class="section-eyebrow">Leistungsfokus</p>
-                    <h2>IT für Privat und Betrieb.</h2>
-                    <p>Der Fokus liegt auf Reparatur, Betreuung und sauber strukturierten IT-Umgebungen.</p>
+                    <h2>IT für Zuhause und Betrieb.</h2>
+                    <p>Der Fokus liegt auf Reparatur, Einrichtung, Betreuung und sauber strukturierten IT-Umgebungen.</p>
                 </div>
                 <div class="audience-grid">
                     <?php foreach ($audiences as $audience): ?>
@@ -164,7 +166,12 @@ $formMessage = match ($formStatus) {
                     <div class="services-carousel-head">
                         <div class="services-carousel-copy">
                             <p class="reviews-label">Ausgewählte Bereiche</p>
-                            <p>Desktop zeigt mehrere Bereiche parallel, mobil automatisch reduziert.</p>
+                            <p>Reparatur, Systempflege und Infrastrukturthemen klar nach Zielgruppe gebündelt.</p>
+                        </div>
+                        <div class="service-filter" aria-label="Leistungen filtern">
+                            <button class="service-filter-button is-active" type="button" data-service-filter="all" aria-pressed="true">Alle</button>
+                            <button class="service-filter-button" type="button" data-service-filter="privat" aria-pressed="false">Privatkunden</button>
+                            <button class="service-filter-button" type="button" data-service-filter="unternehmen" aria-pressed="false">Unternehmen</button>
                         </div>
                         <div class="reviews-controls">
                             <button class="slider-button" type="button" data-service-slide="prev" aria-label="Vorherige Leistung">&#8592;</button>
@@ -174,7 +181,17 @@ $formMessage = match ($formStatus) {
                     <div class="services-carousel" data-service-carousel aria-live="polite">
                         <div class="services-track" data-service-track>
                         <?php foreach ($serviceBands as $band): ?>
-                            <article class="service-card" data-service-card tabindex="0">
+                            <?php
+                                $serviceGroups = ['all'];
+                                $audience = strtolower((string) ($band['audience'] ?? ''));
+                                if (str_contains($audience, 'privat')) {
+                                    $serviceGroups[] = 'privat';
+                                }
+                                if (str_contains($audience, 'unternehmen')) {
+                                    $serviceGroups[] = 'unternehmen';
+                                }
+                            ?>
+                            <article class="service-card" data-service-card data-service-groups="<?= e(implode(' ', array_unique($serviceGroups))); ?>" tabindex="0">
                                 <?php if (!empty($band['image'])): ?>
                                     <div class="service-card-media">
                                         <img src="<?= e(asset_url('img/services/' . $band['image'])); ?>" alt="<?= e($band['title']); ?>" loading="lazy">
@@ -200,15 +217,32 @@ $formMessage = match ($formStatus) {
                 </div>
             </section>
 
+            <section class="process-section section" id="ablauf">
+                <div class="section-heading" data-reveal>
+                    <p class="section-eyebrow">Ablauf</p>
+                    <h2>Klar von Anfrage bis Übergabe.</h2>
+                    <p>Jede Umsetzung soll verständlich bleiben: vom ersten Fehlerbild bis zur getesteten Übergabe.</p>
+                </div>
+                <div class="process-track">
+                    <?php foreach ($processSteps as $index => $step): ?>
+                        <article class="process-step" data-reveal>
+                            <p class="process-number"><?= e(str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT)); ?></p>
+                            <h3><?= e($step['title']); ?></h3>
+                            <p><?= e($step['text']); ?></p>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+
             <section class="reviews-section section" id="bewertungen">
                 <div class="section-heading" data-reveal>
                     <p class="section-eyebrow">Bewertungen</p>
                     <h2>Kundenstimmen.</h2>
-                    <p>Google-Bewertungen können serverseitig eingebunden oder alternativ manuell gepflegt werden.</p>
+                    <p>Rückmeldungen aus typischen Reparatur-, Einrichtungs- und Betreuungssituationen.</p>
                 </div>
                 <div class="reviews-shell" data-reveal>
                     <div class="reviews-meta">
-                        <p class="reviews-label">Google-Bewertungen oder Referenzen</p>
+                        <p class="reviews-label">Rückmeldungen und Referenzen</p>
                         <div class="reviews-controls">
                             <button class="slider-button" type="button" data-slide="prev" aria-label="Vorherige Bewertung">&#8592;</button>
                             <button class="slider-button" type="button" data-slide="next" aria-label="Nächste Bewertung">&#8594;</button>
@@ -217,14 +251,14 @@ $formMessage = match ($formStatus) {
                     <div class="reviews-slider" aria-live="polite">
                         <div class="reviews-track" id="reviews-track">
                             <article class="review-slide review-placeholder">
-                                <p class="review-rating">Vorbereitet</p>
-                                <h3>Bewertungen erscheinen hier, sobald die Quelle eingerichtet ist.</h3>
-                                <p>Bis dahin kann der Bereich mit gepflegten Referenzen oder per Google-Synchronisierung betrieben werden.</p>
+                                <p class="review-rating">Rückmeldungen</p>
+                                <h3>Rückmeldungen erscheinen hier, sobald sie gepflegt sind.</h3>
+                                <p>Der Bereich kann mit freigegebenen Referenzen oder echten Google-Bewertungen betrieben werden.</p>
                             </article>
                         </div>
                     </div>
                     <p class="reviews-footnote" id="reviews-footnote">
-                        Die technische Einbindung erfolgt serverseitig und kann später ohne Umbau der Seite aktiviert werden.
+                        Referenzen werden gepflegt angezeigt; Google-Bewertungen können zusätzlich angebunden werden.
                     </p>
                 </div>
             </section>
@@ -253,7 +287,7 @@ $formMessage = match ($formStatus) {
                 <div class="contact-copy" data-reveal>
                     <p class="section-eyebrow">Kontakt</p>
                     <h2>Direkt anfragen.</h2>
-                    <p>Beschreiben Sie kurz, worum es geht. Die Anfrage wird direkt dem passenden Bereich zugeordnet.</p>
+                    <p>Beschreiben Sie kurz, worum es geht. Ich melde mich mit einer Einschätzung zum nächsten sinnvollen Schritt.</p>
                     <dl class="contact-facts">
                         <div>
                             <dt>Telefon</dt>
@@ -304,7 +338,7 @@ $formMessage = match ($formStatus) {
                                 <span>Bereich</span>
                                 <select name="audience" <?= $formHasError('audience') ? 'aria-invalid="true"' : ''; ?> required>
                                     <option value="">Bitte wählen</option>
-                                    <option value="Privat" <?= $formValue('audience') === 'Privat' ? 'selected' : ''; ?>>Privat</option>
+                                    <option value="Privat" <?= $formValue('audience') === 'Privat' ? 'selected' : ''; ?>>Privatkunden</option>
                                     <option value="Unternehmen" <?= $formValue('audience') === 'Unternehmen' ? 'selected' : ''; ?>>Unternehmen</option>
                                 </select>
                             </label>
