@@ -15,6 +15,7 @@ $company = $siteConfig['company'];
     <link rel="canonical" href="<?= e(canonical_url('nutzungsbedingungen.php')); ?>">
     <meta name="theme-color" content="#08141d">
     <script><?= theme_bootstrap_script(); ?></script>
+    <?= analytics_bootstrap_script(); ?>
     <?= site_favicon_markup(); ?>
     <link rel="stylesheet" href="<?= e(asset_url('css/styles.css')); ?>">
 </head>

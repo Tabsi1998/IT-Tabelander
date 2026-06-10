@@ -15,6 +15,7 @@ $company = $siteConfig['company'];
     <link rel="canonical" href="<?= e(canonical_url('datenschutz.php')); ?>">
     <meta name="theme-color" content="#08141d">
     <script><?= theme_bootstrap_script(); ?></script>
+    <?= analytics_bootstrap_script(); ?>
     <?= site_favicon_markup(); ?>
     <link rel="stylesheet" href="<?= e(asset_url('css/styles.css')); ?>">
 </head>
@@ -62,19 +63,27 @@ $company = $siteConfig['company'];
 
             <article class="legal-panel">
                 <h2>5. Cookies und ähnliche Technologien</h2>
-                <p>In der aktuellen Grundversion werden keine Tracking-Dienste und keine extern eingebundenen Frontend-Widgets eingesetzt. Verwendet werden nur technisch notwendige Sitzungs-Cookies für Formularschutz und Spam-Abwehr.</p>
-                <p>Die Darstellungs-Einstellung für Hell oder Dunkel wird erst nach einer aktiven Auswahl lokal im Browser gespeichert. Für den rein serverseitigen Abruf von Google-Bewertungen wird kein externes Frontend-Skript bei Google geladen.</p>
-                <p>Sollten später Analyse-Tools, Karten, Werbedienste oder andere zustimmungspflichtige Komponenten ergänzt werden, ist ein vollwertiger Consent-Banner mit Auswahl- und Widerrufsmöglichkeit nachzurüsten und diese Datenschutzerklärung entsprechend anzupassen.</p>
+                <p>Verwendet werden technisch notwendige Sitzungs-Cookies für Formularschutz und Spam-Abwehr. Die Darstellungs-Einstellung für Hell oder Dunkel wird erst nach aktiver Auswahl lokal im Browser gespeichert.</p>
+                <p>Google Analytics wird nur geladen, wenn Sie über den Hinweis auf der Website aktiv zustimmen. Vor einer Zustimmung wird kein Analytics-Skript von Google geladen und keine Analytics-Konfiguration ausgeführt.</p>
+                <p>Die Zustimmung oder Ablehnung wird lokal im Browser gespeichert. Sie können die Auswahl jederzeit zurücksetzen und neu treffen.</p>
+                <p><button class="button button-secondary button-compact" type="button" data-cookie-reset>Cookie-Auswahl ändern</button></p>
             </article>
 
             <article class="legal-panel">
-                <h2>6. Ihre Rechte</h2>
+                <h2>6. Google Analytics</h2>
+                <p>Diese Website kann nach Ihrer Zustimmung Google Analytics 4 mit der Mess-ID <?= e(config('analytics.googleMeasurementId', '')); ?> verwenden. Anbieter ist Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland.</p>
+                <p>Google Analytics hilft zu verstehen, welche Seiten aufgerufen werden und wie der Webauftritt technisch verbessert werden kann. Dabei können Nutzungsdaten, technische Geräte- und Browserinformationen, ungefähre Standortdaten sowie gekürzte oder anderweitig verarbeitete IP-Informationen verarbeitet werden.</p>
+                <p>Die Verarbeitung erfolgt nur auf Grundlage Ihrer Einwilligung gemäß Art. 6 Abs. 1 lit. a DSGVO. Eine erteilte Einwilligung kann jederzeit mit Wirkung für die Zukunft widerrufen werden.</p>
+            </article>
+
+            <article class="legal-panel">
+                <h2>7. Ihre Rechte</h2>
                 <p>Ihnen stehen grundsätzlich die Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit sowie Widerspruch zu. Wenn die Verarbeitung auf einer Einwilligung beruht, können Sie diese jederzeit mit Wirkung für die Zukunft widerrufen.</p>
                 <p>Wenn Sie der Ansicht sind, dass die Verarbeitung Ihrer Daten gegen Datenschutzrecht verstößt, können Sie sich bei der <a href="<?= e($company['privacyAuthorityUrl']); ?>" target="_blank" rel="noreferrer"><?= e($company['privacyAuthorityName']); ?></a> beschweren.</p>
             </article>
 
             <article class="legal-panel">
-                <h2>7. Stand und Aktualisierung</h2>
+                <h2>8. Stand und Aktualisierung</h2>
                 <p>Stand dieser Datenschutzerklärung: <?= e(date('d.m.Y')); ?>.</p>
             </article>
         </section>

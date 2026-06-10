@@ -7,8 +7,12 @@ const themeLogos = document.querySelectorAll("[data-theme-logo]");
 const themeStorageKey = "it-tabelander-theme";
 const darkThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
 const cookieNotice = document.querySelector("[data-cookie-notice]");
-const cookieAcknowledgeButton = document.querySelector("[data-cookie-ack]");
-const cookieNoticeStorageKey = "it-tabelander-cookie-notice";
+const cookieAcceptButton = document.querySelector("[data-cookie-accept]");
+const cookieRejectButton = document.querySelector("[data-cookie-reject]");
+const cookieResetButtons = document.querySelectorAll("[data-cookie-reset]");
+const analyticsConsentStorageKey = "it-tabelander-analytics-consent";
+const legacyCookieNoticeStorageKey = "it-tabelander-cookie-notice";
+const analyticsMeasurementId = window.IT_TABELANDER_ANALYTICS_ID || "";
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const contactTopicSelect = document.querySelector('select[name="audience"]');
 const contactServiceSelect = document.querySelector('select[name="service"]');
@@ -446,29 +450,100 @@ const setCookieNoticeVisibility = (visible) => {
     cookieNotice.classList.toggle("is-visible", visible);
 };
 
-if (cookieNotice) {
-    let isAcknowledged = false;
+let analyticsLoaded = false;
 
-    try {
-        isAcknowledged = localStorage.getItem(cookieNoticeStorageKey) === "acknowledged";
-    } catch (error) {
-        isAcknowledged = false;
+const consentModeUpdate = (analyticsStorage) => {
+    if (typeof window.gtag !== "function") {
+        return;
     }
 
-    if (!isAcknowledged) {
+    window.gtag("consent", "update", {
+        analytics_storage: analyticsStorage,
+        ad_storage: "denied",
+        ad_user_data: "denied",
+        ad_personalization: "denied",
+        functionality_storage: "granted",
+        security_storage: "granted",
+    });
+};
+
+const loadGoogleAnalytics = () => {
+    if (!analyticsMeasurementId || analyticsLoaded) {
+        return;
+    }
+
+    analyticsLoaded = true;
+    consentModeUpdate("granted");
+
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(analyticsMeasurementId)}`;
+    document.head.appendChild(script);
+
+    if (typeof window.gtag === "function") {
+        window.gtag("js", new Date());
+        window.gtag("config", analyticsMeasurementId, {
+            anonymize_ip: true,
+        });
+    }
+};
+
+const setAnalyticsConsent = (choice) => {
+    try {
+        localStorage.setItem(analyticsConsentStorageKey, choice);
+        localStorage.removeItem(legacyCookieNoticeStorageKey);
+    } catch (error) {
+        // Keep the choice for the current page even if localStorage is unavailable.
+    }
+
+    if (choice === "accepted") {
+        loadGoogleAnalytics();
+    } else {
+        consentModeUpdate("denied");
+    }
+
+    setCookieNoticeVisibility(false);
+};
+
+if (cookieNotice) {
+    let analyticsConsent = "";
+
+    try {
+        analyticsConsent = localStorage.getItem(analyticsConsentStorageKey) || "";
+    } catch (error) {
+        analyticsConsent = "";
+    }
+
+    if (analyticsConsent === "accepted") {
+        loadGoogleAnalytics();
+    } else if (analyticsConsent === "declined") {
+        consentModeUpdate("denied");
+    } else {
         window.requestAnimationFrame(() => setCookieNoticeVisibility(true));
     }
 
-    cookieAcknowledgeButton?.addEventListener("click", () => {
-        try {
-            localStorage.setItem(cookieNoticeStorageKey, "acknowledged");
-        } catch (error) {
-            // Ignore storage errors and only hide the notice for the current page.
-        }
+    cookieAcceptButton?.addEventListener("click", () => {
+        setAnalyticsConsent("accepted");
+    });
 
-        setCookieNoticeVisibility(false);
+    cookieRejectButton?.addEventListener("click", () => {
+        setAnalyticsConsent("declined");
     });
 }
+
+cookieResetButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+        try {
+            localStorage.removeItem(analyticsConsentStorageKey);
+            localStorage.removeItem(legacyCookieNoticeStorageKey);
+        } catch (error) {
+            // Ignore storage errors and show the notice for the current page.
+        }
+
+        consentModeUpdate("denied");
+        setCookieNoticeVisibility(true);
+    });
+});
 
 if (window.location.hash === "#kontakt" && siteNav) {
     siteNav.classList.remove("is-open");

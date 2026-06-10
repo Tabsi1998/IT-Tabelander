@@ -78,12 +78,19 @@ Zusätzliche Formular-Schutzmechanismen:
 
 ## Cookies und Einwilligung
 
-In der aktuellen Grundversion werden keine Analyse-, Marketing- oder Drittanbieter-Tracking-Cookies gesetzt. Verwendet werden nur:
+Die Website kann Google Analytics 4 verwenden. Das Analytics-Skript wird erst nach aktiver Zustimmung im Cookie-Hinweis geladen. Ohne Zustimmung werden keine Analytics-Aufrufe an Google ausgelöst.
+
+Verwendet werden außerdem:
 
 - technisch notwendige Sitzungs-Cookies für Formularschutz und Spam-Abwehr
 - eine lokale Speicherung der Theme-Auswahl erst nach aktiver Benutzeraktion
+- eine lokale Speicherung der Analytics-Zustimmung oder Ablehnung
 
-Dafür ist im aktuellen Stand kein klassischer Opt-in-Banner mit Ablehnen/Akzeptieren erforderlich. Es ist jedoch ein kompakter Cookie-Hinweis integriert. Wenn später Google Maps, Analytics, Meta Pixel, YouTube-Einbettungen oder andere nicht technisch notwendige Dienste ergänzt werden, muss ein vollwertiger Consent-Banner mit Auswahl- und Widerrufsmöglichkeit ergänzt werden.
+Die Google-Analytics-Mess-ID steht in `private/site-config.php` unter `analytics.googleMeasurementId` und kann alternativ per Umgebungsvariable gesetzt werden:
+
+- `GOOGLE_ANALYTICS_MEASUREMENT_ID`
+
+Die Auswahl kann in der Datenschutzerklärung über „Cookie-Auswahl ändern“ zurückgesetzt werden. Wenn später Google Maps, Meta Pixel, YouTube-Einbettungen oder andere nicht technisch notwendige Dienste ergänzt werden, sollte die Consent-Verwaltung entsprechend erweitert werden.
 
 ## Google-Bewertungen
 

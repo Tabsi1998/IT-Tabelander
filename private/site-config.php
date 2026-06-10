@@ -27,7 +27,7 @@ function config_env_secret(string $key, string $default = ''): string
     return $default;
 }
 
-// Zentrale Pflege: Google-Place-ID, Google-API-Key und SMTP-Zugangsdaten
+// Zentrale Pflege: Google-Place-ID, Google-API-Key, Analytics und SMTP-Zugangsdaten
 // können direkt hier eingetragen oder alternativ als Umgebungsvariablen gesetzt werden.
 return [
     'meta' => [
@@ -36,6 +36,9 @@ return [
         'title' => 'IT-Tabelander | IT-Service in Tirol',
         'description' => 'IT-Service in Telfs: Reparatur, Einrichtung, Server, Netzwerk, WLAN und Sicherheitsprüfung in Tirol.',
         'canonicalBaseUrl' => config_env_value('CANONICAL_BASE_URL', 'https://it.tabelander.co.at'),
+    ],
+    'analytics' => [
+        'googleMeasurementId' => config_env_value('GOOGLE_ANALYTICS_MEASUREMENT_ID', 'G-BFT0P4GG5N'),
     ],
     'company' => [
         'name' => 'IT-Tabelander',

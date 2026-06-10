@@ -43,6 +43,7 @@ $formMessage = match ($formStatus) {
     <meta name="google-site-verification" content="ZQiRDZwcqyQ1si_x_Wxw5NBKlLvHH0_AIsGCbK9xSrc">
     <meta name="theme-color" content="#08141d">
     <script><?= theme_bootstrap_script(); ?></script>
+    <?= analytics_bootstrap_script(); ?>
     <?= site_favicon_markup(); ?>
     <link rel="preload" href="<?= e(asset_url('fonts/space-grotesk-700.ttf')); ?>" as="font" type="font/ttf" crossorigin>
     <link rel="preload" href="<?= e(asset_url('fonts/manrope-400.ttf')); ?>" as="font" type="font/ttf" crossorigin>
