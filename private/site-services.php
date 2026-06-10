@@ -341,7 +341,7 @@ function build_owner_notification_message(array $siteConfig, array $submission):
     $bodyHtml = render_mail_layout(
         $company,
         'Neue Anfrage über das Kontaktformular',
-        'Auf der Website wurde eine neue Anfrage übermittelt.',
+        'Auf der Website wurde eine neue Anfrage übermittelt. Die wichtigsten Angaben sind unten zusammengefasst.',
         render_mail_summary_table($summaryRows)
         . render_mail_message_box('Nachricht', nl2br(escape_mail_html($submission['message']), false))
     );
@@ -389,8 +389,9 @@ function build_customer_confirmation_message(array $siteConfig, array $submissio
         $company,
         'Vielen Dank für Ihre Anfrage',
         'Ihre Nachricht wurde erfolgreich an IT-Tabelander übermittelt.',
-        '<p style="margin:0 0 16px; color:#445463; line-height:1.7;">'
-        . 'Die Anfrage wird geprüft und anschließend direkt beantwortet. Nachfolgend finden Sie eine kurze Zusammenfassung Ihrer übermittelten Angaben.'
+        '<p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0 0 15px 0;">Guten Tag ' . escape_mail_html($submission['name']) . ',</p>'
+        . '<p style="color:#445463; font-size:15px; line-height:1.6; margin:0 0 18px 0;">'
+        . 'vielen Dank für Ihre Nachricht. Die Anfrage wird geprüft und anschließend direkt beantwortet. Nachfolgend finden Sie eine kurze Zusammenfassung Ihrer übermittelten Angaben.'
         . '</p>'
         . render_mail_summary_table($summaryRows)
         . render_mail_message_box('Ihre Nachricht', nl2br(escape_mail_html($submission['message']), false))
@@ -430,54 +431,86 @@ function render_mail_layout(array $company, string $title, string $intro, string
     $email = escape_mail_html((string) ($company['email'] ?? ''));
     $phone = escape_mail_html((string) ($company['phone'] ?? ''));
     $website = escape_mail_html(canonical_url());
+    $owner = escape_mail_html((string) ($company['owner'] ?? ''));
+    $address = escape_mail_html(company_address_inline($company));
+    $bannerLogo = escape_mail_html(email_asset_url('img/logo/IT-Tabelander Banner Dunkel Transparent.png'));
+    $markLogo = escape_mail_html(email_asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png'));
+    $profession = trim((string) ($company['profession'] ?? ''));
+    $professionDetail = trim((string) ($company['professionDetail'] ?? ''));
+    $footerInfo = trim(implode(' | ', array_filter([$profession, $professionDetail])));
 
-    return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0; padding:24px; background:#eef3f8; color:#172635; font-family:Segoe UI, Arial, sans-serif;">'
-        . '<div style="max-width:680px; margin:0 auto; background:#ffffff; border-radius:20px; overflow:hidden; box-shadow:0 20px 48px rgba(21,39,55,0.12);">'
-        . '<div style="padding:24px 28px; background:linear-gradient(135deg, #08141d 0%, #103146 100%); color:#ffffff;">'
-        . '<div style="display:inline-block; padding:8px 12px; border-radius:999px; background:rgba(255,255,255,0.12); font-size:12px; letter-spacing:0.16em; text-transform:uppercase;">'
-        . $brand
-        . '</div>'
-        . '<h1 style="margin:16px 0 8px; font-size:28px; line-height:1.15;">' . escape_mail_html($title) . '</h1>'
-        . '<p style="margin:0; color:rgba(255,255,255,0.84); line-height:1.7;">' . escape_mail_html($intro) . '</p>'
-        . '</div>'
-        . '<div style="padding:28px;">'
+    return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>'
+        . '<body style="margin:0; padding:0; background-color:#f4f6f8; color:#1f2937; font-family:Arial, Helvetica, sans-serif;">'
+        . '<table border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f4f6f8; color:#1f2937; font-family:Arial, Helvetica, sans-serif; margin:0; padding:0; width:100%;">'
+        . '<tbody><tr><td align="center" style="padding:20px 10px;">'
+        . '<table border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#ffffff; border-collapse:collapse; border:1px solid #e5e7eb; max-width:640px; width:100%;">'
+        . '<tbody>'
+        . '<tr><td style="background-color:#ffffff; padding:22px 24px 20px 24px;">'
+        . '<img alt="' . $brand . '" src="' . $bannerLogo . '" width="360" style="border:0; display:block; height:auto; margin:0 auto; max-width:360px; outline:none; text-decoration:none; width:100%;">'
+        . '</td></tr>'
+        . '<tr><td style="background-color:#ff5a24; font-size:0; height:4px; line-height:4px;">&nbsp;</td></tr>'
+        . '<tr><td style="padding:28px 34px 8px 34px;">'
+        . '<div style="color:#ff5a24; font-size:13px; font-weight:bold; letter-spacing:0.12em; text-transform:uppercase;">' . $brand . '</div>'
+        . '<h1 style="color:#111827; font-size:28px; line-height:1.15; margin:10px 0 0 0;">' . escape_mail_html($title) . '</h1>'
+        . '</td></tr>'
+        . '<tr><td style="padding:18px 34px 30px 34px;">'
+        . '<p style="color:#445463; font-size:15px; line-height:1.6; margin:0 0 18px 0;">' . escape_mail_html($intro) . '</p>'
         . $contentHtml
-        . '<div style="margin-top:24px; padding-top:20px; border-top:1px solid #dde6ef; color:#5a6f81; font-size:14px; line-height:1.7;">'
-        . '<strong style="display:block; color:#172635;">' . $brand . '</strong>'
-        . ($email !== '' ? '<div>E-Mail: <a href="mailto:' . $email . '" style="color:#b44720; text-decoration:none;">' . $email . '</a></div>' : '')
-        . ($phone !== '' ? '<div>Telefon: <a href="tel:' . escape_mail_html(phone_href((string) $company['phone'])) . '" style="color:#b44720; text-decoration:none;">' . $phone . '</a></div>' : '')
-        . '<div>Website: <a href="' . $website . '" style="color:#b44720; text-decoration:none;">' . $website . '</a></div>'
-        . '</div>'
-        . '</div>'
-        . '</div>'
+        . '<p style="color:#1f2937; font-size:15px; line-height:1.6; margin:24px 0 0 0;">Mit freundlichen Grüßen<br><strong>' . ($owner !== '' ? $owner : $brand) . '</strong></p>'
+        . '</td></tr>'
+        . '<tr><td style="background-color:#f9fafb; border-top:1px solid #e5e7eb; padding:20px 34px;">'
+        . '<table border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse; width:100%;"><tbody><tr>'
+        . '<td style="padding:0 20px 0 0; vertical-align:middle; width:78px;">'
+        . '<img alt="' . $brand . '" src="' . $markLogo . '" width="58" style="border:0; display:block; height:auto; margin:0 auto; max-width:58px; outline:none; text-decoration:none; width:58px;">'
+        . '</td>'
+        . '<td style="color:#4b5563; font-size:13px; line-height:1.55; vertical-align:middle;">'
+        . '<div style="color:#081221; font-size:14px; font-weight:bold; margin:0 0 4px 0;">' . $brand . '</div>'
+        . ($owner !== '' ? $owner . '<br>' : '')
+        . ($address !== '' ? $address . '<br>' : '')
+        . ($email !== '' ? '<a href="mailto:' . $email . '" style="color:#1b3348; text-decoration:none;">' . $email . '</a><br>' : '')
+        . ($phone !== '' ? '<a href="tel:' . escape_mail_html(phone_href((string) $company['phone'])) . '" style="color:#1b3348; text-decoration:none;">' . $phone . '</a><br>' : '')
+        . '<a href="' . $website . '" style="color:#1b3348; text-decoration:none;">' . $website . '</a>'
+        . '</td></tr></tbody></table>'
+        . '</td></tr>'
+        . ($footerInfo !== '' ? '<tr><td style="background-color:#ffffff; border-top:1px solid #e5e7eb; color:#6b7280; font-size:12px; line-height:1.5; padding:12px 34px; text-align:center;">' . escape_mail_html($footerInfo) . '</td></tr>' : '')
+        . '</tbody></table>'
+        . '</td></tr></tbody></table>'
         . '</body></html>';
 }
 
 function render_mail_summary_table(array $rows): string
 {
-    $html = '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%; border-collapse:collapse; margin:0 0 20px;">';
+    $html = '<table border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f9fafb; border-collapse:collapse; border-left:4px solid #ff5a24; margin:20px 0 22px 0; width:100%;"><tbody><tr><td style="padding:14px 16px;">';
 
     foreach ($rows as $label => $value) {
-        $html .= '<tr>'
-            . '<td style="padding:10px 0; border-bottom:1px solid #e5ecf3; width:34%; color:#5a6f81; vertical-align:top;">' . escape_mail_html((string) $label) . '</td>'
-            . '<td style="padding:10px 0; border-bottom:1px solid #e5ecf3; color:#172635; font-weight:600;">' . escape_mail_html((string) $value) . '</td>'
-            . '</tr>';
+        $html .= '<div style="color:#1f2937; font-size:14px; line-height:1.6; margin:0 0 3px 0;">'
+            . '<strong>' . escape_mail_html((string) $label) . ':</strong> '
+            . escape_mail_html((string) $value)
+            . '</div>';
     }
 
-    return $html . '</table>';
+    return $html . '</td></tr></tbody></table>';
 }
 
 function render_mail_message_box(string $title, string $contentHtml): string
 {
-    return '<div style="padding:18px 20px; border-radius:16px; background:#f6f9fc; border:1px solid #e3ebf3;">'
-        . '<div style="margin:0 0 10px; color:#5a6f81; font-size:12px; letter-spacing:0.12em; text-transform:uppercase;">' . escape_mail_html($title) . '</div>'
-        . '<div style="color:#172635; line-height:1.8;">' . $contentHtml . '</div>'
-        . '</div>';
+    return '<table border="0" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f9fafb; border-collapse:collapse; border-left:4px solid #1b3348; margin:20px 0 22px 0; width:100%;">'
+        . '<tbody><tr><td style="padding:14px 16px;">'
+        . '<div style="color:#ff5a24; font-size:12px; font-weight:bold; letter-spacing:0.12em; margin:0 0 8px 0; text-transform:uppercase;">' . escape_mail_html($title) . '</div>'
+        . '<div style="color:#1f2937; font-size:15px; line-height:1.65;">' . $contentHtml . '</div>'
+        . '</td></tr></tbody></table>';
 }
 
 function escape_mail_html(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function email_asset_url(string $path): string
+{
+    $segments = array_map('rawurlencode', explode('/', ltrim($path, '/')));
+
+    return canonical_url('public/assets/' . implode('/', $segments));
 }
 
 function smtp_send_message(array $mailConfig, array $message): bool
