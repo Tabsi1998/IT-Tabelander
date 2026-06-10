@@ -33,13 +33,14 @@ function ensure_contact_session(): void
     session_start();
 }
 
-function store_contact_form_flash(array $values, array $errors = []): void
+function store_contact_form_flash(array $values, array $errors = [], array $meta = []): void
 {
     ensure_contact_session();
 
     $_SESSION['contact_form']['flash'] = [
         'values' => $values,
         'errors' => array_values(array_unique($errors)),
+        'meta' => $meta,
     ];
 }
 
@@ -253,21 +254,25 @@ function send_contact_mail(array $siteConfig, array $submission): array
 {
     $company = $siteConfig['company'] ?? [];
     $mailConfig = $siteConfig['mail'] ?? [];
+    $requestId = bin2hex(random_bytes(6));
 
     $result = [
         'ownerSent' => false,
         'customerSent' => false,
+        'requestId' => $requestId,
     ];
 
     if (!smtp_configured($mailConfig)) {
         append_mail_log([
             'type' => 'configuration',
+            'requestId' => $requestId,
             'message' => 'SMTP ist nicht vollständig konfiguriert.',
             'diagnostics' => smtp_configuration_diagnostics($mailConfig),
         ]);
 
         append_contact_log([
             'sentAt' => date('c'),
+            'requestId' => $requestId,
             'ownerSent' => false,
             'customerSent' => false,
             'name' => $submission['name'],
@@ -282,20 +287,36 @@ function send_contact_mail(array $siteConfig, array $submission): array
         return $result;
     }
 
+    append_mail_log([
+        'type' => 'contact_mail_start',
+        'requestId' => $requestId,
+        'recipient' => $mailConfig['recipient'] ?? '',
+        'fromEmail' => $mailConfig['fromEmail'] ?? '',
+        'smtp' => smtp_public_config($mailConfig),
+        'clientIp' => (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
+    ]);
+
     if (($mailConfig['sendOwnerNotification'] ?? true) === true) {
         $ownerMessage = build_owner_notification_message($siteConfig, $submission);
-        $result['ownerSent'] = smtp_send_message($mailConfig, $ownerMessage);
+        $result['ownerSent'] = smtp_send_message($mailConfig, $ownerMessage, [
+            'requestId' => $requestId,
+            'mailRole' => 'owner',
+        ]);
     }
 
     if ($result['ownerSent'] && ($mailConfig['sendCustomerConfirmation'] ?? true) === true) {
         $customerMessage = build_customer_confirmation_message($siteConfig, $submission);
-        $result['customerSent'] = smtp_send_message($mailConfig, $customerMessage);
+        $result['customerSent'] = smtp_send_message($mailConfig, $customerMessage, [
+            'requestId' => $requestId,
+            'mailRole' => 'customer',
+        ]);
     } else {
         $result['customerSent'] = !($mailConfig['sendCustomerConfirmation'] ?? true);
     }
 
     append_contact_log([
         'sentAt' => date('c'),
+        'requestId' => $requestId,
         'ownerSent' => $result['ownerSent'],
         'customerSent' => $result['customerSent'],
         'name' => $submission['name'],
@@ -341,6 +362,25 @@ function smtp_configuration_diagnostics(array $mailConfig): array
         'passwordFileExists' => $passwordFile !== '' && is_file($passwordFile),
         'passwordFileReadable' => $passwordFile !== '' && is_readable($passwordFile),
         'passwordFile' => $passwordFile,
+    ];
+}
+
+function smtp_public_config(array $mailConfig): array
+{
+    $smtp = $mailConfig['smtp'] ?? [];
+
+    return [
+        'enabled' => (bool) ($smtp['enabled'] ?? false),
+        'host' => (string) ($smtp['host'] ?? ''),
+        'port' => (int) ($smtp['port'] ?? 0),
+        'encryption' => (string) ($smtp['encryption'] ?? ''),
+        'username' => (string) ($smtp['username'] ?? ''),
+        'passwordLoaded' => trim((string) ($smtp['password'] ?? '')) !== '',
+        'allowSelfSigned' => (bool) ($smtp['allowSelfSigned'] ?? false),
+        'verifyPeer' => (bool) ($smtp['verifyPeer'] ?? true),
+        'verifyPeerName' => (bool) ($smtp['verifyPeerName'] ?? true),
+        'timeout' => (int) ($smtp['timeout'] ?? 0),
+        'ehloDomain' => (string) ($smtp['ehloDomain'] ?? ''),
     ];
 }
 
@@ -535,34 +575,38 @@ function email_asset_url(string $path): string
     return canonical_url('public/assets/' . implode('/', $segments));
 }
 
-function smtp_send_message(array $mailConfig, array $message): bool
+function smtp_send_message(array $mailConfig, array $message, array $context = []): bool
 {
     $smtp = $mailConfig['smtp'] ?? [];
+    $trace = [];
+    $startedAt = microtime(true);
 
     try {
         $socket = smtp_open_connection($smtp);
+        smtp_trace($trace, 'connect', null, 'connected to ' . (string) ($smtp['host'] ?? '') . ':' . (string) ($smtp['port'] ?? ''));
         $ehloDomain = trim((string) ($smtp['ehloDomain'] ?? 'localhost'));
-        smtp_expect($socket, [220]);
-        smtp_command($socket, 'EHLO ' . $ehloDomain, [250]);
+        smtp_expect($socket, [220], $trace, 'banner');
+        smtp_command($socket, 'EHLO ' . $ehloDomain, [250], $trace, 'EHLO');
 
         if (strtolower((string) ($smtp['encryption'] ?? '')) === 'tls') {
-            smtp_command($socket, 'STARTTLS', [220]);
+            smtp_command($socket, 'STARTTLS', [220], $trace, 'STARTTLS');
 
             $cryptoEnabled = stream_socket_enable_crypto($socket, true, smtp_crypto_method());
+            smtp_trace($trace, 'TLS', null, $cryptoEnabled === true ? 'enabled' : 'failed');
             if ($cryptoEnabled !== true) {
                 throw new RuntimeException('TLS konnte nicht aktiviert werden.');
             }
 
-            smtp_command($socket, 'EHLO ' . $ehloDomain, [250]);
+            smtp_command($socket, 'EHLO ' . $ehloDomain, [250], $trace, 'EHLO after STARTTLS');
         }
 
         $username = trim((string) ($smtp['username'] ?? ''));
         $password = (string) ($smtp['password'] ?? '');
 
         if ($username !== '' && $password !== '') {
-            smtp_command($socket, 'AUTH LOGIN', [334]);
-            smtp_command($socket, base64_encode($username), [334]);
-            smtp_command($socket, base64_encode($password), [235]);
+            smtp_command($socket, 'AUTH LOGIN', [334], $trace, 'AUTH LOGIN');
+            smtp_command($socket, base64_encode($username), [334], $trace, 'AUTH username', true);
+            smtp_command($socket, base64_encode($password), [235], $trace, 'AUTH password', true);
         }
 
         $fromEmail = (string) $mailConfig['fromEmail'];
@@ -570,9 +614,9 @@ function smtp_send_message(array $mailConfig, array $message): bool
         $replyToEmail = (string) ($message['replyToEmail'] ?? $mailConfig['replyToEmail'] ?? $fromEmail);
         $replyToName = (string) ($message['replyToName'] ?? $fromName);
 
-        smtp_command($socket, 'MAIL FROM:<' . $fromEmail . '>', [250]);
-        smtp_command($socket, 'RCPT TO:<' . $message['toEmail'] . '>', [250, 251]);
-        smtp_command($socket, 'DATA', [354]);
+        smtp_command($socket, 'MAIL FROM:<' . $fromEmail . '>', [250], $trace, 'MAIL FROM');
+        smtp_command($socket, 'RCPT TO:<' . $message['toEmail'] . '>', [250, 251], $trace, 'RCPT TO');
+        smtp_command($socket, 'DATA', [354], $trace, 'DATA');
 
         $mime = build_mime_message(
             $fromEmail,
@@ -588,9 +632,20 @@ function smtp_send_message(array $mailConfig, array $message): bool
         );
 
         fwrite($socket, dot_stuff(normalize_crlf($mime)) . "\r\n.\r\n");
-        smtp_expect($socket, [250]);
-        smtp_command($socket, 'QUIT', [221]);
+        smtp_expect($socket, [250], $trace, 'message accepted');
+        smtp_command($socket, 'QUIT', [221], $trace, 'QUIT');
         fclose($socket);
+
+        append_mail_log([
+            'type' => 'smtp_success',
+            'requestId' => $context['requestId'] ?? '',
+            'mailRole' => $context['mailRole'] ?? '',
+            'to' => $message['toEmail'] ?? '',
+            'subject' => $message['subject'] ?? '',
+            'smtp' => smtp_public_config($mailConfig),
+            'durationMs' => (int) round((microtime(true) - $startedAt) * 1000),
+            'trace' => $trace,
+        ]);
 
         return true;
     } catch (Throwable $exception) {
@@ -598,15 +653,14 @@ function smtp_send_message(array $mailConfig, array $message): bool
 
         append_mail_log([
             'type' => 'smtp',
+            'requestId' => $context['requestId'] ?? '',
+            'mailRole' => $context['mailRole'] ?? '',
             'to' => $message['toEmail'] ?? '',
             'subject' => $message['subject'] ?? '',
-            'host' => $smtp['host'] ?? '',
-            'port' => $smtp['port'] ?? '',
-            'encryption' => $smtp['encryption'] ?? '',
-            'allowSelfSigned' => $smtp['allowSelfSigned'] ?? null,
-            'verifyPeer' => $smtp['verifyPeer'] ?? null,
-            'verifyPeerName' => $smtp['verifyPeerName'] ?? null,
+            'smtp' => smtp_public_config($mailConfig),
+            'durationMs' => (int) round((microtime(true) - $startedAt) * 1000),
             'message' => $exception->getMessage(),
+            'trace' => $trace,
         ]);
 
         if (isset($socket) && is_resource($socket)) {
@@ -674,14 +728,15 @@ function smtp_crypto_method(): int
     return $method !== 0 ? $method : STREAM_CRYPTO_METHOD_TLS_CLIENT;
 }
 
-function smtp_command($socket, string $command, array $expectedCodes): string
+function smtp_command($socket, string $command, array $expectedCodes, ?array &$trace = null, string $label = '', bool $redactCommand = false): string
 {
     fwrite($socket, $command . "\r\n");
+    smtp_trace($trace, $label !== '' ? $label : 'command', $redactCommand ? '[redacted]' : $command);
 
-    return smtp_expect($socket, $expectedCodes);
+    return smtp_expect($socket, $expectedCodes, $trace, $label !== '' ? $label : 'response');
 }
 
-function smtp_expect($socket, array $expectedCodes): string
+function smtp_expect($socket, array $expectedCodes, ?array &$trace = null, string $label = ''): string
 {
     $response = '';
 
@@ -694,12 +749,49 @@ function smtp_expect($socket, array $expectedCodes): string
     }
 
     $code = (int) substr($response, 0, 3);
+    smtp_trace($trace, $label !== '' ? $label : 'response', null, smtp_compact_response($response), $code);
 
     if (!in_array($code, $expectedCodes, true)) {
         throw new RuntimeException('SMTP-Antwort unerwartet: ' . trim($response));
     }
 
     return $response;
+}
+
+function smtp_trace(?array &$trace, string $step, ?string $command = null, ?string $response = null, ?int $code = null): void
+{
+    if ($trace === null) {
+        return;
+    }
+
+    $entry = [
+        'step' => $step,
+    ];
+
+    if ($command !== null) {
+        $entry['command'] = $command;
+    }
+
+    if ($code !== null) {
+        $entry['code'] = $code;
+    }
+
+    if ($response !== null && $response !== '') {
+        $entry['response'] = $response;
+    }
+
+    $trace[] = $entry;
+}
+
+function smtp_compact_response(string $response): string
+{
+    $compact = trim(str_replace(["\r\n", "\r", "\n"], ' | ', $response));
+
+    if (strlen($compact) > 800) {
+        return substr($compact, 0, 800) . '...';
+    }
+
+    return $compact;
 }
 
 function build_mime_message(

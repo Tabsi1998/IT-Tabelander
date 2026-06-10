@@ -41,7 +41,9 @@ $status = match (true) {
 };
 
 if ($status === 'mail_error') {
-    store_contact_form_flash(contact_submission_values($submission), []);
+    store_contact_form_flash(contact_submission_values($submission), [], [
+        'requestId' => (string) ($mailResult['requestId'] ?? ''),
+    ]);
 }
 
 redirect_home($status);

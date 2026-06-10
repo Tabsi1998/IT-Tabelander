@@ -125,7 +125,7 @@ return [
             'verifyPeer' => config_env_bool('SMTP_VERIFY_PEER', false),
             'verifyPeerName' => config_env_bool('SMTP_VERIFY_PEER_NAME', false),
             'timeout' => 12,
-            'ehloDomain' => config_env_value('SMTP_EHLO_DOMAIN', 'tabelander.co.at'),
+            'ehloDomain' => config_env_value('SMTP_EHLO_DOMAIN', (string) (gethostname() ?: 'localhost')),
         ],
     ],
     'security' => [

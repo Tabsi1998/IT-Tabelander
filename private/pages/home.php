@@ -16,16 +16,19 @@ $contactForm = build_contact_form_view_model($siteConfig);
 $contactFlash = consume_contact_form_flash();
 $formValues = is_array($contactFlash['values'] ?? null) ? $contactFlash['values'] : [];
 $formErrors = is_array($contactFlash['errors'] ?? null) ? $contactFlash['errors'] : [];
+$formMeta = is_array($contactFlash['meta'] ?? null) ? $contactFlash['meta'] : [];
 $formValue = static fn (string $field): string => (string) ($formValues[$field] ?? '');
 $formHasError = static fn (string $field): bool => in_array($field, $formErrors, true);
 $initialReviews = manual_reviews_payload($company);
 $hasPublishedReviews = !empty($initialReviews['reviews']) && is_array($initialReviews['reviews']);
+$mailErrorReference = trim((string) ($formMeta['requestId'] ?? ''));
 
 $formStatus = $_GET['contact'] ?? '';
 $formMessage = match ($formStatus) {
     'success' => 'Ihre Anfrage wurde gesendet. Ich melde mich so bald wie möglich zurück.',
     'partial' => 'Ihre Anfrage wurde übermittelt. Die automatische Bestätigungs-E-Mail konnte jedoch nicht zugestellt werden.',
-    'mail_error' => 'Die Formularangaben wurden angenommen, aber der Mailserver konnte die Anfrage nicht versenden. Bitte versuchen Sie es später erneut oder schreiben Sie direkt an office@tabelander.co.at.',
+    'mail_error' => 'Die Formularangaben wurden angenommen, aber der Mailserver konnte die Anfrage nicht versenden. Bitte versuchen Sie es später erneut oder schreiben Sie direkt an office@tabelander.co.at.'
+        . ($mailErrorReference !== '' ? ' Referenz: ' . $mailErrorReference . '.' : ''),
     'error' => contact_error_message($formErrors),
     default => '',
 };
