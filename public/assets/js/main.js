@@ -396,7 +396,12 @@ if (reviewTrack) {
             reviewFootnote.textContent = payload.message;
         }
 
-        if (Array.isArray(payload?.reviews) && payload.reviews.length > 0) {
+        const hasReviews = Array.isArray(payload?.reviews) && payload.reviews.length > 0;
+        document.querySelectorAll("[data-slide]").forEach((button) => {
+            button.disabled = !hasReviews;
+        });
+
+        if (hasReviews) {
             renderReviewSlides(payload.reviews);
         }
     }).catch(() => {

@@ -98,7 +98,7 @@ Die Google-Analytics-Mess-ID steht in `private/site-config.php` unter `analytics
 
 Die Auswahl kann in der Datenschutzerklärung über „Cookie-Einstellungen ändern“ zurückgesetzt werden. Wenn später Google Maps, Meta Pixel, YouTube-Einbettungen oder andere nicht technisch notwendige Dienste ergänzt werden, sollte die Consent-Verwaltung entsprechend erweitert werden.
 
-## Google-Bewertungen
+## Bewertungen
 
 Der Bewertungsbereich ist auf serverseitigen Abruf vorbereitet. Dadurch bleibt der API-Key außerhalb des Browsers. Die Werte können direkt in `private/site-config.php` eingetragen oder per Umgebungsvariable gesetzt werden.
 
@@ -110,7 +110,24 @@ Benötigte Umgebungsvariablen:
 
 Die Reviews werden in `private/cache/google-reviews.json` zwischengespeichert.
 
-Wenn keine Google-Anbindung gewünscht ist, können in `private/site-config.php` unter `manualTestimonials` manuelle Referenzen eingetragen werden.
+Wenn keine Google-Anbindung gewünscht ist, können manuelle Rezensionen in `private/data/reviews.json` gepflegt werden. Wenn die Datei keine Einträge enthält, zeigt die Website „Noch keine Kundenrezensionen veröffentlicht.“.
+
+Beispiel:
+
+```json
+{
+  "reviews": [
+    {
+      "author": "Max Mustermann",
+      "rating": "5",
+      "text": "Sehr schnelle und saubere Hilfe beim Laptop. Vor der Reparatur war klar, welche Kosten entstehen.",
+      "date": "Juni 2026"
+    }
+  ]
+}
+```
+
+Benötigt werden nur `author` und `text`. `rating`, `date` und `url` sind optional.
 
 ## AGB / Nutzungsbedingungen
 

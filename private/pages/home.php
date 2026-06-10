@@ -238,11 +238,11 @@ $formMessage = match ($formStatus) {
                 <div class="section-heading" data-reveal>
                     <p class="section-eyebrow">Bewertungen</p>
                     <h2>Kundenstimmen.</h2>
-                    <p>Rückmeldungen aus typischen Reparatur-, Einrichtungs- und Betreuungssituationen.</p>
+                    <p>Freigegebene Rückmeldungen werden hier veröffentlicht, sobald echte Kundenrezensionen gepflegt sind.</p>
                 </div>
                 <div class="reviews-shell" data-reveal>
                     <div class="reviews-meta">
-                        <p class="reviews-label">Rückmeldungen und Referenzen</p>
+                        <p class="reviews-label">Kundenrezensionen</p>
                         <div class="reviews-controls">
                             <button class="slider-button" type="button" data-slide="prev" aria-label="Vorherige Bewertung">&#8592;</button>
                             <button class="slider-button" type="button" data-slide="next" aria-label="Nächste Bewertung">&#8594;</button>
@@ -251,14 +251,14 @@ $formMessage = match ($formStatus) {
                     <div class="reviews-slider" aria-live="polite">
                         <div class="reviews-track" id="reviews-track">
                             <article class="review-slide review-placeholder">
-                                <p class="review-rating">Rückmeldungen</p>
-                                <h3>Rückmeldungen erscheinen hier, sobald sie gepflegt sind.</h3>
-                                <p>Der Bereich kann mit freigegebenen Referenzen oder echten Google-Bewertungen betrieben werden.</p>
+                                <p class="review-rating">In Vorbereitung</p>
+                                <h3>Noch keine Kundenrezensionen veröffentlicht.</h3>
+                                <p>Freigegebene Rückmeldungen können später einfach in der JSON-Datei ergänzt werden.</p>
                             </article>
                         </div>
                     </div>
                     <p class="reviews-footnote" id="reviews-footnote">
-                        Referenzen werden gepflegt angezeigt; Google-Bewertungen können zusätzlich angebunden werden.
+                        Noch keine Kundenrezensionen veröffentlicht.
                     </p>
                 </div>
             </section>
