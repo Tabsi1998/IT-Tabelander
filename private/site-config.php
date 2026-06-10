@@ -105,7 +105,7 @@ return [
         'smtp' => [
             'enabled' => true,
             // Zugangsdaten des Mailservers. Alternativ können die SMTP_* Variablen am Server gesetzt werden.
-            'host' => config_env_value('SMTP_HOST', 'mail.tabelander.co.at'),
+            'host' => config_env_value('SMTP_HOST', '192.168.2.106'),
             'port' => (int) config_env_value('SMTP_PORT', '587'),
             'encryption' => config_env_value('SMTP_ENCRYPTION', 'tls'),
             'username' => config_env_value('SMTP_USERNAME', 'office@tabelander.co.at'),
