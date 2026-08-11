@@ -44,7 +44,7 @@ $formMessage = match ($formStatus) {
 <head>
     <?php require dirname(__DIR__) . '/partials/head.php'; ?>
 </head>
-<body data-reviews-url="<?= e(page_url('reviews.php')); ?>">
+<body data-page-key="home" data-contact-status="<?= e((string) $formStatus); ?>" data-reviews-url="<?= e(page_url('reviews.php')); ?>">
     <div class="site-shell">
         <?php $activePageKey = 'home'; require dirname(__DIR__) . '/partials/site-header.php'; ?>
 
@@ -55,7 +55,7 @@ $formMessage = match ($formStatus) {
                     <h1><?= e($hero['headline']); ?></h1>
                     <p class="hero-lead"><?= e($hero['lead']); ?></p>
                     <div class="hero-actions">
-                        <a class="button button-primary" href="#kontakt"><?= e($hero['primaryCta']); ?></a>
+                        <a class="button button-primary" href="#kontakt" data-conversion="primary-cta" data-conversion-location="hero"><?= e($hero['primaryCta']); ?></a>
                         <a class="button button-secondary" href="tel:<?= e(phone_href($company['phone'])); ?>">Jetzt anrufen: <?= e($company['phone']); ?></a>
                     </div>
                     <ul class="hero-points" aria-label="Schwerpunkte">

@@ -150,7 +150,22 @@ const setAnalyticsConsent = (choice) => {
         consentModeUpdate("denied");
     }
 
+    window.dispatchEvent(new CustomEvent("it-tabelander:analytics-consent", {
+        detail: { analytics: nextChoice.analytics },
+    }));
+
     setCookieNoticeVisibility(false);
+};
+
+export const analyticsConsentGranted = () => getStoredConsentChoice()?.analytics === true;
+
+export const trackAnalyticsEvent = (eventName, parameters = {}) => {
+    if (!analyticsConsentGranted() || typeof window.gtag !== "function") {
+        return false;
+    }
+
+    window.gtag("event", eventName, parameters);
+    return true;
 };
 
 if (cookieNotice) {

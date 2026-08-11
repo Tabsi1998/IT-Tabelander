@@ -1,5 +1,6 @@
 import './modules/theme.js';
 import './modules/consent.js';
+void import('./modules/analytics.js');
 
 if (document.querySelector('.nav-toggle')) {
     void import('./modules/navigation.js');

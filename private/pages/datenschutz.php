@@ -12,7 +12,7 @@ $pageSchema = [];
 <head>
     <?php require dirname(__DIR__) . '/partials/head.php'; ?>
 </head>
-<body class="legal-body">
+<body class="legal-body" data-page-key="datenschutz">
     <main class="legal-shell">
         <div class="legal-tools">
             <a class="legal-back" href="<?= e(page_url()); ?>#kontakt">&#8592; Zur Website</a>
@@ -66,6 +66,7 @@ $pageSchema = [];
                 <h2>6. Google Analytics</h2>
                 <p>Diese Website kann nach Ihrer Zustimmung Google Analytics 4 mit der Mess-ID <?= e(config('analytics.googleMeasurementId', '')); ?> verwenden. Anbieter ist Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland.</p>
                 <p>Google Analytics hilft zu verstehen, welche Seiten aufgerufen werden und wie der Webauftritt technisch verbessert werden kann. Dabei können Nutzungsdaten, technische Geräte- und Browserinformationen, ungefähre Standortdaten sowie gekürzte oder anderweitig verarbeitete IP-Informationen verarbeitet werden.</p>
+                <p>Nach Einwilligung werden außerdem ausschließlich technische Conversion-Ereignisse für erfolgreiche Formularübermittlungen sowie Klicks auf Telefon-, E-Mail- und primäre Anfrage-Schaltflächen erfasst. Namen, Kontaktdaten, Nachrichteninhalte und andere Formulareingaben werden nicht an Analytics übermittelt.</p>
                 <p>Die Verarbeitung erfolgt nur auf Grundlage Ihrer Einwilligung gemäß Art. 6 Abs. 1 lit. a DSGVO. Eine erteilte Einwilligung kann jederzeit mit Wirkung für die Zukunft widerrufen werden.</p>
             </article>
 

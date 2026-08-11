@@ -12,7 +12,7 @@ $pageSchema = [];
 <head>
     <?php require dirname(__DIR__) . '/partials/head.php'; ?>
 </head>
-<body class="legal-body">
+<body class="legal-body" data-page-key="nutzungsbedingungen">
     <main class="legal-shell">
         <div class="legal-tools">
             <a class="legal-back" href="<?= e(page_url()); ?>#kontakt">&#8592; Zur Website</a>

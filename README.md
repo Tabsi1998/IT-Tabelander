@@ -113,6 +113,8 @@ Die Google-Analytics-Mess-ID steht in `private/site-config.php` unter `analytics
 
 Die Auswahl kann in der Datenschutzerklärung über „Cookie-Einstellungen ändern“ zurückgesetzt werden. Wenn später Google Maps, Meta Pixel, YouTube-Einbettungen oder andere nicht technisch notwendige Dienste ergänzt werden, sollte die Consent-Verwaltung entsprechend erweitert werden.
 
+Nach Analytics-Einwilligung werden vier zentral definierte Conversion-Events gesendet: `contact_form_success`, `phone_click`, `email_click` und `primary_cta_click`. Zulässige Parameter sind ausschließlich `page_type`, `location` und bei erfolgreichem Formularversand `contact_status`. Formularfelder, Namen, E-Mail-Adressen, Telefonnummern, Nachrichten und Linkziele werden nicht übertragen. Ohne aktive Einwilligung gibt `trackAnalyticsEvent()` sofort zurück und es wird kein Event an Google gesendet.
+
 ## Bewertungen
 
 Der Bewertungsbereich ist auf serverseitigen Abruf vorbereitet. Dadurch bleibt der API-Key außerhalb des Browsers. Die Werte können direkt in `private/site-config.php` eingetragen oder per Umgebungsvariable gesetzt werden.

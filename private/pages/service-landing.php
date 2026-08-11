@@ -21,7 +21,7 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
 <head>
     <?php require dirname(__DIR__) . '/partials/head.php'; ?>
 </head>
-<body class="landing-body">
+<body class="landing-body" data-page-key="<?= e($landingPageKey); ?>">
     <div class="site-shell">
         <?php $activePageKey = $landingPageKey; require dirname(__DIR__) . '/partials/site-header.php'; ?>
 
@@ -32,7 +32,7 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                     <h1><?= e((string) $page['headline']); ?></h1>
                     <p class="hero-lead"><?= e((string) $page['lead']); ?></p>
                     <div class="hero-actions">
-                        <a class="button button-primary" href="<?= e(page_url()); ?>#kontakt"><?= e((string) $page['primaryCta']); ?></a>
+                        <a class="button button-primary" href="<?= e(page_url()); ?>#kontakt" data-conversion="primary-cta" data-conversion-location="hero"><?= e((string) $page['primaryCta']); ?></a>
                         <a class="button button-secondary" href="<?= e($phoneLink); ?>">Jetzt anrufen: <?= e((string) $company['phone']); ?></a>
                     </div>
                     <p class="landing-area"><?= e((string) $company['serviceArea']); ?></p>

@@ -8,7 +8,7 @@ declare(strict_types=1);
         <p><?= e((string) $page['ctaText']); ?></p>
     </div>
     <div class="hero-actions">
-        <a class="button button-primary" href="<?= e(page_url()); ?>#kontakt">Kontaktformular öffnen</a>
+        <a class="button button-primary" href="<?= e(page_url()); ?>#kontakt" data-conversion="primary-cta" data-conversion-location="landing-footer">Kontaktformular öffnen</a>
         <a class="button button-secondary" href="<?= e($phoneLink); ?>"><?= e((string) $company['phone']); ?></a>
     </div>
 </section>
