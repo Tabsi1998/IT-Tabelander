@@ -55,8 +55,20 @@ function config_sibling_secret_file(string $filename): string
     return dirname(__DIR__, 2) . '/it-tabelander-secrets/' . ltrim($filename, '/\\');
 }
 
-// Zentrale Pflege: Google-Place-ID, Google-API-Key, Analytics und SMTP-Zugangsdaten
-// können direkt hier eingetragen oder alternativ als Umgebungsvariablen gesetzt werden.
+$smtpHost = config_env_value('SMTP_HOST');
+$smtpPort = (int) config_env_value('SMTP_PORT', '587');
+$smtpUsername = config_env_value('SMTP_USERNAME');
+$smtpPassword = config_env_secret('SMTP_PASSWORD', '', [
+    config_sibling_secret_file('smtp-password.txt'),
+]);
+$smtpEnabledRequested = config_env_bool('SMTP_ENABLED', false);
+$smtpRequiredConfigurationPresent = $smtpHost !== ''
+    && $smtpPort > 0
+    && $smtpUsername !== ''
+    && $smtpPassword !== '';
+
+// Zentrale Pflege der öffentlichen Seiteninhalte. Zugangsdaten und
+// umgebungsspezifische Endpunkte werden ausschließlich extern konfiguriert.
 return [
     'meta' => [
         'siteName' => 'IT-Tabelander',
@@ -112,18 +124,16 @@ return [
         'sendCustomerConfirmation' => true,
         'customerConfirmationSubject' => 'Ihre Anfrage bei IT-Tabelander',
         'smtp' => [
-            'enabled' => true,
-            // Zugangsdaten des Mailservers. Alternativ können die SMTP_* Variablen am Server gesetzt werden.
-            'host' => config_env_value('SMTP_HOST', '192.168.2.106'),
-            'port' => (int) config_env_value('SMTP_PORT', '587'),
+            'enabled' => $smtpEnabledRequested && $smtpRequiredConfigurationPresent,
+            'enabledRequested' => $smtpEnabledRequested,
+            'host' => $smtpHost,
+            'port' => $smtpPort,
             'encryption' => config_env_value('SMTP_ENCRYPTION', 'tls'),
-            'username' => config_env_value('SMTP_USERNAME', 'office@tabelander.co.at'),
-            'password' => config_env_secret('SMTP_PASSWORD', '', [
-                config_sibling_secret_file('smtp-password.txt'),
-            ]),
-            'allowSelfSigned' => config_env_bool('SMTP_ALLOW_SELF_SIGNED', true),
-            'verifyPeer' => config_env_bool('SMTP_VERIFY_PEER', false),
-            'verifyPeerName' => config_env_bool('SMTP_VERIFY_PEER_NAME', false),
+            'username' => $smtpUsername,
+            'password' => $smtpPassword,
+            'allowSelfSigned' => config_env_bool('SMTP_ALLOW_SELF_SIGNED', false),
+            'verifyPeer' => config_env_bool('SMTP_VERIFY_PEER', true),
+            'verifyPeerName' => config_env_bool('SMTP_VERIFY_PEER_NAME', true),
             'timeout' => 12,
             'ehloDomain' => config_env_value('SMTP_EHLO_DOMAIN', (string) (gethostname() ?: 'localhost')),
         ],

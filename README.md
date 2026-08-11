@@ -29,7 +29,7 @@ Die Seite kann jetzt direkt mit dem Projekt-Root als `DocumentRoot` betrieben we
 
 1. `private/site-config.php` mit echten Unternehmensdaten füllen.
 2. Telefonnummer, E-Mail, Anschrift, Aufsichtsbehörde, Kammer und Berufsbezeichnung vervollständigen.
-3. Google Place ID, Google API Key und SMTP-Zugangsdaten in `private/site-config.php` oder als Umgebungsvariablen eintragen.
+3. Google Place ID, Google API Key und SMTP-Zugangsdaten ausschließlich als Umgebungsvariablen beziehungsweise Secret-Dateien bereitstellen.
 4. Rechtstexte mit den realen technischen Abläufen und gegebenenfalls juristisch prüfen lassen.
 
 ## Kontaktformular
@@ -41,20 +41,10 @@ Das Formular versendet Mails per SMTP und ist auf zwei Nachrichten vorbereitet:
 
 Zusätzlich wird jede Anfrage in `private/logs/contact-submissions.log` protokolliert. SMTP-Fehler werden in `private/logs/mail.log` erfasst.
 
-Wichtige Konfigurationswerte in `private/site-config.php`:
-
-- `mail.recipient`
-- `mail.fromEmail`
-- `mail.replyToEmail`
-- `mail.smtp.host`
-- `mail.smtp.port`
-- `mail.smtp.encryption`
-- `mail.smtp.username`
-- `mail.smtp.password`
-
-Alternativ können diese Umgebungsvariablen gesetzt werden:
+SMTP ist in einem frischen Checkout deaktiviert. Für die lokale Entwicklung kann das Formular damit gefahrlos bis zur kontrollierten Fehlermeldung getestet werden, ohne einen Mailserver anzusprechen. Für echten Versand müssen `SMTP_ENABLED=true` und alle Pflichtwerte gesetzt sein:
 
 - `CONTACT_RECIPIENT` überschreibt die Empfängeradresse aus `site-config.php`.
+- `SMTP_ENABLED` aktiviert den Versand ausdrücklich (`false` als sicherer Standard).
 - `SMTP_HOST`
 - `SMTP_PORT`
 - `SMTP_ENCRYPTION`
@@ -65,15 +55,18 @@ Alternativ können diese Umgebungsvariablen gesetzt werden:
 - `SMTP_VERIFY_PEER_NAME`
 - `SMTP_EHLO_DOMAIN`
 
-Wichtiger Hinweis zu SMTP-Passwörtern:
+Als Vorlage ohne echte Zugangsdaten dient `.env.example`; PHP lädt diese Datei nicht automatisch. Die Werte müssen durch Apache/PHP-FPM, den Prozessmanager oder die Deployment-Umgebung gesetzt werden.
+
+Wichtige Hinweise zu SMTP-Passwörtern und TLS:
 
 - Ein SMTP-Server akzeptiert bei Standard-Authentifizierung kein gehashtes Passwort, sondern das echte Passwort oder ein separates App-Passwort.
 - Das Passwort sollte daher nicht im Klartext in `site-config.php` hinterlegt werden.
 - Empfohlen ist `SMTP_PASSWORD` als Umgebungsvariable oder `SMTP_PASSWORD_FILE` mit einem Dateipfad außerhalb des Webroots.
-- Auf dem aktuellen Server wird zusätzlich automatisch `/var/www/it-tabelander-secrets/smtp-password.txt` gelesen, weil der Ordner als Geschwisterordner neben `/var/www/it-tabelander` liegt.
+- Alternativ zu `SMTP_PASSWORD_FILE` wird eine Datei `it-tabelander-secrets/smtp-password.txt` als Geschwisterpfad des Projektordners unterstützt.
 - Die Passwortdatei sollte nur das SMTP-Passwort enthalten und nicht im Git-Repository liegen. Sinnvolle Rechte sind z.B. `chmod 640 smtp-password.txt` und ein Owner bzw. eine Gruppe, die der Webserver lesen darf.
 - Der Versand erfolgt verschlüsselt über TLS oder SSL, wenn dies im Mailserver so konfiguriert ist.
-- Der aktuelle Standard ist auf den lokalen Mailserver abgestimmt: Host `192.168.2.106`, Port `587`, STARTTLS, selbstsignierte Zertifikate erlaubt und Peer-Prüfung deaktiviert. Für öffentliche Zertifikate sollte `SMTP_VERIFY_PEER=true` und `SMTP_VERIFY_PEER_NAME=true` gesetzt werden.
+- Sichere Standards sind Zertifikatsprüfung und Hostnamenprüfung aktiviert sowie selbstsignierte Zertifikate abgelehnt. Eine unsichere lokale Testumgebung muss Abweichungen ausdrücklich über die drei `SMTP_*`-Schalter setzen und darf diese Werte nicht in Produktion übernehmen.
+- Fehlen Pflichtwerte, bleibt SMTP deaktiviert. Das Formular liefert kontrolliert einen Fehler mit Request-ID; die Diagnose protokolliert nur gesetzte/fehlende Felder und niemals das Passwort.
 
 Zusätzliche Formular-Schutzmechanismen:
 

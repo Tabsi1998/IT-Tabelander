@@ -353,6 +353,7 @@ function smtp_configuration_diagnostics(array $mailConfig): array
 
     return [
         'enabled' => (bool) ($smtp['enabled'] ?? false),
+        'enabledRequested' => (bool) ($smtp['enabledRequested'] ?? false),
         'recipientSet' => trim((string) ($mailConfig['recipient'] ?? '')) !== '',
         'fromEmailValid' => filter_var((string) ($mailConfig['fromEmail'] ?? ''), FILTER_VALIDATE_EMAIL) !== false,
         'hostSet' => trim((string) ($smtp['host'] ?? '')) !== '',
@@ -361,7 +362,6 @@ function smtp_configuration_diagnostics(array $mailConfig): array
         'passwordLoaded' => trim((string) ($smtp['password'] ?? '')) !== '',
         'passwordFileExists' => $passwordFile !== '' && is_file($passwordFile),
         'passwordFileReadable' => $passwordFile !== '' && is_readable($passwordFile),
-        'passwordFile' => $passwordFile,
     ];
 }
 
