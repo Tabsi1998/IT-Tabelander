@@ -4,20 +4,13 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/bootstrap.php';
 
 $company = $siteConfig['company'];
+$pageMeta = page_meta('nutzungsbedingungen');
+$pageSchema = [];
 ?>
 <!DOCTYPE html>
-<html lang="<?= e(config('meta.language')); ?>">
+<html lang="<?= e($pageMeta['language']); ?>">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Nutzungsbedingungen | <?= e($company['name']); ?></title>
-    <meta name="description" content="Nutzungsbedingungen und Hinweise zur Website von <?= e($company['name']); ?>">
-    <link rel="canonical" href="<?= e(canonical_url('nutzungsbedingungen.php')); ?>">
-    <meta name="theme-color" content="#08141d">
-    <script><?= theme_bootstrap_script(); ?></script>
-    <?= analytics_bootstrap_script(); ?>
-    <?= site_favicon_markup(); ?>
-    <link rel="stylesheet" href="<?= e(asset_url('css/styles.css')); ?>">
+    <?php require dirname(__DIR__) . '/partials/head.php'; ?>
 </head>
 <body class="legal-body">
     <main class="legal-shell">

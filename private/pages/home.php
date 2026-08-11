@@ -5,7 +5,9 @@ require dirname(__DIR__) . '/bootstrap.php';
 require dirname(__DIR__) . '/site-services.php';
 
 $company = $siteConfig['company'];
-$meta = $siteConfig['meta'];
+$meta = page_meta('home');
+$pageMeta = $meta;
+$pageSchema = page_schema($pageMeta, $company);
 $hero = $siteConfig['hero'];
 $trustSignals = $siteConfig['trustSignals'];
 $audiences = $siteConfig['audiences'];
@@ -36,55 +38,7 @@ $formMessage = match ($formStatus) {
 <!DOCTYPE html>
 <html lang="<?= e($meta['language']); ?>">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= e($meta['title']); ?></title>
-    <meta name="description" content="<?= e($meta['description']); ?>">
-    <link rel="canonical" href="<?= e(canonical_url()); ?>">
-    <meta property="og:title" content="<?= e($meta['title']); ?>">
-    <meta property="og:description" content="<?= e($meta['description']); ?>">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="<?= e(canonical_url()); ?>">
-    <meta property="og:image" content="<?= e(canonical_url(asset_url('img/hero-it-tabelander.png'))); ?>">
-    <meta name="google-site-verification" content="ZQiRDZwcqyQ1si_x_Wxw5NBKlLvHH0_AIsGCbK9xSrc">
-    <meta name="theme-color" content="#08141d">
-    <script><?= theme_bootstrap_script(); ?></script>
-    <?= analytics_bootstrap_script(); ?>
-    <?= site_favicon_markup(); ?>
-    <link rel="preload" href="<?= e(asset_url('fonts/space-grotesk-700.ttf')); ?>" as="font" type="font/ttf" crossorigin>
-    <link rel="preload" href="<?= e(asset_url('fonts/manrope-400.ttf')); ?>" as="font" type="font/ttf" crossorigin>
-    <link rel="stylesheet" href="<?= e(asset_url('css/styles.css')); ?>">
-    <script type="application/ld+json">
-        <?= json_encode([
-            '@context' => 'https://schema.org',
-            '@type' => 'ProfessionalService',
-            'name' => $company['name'],
-            'description' => $meta['description'],
-            'areaServed' => $company['serviceArea'],
-            'address' => [
-                '@type' => 'PostalAddress',
-                'streetAddress' => $company['street'],
-                'postalCode' => $company['postalCode'],
-                'addressLocality' => $company['city'],
-                'addressCountry' => $company['country'],
-            ],
-            'email' => $company['email'],
-            'telephone' => $company['phone'],
-            'url' => canonical_url(),
-            'serviceType' => [
-                'PC- und Laptop-Reparatur',
-                'PC- und Laptop-Upgrades',
-                'Konsolen- und Controller-Reparatur',
-                'Konfiguration von Windows-Betriebssystemen',
-                'Konfiguration und Betreuung von Windows Server',
-                'Einrichtung von Linux-Distributionen und Open-Source-Servern',
-                'Netzwerk- und WLAN-Konzeption',
-                'WLAN-Messung und Störungsanalyse',
-                'Active-Directory-Betreuung',
-                'IT-Sicherheits- und Virenprüfung',
-            ],
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT); ?>
-    </script>
+    <?php require dirname(__DIR__) . '/partials/head.php'; ?>
 </head>
 <body data-reviews-url="<?= e(page_url('reviews.php')); ?>">
     <div class="site-shell">

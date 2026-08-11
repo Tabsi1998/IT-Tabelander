@@ -130,6 +130,76 @@ function canonical_url(string $path = ''): string
     return $base . $suffix;
 }
 
+function page_registry(): array
+{
+    static $pages;
+
+    if (!is_array($pages)) {
+        $loaded = require __DIR__ . '/page-registry.php';
+        $pages = is_array($loaded) ? $loaded : [];
+    }
+
+    return $pages;
+}
+
+function page_meta(string $pageKey): array
+{
+    $defaults = [
+        'path' => '',
+        'title' => (string) config('meta.title', ''),
+        'description' => (string) config('meta.description', ''),
+        'language' => (string) config('meta.language', 'de-AT'),
+        'ogType' => 'website',
+        'ogImage' => 'img/hero-it-tabelander.png',
+        'schemaType' => '',
+        'serviceTypes' => [],
+        'indexable' => false,
+        'preloadFonts' => false,
+        'googleSiteVerification' => '',
+    ];
+
+    $page = page_registry()[$pageKey] ?? [];
+
+    return array_replace($defaults, is_array($page) ? $page : []);
+}
+
+function page_schema(array $pageMeta, array $company): array
+{
+    $schemaType = trim((string) ($pageMeta['schemaType'] ?? ''));
+    if ($schemaType === '') {
+        return [];
+    }
+
+    $schema = [
+        '@context' => 'https://schema.org',
+        '@type' => $schemaType,
+        'name' => (string) ($company['name'] ?? ''),
+        'description' => (string) ($pageMeta['description'] ?? ''),
+        'areaServed' => (string) ($company['serviceArea'] ?? ''),
+        'address' => [
+            '@type' => 'PostalAddress',
+            'streetAddress' => (string) ($company['street'] ?? ''),
+            'postalCode' => (string) ($company['postalCode'] ?? ''),
+            'addressLocality' => (string) ($company['city'] ?? ''),
+            'addressCountry' => (string) ($company['country'] ?? ''),
+        ],
+        'email' => (string) ($company['email'] ?? ''),
+        'telephone' => (string) ($company['phone'] ?? ''),
+        'url' => canonical_url((string) ($pageMeta['path'] ?? '')),
+    ];
+
+    if (!empty($pageMeta['serviceTypes']) && is_array($pageMeta['serviceTypes'])) {
+        $schema['serviceType'] = array_values($pageMeta['serviceTypes']);
+    }
+
+    return $schema;
+}
+
+function og_locale(string $language): string
+{
+    return str_replace('-', '_', $language);
+}
+
 function phone_href(string $number): string
 {
     $clean = preg_replace('/[^\d+]/', '', $number);
