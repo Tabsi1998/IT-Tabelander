@@ -107,17 +107,36 @@ if (typeof darkThemeQuery.addEventListener === "function") {
 }
 
 if (navToggle && siteNav) {
+    const closeNavigation = (restoreFocus = false) => {
+        navToggle.setAttribute("aria-expanded", "false");
+        navToggle.setAttribute("aria-label", "Navigation öffnen");
+        siteNav.classList.remove("is-open");
+
+        if (restoreFocus) {
+            navToggle.focus();
+        }
+    };
+
     navToggle.addEventListener("click", () => {
         const isExpanded = navToggle.getAttribute("aria-expanded") === "true";
         navToggle.setAttribute("aria-expanded", String(!isExpanded));
+        navToggle.setAttribute("aria-label", isExpanded ? "Navigation öffnen" : "Navigation schließen");
         siteNav.classList.toggle("is-open", !isExpanded);
+
+        if (!isExpanded) {
+            siteNav.querySelector("a")?.focus();
+        }
     });
 
     siteNav.querySelectorAll("a").forEach((link) => {
-        link.addEventListener("click", () => {
-            navToggle.setAttribute("aria-expanded", "false");
-            siteNav.classList.remove("is-open");
-        });
+        link.addEventListener("click", () => closeNavigation());
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && navToggle.getAttribute("aria-expanded") === "true") {
+            event.preventDefault();
+            closeNavigation(true);
+        }
     });
 }
 
@@ -144,14 +163,29 @@ if (revealItems.length > 0 && !reducedMotionQuery.matches) {
 }
 
 const serviceCarousel = document.querySelector("[data-service-carousel]");
+const serviceInteractiveRegion = serviceCarousel?.closest(".services-carousel-shell");
 const serviceTrack = document.querySelector("[data-service-track]");
 const serviceCards = serviceTrack ? Array.from(serviceTrack.querySelectorAll("[data-service-card]")) : [];
 const serviceSliderButtons = document.querySelectorAll("[data-service-slide]");
 const serviceFilterButtons = document.querySelectorAll("[data-service-filter]");
+const serviceAutoplayButton = document.querySelector("[data-service-autoplay]");
 
 let serviceIndex = 0;
 let serviceCardsPerView = 4;
 let serviceSliderTimer = null;
+let serviceAutoplayPaused = reducedMotionQuery.matches;
+
+const updateServiceAutoplayButton = () => {
+    if (!serviceAutoplayButton) {
+        return;
+    }
+
+    serviceAutoplayButton.setAttribute("aria-pressed", String(serviceAutoplayPaused));
+    serviceAutoplayButton.textContent = serviceAutoplayPaused ? "Start" : "Pause";
+    serviceAutoplayButton.setAttribute("aria-label", serviceAutoplayPaused ? "Automatischen Leistungswechsel starten" : "Automatischen Leistungswechsel pausieren");
+    serviceAutoplayButton.disabled = reducedMotionQuery.matches || serviceMaxIndex() <= 0;
+    serviceCarousel?.setAttribute("aria-live", serviceAutoplayPaused ? "polite" : "off");
+};
 
 const getServiceCardsPerView = () => {
     if (window.matchMedia("(max-width: 700px)").matches) {
@@ -191,6 +225,12 @@ const updateServiceSlider = () => {
     const cardWidth = firstCard.getBoundingClientRect().width;
     const translate = serviceIndex * (cardWidth + gap);
     serviceTrack.style.transform = `translateX(-${translate}px)`;
+
+    visibleCards.forEach((card, index) => {
+        const isInView = index >= serviceIndex && index < serviceIndex + serviceCardsPerView;
+        card.tabIndex = isInView ? 0 : -1;
+        card.setAttribute("aria-hidden", String(!isInView));
+    });
 
     serviceSliderButtons.forEach((button) => {
         button.disabled = maxIndex === 0;
@@ -238,7 +278,7 @@ const stopServiceSlider = () => {
 };
 
 const startServiceSlider = () => {
-    if (!serviceCarousel || reducedMotionQuery.matches || serviceMaxIndex() <= 0) {
+    if (!serviceCarousel || reducedMotionQuery.matches || serviceAutoplayPaused || serviceMaxIndex() <= 0) {
         return;
     }
 
@@ -248,7 +288,19 @@ const startServiceSlider = () => {
 
 if (serviceCarousel && serviceTrack && serviceCards.length > 0) {
     updateServiceSlider();
+    updateServiceAutoplayButton();
     startServiceSlider();
+
+    serviceAutoplayButton?.addEventListener("click", () => {
+        serviceAutoplayPaused = !serviceAutoplayPaused;
+        updateServiceAutoplayButton();
+
+        if (serviceAutoplayPaused) {
+            stopServiceSlider();
+        } else {
+            startServiceSlider();
+        }
+    });
 
     serviceSliderButtons.forEach((button) => {
         button.addEventListener("click", () => {
@@ -266,11 +318,11 @@ if (serviceCarousel && serviceTrack && serviceCards.length > 0) {
         });
     });
 
-    serviceCarousel.addEventListener("mouseenter", stopServiceSlider);
-    serviceCarousel.addEventListener("mouseleave", startServiceSlider);
-    serviceCarousel.addEventListener("focusin", stopServiceSlider);
-    serviceCarousel.addEventListener("focusout", (event) => {
-        if (!serviceCarousel.contains(event.relatedTarget)) {
+    serviceInteractiveRegion?.addEventListener("mouseenter", stopServiceSlider);
+    serviceInteractiveRegion?.addEventListener("mouseleave", startServiceSlider);
+    serviceInteractiveRegion?.addEventListener("focusin", stopServiceSlider);
+    serviceInteractiveRegion?.addEventListener("focusout", (event) => {
+        if (!serviceInteractiveRegion.contains(event.relatedTarget)) {
             startServiceSlider();
         }
     });
@@ -291,11 +343,25 @@ if (serviceCarousel && serviceTrack && serviceCards.length > 0) {
 const reviewTrack = document.getElementById("reviews-track");
 const reviewFootnote = document.getElementById("reviews-footnote");
 const sliderButtons = document.querySelectorAll("[data-slide]");
+const reviewAutoplayButton = document.querySelector("[data-review-autoplay]");
 const reviewEndpoint = document.body?.dataset.reviewsUrl || "/reviews.php";
 
 let currentSlide = 0;
 let slideCount = reviewTrack ? reviewTrack.children.length : 0;
 let slideTimer = null;
+let reviewAutoplayPaused = reducedMotionQuery.matches;
+
+const updateReviewAutoplayButton = () => {
+    if (!reviewAutoplayButton) {
+        return;
+    }
+
+    reviewAutoplayButton.setAttribute("aria-pressed", String(reviewAutoplayPaused));
+    reviewAutoplayButton.textContent = reviewAutoplayPaused ? "Start" : "Pause";
+    reviewAutoplayButton.setAttribute("aria-label", reviewAutoplayPaused ? "Automatischen Bewertungswechsel starten" : "Automatischen Bewertungswechsel pausieren");
+    reviewAutoplayButton.disabled = reducedMotionQuery.matches || slideCount <= 1;
+    reviewTrack?.parentElement?.setAttribute("aria-live", reviewAutoplayPaused ? "polite" : "off");
+};
 
 const updateSlider = () => {
     if (!reviewTrack || slideCount === 0) {
@@ -303,6 +369,11 @@ const updateSlider = () => {
     }
 
     reviewTrack.style.transform = `translateX(-${currentSlide * 100}%)`;
+    Array.from(reviewTrack.children).forEach((slide, index) => {
+        const isActive = index === currentSlide;
+        slide.setAttribute("aria-hidden", String(!isActive));
+        slide.toggleAttribute("inert", !isActive);
+    });
 };
 
 const changeSlide = (direction) => {
@@ -315,10 +386,11 @@ const changeSlide = (direction) => {
 };
 
 const startSlider = () => {
-    if (slideCount <= 1 || reducedMotionQuery.matches) {
+    if (slideCount <= 1 || reducedMotionQuery.matches || reviewAutoplayPaused) {
         return;
     }
 
+    stopSlider();
     slideTimer = window.setInterval(() => changeSlide(1), 7000);
 };
 
@@ -337,8 +409,28 @@ sliderButtons.forEach((button) => {
     });
 });
 
-reviewTrack?.addEventListener("mouseenter", stopSlider);
-reviewTrack?.addEventListener("mouseleave", startSlider);
+updateReviewAutoplayButton();
+
+reviewAutoplayButton?.addEventListener("click", () => {
+    reviewAutoplayPaused = !reviewAutoplayPaused;
+    updateReviewAutoplayButton();
+
+    if (reviewAutoplayPaused) {
+        stopSlider();
+    } else {
+        startSlider();
+    }
+});
+
+const reviewInteractiveRegion = reviewTrack?.closest(".reviews-shell");
+reviewInteractiveRegion?.addEventListener("mouseenter", stopSlider);
+reviewInteractiveRegion?.addEventListener("mouseleave", startSlider);
+reviewInteractiveRegion?.addEventListener("focusin", stopSlider);
+reviewInteractiveRegion?.addEventListener("focusout", (event) => {
+    if (!reviewInteractiveRegion.contains(event.relatedTarget)) {
+        startSlider();
+    }
+});
 
 const escapeHtml = (value) => String(value)
     .replace(/&/g, "&amp;")
@@ -376,6 +468,7 @@ const renderReviewSlides = (reviews) => {
     slideCount = reviewTrack.children.length;
     currentSlide = 0;
     updateSlider();
+    updateReviewAutoplayButton();
     stopSlider();
     startSlider();
 };
@@ -450,9 +543,19 @@ const updateContactServiceOptions = () => {
 contactTopicSelect?.addEventListener("change", updateContactServiceOptions);
 updateContactServiceOptions();
 
+let cookieDialogOpener = null;
+
+const cookieFocusableElements = () => cookiePanel
+    ? Array.from(cookiePanel.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+    : [];
+
 const setCookieNoticeVisibility = (visible) => {
     if (!cookieNotice) {
         return;
+    }
+
+    if (visible) {
+        cookieDialogOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     }
 
     cookieNotice.hidden = !visible;
@@ -460,9 +563,12 @@ const setCookieNoticeVisibility = (visible) => {
 
     if (visible) {
         window.setTimeout(() => {
-            const focusTarget = cookieSaveButton || cookieAcceptButton || cookiePanel;
+            const focusTarget = cookieRejectButton || cookieSaveButton || cookieAcceptButton || cookiePanel;
             focusTarget?.focus?.();
         }, 80);
+    } else if (cookieDialogOpener?.isConnected) {
+        cookieDialogOpener.focus();
+        cookieDialogOpener = null;
     }
 };
 
@@ -606,6 +712,36 @@ if (cookieNotice) {
     cookiePanel?.addEventListener("click", (event) => {
         event.stopPropagation();
     });
+
+    cookieNotice.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            setAnalyticsConsent("declined");
+            return;
+        }
+
+        if (event.key !== "Tab") {
+            return;
+        }
+
+        const focusable = cookieFocusableElements();
+        if (focusable.length === 0) {
+            event.preventDefault();
+            cookiePanel?.focus?.();
+            return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
 }
 
 cookieResetButtons.forEach((button) => {
@@ -628,3 +764,23 @@ cookieResetButtons.forEach((button) => {
 if (window.location.hash === "#kontakt" && siteNav) {
     siteNav.classList.remove("is-open");
 }
+
+const handleReducedMotionChange = () => {
+    if (reducedMotionQuery.matches) {
+        serviceAutoplayPaused = true;
+        reviewAutoplayPaused = true;
+        stopServiceSlider();
+        stopSlider();
+    }
+
+    updateServiceAutoplayButton();
+    updateReviewAutoplayButton();
+};
+
+if (typeof reducedMotionQuery.addEventListener === "function") {
+    reducedMotionQuery.addEventListener("change", handleReducedMotionChange);
+} else if (typeof reducedMotionQuery.addListener === "function") {
+    reducedMotionQuery.addListener(handleReducedMotionChange);
+}
+
+document.querySelector('[aria-invalid="true"]')?.focus();

@@ -22,6 +22,9 @@ $formErrors = is_array($contactFlash['errors'] ?? null) ? $contactFlash['errors'
 $formMeta = is_array($contactFlash['meta'] ?? null) ? $contactFlash['meta'] : [];
 $formValue = static fn (string $field): string => (string) ($formValues[$field] ?? '');
 $formHasError = static fn (string $field): bool => in_array($field, $formErrors, true);
+$formErrorAttributes = static fn (string $field): string => $formHasError($field)
+    ? 'aria-invalid="true" aria-describedby="contact-error-' . $field . '"'
+    : '';
 $initialReviews = manual_reviews_payload($company);
 $hasPublishedReviews = !empty($initialReviews['reviews']) && is_array($initialReviews['reviews']);
 $mailErrorReference = trim((string) ($formMeta['requestId'] ?? ''));
@@ -65,7 +68,7 @@ $formMessage = match ($formStatus) {
                     <a href="#kontakt" class="nav-cta">Kontakt</a>
                 </nav>
                 <?= theme_toggle_markup(); ?>
-                <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation">
+                <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Navigation öffnen">
                     <span></span>
                     <span></span>
                 </button>
@@ -194,6 +197,7 @@ $formMessage = match ($formStatus) {
                             <button class="service-filter-button" type="button" data-service-filter="sicherheit" aria-pressed="false">Sicherheit</button>
                         </div>
                         <div class="reviews-controls">
+                            <button class="slider-button autoplay-button" type="button" data-service-autoplay aria-pressed="false">Pause</button>
                             <button class="slider-button" type="button" data-service-slide="prev" aria-label="Vorherige Leistung">&#8592;</button>
                             <button class="slider-button" type="button" data-service-slide="next" aria-label="Nächste Leistung">&#8594;</button>
                         </div>
@@ -259,6 +263,7 @@ $formMessage = match ($formStatus) {
                     <div class="reviews-meta">
                         <p class="reviews-label">Kundenrezensionen</p>
                         <div class="reviews-controls">
+                            <button class="slider-button autoplay-button" type="button" data-review-autoplay aria-pressed="false">Pause</button>
                             <button class="slider-button" type="button" data-slide="prev" aria-label="Vorherige Bewertung">&#8592;</button>
                             <button class="slider-button" type="button" data-slide="next" aria-label="Nächste Bewertung">&#8594;</button>
                         </div>
@@ -346,11 +351,13 @@ $formMessage = match ($formStatus) {
                         <div class="form-row">
                             <label>
                                 <span>Name</span>
-                                <input type="text" name="name" value="<?= e($formValue('name')); ?>" <?= $formHasError('name') ? 'aria-invalid="true"' : ''; ?> required>
+                                <input type="text" name="name" value="<?= e($formValue('name')); ?>" <?= $formErrorAttributes('name'); ?> required>
+                                <?php if ($formHasError('name')): ?><small class="form-field-error" id="contact-error-name">Bitte geben Sie einen Namen ein.</small><?php endif; ?>
                             </label>
                             <label>
                                 <span>E-Mail</span>
-                                <input type="email" name="email" value="<?= e($formValue('email')); ?>" <?= $formHasError('email') ? 'aria-invalid="true"' : ''; ?> required>
+                                <input type="email" name="email" value="<?= e($formValue('email')); ?>" <?= $formErrorAttributes('email'); ?> required>
+                                <?php if ($formHasError('email')): ?><small class="form-field-error" id="contact-error-email">Bitte geben Sie eine gültige E-Mail-Adresse ein.</small><?php endif; ?>
                             </label>
                         </div>
                         <div class="form-row">
@@ -360,7 +367,7 @@ $formMessage = match ($formStatus) {
                             </label>
                             <label>
                                 <span>Anliegen</span>
-                                <select name="audience" <?= $formHasError('audience') ? 'aria-invalid="true"' : ''; ?> required>
+                                <select name="audience" <?= $formErrorAttributes('audience'); ?> required>
                                     <option value="">Bitte wählen</option>
                                     <option value="Reparatur und Diagnose" <?= $formValue('audience') === 'Reparatur und Diagnose' ? 'selected' : ''; ?>>Reparatur und Diagnose</option>
                                     <option value="Einrichtung und Systempflege" <?= $formValue('audience') === 'Einrichtung und Systempflege' ? 'selected' : ''; ?>>Einrichtung und Systempflege</option>
@@ -369,27 +376,31 @@ $formMessage = match ($formStatus) {
                                     <option value="Server und Betreuung" <?= $formValue('audience') === 'Server und Betreuung' ? 'selected' : ''; ?>>Server und Betreuung</option>
                                     <option value="Sonstiges IT-Anliegen" <?= $formValue('audience') === 'Sonstiges IT-Anliegen' ? 'selected' : ''; ?>>Sonstiges IT-Anliegen</option>
                                 </select>
+                                <?php if ($formHasError('audience')): ?><small class="form-field-error" id="contact-error-audience">Bitte wählen Sie ein Anliegen.</small><?php endif; ?>
                             </label>
                         </div>
                         <label>
                             <span>Leistung</span>
-                            <select name="service" <?= $formHasError('service') ? 'aria-invalid="true"' : ''; ?> required>
+                            <select name="service" <?= $formErrorAttributes('service'); ?> required>
                                 <option value="">Bitte wählen</option>
                                 <?php foreach ($serviceBands as $band): ?>
                                     <?php $optionGroups = is_array($band['groups'] ?? null) ? $band['groups'] : []; ?>
                                     <option value="<?= e($band['title']); ?>" data-service-groups="<?= e(implode(' ', array_unique($optionGroups))); ?>" <?= $formValue('service') === $band['title'] ? 'selected' : ''; ?>><?= e($band['title']); ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <?php if ($formHasError('service')): ?><small class="form-field-error" id="contact-error-service">Bitte wählen Sie eine Leistung.</small><?php endif; ?>
                         </label>
                         <label>
                             <span>Nachricht</span>
-                            <textarea name="message" rows="7" <?= $formHasError('message') ? 'aria-invalid="true"' : ''; ?> required><?= e($formValue('message')); ?></textarea>
+                            <textarea name="message" rows="7" <?= $formErrorAttributes('message'); ?> required><?= e($formValue('message')); ?></textarea>
+                            <?php if ($formHasError('message')): ?><small class="form-field-error" id="contact-error-message">Bitte beschreiben Sie Ihr Anliegen etwas genauer.</small><?php endif; ?>
                         </label>
                         <?php if ($contactForm['captchaEnabled']): ?>
                             <div class="form-row form-row-captcha">
                                 <label>
                                     <span><?= e($contactForm['captchaLabel']); ?></span>
-                                    <input type="text" name="captcha_answer" inputmode="numeric" autocomplete="off" <?= $formHasError('captcha') ? 'aria-invalid="true"' : ''; ?> required>
+                                    <input type="text" name="captcha_answer" inputmode="numeric" autocomplete="off" <?= $formErrorAttributes('captcha'); ?> required>
+                                    <?php if ($formHasError('captcha')): ?><small class="form-field-error" id="contact-error-captcha">Bitte lösen Sie die Sicherheitsfrage erneut.</small><?php endif; ?>
                                 </label>
                                 <div class="captcha-question" aria-hidden="true">
                                     <span><?= e($contactForm['captchaQuestion']); ?></span>
@@ -397,8 +408,9 @@ $formMessage = match ($formStatus) {
                             </div>
                         <?php endif; ?>
                         <label class="consent-check">
-                            <input type="checkbox" name="privacy_confirmation" value="1" <?= $formValue('privacyConfirmation') === '1' ? 'checked' : ''; ?> <?= $formHasError('privacyConfirmation') ? 'aria-invalid="true"' : ''; ?> required>
+                            <input type="checkbox" name="privacy_confirmation" value="1" <?= $formValue('privacyConfirmation') === '1' ? 'checked' : ''; ?> <?= $formErrorAttributes('privacyConfirmation'); ?> required>
                             <span>Ich bestätige, dass meine Angaben zur Bearbeitung meiner Anfrage gemäß der <a href="<?= e(page_url('datenschutz.php')); ?>">Datenschutzerklärung</a> verarbeitet werden dürfen.</span>
+                            <?php if ($formHasError('privacyConfirmation')): ?><small class="form-field-error" id="contact-error-privacyConfirmation">Bitte bestätigen Sie die Datenschutzerklärung.</small><?php endif; ?>
                         </label>
                         <p class="form-note">Mit dem Absenden werden die Angaben zur Bearbeitung Ihrer Anfrage verarbeitet. Auf Wunsch kann zusätzlich eine automatische Eingangsbestätigung an die angegebene E-Mail-Adresse versendet werden. Details finden Sie in der <a href="<?= e(page_url('datenschutz.php')); ?>">Datenschutzerklärung</a>.</p>
                         <button class="button button-primary" type="submit">Anfrage absenden</button>

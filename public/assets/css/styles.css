@@ -1352,6 +1352,34 @@ html[data-resolved-theme="light"] .theme-glyph-sun {
     outline-offset: 2px;
 }
 
+.nav-toggle:focus-visible,
+.cookie-choice input:focus-visible,
+.cookie-notice-actions a:focus-visible,
+.mobile-action-bar a:focus-visible {
+    outline: 3px solid var(--accent-soft);
+    outline-offset: 4px;
+}
+
+.form-field-error {
+    display: block;
+    margin-top: 0.45rem;
+    color: #ffb79d;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+html[data-resolved-theme="light"] .form-field-error {
+    color: #8f2f0e;
+}
+
+.autoplay-button {
+    width: auto;
+    min-width: 4.8rem;
+    padding-inline: 0.85rem;
+    font-size: 0.78rem;
+}
+
 .form-note {
     margin: 0;
     color: var(--text-muted);
