@@ -225,29 +225,72 @@ function manual_reviews_path(): string
     return dirname(__DIR__) . '/private/data/reviews.json';
 }
 
-function append_contact_log(array $payload): void
+function append_contact_log(array $payload, int $retentionDays = 30): void
 {
-    ensure_runtime_directory(dirname(contact_log_path()));
-    $line = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $entry = [
+        'loggedAt' => date('c'),
+        'requestId' => (string) ($payload['requestId'] ?? ''),
+        'status' => (string) ($payload['status'] ?? 'unknown'),
+        'ownerSent' => (bool) ($payload['ownerSent'] ?? false),
+        'customerSent' => (bool) ($payload['customerSent'] ?? false),
+    ];
 
-    if ($line === false) {
-        return;
-    }
-
-    @file_put_contents(contact_log_path(), $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+    append_runtime_log(contact_log_path(), $entry, $retentionDays);
 }
 
-function append_mail_log(array $payload): void
+function append_mail_log(array $payload, int $retentionDays = 30): void
 {
     ensure_runtime_directory(dirname(mail_log_path()));
     $payload['loggedAt'] = date('c');
-    $line = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    append_runtime_log(mail_log_path(), $payload, $retentionDays);
+}
 
-    if ($line === false) {
+function append_runtime_log(string $path, array $payload, int $retentionDays): void
+{
+    ensure_runtime_directory(dirname($path));
+    prune_runtime_log($path, $retentionDays);
+
+    if ($retentionDays <= 0) {
         return;
     }
 
-    @file_put_contents(mail_log_path(), $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+    $line = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($line !== false) {
+        @file_put_contents($path, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+    }
+}
+
+function prune_runtime_log(string $path, int $retentionDays): void
+{
+    if (!is_file($path)) {
+        return;
+    }
+
+    if ($retentionDays <= 0) {
+        @file_put_contents($path, '', LOCK_EX);
+        return;
+    }
+
+    $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (!is_array($lines)) {
+        return;
+    }
+
+    $cutoff = time() - ($retentionDays * 86400);
+    $retained = [];
+
+    foreach ($lines as $line) {
+        $entry = json_decode($line, true);
+        $loggedAt = is_array($entry) ? (string) ($entry['loggedAt'] ?? '') : '';
+        $timestamp = $loggedAt !== '' ? strtotime($loggedAt) : false;
+
+        if ($timestamp !== false && $timestamp >= $cutoff) {
+            $retained[] = $line;
+        }
+    }
+
+    $contents = $retained === [] ? '' : implode(PHP_EOL, $retained) . PHP_EOL;
+    @file_put_contents($path, $contents, LOCK_EX);
 }
 
 function send_contact_mail(array $siteConfig, array $submission): array
@@ -255,6 +298,7 @@ function send_contact_mail(array $siteConfig, array $submission): array
     $company = $siteConfig['company'] ?? [];
     $mailConfig = $siteConfig['mail'] ?? [];
     $requestId = bin2hex(random_bytes(6));
+    $logRetentionDays = max(0, (int) ($siteConfig['logging']['retentionDays'] ?? 30));
 
     $result = [
         'ownerSent' => false,
@@ -268,39 +312,24 @@ function send_contact_mail(array $siteConfig, array $submission): array
             'requestId' => $requestId,
             'message' => 'SMTP ist nicht vollständig konfiguriert.',
             'diagnostics' => smtp_configuration_diagnostics($mailConfig),
-        ]);
+        ], $logRetentionDays);
 
         append_contact_log([
-            'sentAt' => date('c'),
             'requestId' => $requestId,
+            'status' => 'configuration_error',
             'ownerSent' => false,
             'customerSent' => false,
-            'name' => $submission['name'],
-            'email' => $submission['email'],
-            'phone' => $submission['phone'],
-            'audience' => $submission['audience'],
-            'service' => $submission['service'],
-            'message' => $submission['message'],
-            'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
-        ]);
+        ], $logRetentionDays);
 
         return $result;
     }
-
-    append_mail_log([
-        'type' => 'contact_mail_start',
-        'requestId' => $requestId,
-        'recipient' => $mailConfig['recipient'] ?? '',
-        'fromEmail' => $mailConfig['fromEmail'] ?? '',
-        'smtp' => smtp_public_config($mailConfig),
-        'clientIp' => (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
-    ]);
 
     if (($mailConfig['sendOwnerNotification'] ?? true) === true) {
         $ownerMessage = build_owner_notification_message($siteConfig, $submission);
         $result['ownerSent'] = smtp_send_message($mailConfig, $ownerMessage, [
             'requestId' => $requestId,
             'mailRole' => 'owner',
+            'logRetentionDays' => $logRetentionDays,
         ]);
     }
 
@@ -309,24 +338,18 @@ function send_contact_mail(array $siteConfig, array $submission): array
         $result['customerSent'] = smtp_send_message($mailConfig, $customerMessage, [
             'requestId' => $requestId,
             'mailRole' => 'customer',
+            'logRetentionDays' => $logRetentionDays,
         ]);
     } else {
         $result['customerSent'] = !($mailConfig['sendCustomerConfirmation'] ?? true);
     }
 
     append_contact_log([
-        'sentAt' => date('c'),
         'requestId' => $requestId,
+        'status' => $result['ownerSent'] ? 'accepted' : 'delivery_error',
         'ownerSent' => $result['ownerSent'],
         'customerSent' => $result['customerSent'],
-        'name' => $submission['name'],
-        'email' => $submission['email'],
-        'phone' => $submission['phone'],
-        'audience' => $submission['audience'],
-        'service' => $submission['service'],
-        'message' => $submission['message'],
-        'ip' => (string) ($_SERVER['REMOTE_ADDR'] ?? ''),
-    ]);
+    ], $logRetentionDays);
 
     return $result;
 }
@@ -397,7 +420,6 @@ function build_owner_notification_message(array $siteConfig, array $submission):
         'Anliegen' => $submission['audience'],
         'Leistung' => $submission['service'],
         'Eingang' => date('d.m.Y H:i'),
-        'IP-Adresse' => (string) ($_SERVER['REMOTE_ADDR'] ?? 'unbekannt'),
     ];
 
     $bodyHtml = render_mail_layout(
@@ -417,7 +439,6 @@ function build_owner_notification_message(array $siteConfig, array $submission):
         'Anliegen: ' . $submission['audience'],
         'Leistung: ' . $submission['service'],
         'Eingang: ' . date('d.m.Y H:i'),
-        'IP-Adresse: ' . (string) ($_SERVER['REMOTE_ADDR'] ?? 'unbekannt'),
         '',
         'Nachricht:',
         $submission['message'],
@@ -580,6 +601,7 @@ function smtp_send_message(array $mailConfig, array $message, array $context = [
     $smtp = $mailConfig['smtp'] ?? [];
     $trace = [];
     $startedAt = microtime(true);
+    $logRetentionDays = max(0, (int) ($context['logRetentionDays'] ?? 30));
 
     try {
         $socket = smtp_open_connection($smtp);
@@ -640,12 +662,9 @@ function smtp_send_message(array $mailConfig, array $message, array $context = [
             'type' => 'smtp_success',
             'requestId' => $context['requestId'] ?? '',
             'mailRole' => $context['mailRole'] ?? '',
-            'to' => $message['toEmail'] ?? '',
-            'subject' => $message['subject'] ?? '',
-            'smtp' => smtp_public_config($mailConfig),
             'durationMs' => (int) round((microtime(true) - $startedAt) * 1000),
             'trace' => $trace,
-        ]);
+        ], $logRetentionDays);
 
         return true;
     } catch (Throwable $exception) {
@@ -655,13 +674,10 @@ function smtp_send_message(array $mailConfig, array $message, array $context = [
             'type' => 'smtp',
             'requestId' => $context['requestId'] ?? '',
             'mailRole' => $context['mailRole'] ?? '',
-            'to' => $message['toEmail'] ?? '',
-            'subject' => $message['subject'] ?? '',
-            'smtp' => smtp_public_config($mailConfig),
             'durationMs' => (int) round((microtime(true) - $startedAt) * 1000),
-            'message' => $exception->getMessage(),
+            'errorType' => get_class($exception),
             'trace' => $trace,
-        ]);
+        ], $logRetentionDays);
 
         if (isset($socket) && is_resource($socket)) {
             fclose($socket);
@@ -768,16 +784,8 @@ function smtp_trace(?array &$trace, string $step, ?string $command = null, ?stri
         'step' => $step,
     ];
 
-    if ($command !== null) {
-        $entry['command'] = $command;
-    }
-
     if ($code !== null) {
         $entry['code'] = $code;
-    }
-
-    if ($response !== null && $response !== '') {
-        $entry['response'] = $response;
     }
 
     $trace[] = $entry;

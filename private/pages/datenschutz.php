@@ -50,7 +50,7 @@ $company = $siteConfig['company'];
                 <h2>3. Kontaktaufnahme über Formular, E-Mail oder Telefon</h2>
                 <p>Wenn Sie das Kontaktformular nutzen oder direkt per E-Mail bzw. Telefon anfragen, werden Ihre Angaben zur Bearbeitung Ihrer Anfrage verarbeitet. Dazu zählen insbesondere Name, E-Mail-Adresse, Telefonnummer, gewählter Leistungsbereich und die von Ihnen übermittelte Nachricht.</p>
                 <p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO zur Durchführung vorvertraglicher Maßnahmen sowie Art. 6 Abs. 1 lit. f DSGVO zur geordneten Bearbeitung von Anfragen.</p>
-                <p>Wenn die automatische Eingangsbestätigung aktiviert ist, wird die angegebene E-Mail-Adresse zusätzlich für eine Bestätigungs-E-Mail verwendet. Technisch protokolliert wird dabei auch, ob die Übermittlung an den Mailserver erfolgreich war.</p>
+                <p>Wenn die automatische Eingangsbestätigung aktiviert ist, wird die angegebene E-Mail-Adresse zusätzlich für eine Bestätigungs-E-Mail verwendet. Das technische Anwendungslog enthält nur Zeitstempel, eine zufällige Request-ID und den Versandstatus. Name, Kontaktdaten, Nachrichteninhalt und IP-Adresse werden dort nicht gespeichert. Die Logeinträge werden standardmäßig nach 30 Tagen automatisch entfernt; der Betreiber kann die Frist verkürzen oder das persistente Logging vollständig deaktivieren.</p>
                 <p>Empfänger der Daten sind interne Ansprechpartner sowie die jeweils eingesetzten Hosting- und Mail-Dienstleister. Die Daten werden so lange gespeichert, wie dies zur Bearbeitung der Anfrage und zur Erfüllung gesetzlicher Pflichten erforderlich ist.</p>
             </article>
 

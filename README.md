@@ -11,7 +11,7 @@ Wartbare One-Page-Website auf Basis von PHP, HTML, CSS und etwas JavaScript. Die
 - `private/pages/` enthält die internen Seitentemplates.
 - `private/actions/` enthält Formular- und JSON-Endpunkte.
 - `private/cache/` speichert den serverseitigen Google-Review-Cache.
-- `private/logs/` speichert Formularanfragen zusätzlich lokal als Fallback-Log.
+- `private/logs/` enthält kurzlebige, datensparsame Versandstatus-Logs und wird nie versioniert.
 
 ## Lokale Vorschau
 
@@ -39,7 +39,9 @@ Das Formular versendet Mails per SMTP und ist auf zwei Nachrichten vorbereitet:
 - Eigentümer-Benachrichtigung an `office@tabelander.co.at` beziehungsweise an die konfigurierte Empfängeradresse
 - automatische Eingangsbestätigung an den Absender
 
-Zusätzlich wird jede Anfrage in `private/logs/contact-submissions.log` protokolliert. SMTP-Fehler werden in `private/logs/mail.log` erfasst.
+Das Anwendungslog enthält ausschließlich Zeitstempel, zufällige Request-ID und Versandstatus. Name, E-Mail-Adresse, Telefonnummer, Nachricht und IP-Adresse werden dort nicht gespeichert. SMTP-Diagnosen enthalten keine Empfänger, Betreffzeilen, Zugangsdaten oder vollständigen Serverantworten.
+
+`RUNTIME_LOG_RETENTION_DAYS` steuert die Aufbewahrung (Standard: `30`). Abgelaufene JSONL-Einträge werden bei jedem neuen Logeintrag entfernt. Der Wert `0` deaktiviert persistente Anwendungslogs und leert vorhandene Runtime-Logs beim nächsten Schreibversuch.
 
 SMTP ist in einem frischen Checkout deaktiviert. Für die lokale Entwicklung kann das Formular damit gefahrlos bis zur kontrollierten Fehlermeldung getestet werden, ohne einen Mailserver anzusprechen. Für echten Versand müssen `SMTP_ENABLED=true` und alle Pflichtwerte gesetzt sein:
 

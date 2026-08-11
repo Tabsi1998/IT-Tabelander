@@ -146,6 +146,10 @@ return [
             'label' => 'Sicherheitsfrage',
         ],
     ],
+    'logging' => [
+        // Set to 0 to disable persistent application logs completely.
+        'retentionDays' => max(0, (int) config_env_value('RUNTIME_LOG_RETENTION_DAYS', '30')),
+    ],
     'hero' => [
         'eyebrow' => 'IT-Dienstleistungen in Tirol',
         'headline' => 'IT-Service für Geräte, Systeme und Netzwerke.',
