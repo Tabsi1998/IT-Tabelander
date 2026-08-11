@@ -170,12 +170,9 @@ function page_schema(array $pageMeta, array $company): array
         return [];
     }
 
-    $schema = [
-        '@context' => 'https://schema.org',
-        '@type' => $schemaType,
+    $business = [
+        '@type' => 'ProfessionalService',
         'name' => (string) ($company['name'] ?? ''),
-        'description' => (string) ($pageMeta['description'] ?? ''),
-        'areaServed' => (string) ($company['serviceArea'] ?? ''),
         'address' => [
             '@type' => 'PostalAddress',
             'streetAddress' => (string) ($company['street'] ?? ''),
@@ -185,6 +182,31 @@ function page_schema(array $pageMeta, array $company): array
         ],
         'email' => (string) ($company['email'] ?? ''),
         'telephone' => (string) ($company['phone'] ?? ''),
+        'url' => canonical_url(),
+    ];
+
+    if ($schemaType === 'Service') {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'Service',
+            'name' => (string) ($pageMeta['schemaName'] ?? $pageMeta['title'] ?? ''),
+            'description' => (string) ($pageMeta['description'] ?? ''),
+            'serviceType' => array_values(is_array($pageMeta['serviceTypes'] ?? null) ? $pageMeta['serviceTypes'] : []),
+            'areaServed' => (string) ($company['serviceArea'] ?? ''),
+            'provider' => $business,
+            'url' => canonical_url((string) ($pageMeta['path'] ?? '')),
+        ];
+    }
+
+    $schema = [
+        '@context' => 'https://schema.org',
+        '@type' => $schemaType,
+        'name' => (string) ($company['name'] ?? ''),
+        'description' => (string) ($pageMeta['description'] ?? ''),
+        'areaServed' => (string) ($company['serviceArea'] ?? ''),
+        'address' => $business['address'],
+        'email' => $business['email'],
+        'telephone' => $business['telephone'],
         'url' => canonical_url((string) ($pageMeta['path'] ?? '')),
     ];
 
@@ -193,6 +215,20 @@ function page_schema(array $pageMeta, array $company): array
     }
 
     return $schema;
+}
+
+function landing_page_content(string $pageKey): array
+{
+    static $pages;
+
+    if (!is_array($pages)) {
+        $loaded = require __DIR__ . '/landing-pages.php';
+        $pages = is_array($loaded) ? $loaded : [];
+    }
+
+    $page = $pages[$pageKey] ?? [];
+
+    return is_array($page) ? $page : [];
 }
 
 function og_locale(string $language): string

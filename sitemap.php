@@ -17,13 +17,22 @@ foreach (page_registry() as $page) {
         continue;
     }
 
-    $source = trim((string) ($page['source'] ?? ''));
-    $sourcePath = $source !== '' ? __DIR__ . '/' . ltrim($source, '/\\') : '';
-    if ($sourcePath === '' || !is_file($sourcePath)) {
+    $sources = array_filter([
+        trim((string) ($page['source'] ?? '')),
+        trim((string) ($page['contentSource'] ?? '')),
+    ]);
+    $sourcePaths = array_values(array_filter(array_map(
+        static fn (string $source): string => __DIR__ . '/' . ltrim($source, '/\\'),
+        $sources
+    ), 'is_file'));
+
+    if ($sourcePaths === []) {
         continue;
     }
 
-    $modifiedAt = filemtime($sourcePath);
+    $modifiedTimes = array_map('filemtime', $sourcePaths);
+    $modifiedTimes = array_values(array_filter($modifiedTimes, static fn ($value): bool => $value !== false));
+    $modifiedAt = $modifiedTimes !== [] ? max($modifiedTimes) : false;
     $entries[] = [
         'loc' => canonical_url((string) ($page['path'] ?? '')),
         'lastmod' => $modifiedAt !== false ? gmdate('Y-m-d', $modifiedAt) : null,

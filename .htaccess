@@ -4,6 +4,11 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule ^sitemap\.xml$ sitemap.php [L]
+    RewriteCond %{THE_REQUEST} \s/+((?:pc-reparatur-telfs|it-betreuung-telfs|wlan-netzwerk-telfs))\.php(?:[\s?]) [NC]
+    RewriteRule ^(pc-reparatur-telfs|it-betreuung-telfs|wlan-netzwerk-telfs)\.php$ /$1 [R=301,L]
+    RewriteRule ^pc-reparatur-telfs/?$ pc-reparatur-telfs.php [L]
+    RewriteRule ^it-betreuung-telfs/?$ it-betreuung-telfs.php [L]
+    RewriteRule ^wlan-netzwerk-telfs/?$ wlan-netzwerk-telfs.php [L]
     RewriteRule ^public/index\.php$ / [R=301,L]
     RewriteRule ^public/(impressum|datenschutz|nutzungsbedingungen|contact|reviews)\.php$ /$1.php [R=301,L]
     RewriteRule ^private(/|$) - [F,L]
