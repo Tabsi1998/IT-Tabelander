@@ -46,34 +46,7 @@ $formMessage = match ($formStatus) {
 </head>
 <body data-reviews-url="<?= e(page_url('reviews.php')); ?>">
     <div class="site-shell">
-        <header class="site-header">
-            <a class="brand-lockup" href="#start" aria-label="Zur Startseite">
-                <span class="brand-mobile-mark" aria-hidden="true">
-                    <img class="brand-logo-image" src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" data-theme-logo data-logo-dark-src="<?= e(asset_url('img/logo/IT-Tabelander Logo Hell Transparent.png')); ?>" data-logo-light-src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" alt="" width="560" height="616" loading="eager">
-                </span>
-                <span class="brand-banner-shell" aria-hidden="true">
-                    <img class="brand-banner-image" src="<?= e(asset_url('img/logo/IT-Tabelander Banner Dunkel Transparent.png')); ?>" data-theme-logo data-logo-dark-src="<?= e(asset_url('img/logo/IT-Tabelander Banner Hell Transparent.png')); ?>" data-logo-light-src="<?= e(asset_url('img/logo/IT-Tabelander Banner Dunkel Transparent.png')); ?>" alt="" width="1317" height="254" loading="eager">
-                </span>
-            </a>
-            <div class="header-actions">
-                <nav class="site-nav" id="site-navigation" aria-label="Hauptnavigation">
-                    <a href="<?= e(page_url('pc-reparatur-telfs')); ?>">PC-Reparatur</a>
-                    <a href="<?= e(page_url('it-betreuung-telfs')); ?>">Für Unternehmen</a>
-                    <a href="<?= e(page_url('wlan-netzwerk-telfs')); ?>">WLAN</a>
-                    <a href="#ablauf">Ablauf</a>
-                    <?php if ($hasPublishedReviews): ?>
-                        <a href="#bewertungen">Bewertungen</a>
-                    <?php endif; ?>
-                    <a href="#faq">FAQ</a>
-                    <a href="#kontakt" class="nav-cta">Kontakt</a>
-                </nav>
-                <?= theme_toggle_markup(); ?>
-                <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Navigation öffnen">
-                    <span></span>
-                    <span></span>
-                </button>
-            </div>
-        </header>
+        <?php $activePageKey = 'home'; require dirname(__DIR__) . '/partials/site-header.php'; ?>
 
         <main id="start">
             <section class="hero section">
@@ -419,24 +392,10 @@ $formMessage = match ($formStatus) {
             </section>
         </main>
 
-        <footer class="site-footer">
-            <div class="footer-brand">
-                <p class="brand-name"><?= e($company['name']); ?></p>
-                <p>IT-Dienstleistungen für Reparatur, Systeme und Infrastruktur in Tirol.</p>
-            </div>
-            <div class="footer-links">
-                <a href="<?= e(page_url('impressum.php')); ?>">Impressum</a>
-                <a href="<?= e(page_url('datenschutz.php')); ?>">Datenschutz</a>
-                <a href="<?= e(page_url('nutzungsbedingungen.php')); ?>">Nutzungsbedingungen</a>
-            </div>
-            <p class="footer-note"><?= e($company['name']); ?>, <?= e($company['city']); ?>, <?= e($company['country']); ?></p>
-        </footer>
+        <?php require dirname(__DIR__) . '/partials/site-footer.php'; ?>
         <?= cookie_notice_markup(); ?>
     </div>
-    <nav class="mobile-action-bar" aria-label="Schnellkontakt">
-        <a href="tel:<?= e(phone_href($company['phone'])); ?>">Anrufen</a>
-        <a href="#kontakt">Anfrage senden</a>
-    </nav>
-    <script src="<?= e(asset_url('js/main.js')); ?>" defer></script>
+    <?php $contactHref = '#kontakt'; require dirname(__DIR__) . '/partials/mobile-contact.php'; ?>
+    <script src="<?= e(asset_url('js/main.js')); ?>" type="module"></script>
 </body>
 </html>

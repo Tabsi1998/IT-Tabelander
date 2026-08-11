@@ -38,9 +38,7 @@ jobs:
         run: php tests/run.php
 
       - name: Check JavaScript syntax
-        run: |
-          node --check public/assets/js/head.js
-          node --check public/assets/js/main.js
+        run: find public/assets/js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
 
       - name: Validate JSON
         run: php -r 'foreach (glob("private/data/*.json") as $file) { json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR); }'

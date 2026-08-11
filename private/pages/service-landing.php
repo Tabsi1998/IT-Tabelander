@@ -23,29 +23,7 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
 </head>
 <body class="landing-body">
     <div class="site-shell">
-        <header class="site-header">
-            <a class="brand-lockup" href="<?= e(page_url()); ?>" aria-label="IT-Tabelander Startseite">
-                <span class="brand-mobile-mark" aria-hidden="true">
-                    <img class="brand-logo-image" src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" data-theme-logo data-logo-dark-src="<?= e(asset_url('img/logo/IT-Tabelander Logo Hell Transparent.png')); ?>" data-logo-light-src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" alt="" width="560" height="616">
-                </span>
-                <span class="brand-banner-shell" aria-hidden="true">
-                    <img class="brand-banner-image" src="<?= e(asset_url('img/logo/IT-Tabelander Banner Dunkel Transparent.png')); ?>" data-theme-logo data-logo-dark-src="<?= e(asset_url('img/logo/IT-Tabelander Banner Hell Transparent.png')); ?>" data-logo-light-src="<?= e(asset_url('img/logo/IT-Tabelander Banner Dunkel Transparent.png')); ?>" alt="" width="1317" height="254">
-                </span>
-            </a>
-            <div class="header-actions">
-                <nav class="site-nav" id="site-navigation" aria-label="Hauptnavigation">
-                    <a href="<?= e(page_url('pc-reparatur-telfs')); ?>">PC-Reparatur</a>
-                    <a href="<?= e(page_url('it-betreuung-telfs')); ?>">IT-Betreuung</a>
-                    <a href="<?= e(page_url('wlan-netzwerk-telfs')); ?>">WLAN</a>
-                    <a class="nav-cta" href="<?= e(page_url()); ?>#kontakt">Kontakt</a>
-                </nav>
-                <?= theme_toggle_markup(); ?>
-                <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Navigation öffnen">
-                    <span></span>
-                    <span></span>
-                </button>
-            </div>
-        </header>
+        <?php $activePageKey = $landingPageKey; require dirname(__DIR__) . '/partials/site-header.php'; ?>
 
         <main id="start">
             <section class="landing-hero section">
@@ -124,29 +102,13 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                 </ol>
             </section>
 
-            <section class="landing-cta section" aria-labelledby="landing-cta-title" data-reveal>
-                <div>
-                    <p class="section-eyebrow">Kontakt</p>
-                    <h2 id="landing-cta-title"><?= e((string) $page['ctaTitle']); ?></h2>
-                    <p><?= e((string) $page['ctaText']); ?></p>
-                </div>
-                <div class="hero-actions">
-                    <a class="button button-primary" href="<?= e(page_url()); ?>#kontakt">Kontaktformular öffnen</a>
-                    <a class="button button-secondary" href="<?= e($phoneLink); ?>"><?= e((string) $company['phone']); ?></a>
-                </div>
-            </section>
+            <?php require dirname(__DIR__) . '/partials/contact-cta.php'; ?>
         </main>
 
-        <footer class="site-footer">
-            <p><strong><?= e((string) $company['name']); ?></strong> · <?= e(company_address_inline($company)); ?></p>
-            <nav aria-label="Rechtliches">
-                <a href="<?= e(page_url('impressum.php')); ?>">Impressum</a>
-                <a href="<?= e(page_url('datenschutz.php')); ?>">Datenschutz</a>
-                <a href="<?= e(page_url('nutzungsbedingungen.php')); ?>">Nutzungsbedingungen</a>
-            </nav>
-        </footer>
+        <?php require dirname(__DIR__) . '/partials/site-footer.php'; ?>
     </div>
     <?= cookie_notice_markup(); ?>
-    <script src="<?= e(asset_url('js/main.js')); ?>" defer></script>
+    <?php $contactHref = page_url() . '#kontakt'; require dirname(__DIR__) . '/partials/mobile-contact.php'; ?>
+    <script src="<?= e(asset_url('js/main.js')); ?>" type="module"></script>
 </body>
 </html>

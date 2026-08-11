@@ -58,6 +58,6 @@ $pageSchema = [];
         </section>
     </main>
     <?= cookie_notice_markup(); ?>
-    <script src="<?= e(asset_url('js/main.js')); ?>" defer></script>
+    <script src="<?= e(asset_url('js/main.js')); ?>" type="module"></script>
 </body>
 </html>
