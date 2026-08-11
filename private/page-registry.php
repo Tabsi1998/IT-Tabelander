@@ -4,17 +4,17 @@ declare(strict_types=1);
 return [
     'home' => [
         'path' => '',
-        'title' => 'IT-Tabelander | IT-Service in Telfs und Tirol',
-        'description' => 'IT-Service in Telfs: Reparatur, Einrichtung, Server, Netzwerk, WLAN und Sicherheitsprüfung für Privatpersonen und Unternehmen in Tirol.',
+        'title' => 'Computerhilfe für Private in Telfs | IT-Tabelander',
+        'description' => 'Persönliche Computerhilfe in Telfs: PC- und Laptop-Reparatur, WLAN zuhause, Einrichtung, Sicherheit sowie Controller-Service direkt mit Fabian.',
         'ogImage' => 'img/hero-it-tabelander-1440.webp',
         'schemaType' => 'ProfessionalService',
         'serviceTypes' => [
             'PC- und Laptop-Reparatur',
             'PC- und Laptop-Upgrades',
-            'Windows- und Linux-Systembetreuung',
-            'Netzwerk- und WLAN-Konzeption',
-            'Server- und Benutzerverwaltung',
-            'IT-Sicherheits- und Virenprüfung',
+            'Einrichtung und Datenumzug',
+            'WLAN- und Heimnetz-Hilfe',
+            'IT-Sicherheits- und Virenprüfung für private Geräte',
+            'Controller- und Konsolen-Service',
         ],
         'indexable' => true,
         'changefreq' => 'weekly',
@@ -46,7 +46,9 @@ return [
         'schemaType' => 'Service',
         'schemaName' => 'IT-Betreuung für Unternehmen in Telfs und Tirol',
         'serviceTypes' => ['Laufende IT-Betreuung', 'Störungsbehebung', 'Benutzerverwaltung', 'IT-Dokumentation'],
-        'indexable' => true,
+        // Die frühere Firmen-Landingpage bleibt nur als archivierter Code erhalten.
+        // Sie wird nicht mehr ausgeliefert oder in die Sitemap aufgenommen.
+        'indexable' => false,
         'changefreq' => 'monthly',
         'priority' => '0.9',
         'source' => 'private/pages/service-landing.php',

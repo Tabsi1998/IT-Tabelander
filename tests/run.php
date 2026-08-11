@@ -173,11 +173,22 @@ test('private Pfade und Endpunkte bleiben außerhalb der Sitemap', function () u
     }
 });
 
+test('Privatkunden-Fokus ohne unbelegte Kennzahlen', function () use ($projectRoot): void {
+    $registry = page_registry();
+    assert_same(false, (bool) ($registry['it-betreuung-telfs']['indexable'] ?? true), 'Firmen-Landingpage ist noch indexierbar.');
+
+    $home = render_php_script($projectRoot . '/index.php');
+    $sitemap = render_php_script($projectRoot . '/sitemap.php');
+    assert_true(str_contains($home, 'PC kaputt?'), 'Neue Privatkunden-Ansprache fehlt.');
+    assert_true(!str_contains($home, 'Für Unternehmen'), 'Firmenansprache ist noch in der sichtbaren Startseite enthalten.');
+    assert_true(!str_contains($home, 'data-count-up'), 'Deaktivierte oder unbelegte Kennzahlen wurden ausgegeben.');
+    assert_true(!str_contains($sitemap, 'it-betreuung-telfs'), 'Firmen-Landingpage ist noch in der Sitemap enthalten.');
+});
+
 test('Smoke-Rendering der öffentlichen Seiten', function () use ($projectRoot): void {
     $scripts = [
-        'index.php' => 'PC-Reparatur und IT-Betreuung in Telfs.',
+        'index.php' => 'Ich bringe Ruhe in Ihre Technik.',
         'pc-reparatur-telfs.php' => 'Wenn der Computer streikt',
-        'it-betreuung-telfs.php' => 'IT-Betreuung für Unternehmen',
         'wlan-netzwerk-telfs.php' => 'WLAN &amp; Netzwerk in Telfs',
         'sitemap.php' => '<urlset',
     ];

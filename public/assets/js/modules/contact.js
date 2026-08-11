@@ -6,7 +6,7 @@ const contactTopicGroups = {
     "Einrichtung und Systempflege": "systeme",
     "Netzwerk und WLAN": "netzwerk",
     "Sicherheit und Virenprüfung": "sicherheit",
-    "Server und Betreuung": "systeme",
+    "Gaming-Hardware": "gaming",
 };
 
 const updateContactServiceOptions = () => {

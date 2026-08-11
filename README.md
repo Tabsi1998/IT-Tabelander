@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Tabsi1998/IT-Tabelander/actions/workflows/ci.yml/badge.svg)](https://github.com/Tabsi1998/IT-Tabelander/actions/workflows/ci.yml)
 
-Wartbare Unternehmenswebsite mit lokaler SEO-Landingpage-Struktur auf Basis von PHP, HTML, modularisiertem CSS und JavaScript. Die Seite ist für Apache mit PHP gedacht und braucht weder Composer noch einen Frontend-Build.
+Wartbare, auf private Haushalte ausgerichtete IT-Service-Website mit lokaler SEO-Landingpage-Struktur auf Basis von PHP, HTML, modularisiertem CSS und JavaScript. Die Seite ist für Apache mit PHP gedacht und braucht weder Composer noch einen Frontend-Build.
 
 ## Voraussetzungen
 
@@ -90,7 +90,7 @@ Leere Pflichtwerte deaktivieren die jeweilige externe Integration kontrolliert. 
 5. SMTP- und Google-Secrets ausschließlich über Environment oder geschützte Dateien bereitstellen; niemals in `site-config.php` schreiben.
 6. Schreibrechte nur für `private/logs/` und `private/cache/` gewähren. Die Verzeichnisse werden bei Bedarf automatisch angelegt; der übrige Code sollte für den Webserver schreibgeschützt sein.
 7. HTTPS und Redirect auf HTTPS vollständig testen, bevor HSTS für eine neue Domain aktiviert wird. CSP, Kontaktformular, Consent und Analytics im Browser ohne Policy-Verstöße prüfen.
-8. Startseite, drei Landingpages, Rechtstexte, `/sitemap.xml`, `robots.txt` und Kontaktstatus als Smoke-Test aufrufen.
+8. Startseite, zwei aktive Privatkunden-Landingpages, Rechtstexte, `/sitemap.xml`, `robots.txt` und Kontaktstatus als Smoke-Test aufrufen. Die frühere Firmen-Landingpage ist bewusst nicht indexierbar und liefert 404.
 9. Rechtstexte mit den realen technischen Abläufen abgleichen und bei Bedarf juristisch prüfen lassen.
 
 ## Niemals committen
@@ -195,6 +195,10 @@ Beispiel:
 ```
 
 Benötigt werden nur `author` und `text`. `rating`, `date` und `url` sind optional.
+
+Eine kurze Schritt-für-Schritt-Anleitung für Bewertungen und die bewusst zunächst deaktivierten, hochzählenden Kennzahlen steht in [`docs/INHALTE-PFLEGEN.md`](docs/INHALTE-PFLEGEN.md). Mit `php private/tools/content-check.php` lassen sich beide JSON-Dateien vor dem Veröffentlichen prüfen.
+
+Die Referenzanalyse, Gestaltungsentscheidungen und empfohlenen nächsten echten Inhalte sind in [`docs/REDESIGN-KONZEPT.md`](docs/REDESIGN-KONZEPT.md) dokumentiert.
 
 ## AGB / Nutzungsbedingungen
 

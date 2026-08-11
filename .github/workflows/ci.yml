@@ -43,6 +43,9 @@ jobs:
       - name: Validate JSON
         run: php -r 'foreach (glob("private/data/*.json") as $file) { json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR); }'
 
+      - name: Validate editable website content
+        run: php private/tools/content-check.php
+
       - name: Validate generated sitemap XML
         run: |
           php sitemap.php > /tmp/it-tabelander-sitemap.xml

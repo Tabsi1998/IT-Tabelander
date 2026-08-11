@@ -69,7 +69,7 @@ $smtpRequiredConfigurationPresent = $smtpHost !== ''
 
 // Zentrale Pflege der öffentlichen Seiteninhalte. Zugangsdaten und
 // umgebungsspezifische Endpunkte werden ausschließlich extern konfiguriert.
-return [
+$config = [
     'meta' => [
         'siteName' => 'IT-Tabelander',
         'language' => 'de-AT',
@@ -361,3 +361,7 @@ return [
         ],
     ],
 ];
+
+$homeContent = require __DIR__ . '/home-content.php';
+
+return array_replace($config, $homeContent);

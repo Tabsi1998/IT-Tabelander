@@ -9,12 +9,11 @@ $meta = page_meta('home');
 $pageMeta = $meta;
 $pageSchema = page_schema($pageMeta, $company);
 $hero = $siteConfig['hero'];
-$trustSignals = $siteConfig['trustSignals'];
 $about = $siteConfig['about'];
-$audiences = $siteConfig['audiences'];
 $serviceBands = $siteConfig['serviceBands'];
 $processSteps = $siteConfig['processSteps'];
 $faq = $siteConfig['faq'];
+$publicStats = load_public_stats();
 $contactForm = build_contact_form_view_model($siteConfig);
 $contactFlash = consume_contact_form_flash();
 $formValues = is_array($contactFlash['values'] ?? null) ? $contactFlash['values'] : [];
@@ -49,347 +48,162 @@ $formMessage = match ($formStatus) {
         <?php $activePageKey = 'home'; require dirname(__DIR__) . '/partials/site-header.php'; ?>
 
         <main id="start">
-            <section class="hero section">
-                <div class="hero-copy" data-reveal>
-                    <p class="section-eyebrow"><?= e($hero['eyebrow']); ?></p>
-                    <h1><?= e($hero['headline']); ?></h1>
-                    <p class="hero-lead"><?= e($hero['lead']); ?></p>
+            <section class="home-hero section" aria-labelledby="home-hero-title">
+                <div class="home-hero-copy" data-reveal>
+                    <p class="section-eyebrow"><?= e((string) $hero['eyebrow']); ?></p>
+                    <h1 id="home-hero-title"><span><?= e((string) $hero['headlineAccent']); ?></span><?= e((string) $hero['headline']); ?></h1>
+                    <p class="home-hero-lead"><?= e((string) $hero['lead']); ?></p>
                     <div class="hero-actions">
-                        <a class="button button-primary" href="#kontakt" data-conversion="primary-cta" data-conversion-location="hero"><?= e($hero['primaryCta']); ?></a>
-                        <a class="button button-secondary" href="tel:<?= e(phone_href($company['phone'])); ?>">Jetzt anrufen: <?= e($company['phone']); ?></a>
+                        <a class="button button-primary" href="#kontakt" data-conversion="primary-cta" data-conversion-location="hero"><?= e((string) $hero['primaryCta']); ?> <span aria-hidden="true">↗</span></a>
+                        <a class="home-phone-link" href="tel:<?= e(phone_href((string) $company['phone'])); ?>">
+                            <span class="home-phone-icon" aria-hidden="true">↗</span>
+                            <span><small>Lieber direkt sprechen?</small><strong><?= e((string) $company['phone']); ?></strong></span>
+                        </a>
                     </div>
-                    <ul class="hero-points" aria-label="Schwerpunkte">
+                    <ul class="home-trust-line" aria-label="Ihre Vorteile">
                         <?php foreach ($hero['highlights'] as $highlight): ?>
-                            <li><?= e($highlight); ?></li>
+                            <li><?= e((string) $highlight); ?></li>
                         <?php endforeach; ?>
                     </ul>
                 </div>
-                <div class="hero-visual" data-reveal>
-                    <div class="hero-image-frame">
-                        <img src="<?= e(asset_url('img/hero-it-tabelander-768.webp')); ?>" srcset="<?= e(asset_url('img/hero-it-tabelander-768.webp')); ?> 768w, <?= e(asset_url('img/hero-it-tabelander-1440.webp')); ?> 1440w" sizes="(max-width: 980px) 100vw, 48vw" alt="Werkbank mit offenem PC, Laptop und Controller-Reparatur" width="1717" height="916" loading="eager" fetchpriority="high">
+                <div class="home-hero-visual" data-reveal>
+                    <div class="home-hero-image">
+                        <img src="<?= e(asset_url('img/hero-it-tabelander-768.webp')); ?>" srcset="<?= e(asset_url('img/hero-it-tabelander-768.webp')); ?> 768w, <?= e(asset_url('img/hero-it-tabelander-1440.webp')); ?> 1440w" sizes="(max-width: 980px) 100vw, 46vw" alt="Werkbank für Computer-, Laptop- und Controller-Reparaturen" width="1717" height="916" loading="eager" fetchpriority="high">
                     </div>
-                    <div class="hero-aside">
-                        <p>Standort und Einsatzgebiet</p>
-                        <strong><?= e($company['serviceArea']); ?></strong>
+                    <div class="home-hero-stamp" aria-label="Persönlich betreut von Fabian Tabelander">
+                        <span>Direkt bei</span>
+                        <strong>Fabian</strong>
+                    </div>
+                    <div class="home-hero-location">
+                        <span class="status-dot" aria-hidden="true"></span>
+                        <p><small>Hilfe aus Telfs</small><strong>Vor Ort · Fernwartung · Geräteübergabe</strong></p>
                     </div>
                 </div>
             </section>
 
-            <section class="signal-strip section">
-                <?php foreach ($trustSignals as $signal): ?>
-                    <article class="signal-item" data-reveal>
-                        <h2><?= e($signal['title']); ?></h2>
-                        <p><?= e($signal['text']); ?></p>
-                    </article>
+            <a class="problem-jump" href="#hilfe" data-reveal>
+                <span>Was macht Probleme?</span>
+                <strong>PC & Laptop</strong>
+                <strong>WLAN zuhause</strong>
+                <strong>Einrichten & Aufrüsten</strong>
+                <strong>Sicherheit</strong>
+                <span class="problem-jump-arrow" aria-hidden="true">↓</span>
+            </a>
+
+            <section class="problem-finder section" id="hilfe" aria-labelledby="problem-finder-title">
+                <div class="problem-finder-heading" data-reveal>
+                    <p class="section-eyebrow">Wobei kann ich helfen?</p>
+                    <h2 id="problem-finder-title">Nicht jede Störung braucht gleich ein neues Gerät.</h2>
+                    <p>Wählen Sie einfach das, was Ihrem Problem am nächsten kommt. Wir klären gemeinsam, ob Reparatur, Einstellung oder ein sinnvoller Austausch hilft.</p>
+                </div>
+                <div class="problem-finder-layout">
+                    <div class="problem-list" data-service-accordion data-reveal>
+                        <?php foreach ($serviceBands as $index => $band): ?>
+                            <details class="problem-service" <?= $index === 0 ? 'open' : ''; ?> data-service-detail data-image-src="<?= e(asset_url('img/services/' . $band['image'] . '-1200.webp')); ?>" data-image-srcset="<?= e(asset_url('img/services/' . $band['image'] . '-640.webp')); ?> 640w, <?= e(asset_url('img/services/' . $band['image'] . '-1200.webp')); ?> 1200w" data-image-alt="<?= e((string) $band['imageAlt']); ?>">
+                                <summary>
+                                    <span class="problem-index"><?= e(str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT)); ?></span>
+                                    <span class="problem-title"><strong><?= e((string) $band['title']); ?></strong><small><?= e((string) $band['audience']); ?></small></span>
+                                    <span class="problem-toggle" aria-hidden="true"></span>
+                                </summary>
+                                <div class="problem-service-body">
+                                    <p><?= e((string) $band['intro']); ?></p>
+                                    <ul>
+                                        <?php foreach ($band['items'] as $item): ?><li><?= e((string) $item); ?></li><?php endforeach; ?>
+                                    </ul>
+                                    <a href="#kontakt">Dieses Problem schildern <span aria-hidden="true">↗</span></a>
+                                </div>
+                            </details>
+                        <?php endforeach; ?>
+                    </div>
+                    <figure class="problem-visual" data-service-visual data-reveal>
+                        <?php $firstService = $serviceBands[0]; ?>
+                        <img src="<?= e(asset_url('img/services/' . $firstService['image'] . '-1200.webp')); ?>" srcset="<?= e(asset_url('img/services/' . $firstService['image'] . '-640.webp')); ?> 640w, <?= e(asset_url('img/services/' . $firstService['image'] . '-1200.webp')); ?> 1200w" sizes="(max-width: 980px) 100vw, 42vw" alt="<?= e((string) $firstService['imageAlt']); ?>" width="<?= e((string) ($firstService['imageWidth'] ?? 1536)); ?>" height="<?= e((string) ($firstService['imageHeight'] ?? 1024)); ?>" loading="lazy" decoding="async">
+                        <figcaption><span aria-hidden="true">●</span> Erst prüfen. Dann ehrlich empfehlen.</figcaption>
+                    </figure>
+                </div>
+            </section>
+
+            <section class="home-process section" id="ablauf" aria-labelledby="home-process-title">
+                <div class="home-process-intro" data-reveal>
+                    <p class="section-eyebrow">So läuft es</p>
+                    <h2 id="home-process-title">Von „geht nicht“ zu „läuft wieder“.</h2>
+                    <p>Sie müssen das Problem nicht technisch erklären können. Beschreiben Sie einfach, was Sie sehen oder hören.</p>
+                    <a class="text-link" href="#kontakt">Jetzt kurz schildern <span aria-hidden="true">↗</span></a>
+                </div>
+                <ol class="home-process-list">
+                    <?php foreach ($processSteps as $index => $step): ?>
+                        <li data-reveal>
+                            <span><?= e(str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT)); ?></span>
+                            <div><h3><?= e((string) $step['title']); ?></h3><p><?= e((string) $step['text']); ?></p></div>
+                        </li>
+                    <?php endforeach; ?>
+                </ol>
+            </section>
+
+            <?php if ($publicStats !== []): ?>
+            <section class="home-stats section" aria-label="Belegte Kennzahlen">
+                <?php foreach ($publicStats as $stat): ?>
+                    <p data-reveal><strong data-count-up="<?= e((string) $stat['value']); ?>">0</strong><span class="stat-suffix"><?= e((string) $stat['suffix']); ?></span><small><?= e((string) $stat['label']); ?></small></p>
                 <?php endforeach; ?>
             </section>
+            <?php endif; ?>
 
-            <section class="local-services section" aria-labelledby="local-services-title">
-                <div class="section-heading" data-reveal>
-                    <p class="section-eyebrow">Direkt zum passenden Service</p>
-                    <h2 id="local-services-title">IT-Hilfe in Telfs – klar nach Anliegen.</h2>
-                    <p>Wählen Sie den Bereich, der zu Ihrem Problem oder Betrieb passt.</p>
-                </div>
-                <div class="local-services-grid">
-                    <a class="local-service-link" href="<?= e(page_url('pc-reparatur-telfs')); ?>" data-reveal>
-                        <span>Für Geräte</span>
-                        <h3>PC- & Laptop-Reparatur</h3>
-                        <p>Diagnose, Startprobleme, Überhitzung sowie SSD- und RAM-Upgrades.</p>
-                        <strong>Reparatur in Telfs ansehen →</strong>
-                    </a>
-                    <a class="local-service-link" href="<?= e(page_url('it-betreuung-telfs')); ?>" data-reveal>
-                        <span>Für Unternehmen</span>
-                        <h3>Laufende IT-Betreuung</h3>
-                        <p>Arbeitsplätze, Benutzer, Netzwerk, Server, Updates und Dokumentation.</p>
-                        <strong>Firmenbetreuung ansehen →</strong>
-                    </a>
-                    <a class="local-service-link" href="<?= e(page_url('wlan-netzwerk-telfs')); ?>" data-reveal>
-                        <span>Privat & Betrieb</span>
-                        <h3>WLAN & Netzwerk</h3>
-                        <p>Funklöcher messen, Access Points planen und Verbindungen stabilisieren.</p>
-                        <strong>WLAN-Service ansehen →</strong>
-                    </a>
-                </div>
-            </section>
-
-            <section class="audience-section section">
-                <div class="section-heading" data-reveal>
-                    <p class="section-eyebrow">Leistungsfokus</p>
-                    <h2>IT ohne unnötige Schubladen.</h2>
-                    <p>Der Fokus liegt auf dem Problem und der passenden Lösung: Reparatur, Einrichtung, Netzwerk, WLAN, Server oder Sicherheit.</p>
-                </div>
-                <div class="audience-grid">
-                    <?php foreach ($audiences as $audience): ?>
-                        <article class="audience-panel" data-reveal>
-                            <p class="audience-label"><?= e($audience['label']); ?></p>
-                            <h3><?= e($audience['headline']); ?></h3>
-                            <p><?= e($audience['copy']); ?></p>
-                        </article>
-                    <?php endforeach; ?>
-                </div>
-            </section>
-
-            <section class="about-section section" id="ueber-uns">
-                <div class="about-copy" data-reveal>
+            <section class="home-about section" id="ueber-mich" aria-labelledby="home-about-title">
+                <div class="home-about-mark" data-reveal aria-hidden="true"><span>FT</span><small>Telfs · Tirol</small></div>
+                <div class="home-about-copy" data-reveal>
                     <p class="section-eyebrow"><?= e((string) $about['eyebrow']); ?></p>
-                    <h2><?= e((string) $about['headline']); ?></h2>
-                    <p><?= e((string) $about['copy']); ?></p>
-                    <div class="hero-actions">
-                        <a class="button button-primary" href="#kontakt">Fabian Tabelander kontaktieren</a>
-                        <a class="button button-secondary" href="tel:<?= e(phone_href($company['phone'])); ?>"><?= e($company['phone']); ?></a>
-                    </div>
-                </div>
-                <aside class="about-facts" aria-label="Arbeitsweise" data-reveal>
-                    <p><strong>Inhaber</strong><span><?= e($company['owner']); ?></span></p>
-                    <p><strong>Standort</strong><span><?= e($company['postalCode'] . ' ' . $company['city']); ?></span></p>
+                    <h2 id="home-about-title"><?= e((string) $about['headline']); ?></h2>
+                    <p class="home-about-lead"><?= e((string) $about['copy']); ?></p>
                     <ul>
-                        <?php foreach ($about['principles'] as $principle): ?>
-                            <li><?= e((string) $principle); ?></li>
-                        <?php endforeach; ?>
+                        <?php foreach ($about['principles'] as $principle): ?><li><?= e((string) $principle); ?></li><?php endforeach; ?>
                     </ul>
-                </aside>
-            </section>
-
-            <section class="services-section section" id="leistungen">
-                <div class="section-heading" data-reveal>
-                    <p class="section-eyebrow">Leistungen</p>
-                    <h2>Leistungen im Überblick.</h2>
-                    <p>Von Endgeräten bis Infrastruktur klar gegliedert und technisch nachvollziehbar.</p>
-                </div>
-                <div class="services-carousel-shell" data-reveal>
-                    <div class="services-carousel-head">
-                        <div class="services-carousel-copy">
-                            <p class="reviews-label">Ausgewählte Bereiche</p>
-                            <p>Reparatur, Systempflege, Netzwerk, WLAN und Sicherheit nach Themen gebündelt.</p>
-                        </div>
-                        <div class="service-filter" aria-label="Leistungen filtern">
-                            <button class="service-filter-button is-active" type="button" data-service-filter="all" aria-pressed="true">Alle</button>
-                            <button class="service-filter-button" type="button" data-service-filter="reparatur" aria-pressed="false">Reparatur</button>
-                            <button class="service-filter-button" type="button" data-service-filter="systeme" aria-pressed="false">Systeme</button>
-                            <button class="service-filter-button" type="button" data-service-filter="netzwerk" aria-pressed="false">Netzwerk/WLAN</button>
-                            <button class="service-filter-button" type="button" data-service-filter="sicherheit" aria-pressed="false">Sicherheit</button>
-                        </div>
-                        <div class="reviews-controls">
-                            <button class="slider-button autoplay-button" type="button" data-service-autoplay aria-pressed="false">Pause</button>
-                            <button class="slider-button" type="button" data-service-slide="prev" aria-label="Vorherige Leistung">&#8592;</button>
-                            <button class="slider-button" type="button" data-service-slide="next" aria-label="Nächste Leistung">&#8594;</button>
-                        </div>
+                    <div class="hero-actions">
+                        <a class="button button-dark" href="#kontakt">Fabian kontaktieren <span aria-hidden="true">↗</span></a>
+                        <a class="text-link text-link-dark" href="tel:<?= e(phone_href((string) $company['phone'])); ?>"><?= e((string) $company['phone']); ?></a>
                     </div>
-                    <div class="services-carousel" data-service-carousel aria-live="polite">
-                        <div class="services-track" data-service-track>
-                        <?php foreach ($serviceBands as $band): ?>
-                            <?php
-                                $serviceGroups = array_merge(['all'], is_array($band['groups'] ?? null) ? $band['groups'] : []);
-                            ?>
-                            <article class="service-card" data-service-card data-service-groups="<?= e(implode(' ', array_unique($serviceGroups))); ?>" tabindex="0">
-                                <?php if (!empty($band['image'])): ?>
-                                    <div class="service-card-media">
-                                        <?php $serviceImageBase = pathinfo((string) $band['image'], PATHINFO_FILENAME); ?>
-                                        <img src="<?= e(asset_url('img/services/' . $serviceImageBase . '-640.webp')); ?>" srcset="<?= e(asset_url('img/services/' . $serviceImageBase . '-640.webp')); ?> 640w, <?= e(asset_url('img/services/' . $serviceImageBase . '-1200.webp')); ?> 1200w" sizes="(max-width: 640px) 92vw, (max-width: 1180px) 46vw, 31vw" alt="<?= e($band['title']); ?>" width="<?= e((string) ($band['imageWidth'] ?? 1536)); ?>" height="<?= e((string) ($band['imageHeight'] ?? 1024)); ?>" loading="lazy" decoding="async">
-                                    </div>
-                                <?php endif; ?>
-                                <div class="service-card-body">
-                                    <p class="service-audience"><?= e($band['audience']); ?></p>
-                                    <h3><?= e($band['title']); ?></h3>
-                                    <p class="service-intro"><?= e($band['intro']); ?></p>
-                                    <div class="service-card-details">
-                                        <p>Schwerpunkte</p>
-                                        <ul class="service-list service-list-compact">
-                                        <?php foreach ($band['items'] as $item): ?>
-                                            <li><?= e($item); ?></li>
-                                        <?php endforeach; ?>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </article>
-                        <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="process-section section" id="ablauf">
-                <div class="section-heading" data-reveal>
-                    <p class="section-eyebrow">Ablauf</p>
-                    <h2>Klar von Anfrage bis Übergabe.</h2>
-                    <p>Jede Umsetzung soll verständlich bleiben: vom ersten Fehlerbild bis zur getesteten Übergabe.</p>
-                </div>
-                <div class="process-track">
-                    <?php foreach ($processSteps as $index => $step): ?>
-                        <article class="process-step" data-reveal>
-                            <p class="process-number"><?= e(str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT)); ?></p>
-                            <h3><?= e($step['title']); ?></h3>
-                            <p><?= e($step['text']); ?></p>
-                        </article>
-                    <?php endforeach; ?>
                 </div>
             </section>
 
             <?php if ($hasPublishedReviews): ?>
-            <section class="reviews-section section" id="bewertungen">
-                <div class="section-heading" data-reveal>
-                    <p class="section-eyebrow">Bewertungen</p>
-                    <h2>Kundenstimmen.</h2>
-                    <p>Rückmeldungen aus abgeschlossenen IT-Service-, Reparatur- und Betreuungsterminen.</p>
+            <section class="home-reviews section" id="bewertungen" aria-labelledby="home-reviews-title">
+                <div class="home-reviews-head" data-reveal>
+                    <div><p class="section-eyebrow">Echte Rückmeldungen</p><h2 id="home-reviews-title">Was Kundinnen und Kunden sagen.</h2></div>
+                    <div class="reviews-controls">
+                        <button class="slider-button" type="button" data-slide="prev" aria-label="Vorherige Bewertung">←</button>
+                        <button class="slider-button" type="button" data-slide="next" aria-label="Nächste Bewertung">→</button>
+                    </div>
                 </div>
-                <div class="reviews-shell" data-reveal>
-                    <div class="reviews-meta">
-                        <p class="reviews-label">Kundenrezensionen</p>
-                        <div class="reviews-controls">
-                            <button class="slider-button autoplay-button" type="button" data-review-autoplay aria-pressed="false">Pause</button>
-                            <button class="slider-button" type="button" data-slide="prev" aria-label="Vorherige Bewertung">&#8592;</button>
-                            <button class="slider-button" type="button" data-slide="next" aria-label="Nächste Bewertung">&#8594;</button>
-                        </div>
+                <div class="reviews-slider" data-reveal aria-live="polite">
+                    <div class="reviews-track" id="reviews-track">
+                        <?php foreach ($initialReviews['reviews'] as $review): ?>
+                            <article class="review-slide">
+                                <p class="review-rating"><?= e((string) ($review['rating'] ?? '')); ?><?= !empty($review['rating']) ? ' / 5' : 'Kundenstimme'; ?></p>
+                                <blockquote>„<?= e((string) ($review['text'] ?? '')); ?>“</blockquote>
+                                <div class="review-meta"><strong><?= e((string) ($review['author'] ?? 'Kundenrezension')); ?></strong><span><?= e((string) ($review['relativeTime'] ?? '')); ?></span><?php if (!empty($review['url'])): ?><a href="<?= e((string) $review['url']); ?>" target="_blank" rel="noreferrer">Original ansehen</a><?php endif; ?></div>
+                            </article>
+                        <?php endforeach; ?>
                     </div>
-                    <div class="reviews-slider" aria-live="polite">
-                        <div class="reviews-track" id="reviews-track">
-                            <?php foreach ($initialReviews['reviews'] as $review): ?>
-                                <article class="review-slide">
-                                    <p class="review-rating"><?= e((string) ($review['rating'] ?? 'Bewertung')); ?><?= !empty($review['rating']) ? ' / 5' : ''; ?></p>
-                                    <h3><?= e((string) ($review['author'] ?? 'Kundenrezension')); ?></h3>
-                                    <p><?= e((string) ($review['text'] ?? '')); ?></p>
-                                    <div class="review-meta">
-                                        <span><?= e((string) ($review['relativeTime'] ?? 'Kundenrezension')); ?></span>
-                                        <?php if (!empty($review['url'])): ?>
-                                            <a href="<?= e((string) $review['url']); ?>" target="_blank" rel="noreferrer">Auf Google ansehen</a>
-                                        <?php endif; ?>
-                                    </div>
-                                </article>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                    <p class="reviews-footnote" id="reviews-footnote">
-                        <?= e((string) $initialReviews['message']); ?>
-                    </p>
                 </div>
             </section>
             <?php endif; ?>
 
-            <section class="faq-section section" id="faq">
-                <div class="section-heading" data-reveal>
-                    <p class="section-eyebrow">FAQ</p>
-                    <h2>Vorab geklärt.</h2>
+            <section class="home-faq section" id="faq" aria-labelledby="home-faq-title">
+                <div class="home-faq-intro" data-reveal>
+                    <p class="section-eyebrow">Kurz beantwortet</p>
+                    <h2 id="home-faq-title">Bevor Sie fragen müssen.</h2>
+                    <p>Noch unsicher? Rufen Sie einfach an – eine erste Einordnung lässt sich oft schon im kurzen Gespräch klären.</p>
                 </div>
                 <div class="faq-list">
                     <?php foreach ($faq as $entry): ?>
                         <details class="faq-item" data-reveal>
-                            <summary>
-                                <span><?= e($entry['question']); ?></span>
-                                <span class="faq-icon" aria-hidden="true"></span>
-                            </summary>
-                            <div class="faq-answer">
-                                <p><?= e($entry['answer']); ?></p>
-                            </div>
+                            <summary><span><?= e((string) $entry['question']); ?></span><span class="faq-icon" aria-hidden="true"></span></summary>
+                            <div class="faq-answer"><p><?= e((string) $entry['answer']); ?></p></div>
                         </details>
                     <?php endforeach; ?>
                 </div>
             </section>
 
-            <section class="contact-section section" id="kontakt">
-                <div class="contact-copy" data-reveal>
-                    <p class="section-eyebrow">Kontakt</p>
-                    <h2>Direkt anfragen.</h2>
-                    <p>Beschreiben Sie kurz, worum es geht. Ich melde mich mit einer Einschätzung zum nächsten sinnvollen Schritt.</p>
-                    <dl class="contact-facts">
-                        <div>
-                            <dt>Telefon</dt>
-                            <dd><a href="tel:<?= e(phone_href($company['phone'])); ?>"><?= e($company['phone']); ?></a></dd>
-                        </div>
-                        <div>
-                            <dt>E-Mail</dt>
-                            <dd><a href="mailto:<?= e($company['email']); ?>"><?= e($company['email']); ?></a></dd>
-                        </div>
-                        <div>
-                            <dt>Standort</dt>
-                            <dd><?= e(company_address_inline($company)); ?></dd>
-                        </div>
-                        <div>
-                            <dt>Einsatzgebiet</dt>
-                            <dd><?= e($company['serviceArea']); ?></dd>
-                        </div>
-                        <div>
-                            <dt>Termine</dt>
-                            <dd><?= e($company['businessHours']); ?></dd>
-                        </div>
-                    </dl>
-                </div>
-                <div class="contact-form-shell" data-reveal>
-                    <?php if ($formMessage !== ''): ?>
-                        <p class="form-feedback <?= in_array($formStatus, ['success', 'partial'], true) ? 'is-success' : 'is-error'; ?>"><?= e($formMessage); ?></p>
-                    <?php endif; ?>
-                    <form class="contact-form" action="<?= e(page_url('contact.php')); ?>" method="post">
-                        <input type="hidden" name="website" value="">
-                        <input type="hidden" name="form_rendered_at" value="<?= e((string) $contactForm['renderedAt']); ?>">
-                        <input type="hidden" name="form_token" value="<?= e($contactForm['formToken']); ?>">
-                        <div class="form-row">
-                            <label>
-                                <span>Name</span>
-                                <input type="text" name="name" value="<?= e($formValue('name')); ?>" <?= $formErrorAttributes('name'); ?> required>
-                                <?php if ($formHasError('name')): ?><small class="form-field-error" id="contact-error-name">Bitte geben Sie einen Namen ein.</small><?php endif; ?>
-                            </label>
-                            <label>
-                                <span>E-Mail</span>
-                                <input type="email" name="email" value="<?= e($formValue('email')); ?>" <?= $formErrorAttributes('email'); ?> required>
-                                <?php if ($formHasError('email')): ?><small class="form-field-error" id="contact-error-email">Bitte geben Sie eine gültige E-Mail-Adresse ein.</small><?php endif; ?>
-                            </label>
-                        </div>
-                        <div class="form-row">
-                            <label>
-                                <span>Telefon</span>
-                                <input type="text" name="phone" value="<?= e($formValue('phone')); ?>">
-                            </label>
-                            <label>
-                                <span>Anliegen</span>
-                                <select name="audience" <?= $formErrorAttributes('audience'); ?> required>
-                                    <option value="">Bitte wählen</option>
-                                    <option value="Reparatur und Diagnose" <?= $formValue('audience') === 'Reparatur und Diagnose' ? 'selected' : ''; ?>>Reparatur und Diagnose</option>
-                                    <option value="Einrichtung und Systempflege" <?= $formValue('audience') === 'Einrichtung und Systempflege' ? 'selected' : ''; ?>>Einrichtung und Systempflege</option>
-                                    <option value="Netzwerk und WLAN" <?= $formValue('audience') === 'Netzwerk und WLAN' ? 'selected' : ''; ?>>Netzwerk und WLAN</option>
-                                    <option value="Sicherheit und Virenprüfung" <?= $formValue('audience') === 'Sicherheit und Virenprüfung' ? 'selected' : ''; ?>>Sicherheit und Virenprüfung</option>
-                                    <option value="Server und Betreuung" <?= $formValue('audience') === 'Server und Betreuung' ? 'selected' : ''; ?>>Server und Betreuung</option>
-                                    <option value="Sonstiges IT-Anliegen" <?= $formValue('audience') === 'Sonstiges IT-Anliegen' ? 'selected' : ''; ?>>Sonstiges IT-Anliegen</option>
-                                </select>
-                                <?php if ($formHasError('audience')): ?><small class="form-field-error" id="contact-error-audience">Bitte wählen Sie ein Anliegen.</small><?php endif; ?>
-                            </label>
-                        </div>
-                        <label>
-                            <span>Leistung</span>
-                            <select name="service" <?= $formErrorAttributes('service'); ?> required>
-                                <option value="">Bitte wählen</option>
-                                <?php foreach ($serviceBands as $band): ?>
-                                    <?php $optionGroups = is_array($band['groups'] ?? null) ? $band['groups'] : []; ?>
-                                    <option value="<?= e($band['title']); ?>" data-service-groups="<?= e(implode(' ', array_unique($optionGroups))); ?>" <?= $formValue('service') === $band['title'] ? 'selected' : ''; ?>><?= e($band['title']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <?php if ($formHasError('service')): ?><small class="form-field-error" id="contact-error-service">Bitte wählen Sie eine Leistung.</small><?php endif; ?>
-                        </label>
-                        <label>
-                            <span>Nachricht</span>
-                            <textarea name="message" rows="7" <?= $formErrorAttributes('message'); ?> required><?= e($formValue('message')); ?></textarea>
-                            <?php if ($formHasError('message')): ?><small class="form-field-error" id="contact-error-message">Bitte beschreiben Sie Ihr Anliegen etwas genauer.</small><?php endif; ?>
-                        </label>
-                        <?php if ($contactForm['captchaEnabled']): ?>
-                            <div class="form-row form-row-captcha">
-                                <label>
-                                    <span><?= e($contactForm['captchaLabel']); ?></span>
-                                    <input type="text" name="captcha_answer" inputmode="numeric" autocomplete="off" <?= $formErrorAttributes('captcha'); ?> required>
-                                    <?php if ($formHasError('captcha')): ?><small class="form-field-error" id="contact-error-captcha">Bitte lösen Sie die Sicherheitsfrage erneut.</small><?php endif; ?>
-                                </label>
-                                <div class="captcha-question" aria-hidden="true">
-                                    <span><?= e($contactForm['captchaQuestion']); ?></span>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-                        <label class="consent-check">
-                            <input type="checkbox" name="privacy_confirmation" value="1" <?= $formValue('privacyConfirmation') === '1' ? 'checked' : ''; ?> <?= $formErrorAttributes('privacyConfirmation'); ?> required>
-                            <span>Ich bestätige, dass meine Angaben zur Bearbeitung meiner Anfrage gemäß der <a href="<?= e(page_url('datenschutz.php')); ?>">Datenschutzerklärung</a> verarbeitet werden dürfen.</span>
-                            <?php if ($formHasError('privacyConfirmation')): ?><small class="form-field-error" id="contact-error-privacyConfirmation">Bitte bestätigen Sie die Datenschutzerklärung.</small><?php endif; ?>
-                        </label>
-                        <p class="form-note">Mit dem Absenden werden die Angaben zur Bearbeitung Ihrer Anfrage verarbeitet. Auf Wunsch kann zusätzlich eine automatische Eingangsbestätigung an die angegebene E-Mail-Adresse versendet werden. Details finden Sie in der <a href="<?= e(page_url('datenschutz.php')); ?>">Datenschutzerklärung</a>.</p>
-                        <button class="button button-primary" type="submit">Anfrage absenden</button>
-                    </form>
-                </div>
-            </section>
+            <?php require dirname(__DIR__) . '/partials/home-contact.php'; ?>
         </main>
 
         <?php require dirname(__DIR__) . '/partials/site-footer.php'; ?>

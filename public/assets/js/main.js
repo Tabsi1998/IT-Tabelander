@@ -14,6 +14,14 @@ if (document.querySelector('[data-service-carousel]')) {
     void import('./modules/services-carousel.js');
 }
 
+if (document.querySelector('[data-service-accordion]')) {
+    void import('./modules/service-accordion.js');
+}
+
+if (document.querySelector('[data-count-up]')) {
+    void import('./modules/count-up.js');
+}
+
 if (document.getElementById('reviews-track')) {
     void import('./modules/reviews.js');
 }

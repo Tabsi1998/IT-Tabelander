@@ -10,18 +10,17 @@ $homeAnchor = static fn (string $anchor): string => $isHomePage ? '#' . $anchor 
         <span class="brand-mobile-mark" aria-hidden="true">
             <img class="brand-logo-image" src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" data-theme-logo data-logo-dark-src="<?= e(asset_url('img/logo/IT-Tabelander Logo Hell Transparent.png')); ?>" data-logo-light-src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" alt="" width="560" height="616">
         </span>
-        <span class="brand-banner-shell" aria-hidden="true">
-            <img class="brand-banner-image" src="<?= e(asset_url('img/logo/IT-Tabelander Banner Dunkel Transparent.png')); ?>" data-theme-logo data-logo-dark-src="<?= e(asset_url('img/logo/IT-Tabelander Banner Hell Transparent.png')); ?>" data-logo-light-src="<?= e(asset_url('img/logo/IT-Tabelander Banner Dunkel Transparent.png')); ?>" alt="" width="1317" height="254">
-        </span>
+        <span class="brand-wordmark"><strong>IT-Tabelander</strong><small>Fabian · Telfs</small></span>
     </a>
     <div class="header-actions">
         <nav class="site-nav" id="site-navigation" aria-label="Hauptnavigation">
-            <a href="<?= e(page_url('pc-reparatur-telfs')); ?>" <?= $activePageKey === 'pc-reparatur-telfs' ? 'aria-current="page"' : ''; ?>>PC-Reparatur</a>
-            <a href="<?= e(page_url('it-betreuung-telfs')); ?>" <?= $activePageKey === 'it-betreuung-telfs' ? 'aria-current="page"' : ''; ?>>Für Unternehmen</a>
-            <a href="<?= e(page_url('wlan-netzwerk-telfs')); ?>" <?= $activePageKey === 'wlan-netzwerk-telfs' ? 'aria-current="page"' : ''; ?>>WLAN</a>
-            <a href="<?= e($homeAnchor('ablauf')); ?>">Ablauf</a>
+            <a href="<?= e($homeAnchor('hilfe')); ?>">Hilfe finden</a>
+            <a href="<?= e($homeAnchor('ablauf')); ?>">So läuft’s</a>
+            <a href="<?= e($homeAnchor('ueber-mich')); ?>">Über mich</a>
             <?php if ($isHomePage && !empty($hasPublishedReviews)): ?><a href="#bewertungen">Bewertungen</a><?php endif; ?>
-            <a href="<?= e($homeAnchor('kontakt')); ?>" class="nav-cta">Kontakt</a>
+            <a href="<?= e($homeAnchor('faq')); ?>">FAQ</a>
+            <a href="<?= e($homeAnchor('kontakt')); ?>" class="nav-cta">Problem schildern <span aria-hidden="true">↗</span></a>
+            <p class="nav-contact-note"><small>Direkt erreichbar</small><a href="tel:<?= e(phone_href((string) $company['phone'])); ?>"><?= e((string) $company['phone']); ?></a></p>
         </nav>
         <?= theme_toggle_markup(); ?>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Navigation öffnen">

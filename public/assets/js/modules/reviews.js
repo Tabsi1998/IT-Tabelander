@@ -9,7 +9,7 @@ const reviewEndpoint = document.body?.dataset.reviewsUrl || "/reviews.php";
 let currentSlide = 0;
 let slideCount = reviewTrack ? reviewTrack.children.length : 0;
 let slideTimer = null;
-let reviewAutoplayPaused = reducedMotionQuery.matches;
+let reviewAutoplayPaused = reducedMotionQuery.matches || !reviewAutoplayButton;
 
 const updateReviewAutoplayButton = () => {
     if (!reviewAutoplayButton) {
@@ -82,7 +82,7 @@ reviewAutoplayButton?.addEventListener("click", () => {
     }
 });
 
-const reviewInteractiveRegion = reviewTrack?.closest(".reviews-shell");
+const reviewInteractiveRegion = reviewTrack?.closest(".reviews-shell, .home-reviews");
 reviewInteractiveRegion?.addEventListener("mouseenter", stopSlider);
 reviewInteractiveRegion?.addEventListener("mouseleave", startSlider);
 reviewInteractiveRegion?.addEventListener("focusin", stopSlider);

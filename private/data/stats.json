@@ -1,0 +1,16 @@
+{
+  "_hinweis": "Nur belegbare Werte eintragen. Erst danach enabled auf true setzen. Bei enabled=false wird der gesamte Zahlenbereich ausgeblendet.",
+  "enabled": false,
+  "items": [
+    {
+      "value": 0,
+      "suffix": "+",
+      "label": "Privatkundinnen und Privatkunden unterstützt"
+    },
+    {
+      "value": 0,
+      "suffix": "+",
+      "label": "Geräte wieder einsatzbereit gemacht"
+    }
+  ]
+}

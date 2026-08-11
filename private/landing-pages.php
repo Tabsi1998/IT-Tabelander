@@ -27,7 +27,7 @@ return [
             ['title' => 'Reinigung und Wartung', 'text' => 'Staub, Wärmeleitmaterial und Kühlung werden geprüft, wenn Temperatur oder Lautstärke auffällig sind.'],
         ],
         'audienceTitle' => 'Direkt in Telfs und in der Umgebung erreichbar',
-        'audienceText' => 'Der Service richtet sich an Privatpersonen, Selbstständige und kleine Unternehmen in Telfs und Umgebung. Je nach Fehlerbild erfolgt die Hilfe vor Ort, per Fernwartung oder nach Geräteübergabe.',
+        'audienceText' => 'Der Service richtet sich an private Haushalte in Telfs und Umgebung. Je nach Fehlerbild erfolgt die Hilfe vor Ort, per Fernwartung oder nach Geräteübergabe.',
         'processTitle' => 'So läuft eine Reparaturanfrage ab',
         'process' => [
             ['title' => 'Fehler kurz schildern', 'text' => 'Gerät, Symptome und Dringlichkeit übermitteln.'],
@@ -75,7 +75,7 @@ return [
     'wlan-netzwerk-telfs' => [
         'eyebrow' => 'WLAN & Netzwerk in Telfs',
         'headline' => 'Stabiles WLAN beginnt mit Messung, Platzierung und einer sauberen Netzwerkstruktur.',
-        'lead' => 'IT-Tabelander analysiert Funklöcher, langsame oder instabile Verbindungen und entwickelt eine passende Lösung für Wohnungen, Häuser und kleine Unternehmen in Telfs.',
+        'lead' => 'IT-Tabelander analysiert Funklöcher, langsame oder instabile Verbindungen und entwickelt eine passende Lösung für Wohnungen und Häuser in Telfs.',
         'imageBase' => 'img/services/netzwerk-wlan',
         'imageLargeWidth' => 1200,
         'imageWidth' => 1536,
@@ -96,8 +96,8 @@ return [
             ['title' => 'Netzwerkstruktur', 'text' => 'Router, Switches, Verkabelung und logische Trennung werden verständlich und wartbar aufgebaut.'],
             ['title' => 'Basissicherheit', 'text' => 'Verschlüsselung, Gastzugänge, Gerätezustand, Updates und unnötig offene Funktionen werden mitgeprüft.'],
         ],
-        'audienceTitle' => 'Für private Haushalte und Unternehmen',
-        'audienceText' => 'Zu Hause zählen zuverlässige Abdeckung und einfache Nutzung. In Unternehmen kommen getrennte Zugänge, planbare Kapazität, Sicherheit und Dokumentation hinzu.',
+        'audienceTitle' => 'Für Wohnung, Haus und Homeoffice',
+        'audienceText' => 'Zu Hause zählen zuverlässige Abdeckung, einfache Nutzung und ein sicher eingerichteter Gastzugang. Die Lösung wird an Grundriss, Stockwerke und Ihre tatsächlich verwendeten Geräte angepasst.',
         'processTitle' => 'So wird Ihr WLAN geprüft',
         'process' => [
             ['title' => 'Situation erfassen', 'text' => 'Gebäude, Nutzung, bestehende Geräte und konkrete Problemstellen werden aufgenommen.'],
