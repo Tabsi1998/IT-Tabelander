@@ -219,7 +219,9 @@ return [
     'serviceBands' => [
         [
             'title' => 'PC und Laptop',
-            'image' => 'pc-laptop-reparatur.png',
+            'image' => 'pc-laptop-reparatur',
+            'imageWidth' => 1536,
+            'imageHeight' => 1024,
             'intro' => 'Diagnose, Reparatur und Instandsetzung bei Startproblemen, Defekten, Überhitzung oder instabilem Verhalten.',
             'items' => [
                 'Analyse bei Startfehlern, Bluescreens, Temperatur- oder Leistungsproblemen',
@@ -231,7 +233,9 @@ return [
         ],
         [
             'title' => 'Upgrades und Systempflege',
-            'image' => 'upgrades-systempflege.png',
+            'image' => 'upgrades-systempflege',
+            'imageWidth' => 1536,
+            'imageHeight' => 1024,
             'intro' => 'Bestehende Systeme werden aufgerüstet, bereinigt und sauber für den Alltag oder den Betrieb vorbereitet.',
             'items' => [
                 'SSD- und RAM-Upgrades für spürbar bessere Alltags- und Arbeitsleistung',
@@ -243,7 +247,9 @@ return [
         ],
         [
             'title' => 'Windows und Windows Server',
-            'image' => 'windows-server.png',
+            'image' => 'windows-server',
+            'imageWidth' => 1536,
+            'imageHeight' => 1024,
             'intro' => 'Windows-Arbeitsplätze und Windows-Server werden eingerichtet, abgesichert und auf den Einsatz abgestimmt.',
             'items' => [
                 'Einrichtung von Windows-Systemen für Arbeitsplatz, Homeoffice und Teams',
@@ -255,7 +261,9 @@ return [
         ],
         [
             'title' => 'Netzwerk und WLAN',
-            'image' => 'netzwerk-wlan.png',
+            'image' => 'netzwerk-wlan',
+            'imageWidth' => 1536,
+            'imageHeight' => 1024,
             'intro' => 'Netzwerk- und WLAN-Strukturen werden geplant, gemessen, eingerichtet und bei Bedarf gezielt verbessert.',
             'items' => [
                 'WLAN- beziehungsweise WiFi-Konzept mit sinnvoller Platzierung von Router, Access Points und Repeatern',
@@ -267,7 +275,9 @@ return [
         ],
         [
             'title' => 'Linux und Open-Source-Server',
-            'image' => 'linux-open-source-server.png',
+            'image' => 'linux-open-source-server',
+            'imageWidth' => 1536,
+            'imageHeight' => 1024,
             'intro' => 'Linux- und Open-Source-Server werden nachvollziehbar, wartbar und passend zum Einsatzzweck aufgebaut.',
             'items' => [
                 'Einrichtung von Linux-Distributionen für Server und technische Speziallösungen',
@@ -279,7 +289,9 @@ return [
         ],
         [
             'title' => 'Active Directory und Konzeption',
-            'image' => 'active-directory-konzeption.png',
+            'image' => 'active-directory-konzeption',
+            'imageWidth' => 1661,
+            'imageHeight' => 947,
             'intro' => 'Benutzerverwaltung und Infrastruktur werden strukturiert für Betrieb, Erweiterung und Betreuung aufgebaut.',
             'items' => [
                 'Konzeption, Einrichtung und Wartung von Active-Directory-Domänen',
@@ -291,7 +303,9 @@ return [
         ],
         [
             'title' => 'IT-Sicherheit und Virenprüfung',
-            'image' => 'service-overview.png',
+            'image' => 'service-overview',
+            'imageWidth' => 1717,
+            'imageHeight' => 916,
             'intro' => 'Systeme werden auf offensichtliche Risiken, Schadsoftware, unsichere Einstellungen und fehlende Schutzmaßnahmen geprüft.',
             'items' => [
                 'Viren-, Malware- und Adware-Prüfung mit sauberer Einschätzung statt blinder Schnellreparatur',
@@ -303,7 +317,9 @@ return [
         ],
         [
             'title' => 'Konsolen und Controller',
-            'image' => 'controller-konsolen-service.png',
+            'image' => 'controller-konsolen-service',
+            'imageWidth' => 1536,
+            'imageHeight' => 1024,
             'intro' => 'Service für defekte oder verschlissene Gaming-Geräte mit klarer technischer Einschätzung.',
             'items' => [
                 'Reparatur und Wartung ausgewählter Konsolen nach technischer Prüfung',

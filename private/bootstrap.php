@@ -150,7 +150,7 @@ function page_meta(string $pageKey): array
         'description' => (string) config('meta.description', ''),
         'language' => (string) config('meta.language', 'de-AT'),
         'ogType' => 'website',
-        'ogImage' => 'img/hero-it-tabelander.png',
+        'ogImage' => 'img/hero-it-tabelander-1440.webp',
         'schemaType' => '',
         'serviceTypes' => [],
         'indexable' => false,
@@ -255,7 +255,7 @@ function theme_toggle_markup(string $className = ''): string
 
 function site_favicon_markup(): string
 {
-    $favicon = asset_url('img/it-tabelander-mark.png');
+    $favicon = asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png');
 
     return '<link rel="icon" type="image/png" href="' . e($favicon) . '">'
         . '<link rel="apple-touch-icon" href="' . e($favicon) . '">';

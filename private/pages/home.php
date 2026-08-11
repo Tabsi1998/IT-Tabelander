@@ -90,7 +90,7 @@ $formMessage = match ($formStatus) {
                 </div>
                 <div class="hero-visual" data-reveal>
                     <div class="hero-image-frame">
-                        <img src="<?= e(asset_url('img/hero-it-tabelander.png')); ?>" alt="Werkbank mit offenem PC, Laptop und Controller-Reparatur" loading="eager">
+                        <img src="<?= e(asset_url('img/hero-it-tabelander-768.webp')); ?>" srcset="<?= e(asset_url('img/hero-it-tabelander-768.webp')); ?> 768w, <?= e(asset_url('img/hero-it-tabelander-1440.webp')); ?> 1440w" sizes="(max-width: 980px) 100vw, 48vw" alt="Werkbank mit offenem PC, Laptop und Controller-Reparatur" width="1717" height="916" loading="eager" fetchpriority="high">
                     </div>
                     <div class="hero-aside">
                         <p>Standort und Einsatzgebiet</p>
@@ -207,7 +207,8 @@ $formMessage = match ($formStatus) {
                             <article class="service-card" data-service-card data-service-groups="<?= e(implode(' ', array_unique($serviceGroups))); ?>" tabindex="0">
                                 <?php if (!empty($band['image'])): ?>
                                     <div class="service-card-media">
-                                        <img src="<?= e(asset_url('img/services/' . $band['image'])); ?>" alt="<?= e($band['title']); ?>" loading="lazy">
+                                        <?php $serviceImageBase = pathinfo((string) $band['image'], PATHINFO_FILENAME); ?>
+                                        <img src="<?= e(asset_url('img/services/' . $serviceImageBase . '-640.webp')); ?>" srcset="<?= e(asset_url('img/services/' . $serviceImageBase . '-640.webp')); ?> 640w, <?= e(asset_url('img/services/' . $serviceImageBase . '-1200.webp')); ?> 1200w" sizes="(max-width: 640px) 92vw, (max-width: 1180px) 46vw, 31vw" alt="<?= e($band['title']); ?>" width="<?= e((string) ($band['imageWidth'] ?? 1536)); ?>" height="<?= e((string) ($band['imageHeight'] ?? 1024)); ?>" loading="lazy" decoding="async">
                                     </div>
                                 <?php endif; ?>
                                 <div class="service-card-body">

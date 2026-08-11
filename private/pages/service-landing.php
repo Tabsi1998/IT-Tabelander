@@ -60,7 +60,7 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                     <p class="landing-area"><?= e((string) $company['serviceArea']); ?></p>
                 </div>
                 <div class="landing-hero-media" data-reveal>
-                    <img src="<?= e(asset_url((string) $page['image'])); ?>" alt="<?= e((string) $page['imageAlt']); ?>" width="1200" height="800" fetchpriority="high">
+                    <img src="<?= e(asset_url((string) $page['imageBase'] . '-640.webp')); ?>" srcset="<?= e(asset_url((string) $page['imageBase'] . '-640.webp')); ?> 640w, <?= e(asset_url((string) $page['imageBase'] . '-' . (string) $page['imageLargeWidth'] . '.webp')); ?> <?= e((string) $page['imageLargeWidth']); ?>w" sizes="(max-width: 980px) 100vw, 46vw" alt="<?= e((string) $page['imageAlt']); ?>" width="<?= e((string) $page['imageWidth']); ?>" height="<?= e((string) $page['imageHeight']); ?>" fetchpriority="high" decoding="async">
                 </div>
             </section>
 

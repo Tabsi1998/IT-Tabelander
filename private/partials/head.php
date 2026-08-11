@@ -4,7 +4,7 @@ declare(strict_types=1);
 $pageMeta = is_array($pageMeta ?? null) ? $pageMeta : page_meta('home');
 $pageSchema = is_array($pageSchema ?? null) ? $pageSchema : [];
 $canonical = canonical_url((string) ($pageMeta['path'] ?? ''));
-$ogImage = canonical_url(asset_url((string) ($pageMeta['ogImage'] ?? 'img/hero-it-tabelander.png')));
+$ogImage = canonical_url(asset_url((string) ($pageMeta['ogImage'] ?? 'img/hero-it-tabelander-1440.webp')));
 ?>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
