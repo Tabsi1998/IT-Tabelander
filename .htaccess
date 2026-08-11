@@ -3,6 +3,7 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteRule ^sitemap\.xml$ sitemap.php [L]
     RewriteRule ^public/index\.php$ / [R=301,L]
     RewriteRule ^public/(impressum|datenschutz|nutzungsbedingungen|contact|reviews)\.php$ /$1.php [R=301,L]
     RewriteRule ^private(/|$) - [F,L]

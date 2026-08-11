@@ -25,6 +25,12 @@ Danach im Browser `http://localhost:8000` öffnen.
 
 Die Seite kann jetzt direkt mit dem Projekt-Root als `DocumentRoot` betrieben werden, weil `index.php` im Root liegt. Wichtig ist dabei, dass die mitgelieferte Root-`.htaccess` aktiv ist, damit `private/` nicht öffentlich erreichbar ist. Zusätzlich liegt in `private/.htaccess` noch einmal eine direkte Zugriffssperre als zweite Schutzschicht.
 
+## Seiten und Sitemap
+
+Öffentliche Seiten werden zentral in `private/page-registry.php` registriert. Dort stehen Pfad, Meta-Daten, Indexierbarkeit, Sitemap-Priorität und die zugehörige Quelldatei. Eine neue öffentliche Seite wird in dieser Registry ergänzt und verwendet im Template `page_meta()` sowie `private/partials/head.php`.
+
+Die Route `/sitemap.xml` wird durch Apache auf `sitemap.php` abgebildet. Sie enthält ausschließlich als `indexable` markierte Registry-Einträge, deren Quelldatei tatsächlich existiert. `lastmod` basiert auf dem Änderungszeitpunkt der jeweiligen Quelldatei; Kontakt-Endpunkte und private Pfade können dadurch nicht versehentlich aufgenommen werden.
+
 ## Vor Livegang anpassen
 
 1. `private/site-config.php` mit echten Unternehmensdaten füllen.
