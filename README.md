@@ -1,5 +1,7 @@
 # IT-Tabelander Website
 
+[![CI](https://github.com/Tabsi1998/IT-Tabelander/actions/workflows/ci.yml/badge.svg)](https://github.com/Tabsi1998/IT-Tabelander/actions/workflows/ci.yml)
+
 Wartbare One-Page-Website auf Basis von PHP, HTML, CSS und etwas JavaScript. Die Seite ist für Apache mit PHP gedacht und braucht keinen Build-Schritt.
 
 ## Struktur
