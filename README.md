@@ -2,36 +2,55 @@
 
 [![CI](https://github.com/Tabsi1998/IT-Tabelander/actions/workflows/ci.yml/badge.svg)](https://github.com/Tabsi1998/IT-Tabelander/actions/workflows/ci.yml)
 
-Wartbare One-Page-Website auf Basis von PHP, HTML, CSS und etwas JavaScript. Die Seite ist für Apache mit PHP gedacht und braucht keinen Build-Schritt.
+Wartbare Unternehmenswebsite mit lokaler SEO-Landingpage-Struktur auf Basis von PHP, HTML, modularisiertem CSS und JavaScript. Die Seite ist für Apache mit PHP gedacht und braucht weder Composer noch einen Frontend-Build.
+
+## Voraussetzungen
+
+- PHP 8.2 bis 8.5; die CI prüft 8.2, 8.4 und 8.5.
+- Apache 2.4 mit `mod_rewrite`, `mod_headers` und `mod_setenvif`.
+- Für `.htaccess` muss mindestens `AllowOverride FileInfo Options` aktiv sein; der Webserver muss den Projekt-Root als `DocumentRoot` verwenden.
+- PHP-Standarderweiterungen für Sessions, Filter, JSON und OpenSSL. `mbstring` verbessert die Unicode-Längenprüfung, ist aber nicht zwingend.
+- Ausgehende HTTPS-Verbindungen und `allow_url_fopen`, wenn Google Places serverseitig abgerufen werden soll.
 
 ## Struktur
 
 - `index.php` im Projekt-Root ist die öffentliche Startseite.
-- `public/assets/` enthält CSS, JavaScript, Schriften und Bilder.
+- `public/assets/css/` ist in Basis, Komponenten, Recht/Theme, Responsive und Landingpages gegliedert; `styles.css` bindet diese Schichten in stabiler Reihenfolge ein.
+- `public/assets/js/main.js` lädt DOM-abhängig ES-Module für Theme, Navigation, Animationen, Carousels, Kontakt, Consent und Analytics.
 - `private/site-config.php` bündelt Inhalte, Kontaktdaten, SMTP- und Review-Konfiguration.
-- `private/site-services.php` enthält Formular-, Mail- und Review-Helfer.
-- `private/pages/` enthält die internen Seitentemplates.
+- `private/site-services.php` ist der kompatible Loader für die Fachmodule in `private/services/`: Kontakt, Runtime-Logging, Mail/SMTP und Reviews.
+- `private/page-registry.php` ist die zentrale Quelle für Metadaten, Canonicals, Schema und Sitemap-Einträge.
+- `private/landing-pages.php` enthält die individuellen Inhalte der lokalen Landingpages.
+- `private/pages/` enthält Seitentemplates; `private/partials/` enthält Head, Header, Footer und Kontakt-CTA-Komponenten.
 - `private/actions/` enthält Formular- und JSON-Endpunkte.
 - `private/cache/` speichert den serverseitigen Google-Review-Cache.
 - `private/logs/` enthält kurzlebige, datensparsame Versandstatus-Logs und wird nie versioniert.
 
 ## Lokale Vorschau
 
+Ein frischer Checkout benötigt keine Secrets. SMTP ist standardmäßig deaktiviert, Google Places bleibt ohne Zugangsdaten aus und Analytics lädt ohne Browser-Einwilligung nicht.
+
 ```powershell
 php -S localhost:8000
 ```
 
-Danach im Browser `http://localhost:8000` öffnen.
+Danach im Browser `http://localhost:8000` öffnen. Der PHP-Entwicklungsserver wertet `.htaccess` nicht aus und ist deshalb ausschließlich für lokale Entwicklung gedacht.
 
 ## Tests
 
-Die Tests benötigen PHP 8.2 oder neuer und kommen ohne Composer-Abhängigkeiten aus:
+Die Tests kommen ohne Composer-Abhängigkeiten aus:
 
 ```powershell
 php tests/run.php
 ```
 
-Die Suite prüft Kontaktvalidierung, zentrale URL-/Telefon-Helfer, sichere SMTP-Konfiguration, den Ausschluss privater Routen sowie das Rendering der Startseite, Landingpages und Sitemap. Ein Syntaxcheck aller PHP-Dateien kann zusätzlich mit `php -l <datei>` ausgeführt werden und läuft in der CI automatisch über alle versionierten PHP-Dateien.
+Die Suite prüft Kontaktvalidierung, zentrale URL-/Telefon-Helfer, sichere SMTP-Konfiguration, den Ausschluss privater Routen sowie das Rendering der Startseite, Landingpages und Sitemap. Die CI ergänzt PHP-Lint, JavaScript-Syntax, JSON/XML-Validierung, Runtime-Datei-Schutz und das 500-KB-Bildbudget.
+
+```powershell
+php tests/run.php
+git ls-files '*.php' | ForEach-Object { php -l $_ }
+node --check public/assets/js/main.js
+```
 
 ## Apache-Empfehlung
 
@@ -41,16 +60,47 @@ PHP setzt eine restriktive Content-Security-Policy mit einem zufälligen Nonce j
 
 ## Seiten und Sitemap
 
-Öffentliche Seiten werden zentral in `private/page-registry.php` registriert. Dort stehen Pfad, Meta-Daten, Indexierbarkeit, Sitemap-Priorität und die zugehörige Quelldatei. Eine neue öffentliche Seite wird in dieser Registry ergänzt und verwendet im Template `page_meta()` sowie `private/partials/head.php`.
+Öffentliche Seiten werden zentral in `private/page-registry.php` registriert. Dort stehen Pfad, Meta-Daten, Indexierbarkeit, Sitemap-Priorität und die zugehörige Quelldatei. Für eine neue Landingpage:
+
+1. Inhalte in `private/landing-pages.php` ergänzen.
+2. Meta-, Schema- und Sitemap-Werte in `private/page-registry.php` ergänzen.
+3. Einen kleinen öffentlichen Entrypoint im Projekt-Root anlegen, der `private/pages/service-landing.php` mit dem passenden Key lädt.
+4. Sprechende URL und `.php`-Redirect in `.htaccess` ergänzen.
+5. Die Seite intern verlinken und `php tests/run.php` ausführen.
 
 Die Route `/sitemap.xml` wird durch Apache auf `sitemap.php` abgebildet. Sie enthält ausschließlich als `indexable` markierte Registry-Einträge, deren Quelldatei tatsächlich existiert. `lastmod` basiert auf dem Änderungszeitpunkt der jeweiligen Quelldatei; Kontakt-Endpunkte und private Pfade können dadurch nicht versehentlich aufgenommen werden.
 
-## Vor Livegang anpassen
+## Environment-Variablen
 
-1. `private/site-config.php` mit echten Unternehmensdaten füllen.
-2. Telefonnummer, E-Mail, Anschrift, Aufsichtsbehörde, Kammer und Berufsbezeichnung vervollständigen.
-3. Google Place ID, Google API Key und SMTP-Zugangsdaten ausschließlich als Umgebungsvariablen beziehungsweise Secret-Dateien bereitstellen.
-4. Rechtstexte mit den realen technischen Abläufen und gegebenenfalls juristisch prüfen lassen.
+`.env.example` dokumentiert sichere Beispielwerte, wird von PHP aber absichtlich nicht automatisch geladen. Konfiguration erfolgt über Apache/PHP-FPM, den Prozessmanager, Container-Secrets oder Secret-Dateien.
+
+- Allgemein: `CANONICAL_BASE_URL`, `CONTACT_RECIPIENT`, `RUNTIME_LOG_RETENTION_DAYS`.
+- SMTP: `SMTP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_ENCRYPTION`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_PASSWORD_FILE`, `SMTP_ALLOW_SELF_SIGNED`, `SMTP_VERIFY_PEER`, `SMTP_VERIFY_PEER_NAME`, `SMTP_EHLO_DOMAIN`.
+- Analytics: `GOOGLE_ANALYTICS_MEASUREMENT_ID`.
+- Bewertungen: `GOOGLE_PLACE_ID`, `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACES_API_KEY_FILE`.
+
+Leere Pflichtwerte deaktivieren die jeweilige externe Integration kontrolliert. Secret-Dateien müssen außerhalb des Webroots liegen und nur für den Webserver-Benutzer lesbar sein.
+
+## Deployment-Checkliste
+
+1. Zielbranch und grünen CI-Status prüfen; `php tests/run.php` zusätzlich im Deployment-Artefakt ausführen.
+2. PHP-Version, benötigte Erweiterungen sowie Apache-Module prüfen und `.htaccess` tatsächlich aktivieren.
+3. Projekt-Root als `DocumentRoot` konfigurieren; Zugriffe auf `/private`, `README.md`, Runtime-Verzeichnisse und Secret-Dateien mit HTTP-Requests verifizieren.
+4. `CANONICAL_BASE_URL`, Unternehmensdaten und echte Produktionsdomain kontrollieren; bei Domainänderung HSTS-Hostbedingung in `.htaccess` anpassen.
+5. SMTP- und Google-Secrets ausschließlich über Environment oder geschützte Dateien bereitstellen; niemals in `site-config.php` schreiben.
+6. Schreibrechte nur für `private/logs/` und `private/cache/` gewähren. Die Verzeichnisse werden bei Bedarf automatisch angelegt; der übrige Code sollte für den Webserver schreibgeschützt sein.
+7. HTTPS und Redirect auf HTTPS vollständig testen, bevor HSTS für eine neue Domain aktiviert wird. CSP, Kontaktformular, Consent und Analytics im Browser ohne Policy-Verstöße prüfen.
+8. Startseite, drei Landingpages, Rechtstexte, `/sitemap.xml`, `robots.txt` und Kontaktstatus als Smoke-Test aufrufen.
+9. Rechtstexte mit den realen technischen Abläufen abgleichen und bei Bedarf juristisch prüfen lassen.
+
+## Niemals committen
+
+- Dateien unter `private/logs/` und `private/cache/`.
+- `.env`-Dateien mit echten Werten.
+- SMTP-Passwörter, API-Keys, Tokens, Zertifikatsschlüssel oder Secret-Dateien.
+- Exporte echter Kontaktanfragen, Server-Dumps oder produktionsbezogene Diagnoseausgaben.
+
+Vor einem Commit helfen `git status`, `git diff --cached` und `git check-ignore -v <datei>`. Wurde ein Secret oder personenbezogener Inhalt bereits veröffentlicht, reicht Löschen im aktuellen Commit nicht: Git-Historie bereinigen und den betroffenen Wert beziehungsweise die Datenquelle rotieren.
 
 ## Kontaktformular
 
@@ -117,7 +167,7 @@ Nach Analytics-Einwilligung werden vier zentral definierte Conversion-Events ges
 
 ## Bewertungen
 
-Der Bewertungsbereich ist auf serverseitigen Abruf vorbereitet. Dadurch bleibt der API-Key außerhalb des Browsers. Die Werte können direkt in `private/site-config.php` eingetragen oder per Umgebungsvariable gesetzt werden.
+Der Bewertungsbereich ist auf serverseitigen Abruf vorbereitet. Dadurch bleibt der API-Key außerhalb des Browsers. Produktionswerte werden per Environment beziehungsweise Secret-Datei gesetzt.
 
 Benötigte Umgebungsvariablen:
 
