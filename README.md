@@ -21,6 +21,16 @@ php -S localhost:8000
 
 Danach im Browser `http://localhost:8000` öffnen.
 
+## Tests
+
+Die Tests benötigen PHP 8.2 oder neuer und kommen ohne Composer-Abhängigkeiten aus:
+
+```powershell
+php tests/run.php
+```
+
+Die Suite prüft Kontaktvalidierung, zentrale URL-/Telefon-Helfer, sichere SMTP-Konfiguration, den Ausschluss privater Routen sowie das Rendering der Startseite, Landingpages und Sitemap. Ein Syntaxcheck aller PHP-Dateien kann zusätzlich mit `php -l <datei>` ausgeführt werden und läuft in der CI automatisch über alle versionierten PHP-Dateien.
+
 ## Apache-Empfehlung
 
 Die Seite kann jetzt direkt mit dem Projekt-Root als `DocumentRoot` betrieben werden, weil `index.php` im Root liegt. Wichtig ist dabei, dass die mitgelieferte Root-`.htaccess` aktiv ist, damit `private/` nicht öffentlich erreichbar ist. Zusätzlich liegt in `private/.htaccess` noch einmal eine direkte Zugriffssperre als zweite Schutzschicht.
