@@ -1,0 +1,16 @@
+# Runtime data can contain personal data or environment-specific state.
+/private/logs/
+/private/cache/
+
+# Local configuration and secrets.
+.env
+.env.*
+!.env.example
+
+# Local tooling noise.
+/.phpunit.cache/
+/.phpunit.result.cache
+/.idea/
+/.vscode/
+Thumbs.db
+.DS_Store
