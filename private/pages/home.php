@@ -53,7 +53,9 @@ $formMessage = match ($formStatus) {
             </a>
             <div class="header-actions">
                 <nav class="site-nav" id="site-navigation" aria-label="Hauptnavigation">
-                    <a href="#leistungen">Leistungen</a>
+                    <a href="<?= e(page_url('pc-reparatur-telfs')); ?>">PC-Reparatur</a>
+                    <a href="<?= e(page_url('it-betreuung-telfs')); ?>">Für Unternehmen</a>
+                    <a href="<?= e(page_url('wlan-netzwerk-telfs')); ?>">WLAN</a>
                     <a href="#ablauf">Ablauf</a>
                     <?php if ($hasPublishedReviews): ?>
                         <a href="#bewertungen">Bewertungen</a>
@@ -77,7 +79,7 @@ $formMessage = match ($formStatus) {
                     <p class="hero-lead"><?= e($hero['lead']); ?></p>
                     <div class="hero-actions">
                         <a class="button button-primary" href="#kontakt"><?= e($hero['primaryCta']); ?></a>
-                        <a class="button button-secondary" href="#leistungen"><?= e($hero['secondaryCta']); ?></a>
+                        <a class="button button-secondary" href="tel:<?= e(phone_href($company['phone'])); ?>">Jetzt anrufen: <?= e($company['phone']); ?></a>
                     </div>
                     <ul class="hero-points" aria-label="Schwerpunkte">
                         <?php foreach ($hero['highlights'] as $highlight): ?>
@@ -103,6 +105,34 @@ $formMessage = match ($formStatus) {
                         <p><?= e($signal['text']); ?></p>
                     </article>
                 <?php endforeach; ?>
+            </section>
+
+            <section class="local-services section" aria-labelledby="local-services-title">
+                <div class="section-heading" data-reveal>
+                    <p class="section-eyebrow">Direkt zum passenden Service</p>
+                    <h2 id="local-services-title">IT-Hilfe in Telfs – klar nach Anliegen.</h2>
+                    <p>Wählen Sie den Bereich, der zu Ihrem Problem oder Betrieb passt.</p>
+                </div>
+                <div class="local-services-grid">
+                    <a class="local-service-link" href="<?= e(page_url('pc-reparatur-telfs')); ?>" data-reveal>
+                        <span>Für Geräte</span>
+                        <h3>PC- & Laptop-Reparatur</h3>
+                        <p>Diagnose, Startprobleme, Überhitzung sowie SSD- und RAM-Upgrades.</p>
+                        <strong>Reparatur in Telfs ansehen →</strong>
+                    </a>
+                    <a class="local-service-link" href="<?= e(page_url('it-betreuung-telfs')); ?>" data-reveal>
+                        <span>Für Unternehmen</span>
+                        <h3>Laufende IT-Betreuung</h3>
+                        <p>Arbeitsplätze, Benutzer, Netzwerk, Server, Updates und Dokumentation.</p>
+                        <strong>Firmenbetreuung ansehen →</strong>
+                    </a>
+                    <a class="local-service-link" href="<?= e(page_url('wlan-netzwerk-telfs')); ?>" data-reveal>
+                        <span>Privat & Betrieb</span>
+                        <h3>WLAN & Netzwerk</h3>
+                        <p>Funklöcher messen, Access Points planen und Verbindungen stabilisieren.</p>
+                        <strong>WLAN-Service ansehen →</strong>
+                    </a>
+                </div>
             </section>
 
             <section class="audience-section section">
@@ -368,6 +398,10 @@ $formMessage = match ($formStatus) {
         </footer>
         <?= cookie_notice_markup(); ?>
     </div>
+    <nav class="mobile-action-bar" aria-label="Schnellkontakt">
+        <a href="tel:<?= e(phone_href($company['phone'])); ?>">Anrufen</a>
+        <a href="#kontakt">Anfrage senden</a>
+    </nav>
     <script src="<?= e(asset_url('js/main.js')); ?>" defer></script>
 </body>
 </html>

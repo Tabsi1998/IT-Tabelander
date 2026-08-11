@@ -151,21 +151,21 @@ return [
         'retentionDays' => max(0, (int) config_env_value('RUNTIME_LOG_RETENTION_DAYS', '30')),
     ],
     'hero' => [
-        'eyebrow' => 'IT-Dienstleistungen in Tirol',
-        'headline' => 'IT-Service für Geräte, Systeme und Netzwerke.',
-        'lead' => 'Reparatur, Einrichtung und Betreuung von PCs, Arbeitsplätzen, Servern, WLAN und Netzwerken in Tirol.',
+        'eyebrow' => 'IT-Service in Telfs und Tirol',
+        'headline' => 'PC-Reparatur und IT-Betreuung in Telfs.',
+        'lead' => 'Persönliche Hilfe für PCs und Laptops, stabiles WLAN sowie laufende IT-Betreuung für kleine Unternehmen in Telfs und Umgebung.',
         'highlights' => [
-            'PC, Laptop, Konsole und Controller',
-            'Windows, Linux, Server und Benutzerverwaltung',
-            'WLAN-Konzept, Messung und Sicherheitsprüfung',
+            'PC- und Laptop-Reparatur mit nachvollziehbarer Diagnose',
+            'WLAN- und Netzwerkoptimierung vor Ort',
+            'IT-Betreuung für kleine Unternehmen',
         ],
         'primaryCta' => 'Anfrage senden',
         'secondaryCta' => 'Leistungsbereiche',
     ],
     'trustSignals' => [
         [
-            'title' => 'Standort Tirol',
-            'text' => 'Vor Ort in Telfs, Tirol und Umgebung sowie per Fernwartung, wenn es technisch sinnvoll ist.',
+            'title' => 'Persönlich betreut',
+            'text' => 'Inhaber Fabian Tabelander ist Ihr direkter Ansprechpartner – von der ersten Einordnung bis zur Übergabe.',
         ],
         [
             'title' => 'Ein Ansprechpartner',
@@ -196,14 +196,14 @@ return [
     ],
     'audiences' => [
         [
-            'label' => 'Geräte und Systeme',
-            'headline' => 'Reparieren, einrichten und sinnvoll verbessern.',
-            'copy' => 'PCs, Laptops, Konsolen, Controller und Arbeitsplätze werden geprüft, repariert, neu eingerichtet oder gezielt aufgerüstet.',
+            'label' => 'Privatkunden',
+            'headline' => 'Geräte reparieren und das Heimnetz zuverlässig machen.',
+            'copy' => 'PCs und Laptops werden geprüft, repariert oder sinnvoll aufgerüstet. WLAN-Probleme lassen sich vor Ort messen und gezielt lösen.',
         ],
         [
-            'label' => 'Netzwerk und Sicherheit',
-            'headline' => 'Stabile Verbindung, saubere Struktur und Basisschutz.',
-            'copy' => 'WLAN, Netzwerk, Server, Benutzerverwaltung und Sicherheitsprüfung werden nachvollziehbar geplant, umgesetzt und dokumentiert.',
+            'label' => 'Unternehmen',
+            'headline' => 'Ein Ansprechpartner für den laufenden IT-Alltag.',
+            'copy' => 'Arbeitsplätze, Benutzer, Netzwerk, WLAN und Server werden für kleine Betriebe in Telfs und Tirol nachvollziehbar betreut und dokumentiert.',
         ],
     ],
     'serviceBands' => [
