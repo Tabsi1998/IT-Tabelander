@@ -15,7 +15,7 @@ const cookieResetButtons = document.querySelectorAll("[data-cookie-reset]");
 const cookieAnalyticsCheckbox = document.querySelector("[data-cookie-analytics]");
 const analyticsConsentStorageKey = "it-tabelander-analytics-consent";
 const legacyCookieNoticeStorageKey = "it-tabelander-cookie-notice";
-const analyticsMeasurementId = window.IT_TABELANDER_ANALYTICS_ID || "";
+const analyticsMeasurementId = document.querySelector('meta[name="it-tabelander-analytics-id"]')?.content || "";
 const consentDurationDays = 30;
 const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const contactTopicSelect = document.querySelector('select[name="audience"]');

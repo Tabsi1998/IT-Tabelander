@@ -25,6 +25,8 @@ Danach im Browser `http://localhost:8000` öffnen.
 
 Die Seite kann jetzt direkt mit dem Projekt-Root als `DocumentRoot` betrieben werden, weil `index.php` im Root liegt. Wichtig ist dabei, dass die mitgelieferte Root-`.htaccess` aktiv ist, damit `private/` nicht öffentlich erreichbar ist. Zusätzlich liegt in `private/.htaccess` noch einmal eine direkte Zugriffssperre als zweite Schutzschicht.
 
+PHP setzt eine restriktive Content-Security-Policy mit einem zufälligen Nonce je Anfrage und ohne `unsafe-eval` oder `unsafe-inline`. Erlaubt sind lokale Assets sowie die erst nach Einwilligung geladenen Google-Analytics-Skript- und Messendpunkte. Die Nonce wird nur für das zentrale Head-Skript und das JSON-LD verwendet. HSTS wird durch Apache nur gesetzt, wenn eine HTTPS-Anfrage für `it.tabelander.co.at` verarbeitet wird; lokale HTTP-Entwicklung erhält den Header nicht. Wird die Produktionsdomain geändert, muss die Bedingung `IT_TABELANDER_PRODUCTION_HTTPS` entsprechend angepasst und erst nach geprüftem HTTPS-Rollout aktiviert werden.
+
 ## Seiten und Sitemap
 
 Öffentliche Seiten werden zentral in `private/page-registry.php` registriert. Dort stehen Pfad, Meta-Daten, Indexierbarkeit, Sitemap-Priorität und die zugehörige Quelldatei. Eine neue öffentliche Seite wird in dieser Registry ergänzt und verwendet im Template `page_meta()` sowie `private/partials/head.php`.

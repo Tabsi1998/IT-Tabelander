@@ -29,8 +29,8 @@ $ogImage = canonical_url(asset_url((string) ($pageMeta['ogImage'] ?? 'img/hero-i
     <meta name="google-site-verification" content="<?= e((string) $pageMeta['googleSiteVerification']); ?>">
 <?php endif; ?>
 <meta name="theme-color" content="#08141d">
-<script><?= theme_bootstrap_script(); ?></script>
-<?= analytics_bootstrap_script(); ?>
+<meta name="it-tabelander-analytics-id" content="<?= e((string) config('analytics.googleMeasurementId', '')); ?>">
+<script src="<?= e(asset_url('js/head.js')); ?>" nonce="<?= e(csp_nonce()); ?>"></script>
 <?= site_favicon_markup(); ?>
 <?php if (!empty($pageMeta['preloadFonts'])): ?>
     <link rel="preload" href="<?= e(asset_url('fonts/space-grotesk-700.ttf')); ?>" as="font" type="font/ttf" crossorigin>
@@ -38,5 +38,5 @@ $ogImage = canonical_url(asset_url((string) ($pageMeta['ogImage'] ?? 'img/hero-i
 <?php endif; ?>
 <link rel="stylesheet" href="<?= e(asset_url('css/styles.css')); ?>">
 <?php if ($pageSchema !== []): ?>
-    <script type="application/ld+json"><?= json_encode($pageSchema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?></script>
+    <script type="application/ld+json" nonce="<?= e(csp_nonce()); ?>"><?= json_encode($pageSchema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?></script>
 <?php endif; ?>

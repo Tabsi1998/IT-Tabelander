@@ -3,6 +3,42 @@ declare(strict_types=1);
 
 $siteConfig = require __DIR__ . '/site-config.php';
 
+function csp_nonce(): string
+{
+    static $nonce;
+
+    if (!is_string($nonce)) {
+        $nonce = rtrim(strtr(base64_encode(random_bytes(18)), '+/', '-_'), '=');
+    }
+
+    return $nonce;
+}
+
+function send_content_security_policy(): void
+{
+    if (headers_sent()) {
+        return;
+    }
+
+    $nonce = csp_nonce();
+    $directives = [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'self'",
+        "form-action 'self'",
+        "script-src 'self' 'nonce-{$nonce}' https://www.googletagmanager.com",
+        "style-src 'self'",
+        "font-src 'self'",
+        "img-src 'self' data: https://www.google-analytics.com https://www.googletagmanager.com",
+        "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com",
+    ];
+
+    header('Content-Security-Policy: ' . implode('; ', $directives));
+}
+
+send_content_security_policy();
+
 function e(?string $value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -290,46 +326,3 @@ function cookie_notice_markup(): string
         . '</aside>';
 }
 
-function analytics_bootstrap_script(): string
-{
-    $measurementId = trim((string) config('analytics.googleMeasurementId', ''));
-
-    if ($measurementId === '') {
-        return '';
-    }
-
-    return '<script>'
-        . 'window.IT_TABELANDER_ANALYTICS_ID=' . json_encode($measurementId, JSON_UNESCAPED_SLASHES) . ';'
-        . 'window.dataLayer=window.dataLayer||[];'
-        . 'window.gtag=window.gtag||function(){window.dataLayer.push(arguments);};'
-        . 'window.gtag("consent","default",{analytics_storage:"denied",ad_storage:"denied",ad_user_data:"denied",ad_personalization:"denied",functionality_storage:"granted",security_storage:"granted"});'
-        . '</script>';
-}
-
-function theme_bootstrap_script(): string
-{
-    return <<<'JS'
-(() => {
-    try {
-        const stored = localStorage.getItem('it-tabelander-theme');
-        const choice = stored === 'light' || stored === 'dark' ? stored : 'auto';
-        const root = document.documentElement;
-        if (choice === 'light' || choice === 'dark') {
-            root.dataset.theme = choice;
-        } else {
-            delete root.dataset.theme;
-        }
-        root.dataset.themeChoice = choice;
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const resolved = choice === 'auto' ? (prefersDark ? 'dark' : 'light') : choice;
-        root.dataset.resolvedTheme = resolved;
-        const meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) {
-            meta.setAttribute('content', resolved === 'dark' ? '#08141d' : '#f4f7fb');
-        }
-    } catch (error) {
-        // Keep the default color scheme if storage is unavailable.
-    }
-})();
-JS;
-}
