@@ -103,6 +103,12 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                 <p data-reveal><?= e((string) $page['audienceText']); ?></p>
             </section>
 
+            <aside class="landing-trust section" aria-label="Über IT-Tabelander" data-reveal>
+                <p><strong>Direkter Ansprechpartner</strong><span><?= e((string) $company['owner']); ?>, Inhaber von IT-Tabelander</span></p>
+                <p><strong>Standort</strong><span><?= e((string) $company['postalCode'] . ' ' . (string) $company['city']); ?></span></p>
+                <p><strong>Arbeitsweise</strong><span>Verständliche Diagnose, klare Empfehlung und nachvollziehbare Übergabe</span></p>
+            </aside>
+
             <section class="landing-section section" aria-labelledby="process-title">
                 <div class="section-heading" data-reveal>
                     <p class="section-eyebrow">Ablauf</p>

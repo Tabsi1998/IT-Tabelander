@@ -10,6 +10,7 @@ $pageMeta = $meta;
 $pageSchema = page_schema($pageMeta, $company);
 $hero = $siteConfig['hero'];
 $trustSignals = $siteConfig['trustSignals'];
+$about = $siteConfig['about'];
 $audiences = $siteConfig['audiences'];
 $serviceBands = $siteConfig['serviceBands'];
 $processSteps = $siteConfig['processSteps'];
@@ -150,6 +151,27 @@ $formMessage = match ($formStatus) {
                         </article>
                     <?php endforeach; ?>
                 </div>
+            </section>
+
+            <section class="about-section section" id="ueber-uns">
+                <div class="about-copy" data-reveal>
+                    <p class="section-eyebrow"><?= e((string) $about['eyebrow']); ?></p>
+                    <h2><?= e((string) $about['headline']); ?></h2>
+                    <p><?= e((string) $about['copy']); ?></p>
+                    <div class="hero-actions">
+                        <a class="button button-primary" href="#kontakt">Fabian Tabelander kontaktieren</a>
+                        <a class="button button-secondary" href="tel:<?= e(phone_href($company['phone'])); ?>"><?= e($company['phone']); ?></a>
+                    </div>
+                </div>
+                <aside class="about-facts" aria-label="Arbeitsweise" data-reveal>
+                    <p><strong>Inhaber</strong><span><?= e($company['owner']); ?></span></p>
+                    <p><strong>Standort</strong><span><?= e($company['postalCode'] . ' ' . $company['city']); ?></span></p>
+                    <ul>
+                        <?php foreach ($about['principles'] as $principle): ?>
+                            <li><?= e((string) $principle); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </aside>
             </section>
 
             <section class="services-section section" id="leistungen">

@@ -176,6 +176,16 @@ return [
             'text' => 'Virenprüfung, Basisschutz, Updates und saubere Konfiguration werden bei Bedarf direkt mitgeprüft.',
         ],
     ],
+    'about' => [
+        'eyebrow' => 'Über IT-Tabelander',
+        'headline' => 'Persönliche IT-Hilfe aus Telfs.',
+        'copy' => 'IT-Tabelander ist das Einzelunternehmen von Fabian Tabelander in Telfs. Anliegen werden direkt mit dem Inhaber geklärt – ohne wechselnde Ansprechpartner und mit einer verständlichen Einschätzung vor der Umsetzung.',
+        'principles' => [
+            'Erst prüfen, dann eine passende Maßnahme empfehlen.',
+            'Aufwand, Nutzen und nächste Schritte verständlich erklären.',
+            'Wichtige Änderungen nachvollziehbar dokumentieren.',
+        ],
+    ],
     'processSteps' => [
         [
             'title' => 'Anfrage und Einordnung',
