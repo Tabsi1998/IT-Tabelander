@@ -187,7 +187,7 @@ test('Privatkunden-Fokus ohne unbelegte Kennzahlen', function () use ($projectRo
 
 test('Smoke-Rendering der öffentlichen Seiten', function () use ($projectRoot): void {
     $scripts = [
-        'index.php' => 'Ich bringe Ruhe in Ihre Technik.',
+        'index.php' => 'Ich bringe Ihre Technik wieder in Ordnung.',
         'pc-reparatur-telfs.php' => 'Wenn der Computer streikt',
         'wlan-netzwerk-telfs.php' => 'WLAN &amp; Netzwerk in Telfs',
         'sitemap.php' => '<urlset',

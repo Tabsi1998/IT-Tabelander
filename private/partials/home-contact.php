@@ -4,8 +4,8 @@ declare(strict_types=1);
 <section class="contact-section section" id="kontakt">
     <div class="contact-copy" data-reveal>
         <p class="section-eyebrow">Direkter Kontakt</p>
-        <h2>Was macht Ihre Technik gerade?</h2>
-        <p>Ein paar Stichworte reichen für den Anfang. Ich melde mich persönlich und sage Ihnen, welcher nächste Schritt sinnvoll ist.</p>
+        <h2>Wobei brauchen Sie Hilfe?</h2>
+        <p>Ein paar Stichworte reichen für den Anfang. Ich melde mich persönlich bei Ihnen und erkläre, welcher nächste Schritt sinnvoll ist.</p>
         <dl class="contact-facts">
             <div>
                 <dt>Telefon</dt>
@@ -102,7 +102,7 @@ declare(strict_types=1);
                 <?php if ($formHasError('privacyConfirmation')): ?><small class="form-field-error" id="contact-error-privacyConfirmation">Bitte bestätigen Sie die Datenschutzerklärung.</small><?php endif; ?>
             </label>
             <p class="form-note">Ihre Angaben werden nur zur Bearbeitung der Anfrage verwendet. Weitere Details stehen in der <a href="<?= e(page_url('datenschutz.php')); ?>">Datenschutzerklärung</a>.</p>
-            <button class="button button-primary" type="submit">Problem an Fabian senden <span aria-hidden="true">↗</span></button>
+            <button class="button button-primary" type="submit">Anfrage an mich senden <span aria-hidden="true">↗</span></button>
         </form>
     </div>
 </section>

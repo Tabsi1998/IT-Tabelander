@@ -8,7 +8,7 @@ declare(strict_types=1);
     </div>
     <nav class="footer-service-links" aria-label="Services">
         <a href="<?= e(page_url('pc-reparatur-telfs')); ?>">PC- & Laptop-Reparatur</a>
-        <a href="<?= e(page_url('wlan-netzwerk-telfs')); ?>">WLAN zuhause</a>
+        <a href="<?= e(page_url('wlan-netzwerk-telfs')); ?>">WLAN zu Hause</a>
         <a href="<?= e(page_url()); ?>#kontakt">Problem schildern</a>
     </nav>
     <nav class="footer-links" aria-label="Rechtliches">

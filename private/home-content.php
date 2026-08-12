@@ -5,8 +5,8 @@ return [
     'hero' => [
         'eyebrow' => 'Persönliche Computerhilfe in Telfs',
         'headlineAccent' => 'PC kaputt? ',
-        'headline' => 'Ich bringe Ruhe in Ihre Technik.',
-        'lead' => 'Ob Laptop, WLAN oder Controller: Sie sprechen direkt mit Fabian. Ich prüfe das Problem, erkläre die Möglichkeiten verständlich und repariere nur, was wirklich Sinn ergibt.',
+        'headline' => 'Ich bringe Ihre Technik wieder in Ordnung.',
+        'lead' => 'Ob Laptop, WLAN oder Controller: Sie sprechen direkt mit mir. Ich prüfe das Problem, erkläre Ihnen die Möglichkeiten verständlich und repariere nur, was sich wirklich lohnt.',
         'highlights' => [
             'Direkter Ansprechpartner',
             'Verständlich erklärt',
@@ -16,7 +16,7 @@ return [
         'secondaryCta' => 'Hilfe finden',
     ],
     'trustSignals' => [
-        ['title' => 'Persönlich', 'text' => 'Vom ersten Anruf bis zur Übergabe bleibt Fabian Ihr Ansprechpartner.'],
+        ['title' => 'Persönlich', 'text' => 'Vom ersten Anruf bis zur Übergabe kümmere ich mich persönlich um Ihr Anliegen.'],
         ['title' => 'Nachvollziehbar', 'text' => 'Sie erfahren vor der Umsetzung, was sinnvoll ist und welche Alternativen es gibt.'],
         ['title' => 'Flexibel', 'text' => 'Je nach Anliegen vor Ort, per Fernwartung oder nach Geräteübergabe.'],
     ],
@@ -33,15 +33,15 @@ return [
     'processSteps' => [
         [
             'title' => 'Kurz erzählen',
-            'text' => 'Schildern Sie ohne Fachbegriffe, was nicht funktioniert. Fotos oder Fehlermeldungen können später helfen.',
+            'text' => 'Beschreiben Sie einfach, was nicht funktioniert. Fotos oder Fehlermeldungen helfen mir bei der ersten Einschätzung.',
         ],
         [
             'title' => 'Prüfen & erklären',
-            'text' => 'Ich ordne das Problem ein und erkläre Ihnen die sinnvollen Möglichkeiten, bevor etwas Größeres gemacht wird.',
+            'text' => 'Ich prüfe das Problem und erkläre Ihnen die sinnvollen Möglichkeiten, bevor ich mit größeren Arbeiten beginne.',
         ],
         [
             'title' => 'Lösen & testen',
-            'text' => 'Nach Ihrer Freigabe wird repariert oder eingerichtet. Zum Schluss prüfen wir gemeinsam, ob wieder alles passt.',
+            'text' => 'Nach Ihrer Freigabe repariere oder richte ich das Gerät ein. Anschließend prüfen wir gemeinsam, ob alles wieder funktioniert.',
         ],
     ],
     'serviceBands' => [
@@ -51,18 +51,18 @@ return [
             'imageAlt' => 'Geöffneter Computer bei der Fehlerdiagnose',
             'imageWidth' => 1536,
             'imageHeight' => 1024,
-            'intro' => 'Der Computer startet nicht, wird heiß, ist sehr langsam oder zeigt ständig Fehler? Ich suche zuerst die Ursache und bespreche dann die vernünftige Lösung.',
+            'intro' => 'Der Computer startet nicht, wird heiß, ist sehr langsam oder zeigt ständig Fehler? Ich suche zuerst die Ursache und bespreche anschließend mit Ihnen, welche Lösung sinnvoll ist.',
             'items' => ['Fehlerdiagnose und Reparatur', 'SSD- oder RAM-Aufrüstung', 'Reinigung, Windows- und Startprobleme'],
             'audience' => 'Startfehler · langsam · laut · defekt',
             'groups' => ['reparatur'],
         ],
         [
-            'title' => 'WLAN zuhause',
+            'title' => 'WLAN zu Hause',
             'image' => 'netzwerk-wlan',
             'imageAlt' => 'WLAN- und Netzwerkprüfung in einem Zuhause',
             'imageWidth' => 1536,
             'imageHeight' => 1024,
-            'intro' => 'Funklöcher, Abbrüche oder langsames Internet löst man nicht automatisch mit noch einem Repeater. Ich prüfe Platzierung, Einstellungen und vorhandene Geräte.',
+            'intro' => 'Bei Funklöchern, Verbindungsabbrüchen oder langsamem Internet hilft nicht immer ein weiterer Repeater. Ich prüfe die Platzierung, die Einstellungen und Ihre vorhandenen Geräte.',
             'items' => ['WLAN-Abdeckung und Störungen prüfen', 'Router, Mesh und Access Points einrichten', 'Heimnetz verständlich und sicher aufbauen'],
             'audience' => 'Funklöcher · Abbrüche · langsames Internet',
             'groups' => ['netzwerk'],
@@ -73,7 +73,7 @@ return [
             'imageAlt' => 'Computer-Komponenten für eine sinnvolle Aufrüstung',
             'imageWidth' => 1536,
             'imageHeight' => 1024,
-            'intro' => 'Ein neuer Computer, Drucker oder eine neue Festplatte soll einfach funktionieren. Ich richte alles sauber ein und übernehme auf Wunsch Ihre vorhandenen Daten.',
+            'intro' => 'Neue Geräte sollen von Anfang an zuverlässig funktionieren. Ich richte Computer, Drucker oder Festplatten für Sie ein und übertrage auf Wunsch Ihre vorhandenen Daten.',
             'items' => ['Neue Geräte startklar machen', 'Daten und Programme übersiedeln', 'Sinnvoll aufrüsten statt vorschnell ersetzen'],
             'audience' => 'Neugerät · Datenumzug · mehr Leistung',
             'groups' => ['systeme'],
@@ -84,7 +84,7 @@ return [
             'imageAlt' => 'Sicherheitsprüfung eines privaten Computers',
             'imageWidth' => 1717,
             'imageHeight' => 916,
-            'intro' => 'Seltsame Pop-ups, ein gehacktes Konto oder die Sorge um wichtige Fotos? Ich prüfe das Gerät und helfe bei einer verständlichen, sicheren Grundeinstellung.',
+            'intro' => 'Seltsame Pop-ups, ein gehacktes Konto oder Sorge um wichtige Fotos? Ich prüfe Ihr Gerät und helfe Ihnen, es verständlich und sicher einzurichten.',
             'items' => ['Viren- und Schadsoftware-Prüfung', 'Updates, Konten und Basisschutz', 'Backup für wichtige persönliche Daten'],
             'audience' => 'Pop-ups · Konto · Daten · Backup',
             'groups' => ['sicherheit'],
@@ -104,11 +104,11 @@ return [
     'faq' => [
         [
             'question' => 'Muss ich wissen, was genau kaputt ist?',
-            'answer' => 'Nein. Beschreiben Sie einfach, was Sie sehen, hören oder seit wann nicht mehr funktioniert. Die technische Einordnung ist Teil meiner Arbeit.',
+            'answer' => 'Nein. Beschreiben Sie einfach, was nicht funktioniert, was Sie beobachten und seit wann das Problem besteht. Um die technische Einordnung kümmere ich mich.',
         ],
         [
             'question' => 'Kommen Sie auch zu mir nach Hause?',
-            'answer' => 'Ja, wenn das Problem vor Ort gelöst werden sollte – zum Beispiel bei WLAN oder fest eingerichteten Geräten. Anderes lässt sich per Fernwartung oder nach Geräteübergabe meist effizienter lösen.',
+            'answer' => 'Ja, wenn sich das Problem am besten vor Ort lösen lässt – zum Beispiel bei WLAN oder fest installierten Geräten. Andere Anliegen lassen sich per Fernwartung oder nach einer Geräteübergabe meist schneller lösen.',
         ],
         [
             'question' => 'Erfahre ich die Kosten vor der Reparatur?',
@@ -116,7 +116,7 @@ return [
         ],
         [
             'question' => 'Lohnt sich die Reparatur bei einem älteren Gerät?',
-            'answer' => 'Nicht immer. Ersatzteilkosten, Zustand und geplanter Einsatz werden gemeinsam betrachtet. Wenn ein Ersatz sinnvoller ist, sage ich das offen.',
+            'answer' => 'Nicht immer. Ich berücksichtige die Ersatzteilkosten, den Zustand und die geplante weitere Nutzung. Wenn ein neues Gerät sinnvoller ist, sage ich Ihnen das offen.',
         ],
         [
             'question' => 'Helfen Sie auch per Fernwartung?',

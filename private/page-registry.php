@@ -5,7 +5,7 @@ return [
     'home' => [
         'path' => '',
         'title' => 'Computerhilfe für Private in Telfs | IT-Tabelander',
-        'description' => 'Persönliche Computerhilfe in Telfs: PC- und Laptop-Reparatur, WLAN zuhause, Einrichtung, Sicherheit sowie Controller-Service direkt mit Fabian.',
+        'description' => 'Persönliche Computerhilfe in Telfs: PC- und Laptop-Reparatur, WLAN zu Hause, Einrichtung, Sicherheit und Controller-Service aus einer Hand.',
         'ogImage' => 'img/hero-it-tabelander-1440.webp',
         'schemaType' => 'ProfessionalService',
         'serviceTypes' => [

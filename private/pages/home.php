@@ -70,9 +70,9 @@ $formMessage = match ($formStatus) {
                     <div class="home-hero-image">
                         <img src="<?= e(asset_url('img/hero-it-tabelander-768.webp')); ?>" srcset="<?= e(asset_url('img/hero-it-tabelander-768.webp')); ?> 768w, <?= e(asset_url('img/hero-it-tabelander-1440.webp')); ?> 1440w" sizes="(max-width: 980px) 100vw, 46vw" alt="Werkbank für Computer-, Laptop- und Controller-Reparaturen" width="1717" height="916" loading="eager" fetchpriority="high">
                     </div>
-                    <div class="home-hero-stamp" aria-label="Persönlich betreut von Fabian Tabelander">
+                    <div class="home-hero-stamp" aria-label="Persönliche Betreuung direkt durch mich">
                         <span>Direkt bei</span>
-                        <strong>Fabian</strong>
+                        <strong>mir</strong>
                     </div>
                     <div class="home-hero-location">
                         <span class="status-dot" aria-hidden="true"></span>
@@ -84,7 +84,7 @@ $formMessage = match ($formStatus) {
             <a class="problem-jump" href="#hilfe" data-reveal>
                 <span>Was macht Probleme?</span>
                 <strong>PC & Laptop</strong>
-                <strong>WLAN zuhause</strong>
+                <strong>WLAN zu Hause</strong>
                 <strong>Einrichten & Aufrüsten</strong>
                 <strong>Sicherheit</strong>
                 <span class="problem-jump-arrow" aria-hidden="true">↓</span>
@@ -94,7 +94,7 @@ $formMessage = match ($formStatus) {
                 <div class="problem-finder-heading" data-reveal>
                     <p class="section-eyebrow">Wobei kann ich helfen?</p>
                     <h2 id="problem-finder-title">Nicht jede Störung braucht gleich ein neues Gerät.</h2>
-                    <p>Wählen Sie einfach das, was Ihrem Problem am nächsten kommt. Wir klären gemeinsam, ob Reparatur, Einstellung oder ein sinnvoller Austausch hilft.</p>
+                    <p>Wählen Sie einfach den Bereich, der am besten zu Ihrem Problem passt. Gemeinsam klären wir, ob eine Reparatur, eine neue Einstellung oder ein Austausch sinnvoll ist.</p>
                 </div>
                 <div class="problem-finder-layout">
                     <div class="problem-list" data-service-accordion data-reveal>
@@ -158,7 +158,7 @@ $formMessage = match ($formStatus) {
                         <?php foreach ($about['principles'] as $principle): ?><li><?= e((string) $principle); ?></li><?php endforeach; ?>
                     </ul>
                     <div class="hero-actions">
-                        <a class="button button-dark" href="#kontakt">Fabian kontaktieren <span aria-hidden="true">↗</span></a>
+                        <a class="button button-dark" href="#kontakt">Mich kontaktieren <span aria-hidden="true">↗</span></a>
                         <a class="text-link text-link-dark" href="tel:<?= e(phone_href((string) $company['phone'])); ?>"><?= e((string) $company['phone']); ?></a>
                     </div>
                 </div>
@@ -190,8 +190,8 @@ $formMessage = match ($formStatus) {
             <section class="home-faq section" id="faq" aria-labelledby="home-faq-title">
                 <div class="home-faq-intro" data-reveal>
                     <p class="section-eyebrow">Kurz beantwortet</p>
-                    <h2 id="home-faq-title">Bevor Sie fragen müssen.</h2>
-                    <p>Noch unsicher? Rufen Sie einfach an – eine erste Einordnung lässt sich oft schon im kurzen Gespräch klären.</p>
+                    <h2 id="home-faq-title">Häufig gestellte Fragen.</h2>
+                    <p>Noch unsicher? Rufen Sie mich einfach an. Vieles lässt sich bereits in einem kurzen Gespräch klären.</p>
                 </div>
                 <div class="faq-list">
                     <?php foreach ($faq as $entry): ?>
