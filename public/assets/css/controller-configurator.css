@@ -110,30 +110,14 @@ html[data-resolved-theme] body.controller-page {
     filter: blur(5px);
 }
 
-.controller-hero-art svg {
+.controller-hero-product {
     position: relative;
     z-index: 2;
     width: min(51rem, 108%);
+    height: auto;
     overflow: visible;
     filter: drop-shadow(0 45px 55px rgba(0, 0, 0, 0.42));
     animation: controller-float 5.5s ease-in-out infinite;
-}
-
-.controller-silhouette {
-    fill: #edf2f5;
-    stroke: rgba(255, 255, 255, 0.72);
-    stroke-width: 4;
-}
-
-.controller-panel {
-    fill: #17232c;
-}
-
-.controller-accent,
-.controller-buttons-art circle {
-    fill: #1a2730;
-    stroke: #8da1ae;
-    stroke-width: 4;
 }
 
 .controller-orbit {
@@ -472,17 +456,18 @@ html[data-resolved-theme] body.controller-page {
 
 .controller-live-stage {
     position: relative;
-    min-height: 25rem;
-    padding: 2rem 1rem 0;
+    min-height: 31rem;
+    padding: 2.8rem 1rem 4.7rem;
     background:
-        radial-gradient(circle at 50% 45%, rgba(76, 147, 206, 0.19), transparent 43%),
-        linear-gradient(145deg, rgba(20, 51, 70, 0.6), rgba(7, 20, 29, 0.15));
+        radial-gradient(circle at 50% 46%, rgba(76, 147, 206, 0.24), transparent 42%),
+        linear-gradient(145deg, rgba(20, 51, 70, 0.72), rgba(7, 20, 29, 0.2));
+    isolation: isolate;
 }
 
 .controller-live-stage::after {
     content: "";
     position: absolute;
-    inset: 20% 11% 7%;
+    inset: 15% 8% 12%;
     border: 1px solid rgba(136, 191, 255, 0.13);
     border-radius: 50%;
     transform: rotate(-11deg);
@@ -511,100 +496,128 @@ html[data-resolved-theme] body.controller-page {
     box-shadow: 0 0 0 5px rgba(86, 212, 130, 0.1);
 }
 
-.controller-live-svg {
+.controller-product-visual {
     position: relative;
     z-index: 1;
-    display: block;
     width: 100%;
-    margin-top: 1.5rem;
-    overflow: visible;
-    filter: drop-shadow(0 30px 38px rgba(0, 0, 0, 0.4));
+    max-width: 47rem;
+    aspect-ratio: 3 / 2;
+    margin: 1.5rem auto 0;
+    filter: drop-shadow(0 35px 42px rgba(0, 0, 0, 0.46));
 }
 
-.controller-device-shadow {
-    fill: rgba(0, 0, 0, 0.27);
-    transform: translateY(14px);
-}
-
-.controller-device-body {
-    fill: #e8eef1;
-    stroke: #fff;
-    stroke-width: 4;
-    transition: fill 220ms ease, filter 220ms ease;
-}
-
-.controller-device-center {
-    fill: #14232d;
-}
-
-.controller-touchpad {
-    fill: #23353f;
-    stroke: #7692a2;
-    stroke-width: 2;
-}
-
-.controller-zone {
-    fill: #253741;
-    stroke: #8198a5;
-    stroke-width: 4;
-    transition: fill 220ms ease, stroke 220ms ease, filter 220ms ease, transform 220ms ease;
-    transform-box: fill-box;
-    transform-origin: center;
-}
-
-.controller-zone circle:nth-child(2) {
-    fill: #17252e;
-}
-
-.controller-connection-zone path {
-    fill: none;
-}
-
-.controller-battery-zone {
-    opacity: 0.22;
-}
-
-.controller-zone.is-active,
-.controller-device-body.is-active {
-    fill: var(--controller-orange);
-    stroke: #ffc1a9;
-    filter: drop-shadow(0 0 18px rgba(255, 106, 50, 0.72));
-    animation: controller-zone-active 1.8s ease-in-out infinite;
-}
-
-.controller-device-body.is-active {
-    fill: #f2b19a;
-}
-
-.controller-edge-details {
+.controller-product-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
     opacity: 0;
-    fill: none;
-    stroke: var(--controller-blue);
-    stroke-width: 5;
-    transition: opacity 220ms ease;
+    transform: translateY(0.8rem) scale(0.94);
+    transition: opacity 380ms ease, transform 520ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 320ms ease;
 }
 
-.controller-back-paddle-zone {
-    opacity: 0.12;
+.controller-live-stage[data-controller-model=""] .controller-product-dualsense {
+    opacity: 0.4;
+    filter: grayscale(0.75) saturate(0.55);
 }
 
-.controller-back-paddle-zone.is-active {
+.controller-live-stage[data-controller-model="dualsense"] .controller-product-dualsense,
+.controller-live-stage[data-controller-model="dualsense-edge"] .controller-product-edge {
     opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.controller-upgrade-hotspots {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+}
+
+.controller-hotspot {
+    --hotspot-size: clamp(2.1rem, 6.5vw, 3.3rem);
+    position: absolute;
+    width: var(--hotspot-size);
+    height: var(--hotspot-size);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.58);
+    transition: opacity 180ms ease, transform 320ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.controller-hotspot i {
+    position: absolute;
+    inset: 0;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: rgba(255, 106, 50, 0.2);
+    box-shadow:
+        0 0 0 0.45rem rgba(255, 106, 50, 0.12),
+        0 0 2rem rgba(255, 106, 50, 0.9),
+        inset 0 0 1.2rem rgba(255, 106, 50, 0.45);
+}
+
+.controller-hotspot b {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 0.65rem);
+    min-width: max-content;
+    padding: 0.42rem 0.62rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    background: rgba(5, 15, 22, 0.88);
+    color: #fff;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: clamp(0.58rem, 1.4vw, 0.7rem);
+    letter-spacing: 0.03em;
+    transform: translateX(-50%);
+    backdrop-filter: blur(10px);
+}
+
+.controller-hotspot.is-active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.controller-hotspot.is-active i {
+    animation: controller-hotspot-active 1.8s ease-in-out infinite;
+}
+
+.controller-hotspot-triggers { --hotspot-size: 2.8rem; left: 50%; top: 10%; }
+.controller-hotspot-triggers i { right: auto; width: 13rem; left: 50%; border-radius: 999px; transform: translateX(-50%); }
+.controller-hotspot-dpad { left: 20%; top: 34%; }
+.controller-hotspot-buttons { left: 80%; top: 34%; }
+.controller-hotspot-stick-left { left: 35%; top: 52%; }
+.controller-hotspot-stick-right { left: 66%; top: 52%; }
+.controller-hotspot-battery { left: 50%; top: 67%; }
+.controller-hotspot-paddles { left: 50%; top: 82%; }
+.controller-hotspot-led { left: 50%; top: 25%; }
+
+.controller-hotspot-paddles i {
+    right: auto;
+    width: 10rem;
+    left: 50%;
+    border-radius: 999px;
+    transform: translateX(-50%);
 }
 
 .controller-live-stage.is-led-active {
     animation: controller-stage-led 4s linear infinite;
 }
 
-.controller-live-stage[data-controller-model="dualsense-edge"] .controller-edge-details {
-    opacity: 1;
+.controller-visual-status {
+    position: absolute;
+    right: 1.2rem;
+    bottom: 1rem;
+    left: 1.2rem;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
 }
 
 .controller-model-badge {
-    position: absolute;
-    right: 1.2rem;
-    bottom: 1.1rem;
-    z-index: 2;
     margin: 0;
     padding: 0.6rem 0.8rem;
     border: 1px solid var(--controller-line);
@@ -613,6 +626,13 @@ html[data-resolved-theme] body.controller-page {
     color: #dce9f0;
     font-size: 0.72rem;
     backdrop-filter: blur(10px);
+}
+
+.controller-visual-caption {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    text-align: right;
 }
 
 .controller-summary {
@@ -790,9 +810,9 @@ html[data-resolved-theme] body.controller-page {
     50% { opacity: 1; transform: translateY(-4px); }
 }
 
-@keyframes controller-zone-active {
-    0%, 100% { filter: drop-shadow(0 0 10px rgba(255, 106, 50, 0.48)); }
-    50% { filter: drop-shadow(0 0 22px rgba(255, 106, 50, 0.82)); }
+@keyframes controller-hotspot-active {
+    0%, 100% { transform: scale(0.9); opacity: 0.8; }
+    50% { transform: scale(1.1); opacity: 1; }
 }
 
 @keyframes controller-stage-led {
@@ -887,6 +907,29 @@ html[data-resolved-theme] body.controller-page {
 
     .controller-live-stage {
         min-height: auto;
+        padding-inline: 0.35rem;
+    }
+
+    .controller-product-visual {
+        margin-top: 2.1rem;
+    }
+
+    .controller-hotspot-triggers i {
+        width: 8.5rem;
+    }
+
+    .controller-hotspot-paddles i {
+        width: 7rem;
+    }
+
+    .controller-visual-status {
+        right: 0.8rem;
+        bottom: 0.75rem;
+        left: 0.8rem;
+    }
+
+    .controller-visual-caption {
+        max-width: 11rem;
     }
 
     .controller-summary {
@@ -904,10 +947,9 @@ html[data-resolved-theme] body.controller-page {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .controller-hero-art svg,
+    .controller-hero-product,
     .controller-art-label,
-    .controller-zone.is-active,
-    .controller-device-body.is-active,
+    .controller-hotspot.is-active i,
     .controller-live-stage.is-led-active {
         animation: none;
     }

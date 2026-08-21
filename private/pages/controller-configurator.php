@@ -43,14 +43,7 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                     <span class="controller-art-label controller-art-label-one">Hall Effect</span>
                     <span class="controller-art-label controller-art-label-two">Clicky</span>
                     <span class="controller-art-label controller-art-label-three">Back Paddles</span>
-                    <svg viewBox="0 0 800 520" focusable="false">
-                        <path class="controller-silhouette" d="M201 122C132 140 94 215 71 328c-13 65 2 123 48 139 49 17 85-25 119-79l37-58h250l37 58c34 54 70 96 119 79 46-16 61-74 48-139-23-113-61-188-130-206-53-14-91 8-129 8H330c-38 0-76-22-129-8Z"/>
-                        <path class="controller-panel" d="M308 143h184l-24 111H332Z"/>
-                        <circle class="controller-accent" cx="286" cy="294" r="43"/>
-                        <circle class="controller-accent" cx="514" cy="294" r="43"/>
-                        <path class="controller-accent controller-dpad-art" d="M177 226h32v-32h34v32h32v34h-32v32h-34v-32h-32Z"/>
-                        <g class="controller-buttons-art"><circle cx="603" cy="208" r="16"/><circle cx="643" cy="248" r="16"/><circle cx="603" cy="288" r="16"/><circle cx="563" cy="248" r="16"/></g>
-                    </svg>
+                    <img class="controller-hero-product" src="<?= e(asset_url('img/controller/controller-dualsense-premium.png')); ?>" alt="" width="768" height="512" loading="eager" decoding="async">
                 </div>
             </section>
 
@@ -124,47 +117,24 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                         <aside class="controller-live-panel" aria-label="Vorschau und Zusammenfassung">
                             <div class="controller-live-stage" data-controller-stage data-controller-model="">
                                 <p class="controller-live-kicker"><span></span> Live-Vorschau</p>
-                                <svg class="controller-live-svg" viewBox="0 0 800 520" role="img" aria-labelledby="controller-svg-title controller-svg-description">
-                                    <title id="controller-svg-title">Schematische Vorderansicht eines PS5-Controllers</title>
-                                    <desc id="controller-svg-description">Ausgewählte Upgrade-Bereiche werden farblich hervorgehoben.</desc>
-                                    <path class="controller-device-shadow" d="M201 122C132 140 94 215 71 328c-13 65 2 123 48 139 49 17 85-25 119-79l37-58h250l37 58c34 54 70 96 119 79 46-16 61-74 48-139-23-113-61-188-130-206-53-14-91 8-129 8H330c-38 0-76-22-129-8Z"/>
-                                    <path class="controller-device-body" data-controller-zone="housing" d="M201 110C132 128 94 203 71 316c-13 65 2 123 48 139 49 17 85-25 119-79l37-58h250l37 58c34 54 70 96 119 79 46-16 61-74 48-139-23-113-61-188-130-206-53-14-91 8-129 8H330c-38 0-76-22-129-8Z"/>
-                                    <path class="controller-device-center" d="M309 132h182l-23 112H332Z"/>
-                                    <rect class="controller-touchpad" x="325" y="144" width="150" height="76" rx="15"/>
-                                    <g class="controller-zone controller-zone-triggers" data-controller-zone="triggers">
-                                        <path d="M176 129c25-23 66-33 104-18l-13 34c-31-10-58-4-78 12Z"/>
-                                        <path d="M624 129c-25-23-66-33-104-18l13 34c31-10 58-4 78 12Z"/>
-                                    </g>
-                                    <g class="controller-zone" data-controller-zone="charging">
-                                        <rect x="375" y="104" width="50" height="18" rx="9"/>
-                                    </g>
-                                    <g class="controller-zone" data-controller-zone="dpad">
-                                        <path d="M174 215h34v-34h36v34h34v36h-34v34h-36v-34h-34Z"/>
-                                    </g>
-                                    <g class="controller-zone controller-face-buttons" data-controller-zone="buttons">
-                                        <circle cx="603" cy="197" r="18"/><circle cx="646" cy="240" r="18"/><circle cx="603" cy="283" r="18"/><circle cx="560" cy="240" r="18"/>
-                                    </g>
-                                    <g class="controller-zone" data-controller-zone="stick-left">
-                                        <circle cx="286" cy="292" r="48"/><circle cx="286" cy="292" r="31"/>
-                                    </g>
-                                    <g class="controller-zone" data-controller-zone="stick-right">
-                                        <circle cx="514" cy="292" r="48"/><circle cx="514" cy="292" r="31"/>
-                                    </g>
-                                    <g class="controller-zone controller-connection-zone" data-controller-zone="connection">
-                                        <circle cx="400" cy="271" r="20"/><path d="M390 271h20M400 261v20"/>
-                                    </g>
-                                    <g class="controller-zone controller-battery-zone" data-controller-zone="battery">
-                                        <path d="M355 343h90v48h-90Z"/><path d="M386 333h28v10h-28Z"/>
-                                    </g>
-                                    <g class="controller-edge-details" aria-hidden="true">
-                                        <circle cx="350" cy="287" r="10"/><circle cx="450" cy="287" r="10"/>
-                                        <path d="M348 339l-24 54M452 339l24 54"/>
-                                    </g>
-                                    <g class="controller-zone controller-back-paddle-zone" data-controller-zone="back-paddles" aria-hidden="true">
-                                        <path d="M318 351l-30 75 31 13 39-79Z"/><path d="M482 351l30 75-31 13-39-79Z"/>
-                                    </g>
-                                </svg>
-                                <p class="controller-model-badge" data-model-badge>Noch kein Modell gewählt</p>
+                                <div class="controller-product-visual" role="img" aria-label="Live-Vorschau des gewählten Controllers mit markierten Upgrade-Bereichen">
+                                    <img class="controller-product-image controller-product-dualsense" src="<?= e(asset_url('img/controller/controller-dualsense-premium.png')); ?>" alt="" width="768" height="512" loading="lazy" decoding="async">
+                                    <img class="controller-product-image controller-product-edge" src="<?= e(asset_url('img/controller/controller-dualsense-edge-premium.png')); ?>" alt="" width="768" height="512" loading="lazy" decoding="async">
+                                    <div class="controller-upgrade-hotspots" aria-hidden="true">
+                                        <span class="controller-hotspot controller-hotspot-triggers" data-controller-zone="triggers"><i></i><b>Clicky Trigger</b></span>
+                                        <span class="controller-hotspot controller-hotspot-dpad" data-controller-zone="dpad"><i></i><b>D-Pad</b></span>
+                                        <span class="controller-hotspot controller-hotspot-buttons" data-controller-zone="buttons"><i></i><b>Clicky Buttons</b></span>
+                                        <span class="controller-hotspot controller-hotspot-stick-left" data-controller-zone="stick-left"><i></i><b>Hall Effect</b></span>
+                                        <span class="controller-hotspot controller-hotspot-stick-right" data-controller-zone="stick-right"><i></i></span>
+                                        <span class="controller-hotspot controller-hotspot-battery" data-controller-zone="battery"><i></i><b>Akku</b></span>
+                                        <span class="controller-hotspot controller-hotspot-paddles" data-controller-zone="back-paddles"><i></i><b>Back Paddles</b></span>
+                                        <span class="controller-hotspot controller-hotspot-led" data-controller-zone="led"><i></i><b>LED Kit</b></span>
+                                    </div>
+                                </div>
+                                <div class="controller-visual-status">
+                                    <p class="controller-model-badge" data-model-badge>Noch kein Modell gewählt</p>
+                                    <p class="controller-visual-caption" data-visual-caption>Modell auswählen und Upgrades live entdecken</p>
+                                </div>
                             </div>
 
                             <div class="controller-summary" aria-live="polite" aria-atomic="true">
