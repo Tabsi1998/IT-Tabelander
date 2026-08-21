@@ -15,8 +15,10 @@ Prompt-Kern Front: hochwertiges fotorealistisches 3D-Produktbild, transparenter 
 
 Für die für Kunden entscheidenden Edge- und Upgrade-Zustände werden bewusst reale Produktabbildungen verwendet:
 
-- `controller-dualsense-edge-official-front.png` und `controller-dualsense-edge-official-back.png`: offizielle DualSense-Edge-Produktansichten von PlayStation Direct, auf maximal 1.000 × 750 Pixel optimiert.
-- `upgrade-rise4.jpg`, `upgrade-spark-oled.jpg` und `upgrade-beyond-edge.jpg`: reale eXtremeRate-Produktabbildungen der montierten bzw. enthaltenen Umbaukomponenten.
+- `controller-dualsense-edge-midnight-front.png` und `controller-dualsense-edge-midnight-back.png`: zusammengehörige reale Midnight-Black-Produktansichten mit echtem Alphakanal, auf 1.000 × 1.000 Pixel optimiert.
+- `upgrade-rise4.jpg`, `upgrade-spark-oled.jpg` und `upgrade-beyond-edge.jpg`: unveränderte reale eXtremeRate-Quellabbildungen.
+- Die gleichnamigen Dateien mit dem Suffix `-cutout.png` enthalten ausschließlich den montierten Controllerzustand. Platinen, Kabel, Beschriftungen und weißer Hintergrund wurden deterministisch entfernt; die Produktpixel werden nicht neu generiert.
+- `private/tools/controller-cutouts.py` erzeugt diese transparenten Ebenen reproduzierbar aus den unveränderten Quellen.
 - Weitere Shell-Designs werden serverseitig aus den öffentlichen eXtremeRate-Katalogen geladen und über einen streng auf `cdn.shopify.com/s/files/` begrenzten Bild-Proxy ausgeliefert. So zeigt die Galerie die jeweils echte montierte Produktansicht und bleibt mit der Content-Security-Policy kompatibel.
 
 PlayStation, DualSense und DualSense Edge sind Marken von Sony Interactive Entertainment. eXtremeRate ist eine Marke des jeweiligen Rechteinhabers. Die Abbildungen dienen ausschließlich der konkreten Produkt- und Umbauvorschau; Verfügbarkeit und Kompatibilität werden vor Angebotserstellung geprüft.

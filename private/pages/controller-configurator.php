@@ -259,7 +259,7 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                     <div class="controller-visual-flipper" data-controller-flipper>
                                         <div class="controller-visual-face controller-visual-front">
                                             <img class="controller-product-image controller-product-dualsense" src="<?= e(asset_url('img/controller/controller-dualsense-premium.png')); ?>" alt="" width="768" height="512" loading="lazy" decoding="async">
-                                            <img class="controller-product-image controller-product-edge" src="<?= e(asset_url('img/controller/controller-dualsense-edge-official-front.png')); ?>" alt="" width="1000" height="750" loading="lazy" decoding="async">
+                                            <img class="controller-product-image controller-product-edge" src="<?= e(asset_url('img/controller/controller-dualsense-edge-midnight-front.png')); ?>" alt="" width="1000" height="1000" loading="lazy" decoding="async">
                                             <img class="controller-catalog-preview" data-shell-preview src="" alt="" loading="lazy" decoding="async" hidden>
                                             <div class="controller-upgrade-hotspots" aria-hidden="true">
                                                 <span class="controller-hotspot controller-hotspot-triggers" data-controller-zone="triggers"><i></i><b>Clicky Trigger</b></span>
@@ -273,10 +273,10 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                         </div>
                                         <div class="controller-visual-face controller-visual-back">
                                             <img class="controller-product-image controller-product-dualsense" src="<?= e(asset_url('img/controller/controller-dualsense-back.png')); ?>" alt="" width="768" height="512" loading="lazy" decoding="async">
-                                            <img class="controller-product-image controller-product-edge" src="<?= e(asset_url('img/controller/controller-dualsense-edge-official-back.png')); ?>" alt="" width="1000" height="750" loading="lazy" decoding="async">
-                                            <img class="controller-upgrade-preview" data-upgrade-preview="rise4" src="<?= e(asset_url('img/controller/upgrade-rise4.jpg')); ?>" alt="Echte Produktansicht eines montierten Vier-Tasten-Rückseiten-Kits" loading="lazy" decoding="async">
-                                            <img class="controller-upgrade-preview" data-upgrade-preview="spark" src="<?= e(asset_url('img/controller/upgrade-spark-oled.jpg')); ?>" alt="Echte Produktansicht des montierten SPARK OLED-Rückseiten-Kits" loading="lazy" decoding="async">
-                                            <img class="controller-upgrade-preview" data-upgrade-preview="beyond" src="<?= e(asset_url('img/controller/upgrade-beyond-edge.jpg')); ?>" alt="Echte Produktansicht des montierten BEYOND OLED-Rückseiten-Kits für Edge" loading="lazy" decoding="async">
+                                            <img class="controller-product-image controller-product-edge" src="<?= e(asset_url('img/controller/controller-dualsense-edge-midnight-back.png')); ?>" alt="" width="1000" height="1000" loading="lazy" decoding="async">
+                                            <img class="controller-upgrade-preview" data-upgrade-preview="rise4" src="<?= e(asset_url('img/controller/upgrade-rise4-cutout.png')); ?>" alt="Freigestellte reale Produktansicht eines montierten Vier-Tasten-Rückseiten-Kits" loading="lazy" decoding="async">
+                                            <img class="controller-upgrade-preview" data-upgrade-preview="spark" src="<?= e(asset_url('img/controller/upgrade-spark-oled-cutout.png')); ?>" alt="Freigestellte reale Produktansicht des montierten SPARK OLED-Rückseiten-Kits" loading="lazy" decoding="async">
+                                            <img class="controller-upgrade-preview" data-upgrade-preview="beyond" src="<?= e(asset_url('img/controller/upgrade-beyond-edge-cutout.png')); ?>" alt="Freigestellte reale Produktansicht des montierten BEYOND OLED-Rückseiten-Kits für Edge" loading="lazy" decoding="async">
                                         </div>
                                     </div>
                                 </div>
