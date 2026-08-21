@@ -125,7 +125,9 @@ html[data-resolved-theme="light"] body.controller-page .controller-summary dd {
     color: #172733;
 }
 
-html[data-resolved-theme="light"] body.controller-page .controller-notes textarea {
+html[data-resolved-theme="light"] body.controller-page .controller-notes textarea,
+html[data-resolved-theme="light"] body.controller-page .controller-contact-grid input,
+html[data-resolved-theme="light"] body.controller-page .controller-captcha-row input {
     border-color: rgba(29, 64, 85, 0.2);
     background: #fff;
     color: #172733;
@@ -144,7 +146,8 @@ html[data-resolved-theme="light"] body.controller-page .controller-live-stage {
 }
 
 html[data-resolved-theme="light"] body.controller-page .controller-model-badge,
-html[data-resolved-theme="light"] body.controller-page .controller-art-label {
+html[data-resolved-theme="light"] body.controller-page .controller-art-label,
+html[data-resolved-theme="light"] body.controller-page .controller-view-toggle {
     border-color: rgba(29, 64, 85, 0.18);
     background: rgba(255, 255, 255, 0.88);
     color: #263b49;
@@ -155,6 +158,13 @@ html[data-resolved-theme="light"] body.controller-page .controller-boundary {
 }
 
 html[data-resolved-theme="light"] body.controller-page .controller-config-error,
+html[data-resolved-theme="light"] body.controller-page .controller-config-feedback.is-error,
 html[data-resolved-theme="light"] body.controller-page .controller-field-error {
     color: #7b2a10;
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-config-feedback.is-success {
+    border-color: rgba(24, 128, 67, 0.32);
+    background: rgba(24, 128, 67, 0.08);
+    color: #135d32;
 }

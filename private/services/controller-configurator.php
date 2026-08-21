@@ -39,67 +39,58 @@ function controller_price(int $priceCents): string
     return number_format($priceCents / 100, 2, ',', '.') . ' €';
 }
 
-function store_controller_request(array $selection): string
+function controller_submission_values(array $input): array
 {
-    ensure_contact_session();
-    prune_controller_requests();
-
-    $requestId = bin2hex(random_bytes(16));
-    $_SESSION['controller_requests'][$requestId] = [
-        'createdAt' => time(),
-        'selection' => $selection,
+    return [
+        'model' => trim((string) ($input['model'] ?? '')),
+        'source' => trim((string) ($input['source'] ?? '')),
+        'shell' => trim((string) ($input['shell'] ?? 'original')),
+        'offers' => controller_string_list($input['offers'] ?? []),
+        'extras' => controller_string_list($input['extras'] ?? []),
+        'notes' => controller_notes((string) ($input['notes'] ?? '')),
+        'firstName' => trim((string) ($input['first_name'] ?? '')),
+        'lastName' => trim((string) ($input['last_name'] ?? '')),
+        'email' => trim((string) ($input['email'] ?? '')),
+        'phone' => trim((string) ($input['phone'] ?? '')),
+        'address' => trim((string) ($input['address'] ?? '')),
+        'postalCode' => trim((string) ($input['postal_code'] ?? '')),
+        'city' => trim((string) ($input['city'] ?? '')),
+        'preferredContact' => trim((string) ($input['preferred_contact'] ?? 'email')),
+        'privacyConfirmation' => trim((string) ($input['privacy_confirmation'] ?? '')),
     ];
-
-    return $requestId;
 }
 
-function controller_request(string $requestId, bool $consume = false): array
+function store_controller_form_flash(array $values, array $errors = [], array $meta = []): void
 {
     ensure_contact_session();
-    prune_controller_requests();
-
-    if (!preg_match('/^[a-f0-9]{32}$/', $requestId)) {
-        return [];
-    }
-
-    $entry = $_SESSION['controller_requests'][$requestId] ?? null;
-    if (!is_array($entry) || !is_array($entry['selection'] ?? null)) {
-        return [];
-    }
-
-    if ($consume) {
-        unset($_SESSION['controller_requests'][$requestId]);
-    }
-
-    return $entry['selection'];
+    $_SESSION['controller_form']['flash'] = [
+        'values' => $values,
+        'errors' => array_values(array_unique($errors)),
+        'meta' => $meta,
+    ];
 }
 
-function prune_controller_requests(int $maxAgeSeconds = 7200): void
+function consume_controller_form_flash(): array
 {
-    $requests = $_SESSION['controller_requests'] ?? [];
-    if (!is_array($requests)) {
-        $_SESSION['controller_requests'] = [];
-        return;
-    }
+    ensure_contact_session();
+    $flash = $_SESSION['controller_form']['flash'] ?? [];
+    unset($_SESSION['controller_form']['flash']);
 
-    $cutoff = time() - max(300, $maxAgeSeconds);
-    foreach ($requests as $requestId => $entry) {
-        if (!is_array($entry) || (int) ($entry['createdAt'] ?? 0) < $cutoff) {
-            unset($requests[$requestId]);
-        }
-    }
-
-    $_SESSION['controller_requests'] = array_slice($requests, -5, null, true);
+    return is_array($flash) ? $flash : [];
 }
 
 function build_controller_selection(array $input): array
 {
     $catalog = controller_catalog();
     $models = is_array($catalog['models'] ?? null) ? $catalog['models'] : [];
+    $sources = is_array($catalog['sources'] ?? null) ? $catalog['sources'] : [];
+    $shells = is_array($catalog['shells'] ?? null) ? $catalog['shells'] : [];
     $offers = is_array($catalog['offers'] ?? null) ? $catalog['offers'] : [];
     $extras = is_array($catalog['extras'] ?? null) ? $catalog['extras'] : [];
 
     $modelId = trim((string) ($input['model'] ?? ''));
+    $sourceId = trim((string) ($input['source'] ?? ''));
+    $shellId = trim((string) ($input['shell'] ?? 'original'));
     $submittedOfferIds = array_values(array_intersect(controller_string_list($input['offers'] ?? []), array_keys($offers)));
     $extraIds = array_values(array_intersect(controller_string_list($input['extras'] ?? []), array_keys($extras)));
     $notes = controller_notes((string) ($input['notes'] ?? ''));
@@ -107,6 +98,15 @@ function build_controller_selection(array $input): array
 
     if (!array_key_exists($modelId, $models)) {
         $errors[] = 'model';
+    }
+
+    if (!array_key_exists($sourceId, $sources)) {
+        $errors[] = 'source';
+    }
+
+    $shellModels = is_array($shells[$shellId]['models'] ?? null) ? $shells[$shellId]['models'] : [];
+    if (!array_key_exists($shellId, $shells) || !in_array($modelId, $shellModels, true)) {
+        $errors[] = 'shell';
     }
 
     $offerIds = array_values(array_filter($submittedOfferIds, static function (string $offerId) use ($offers, $modelId): bool {
@@ -139,6 +139,8 @@ function build_controller_selection(array $input): array
             'valid' => false,
             'errors' => $errors,
             'modelId' => $modelId,
+            'sourceId' => $sourceId,
+            'shellId' => $shellId,
             'offerIds' => $offerIds,
             'extraIds' => $extraIds,
             'notes' => $notes,
@@ -146,6 +148,11 @@ function build_controller_selection(array $input): array
     }
 
     $modelLabel = (string) ($models[$modelId]['label'] ?? $modelId);
+    $sourceLabel = (string) ($sources[$sourceId]['shortLabel'] ?? $sourceId);
+    $sourcePrices = is_array($sources[$sourceId]['priceCents'] ?? null) ? $sources[$sourceId]['priceCents'] : [];
+    $sourcePriceCents = max(0, (int) ($sourcePrices[$modelId] ?? 0));
+    $shellLabel = (string) ($shells[$shellId]['shortLabel'] ?? $shellId);
+    $shellPriceCents = max(0, (int) ($shells[$shellId]['priceCents'] ?? 0));
     $extraLabels = array_map(
         static fn (string $id): string => (string) ($extras[$id]['shortLabel'] ?? $id),
         $extraIds
@@ -158,10 +165,14 @@ function build_controller_selection(array $input): array
         static fn (string $id): int => max(0, (int) ($offers[$id]['priceCents'] ?? 0)),
         $offerIds
     ));
-    $totalPriceCents = $offerPriceCents;
+    $totalPriceCents = $sourcePriceCents + $shellPriceCents + $offerPriceCents;
     $messageLines = [
         'Controller-Upgrade-Konfiguration:',
         'Modell: ' . $modelLabel,
+        'Bereitstellung: ' . $sourceLabel
+            . ($sourcePriceCents > 0 ? ' (' . controller_price($sourcePriceCents) . ')' : ''),
+        'Gehäuse / Optik: ' . $shellLabel
+            . ($shellPriceCents > 0 ? ' (' . controller_price($shellPriceCents) . ')' : ''),
         '',
         'Gewählte Upgrade-Pakete:',
     ];
@@ -190,6 +201,12 @@ function build_controller_selection(array $input): array
         'errors' => [],
         'modelId' => $modelId,
         'modelLabel' => $modelLabel,
+        'sourceId' => $sourceId,
+        'sourceLabel' => $sourceLabel,
+        'sourcePriceCents' => $sourcePriceCents,
+        'shellId' => $shellId,
+        'shellLabel' => $shellLabel,
+        'shellPriceCents' => $shellPriceCents,
         'offerIds' => $offerIds,
         'offerLabels' => $offerLabels,
         'extraIds' => $extraIds,

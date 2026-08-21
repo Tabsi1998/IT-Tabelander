@@ -143,7 +143,7 @@ test('Dolibarr bleibt ohne bewusste Freigabe deaktiviert', function () use ($sit
     $dolibarr = $siteConfig['dolibarr'];
     assert_same(false, $dolibarr['enabled']);
     assert_same('https://erp.tabelander.co.at', $dolibarr['baseUrl']);
-    assert_same(null, $dolibarr['vatRate']);
+    assert_same(0.0, $dolibarr['vatRate']);
     assert_true(!dolibarr_configured($dolibarr));
 });
 
@@ -168,6 +168,7 @@ test('SMTP-Konfigurationsvalidierung', function (): void {
 test('Controller-Konfiguration wird ausschließlich aus dem Katalog aufgebaut', function (): void {
     $selection = build_controller_selection([
         'model' => 'dualsense-edge',
+        'source' => 'customer-dropoff',
         'offers' => ['edge-face-clicky', 'hall-pair', 'nicht-erlaubt'],
         'extras' => ['opened-before', 'nicht-erlaubt'],
         'notes' => 'Bitte schwarze Tasten verwenden.',
@@ -185,28 +186,33 @@ test('Controller-Konfiguration wird ausschließlich aus dem Katalog aufgebaut', 
 test('Unvollständige Controller-Konfiguration wird abgelehnt', function (): void {
     $selection = build_controller_selection([
         'model' => 'xbox',
+        'source' => 'customer-dropoff',
         'offers' => [],
     ]);
 
     assert_same(false, $selection['valid']);
-    assert_same(['model', 'selection'], $selection['errors']);
+    assert_true(in_array('model', $selection['errors'], true));
+    assert_true(in_array('shell', $selection['errors'], true));
+    assert_true(in_array('selection', $selection['errors'], true));
 });
 
 test('Controller-Pauschalpreise werden serverseitig summiert', function (): void {
     $selection = build_controller_selection([
         'model' => 'dualsense',
+        'source' => 'customer-dropoff',
         'offers' => ['hall-pair', 'face-clicky'],
     ]);
 
     assert_same(true, $selection['valid']);
     assert_same(14980, $selection['totalPriceCents']);
     assert_same('149,80 €', $selection['totalPriceLabel']);
-    assert_true(str_contains($selection['message'], 'Hall-Effect-Umbau (2 Sticks): 99,90 €'));
+    assert_true(str_contains($selection['message'], 'Hall-Effect 80 gf (2 Sticks): 99,90 €'));
 });
 
 test('Konkurrierende Controller-Pakete werden abgelehnt', function (): void {
     $selection = build_controller_selection([
         'model' => 'dualsense',
+        'source' => 'customer-dropoff',
         'offers' => ['face-clicky', 'full-clicky'],
     ]);
 
@@ -214,26 +220,29 @@ test('Konkurrierende Controller-Pakete werden abgelehnt', function (): void {
     assert_true(in_array('offers', $selection['errors'], true));
 });
 
-test('Controller-Auswahl bleibt bis zum Kontaktversand serverseitig gespeichert', function (): void {
-    $_SESSION['controller_requests'] = [];
+test('Controller-Beschaffung und Gehäuse werden serverseitig eingerechnet', function (): void {
     $selection = build_controller_selection([
         'model' => 'dualsense',
+        'source' => 'new-controller',
+        'shell' => 'dualsense-black',
         'offers' => ['hall-pair'],
     ]);
 
-    $requestId = store_controller_request($selection);
-    assert_true((bool) preg_match('/^[a-f0-9]{32}$/', $requestId));
-    assert_same('dualsense', controller_request($requestId)['modelId'] ?? '');
-    assert_same('dualsense', controller_request($requestId, true)['modelId'] ?? '');
-    assert_same([], controller_request($requestId));
+    assert_same(true, $selection['valid']);
+    assert_same(7499, $selection['sourcePriceCents']);
+    assert_same(4990, $selection['shellPriceCents']);
+    assert_same(22479, $selection['totalPriceCents']);
+    assert_true(str_contains($selection['message'], 'Neuer Controller durch IT-Tabelander'));
+    assert_true(str_contains($selection['message'], 'Front-Shell Schwarz'));
 });
 
 test('Dolibarr-Positionen verwenden ausschließlich serverseitige Bruttopreise', function (): void {
     $selection = build_controller_selection([
         'model' => 'dualsense',
+        'source' => 'customer-dropoff',
         'offers' => ['hall-pair', 'battery-upgrade'],
     ]);
-    $lines = dolibarr_controller_lines($selection, 0.0);
+    $lines = dolibarr_controller_lines($selection);
 
     assert_same(2, count($lines));
     assert_same('99.90', $lines[0]['subprice']);
@@ -267,6 +276,51 @@ test('Dolibarr-Kundensuche legt nur bei 404 einen neuen Kunden an', function ():
     assert_same('thirdparties', $calls[1][1]);
     assert_same('-1', $calls[1][2]['code_client']);
     assert_same(2, $calls[1][2]['client']);
+    assert_same(0, $calls[1][2]['tva_assuj']);
+});
+
+test('Controller-Angebot erzwingt auch bei falscher Serverkonfiguration 0 Prozent USt', function (): void {
+    $calls = [];
+    $transport = static function (string $method, string $path, ?array $payload) use (&$calls): array {
+        $calls[] = [$method, $path, $payload];
+        if ($path === 'thirdparties/email/test%40example.test') {
+            return ['ok' => true, 'status' => 200, 'data' => ['id' => 42]];
+        }
+        if ($path === 'proposals') {
+            return ['ok' => true, 'status' => 201, 'data' => 91];
+        }
+
+        return ['ok' => true, 'status' => 201, 'data' => 1];
+    };
+    $selection = build_controller_selection([
+        'model' => 'dualsense',
+        'source' => 'new-controller',
+        'shell' => 'dualsense-black',
+        'offers' => ['hall-pair'],
+    ]);
+    $result = create_dolibarr_controller_proposal([
+        'dolibarr' => [
+            'enabled' => true,
+            'baseUrl' => 'https://erp.example.test',
+            'apiKey' => 'test-key',
+            'vatRate' => 20,
+            'countryCode' => 'AT',
+        ],
+        'logging' => ['retentionDays' => 0],
+    ], [
+        'name' => 'Test Person',
+        'email' => 'test@example.test',
+        'phone' => '+43 123',
+    ], $selection, '1234567890abcdef1234567890abcdef', 'vat-zero-test', $transport);
+
+    assert_same(true, $result['ok']);
+    $lineCalls = array_values(array_filter($calls, static fn (array $call): bool => str_ends_with($call[1], '/line')));
+    assert_same(3, count($lineCalls));
+    foreach ($lineCalls as $lineCall) {
+        assert_same(0.0, $lineCall[2]['tva_tx']);
+        assert_same('TTC', $lineCall[2]['price_base_type']);
+    }
+    assert_same(0, $lineCalls[0][2]['product_type']);
 });
 
 test('Allgemeine Website-Anfrage wird als Dolibarr-Ticket verknüpft', function (): void {
@@ -347,7 +401,11 @@ test('Controller-Konfigurator bleibt auf Upgrades begrenzt und Theme-Korrektur i
     assert_true(str_contains($controller, 'Reparaturen bleiben bewusst individuelle Anfragen.'));
     assert_true(str_contains($controller, 'controller-dualsense-premium.png'));
     assert_true(str_contains($controller, 'controller-dualsense-edge-premium.png'));
+    assert_true(str_contains($controller, 'controller-dualsense-back.png'));
+    assert_true(str_contains($controller, 'controller-dualsense-edge-back.png'));
     assert_true(str_contains($controller, 'controller-upgrade-hotspots'));
+    assert_true(str_contains($controller, 'Unverbindliches Angebot anfragen'));
+    assert_true(str_contains($controller, 'name="first_name"'));
     assert_true(!str_contains($controller, 'controller-live-svg'));
     assert_true(!str_contains($controller, 'Was funktioniert nicht?'));
     assert_true(!str_contains($controller, 'Diagnosepauschale'));
@@ -355,11 +413,23 @@ test('Controller-Konfigurator bleibt auf Upgrades begrenzt und Theme-Korrektur i
     assert_true(is_string($themePolish) && str_contains($themePolish, '.contact-facts dd'));
     assert_true(str_contains($themePolish, 'html[data-resolved-theme="light"] body.controller-page'));
 
-    foreach (['controller-dualsense-premium.png', 'controller-dualsense-edge-premium.png'] as $asset) {
+    foreach (['controller-dualsense-premium.png', 'controller-dualsense-edge-premium.png', 'controller-dualsense-back.png', 'controller-dualsense-edge-back.png'] as $asset) {
         $path = $projectRoot . '/public/assets/img/controller/' . $asset;
         assert_true(is_file($path), 'Controller-Produktvisual fehlt: ' . $asset);
         assert_true(filesize($path) <= 500 * 1024, 'Controller-Produktvisual überschreitet 500 KB: ' . $asset);
     }
+});
+
+test('Kontakt-Ticket und Controller-Angebot bleiben getrennte Dolibarr-Abläufe', function () use ($projectRoot): void {
+    $contactAction = file_get_contents($projectRoot . '/private/actions/contact.php');
+    $controllerAction = file_get_contents($projectRoot . '/private/actions/controller-request.php');
+
+    assert_true(is_string($contactAction) && str_contains($contactAction, 'create_dolibarr_contact_ticket'));
+    assert_true(!str_contains($contactAction, 'send_contact_mail'));
+    assert_true(!str_contains($contactAction, 'create_dolibarr_controller_proposal'));
+    assert_true(is_string($controllerAction) && str_contains($controllerAction, 'create_dolibarr_controller_proposal'));
+    assert_true(!str_contains($controllerAction, 'send_contact_mail'));
+    assert_true(!str_contains($controllerAction, 'redirect_home'));
 });
 
 test('Smoke-Rendering der öffentlichen Seiten', function () use ($projectRoot): void {
