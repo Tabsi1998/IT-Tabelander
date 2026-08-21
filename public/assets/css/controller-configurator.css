@@ -391,6 +391,10 @@ html[data-resolved-theme] body.controller-page {
     display: none;
 }
 
+.controller-shell-choice.is-catalog-placeholder {
+    display: none;
+}
+
 .controller-shell-choice-content {
     align-items: center;
 }
@@ -419,6 +423,136 @@ html[data-resolved-theme] body.controller-page {
         linear-gradient(135deg, rgba(255, 255, 255, 0.5), transparent 52%),
         var(--swatch);
     box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.05);
+}
+
+.controller-shell-catalog {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--controller-line);
+    border-radius: 1.35rem;
+    background: rgba(8, 22, 31, 0.42);
+}
+
+.controller-shell-catalog[hidden] {
+    display: none;
+}
+
+.controller-shell-catalog-head {
+    display: flex;
+    gap: 0.8rem;
+    align-items: end;
+    justify-content: space-between;
+}
+
+.controller-shell-catalog-head > div {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.controller-shell-catalog-head strong {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 0.95rem;
+}
+
+.controller-shell-catalog-head small,
+.controller-shell-source-note,
+.controller-shell-catalog-status {
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    line-height: 1.5;
+}
+
+.controller-shell-catalog-head input {
+    width: min(14rem, 34vw);
+    padding: 0.65rem 0.8rem;
+    border: 1px solid var(--controller-line);
+    border-radius: 999px;
+    background: rgba(4, 14, 20, 0.72);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.72rem;
+}
+
+.controller-shell-catalog-status {
+    margin: 0.8rem 0 0.55rem;
+}
+
+.controller-shell-gallery {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+    max-height: 34rem;
+    padding: 0.1rem 0.25rem 0.25rem 0.1rem;
+    overflow: auto;
+    scrollbar-color: var(--controller-orange) transparent;
+}
+
+.controller-shell-design {
+    position: relative;
+    display: grid;
+    grid-template-rows: 7rem auto;
+    gap: 0.4rem;
+    min-width: 0;
+    padding: 0.42rem;
+    overflow: hidden;
+    border: 1px solid var(--controller-line);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--text-soft);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+}
+
+.controller-shell-design:hover,
+.controller-shell-design:focus-visible,
+.controller-shell-design.is-selected {
+    border-color: var(--controller-orange);
+    box-shadow: 0 0 0 2px rgba(255, 106, 50, 0.15), 0 14px 30px rgba(0, 0, 0, 0.18);
+    transform: translateY(-2px);
+}
+
+.controller-shell-design img {
+    width: 100%;
+    height: 7rem;
+    border-radius: 0.7rem;
+    background: #fff;
+    object-fit: contain;
+}
+
+.controller-shell-design span {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.controller-shell-design i {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(5, 15, 22, 0.78);
+    color: #fff;
+    font-size: 0.55rem;
+    font-style: normal;
+    opacity: 0;
+    transition: opacity 180ms ease;
+}
+
+.controller-shell-design:hover i,
+.controller-shell-design:focus-visible i,
+.controller-shell-design.is-selected i {
+    opacity: 1;
+}
+
+.controller-shell-source-note {
+    margin: 0.7rem 0 0;
 }
 
 .controller-issue-options {
@@ -754,152 +888,35 @@ html[data-resolved-theme] body.controller-page {
     transform: translateY(0) scale(1);
 }
 
-.controller-shell-tint {
+.controller-catalog-preview,
+.controller-upgrade-preview {
     position: absolute;
-    inset: 0;
-    z-index: 2;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 320ms ease;
-}
-
-.controller-shell-tint i,
-.controller-shell-tint b,
-.controller-shell-tint em {
-    position: absolute;
-    display: block;
-    background:
-        linear-gradient(145deg, rgba(255, 255, 255, 0.45), transparent 38%, rgba(0, 0, 0, 0.3)),
-        var(--controller-shell-color, #f5f5f2);
-    box-shadow: inset 0 0 2rem rgba(255, 255, 255, 0.18);
-    mix-blend-mode: multiply;
-}
-
-.controller-shell-tint i {
-    inset: 8% 60% 11% 5%;
-    border-radius: 48% 34% 52% 58%;
-    clip-path: polygon(25% 1%, 92% 14%, 100% 50%, 83% 100%, 29% 89%, 0 50%);
-}
-
-.controller-shell-tint b {
-    inset: 8% 5% 11% 60%;
-    border-radius: 34% 48% 58% 52%;
-    clip-path: polygon(8% 14%, 75% 1%, 100% 50%, 71% 89%, 17% 100%, 0 50%);
-}
-
-.controller-shell-tint em {
-    top: 12%;
-    left: 36%;
-    width: 28%;
-    height: 24%;
-    border-radius: 24% 24% 35% 35%;
-    clip-path: polygon(9% 5%, 91% 5%, 100% 82%, 80% 100%, 20% 100%, 0 82%);
-}
-
-.controller-live-stage[data-shell-visual="solid"] .controller-shell-tint,
-.controller-live-stage[data-shell-visual="clear"] .controller-shell-tint {
-    opacity: 0.76;
-}
-
-.controller-live-stage[data-shell-visual="clear"] .controller-shell-tint {
-    opacity: 0.45;
-}
-
-.controller-shell-tint-back i {
-    inset: 14% 60% 7% 4%;
-}
-
-.controller-shell-tint-back b {
-    inset: 14% 4% 7% 60%;
-}
-
-.controller-paddle-module {
-    position: absolute;
-    top: 28%;
-    left: 50%;
+    inset: 2%;
     z-index: 4;
-    width: 37%;
-    height: 48%;
+    width: 96%;
+    height: 96%;
+    border-radius: 1.15rem;
+    background: #fff;
+    object-fit: contain;
     opacity: 0;
-    transform: translateX(-50%) translateY(1rem) scale(0.72);
-    transition: opacity 280ms ease, transform 520ms cubic-bezier(0.2, 0.9, 0.2, 1);
+    transform: translateY(0.7rem) scale(0.96);
+    transition: opacity 260ms ease, transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.controller-paddle-module.is-active {
+.controller-catalog-preview:not([hidden]) {
     opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
+    transform: none;
 }
 
-.controller-module-screen {
-    position: absolute;
-    top: 1%;
-    left: 50%;
-    z-index: 4;
-    display: grid;
-    width: 34%;
-    aspect-ratio: 1.14;
-    place-items: center;
-    border: 0.18rem solid #788594;
-    border-radius: 24% 24% 30% 30%;
-    background: linear-gradient(150deg, #17212d, #020508 72%);
-    box-shadow: 0 0 1.5rem rgba(89, 176, 255, 0.55), inset 0 0 1rem rgba(136, 191, 255, 0.24);
-    clip-path: polygon(24% 0, 76% 0, 100% 24%, 100% 76%, 76% 100%, 24% 100%, 0 76%, 0 24%);
-    transform: translateX(-50%);
+.controller-upgrade-preview {
+    pointer-events: none;
 }
 
-.controller-module-screen i,
-.controller-module-screen b,
-.controller-module-screen em {
-    position: absolute;
-    height: 0.13rem;
-    border-radius: 999px;
-    background: #bce2ff;
-    box-shadow: 0 0 0.5rem #63b8ff;
-}
-
-.controller-module-screen i { top: 34%; width: 46%; }
-.controller-module-screen b { top: 50%; width: 31%; }
-.controller-module-screen em { top: 66%; width: 40%; }
-
-.controller-module-wing,
-.controller-module-paddle {
-    position: absolute;
-    border: 0.12rem solid #657484;
-    background: linear-gradient(145deg, #354354, #090d12 68%);
-    box-shadow: 0 0 1rem rgba(89, 176, 255, 0.25), inset 0 0 0.6rem rgba(255, 255, 255, 0.12);
-}
-
-.controller-module-wing {
-    top: 24%;
-    width: 43%;
-    height: 25%;
-}
-
-.controller-module-wing.is-left {
-    left: 9%;
-    clip-path: polygon(0 18%, 100% 0, 90% 100%, 14% 82%);
-}
-
-.controller-module-wing.is-right {
-    right: 9%;
-    clip-path: polygon(0 0, 100% 18%, 86% 82%, 10% 100%);
-}
-
-.controller-module-paddle {
-    top: 42%;
-    width: 27%;
-    height: 48%;
-    border-radius: 40% 40% 55% 55%;
-}
-
-.controller-module-paddle.is-left {
-    left: 17%;
-    transform: rotate(13deg);
-}
-
-.controller-module-paddle.is-right {
-    right: 17%;
-    transform: rotate(-13deg);
+.controller-live-stage[data-upgrade-preview="rise4"] [data-upgrade-preview="rise4"],
+.controller-live-stage[data-upgrade-preview="spark"] [data-upgrade-preview="spark"],
+.controller-live-stage[data-upgrade-preview="beyond"] [data-upgrade-preview="beyond"] {
+    opacity: 1;
+    transform: none;
 }
 
 .controller-view-toggle {
@@ -1305,6 +1322,20 @@ html[data-resolved-theme] body.controller-page {
 
     .controller-source-choice:last-child {
         grid-column: auto;
+    }
+
+    .controller-shell-catalog-head {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .controller-shell-catalog-head input {
+        width: 100%;
+    }
+
+    .controller-shell-gallery {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-height: 28rem;
     }
 
     .controller-contact-grid,

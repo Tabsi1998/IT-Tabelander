@@ -128,10 +128,11 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                             <fieldset class="config-step" data-config-step="shell">
                                 <legend><span>03</span><strong>Welche Optik darf es sein?</strong><small>Optionales Gehäuse</small></legend>
                                 <p class="controller-offer-placeholder" data-shell-placeholder>Nach der Modellwahl erscheinen nur passende Gehäusevarianten.</p>
+                                <input type="hidden" name="shell_design" value="<?= e($controllerValue('shellDesign')); ?>" data-shell-design>
                                 <div class="controller-shell-options">
                                     <?php foreach ($catalog['shells'] as $shellId => $shell): ?>
                                         <?php $shellModels = is_array($shell['models'] ?? null) ? $shell['models'] : []; ?>
-                                        <label class="controller-choice controller-shell-choice" data-shell-card data-models="<?= e(implode(' ', $shellModels)); ?>">
+                                        <label class="controller-choice controller-shell-choice<?= (string) ($shell['visual'] ?? '') === 'catalog' ? ' is-catalog-placeholder' : ''; ?>" data-shell-card data-models="<?= e(implode(' ', $shellModels)); ?>">
                                             <input type="radio" name="shell" value="<?= e((string) $shellId); ?>"
                                                 data-label="<?= e((string) $shell['shortLabel']); ?>"
                                                 data-price-cents="<?= e((string) $shell['priceCents']); ?>"
@@ -146,6 +147,15 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                         </label>
                                     <?php endforeach; ?>
                                 </div>
+                                <div class="controller-shell-catalog" data-shell-catalog hidden>
+                                    <div class="controller-shell-catalog-head">
+                                        <div><strong>Echte Design-Vorschauen</strong><small>Aktuelle Front- und Full-Shells aus dem eXtremeRate-Katalog</small></div>
+                                        <label><span class="visually-hidden">Design suchen</span><input type="search" data-shell-search placeholder="Farbe oder Motiv suchen …" autocomplete="off"></label>
+                                    </div>
+                                    <p class="controller-shell-catalog-status" data-shell-catalog-status>Designs werden geladen …</p>
+                                    <div class="controller-shell-gallery" data-shell-gallery></div>
+                                    <p class="controller-shell-source-note">Produktabbildungen: eXtremeRate. Die endgültige Verfügbarkeit und technische Passform prüfe ich vor dem Angebot.</p>
+                                </div>
                                 <?php if ($controllerHasError('shell')): ?><p class="controller-field-error">Bitte wählen Sie eine zum Controller passende Gehäuseoption.</p><?php endif; ?>
                             </fieldset>
 
@@ -157,7 +167,7 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                     <?php foreach ($catalog['offers'] as $offerId => $offer): ?>
                                         <?php $offerModels = is_array($offer['models'] ?? null) ? $offer['models'] : []; ?>
                                         <label class="controller-choice controller-offer-choice" data-offer-card data-models="<?= e(implode(' ', $offerModels)); ?>">
-                                            <input type="checkbox" name="offers[]" value="<?= e((string) $offerId); ?>" data-label="<?= e((string) $offer['shortLabel']); ?>" data-price-cents="<?= e((string) $offer['priceCents']); ?>" data-zone="<?= e((string) $offer['zone']); ?>" data-exclusive-group="<?= e((string) $offer['group']); ?>" <?= in_array((string) $offerId, $controllerList('offers'), true) ? 'checked' : ''; ?>>
+                                            <input type="checkbox" name="offers[]" value="<?= e((string) $offerId); ?>" data-label="<?= e((string) $offer['shortLabel']); ?>" data-price-cents="<?= e((string) $offer['priceCents']); ?>" data-zone="<?= e((string) $offer['zone']); ?>" data-exclusive-group="<?= e((string) $offer['group']); ?>" data-upgrade-preview="<?= e(match ((string) $offerId) { 'back-paddles-oled' => 'spark', 'edge-beyond-paddles' => 'beyond', 'back-paddles', 'back-paddles-metal' => 'rise4', default => '' }); ?>" <?= in_array((string) $offerId, $controllerList('offers'), true) ? 'checked' : ''; ?>>
                                             <span>
                                                 <span class="controller-offer-copy"><small><?= e((string) $offer['badge']); ?></small><strong><?= e((string) $offer['label']); ?></strong><em><?= e((string) $offer['description']); ?></em></span>
                                                 <span class="controller-offer-price"><?= e(controller_price((int) $offer['priceCents'])); ?><small>Pauschal</small></span>
@@ -249,8 +259,8 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                     <div class="controller-visual-flipper" data-controller-flipper>
                                         <div class="controller-visual-face controller-visual-front">
                                             <img class="controller-product-image controller-product-dualsense" src="<?= e(asset_url('img/controller/controller-dualsense-premium.png')); ?>" alt="" width="768" height="512" loading="lazy" decoding="async">
-                                            <img class="controller-product-image controller-product-edge" src="<?= e(asset_url('img/controller/controller-dualsense-edge-premium.png')); ?>" alt="" width="768" height="512" loading="lazy" decoding="async">
-                                            <div class="controller-shell-tint" aria-hidden="true"><i></i><b></b><em></em></div>
+                                            <img class="controller-product-image controller-product-edge" src="<?= e(asset_url('img/controller/controller-dualsense-edge-official-front.png')); ?>" alt="" width="1000" height="750" loading="lazy" decoding="async">
+                                            <img class="controller-catalog-preview" data-shell-preview src="" alt="" loading="lazy" decoding="async" hidden>
                                             <div class="controller-upgrade-hotspots" aria-hidden="true">
                                                 <span class="controller-hotspot controller-hotspot-triggers" data-controller-zone="triggers"><i></i><b>Clicky Trigger</b></span>
                                                 <span class="controller-hotspot controller-hotspot-dpad" data-controller-zone="dpad"><i></i><b>D-Pad</b></span>
@@ -263,15 +273,10 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                         </div>
                                         <div class="controller-visual-face controller-visual-back">
                                             <img class="controller-product-image controller-product-dualsense" src="<?= e(asset_url('img/controller/controller-dualsense-back.png')); ?>" alt="" width="768" height="512" loading="lazy" decoding="async">
-                                            <img class="controller-product-image controller-product-edge" src="<?= e(asset_url('img/controller/controller-dualsense-edge-back.png')); ?>" alt="" width="768" height="512" loading="lazy" decoding="async">
-                                            <div class="controller-shell-tint controller-shell-tint-back" aria-hidden="true"><i></i><b></b></div>
-                                            <div class="controller-paddle-module" data-controller-zone="back-paddles" aria-hidden="true">
-                                                <span class="controller-module-screen"><i></i><b></b><em></em></span>
-                                                <span class="controller-module-wing is-left"></span>
-                                                <span class="controller-module-wing is-right"></span>
-                                                <span class="controller-module-paddle is-left"></span>
-                                                <span class="controller-module-paddle is-right"></span>
-                                            </div>
+                                            <img class="controller-product-image controller-product-edge" src="<?= e(asset_url('img/controller/controller-dualsense-edge-official-back.png')); ?>" alt="" width="1000" height="750" loading="lazy" decoding="async">
+                                            <img class="controller-upgrade-preview" data-upgrade-preview="rise4" src="<?= e(asset_url('img/controller/upgrade-rise4.jpg')); ?>" alt="Echte Produktansicht eines montierten Vier-Tasten-Rückseiten-Kits" loading="lazy" decoding="async">
+                                            <img class="controller-upgrade-preview" data-upgrade-preview="spark" src="<?= e(asset_url('img/controller/upgrade-spark-oled.jpg')); ?>" alt="Echte Produktansicht des montierten SPARK OLED-Rückseiten-Kits" loading="lazy" decoding="async">
+                                            <img class="controller-upgrade-preview" data-upgrade-preview="beyond" src="<?= e(asset_url('img/controller/upgrade-beyond-edge.jpg')); ?>" alt="Echte Produktansicht des montierten BEYOND OLED-Rückseiten-Kits für Edge" loading="lazy" decoding="async">
                                         </div>
                                     </div>
                                 </div>

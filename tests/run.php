@@ -224,16 +224,17 @@ test('Controller-Beschaffung und Gehäuse werden serverseitig eingerechnet', fun
     $selection = build_controller_selection([
         'model' => 'dualsense',
         'source' => 'new-controller',
-        'shell' => 'dualsense-black',
+        'shell' => 'dualsense-design',
+        'shell_design' => 'Aqua Magic',
         'offers' => ['hall-pair'],
     ]);
 
     assert_same(true, $selection['valid']);
     assert_same(7499, $selection['sourcePriceCents']);
-    assert_same(4990, $selection['shellPriceCents']);
-    assert_same(22479, $selection['totalPriceCents']);
+    assert_same(5490, $selection['shellPriceCents']);
+    assert_same(22979, $selection['totalPriceCents']);
     assert_true(str_contains($selection['message'], 'Neuer Controller durch IT-Tabelander'));
-    assert_true(str_contains($selection['message'], 'Front-Shell Schwarz'));
+    assert_true(str_contains($selection['message'], 'DualSense Design-Shell · Aqua Magic'));
 });
 
 test('Dolibarr-Positionen verwenden ausschließlich serverseitige Bruttopreise', function (): void {
@@ -295,7 +296,8 @@ test('Controller-Angebot erzwingt auch bei falscher Serverkonfiguration 0 Prozen
     $selection = build_controller_selection([
         'model' => 'dualsense',
         'source' => 'new-controller',
-        'shell' => 'dualsense-black',
+        'shell' => 'dualsense-design',
+        'shell_design' => 'Aqua Magic',
         'offers' => ['hall-pair'],
     ]);
     $result = create_dolibarr_controller_proposal([
@@ -400,10 +402,13 @@ test('Controller-Konfigurator bleibt auf Upgrades begrenzt und Theme-Korrektur i
     assert_true(str_contains($controller, 'Welche Upgrades möchten Sie?'));
     assert_true(str_contains($controller, 'Reparaturen bleiben bewusst individuelle Anfragen.'));
     assert_true(str_contains($controller, 'controller-dualsense-premium.png'));
-    assert_true(str_contains($controller, 'controller-dualsense-edge-premium.png'));
+    assert_true(str_contains($controller, 'controller-dualsense-edge-official-front.png'));
     assert_true(str_contains($controller, 'controller-dualsense-back.png'));
-    assert_true(str_contains($controller, 'controller-dualsense-edge-back.png'));
+    assert_true(str_contains($controller, 'controller-dualsense-edge-official-back.png'));
     assert_true(str_contains($controller, 'controller-upgrade-hotspots'));
+    assert_true(str_contains($controller, 'Echte Design-Vorschauen'));
+    assert_true(str_contains($controller, 'upgrade-spark-oled.jpg'));
+    assert_true(!str_contains($controller, 'controller-paddle-module'));
     assert_true(str_contains($controller, 'Unverbindliches Angebot anfragen'));
     assert_true(str_contains($controller, 'name="first_name"'));
     assert_true(!str_contains($controller, 'controller-live-svg'));
@@ -413,7 +418,7 @@ test('Controller-Konfigurator bleibt auf Upgrades begrenzt und Theme-Korrektur i
     assert_true(is_string($themePolish) && str_contains($themePolish, '.contact-facts dd'));
     assert_true(str_contains($themePolish, 'html[data-resolved-theme="light"] body.controller-page'));
 
-    foreach (['controller-dualsense-premium.png', 'controller-dualsense-edge-premium.png', 'controller-dualsense-back.png', 'controller-dualsense-edge-back.png'] as $asset) {
+    foreach (['controller-dualsense-premium.png', 'controller-dualsense-edge-official-front.png', 'controller-dualsense-back.png', 'controller-dualsense-edge-official-back.png', 'upgrade-rise4.jpg', 'upgrade-spark-oled.jpg', 'upgrade-beyond-edge.jpg'] as $asset) {
         $path = $projectRoot . '/public/assets/img/controller/' . $asset;
         assert_true(is_file($path), 'Controller-Produktvisual fehlt: ' . $asset);
         assert_true(filesize($path) <= 500 * 1024, 'Controller-Produktvisual überschreitet 500 KB: ' . $asset);
