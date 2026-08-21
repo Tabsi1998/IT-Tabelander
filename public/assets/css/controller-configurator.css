@@ -896,11 +896,11 @@ html[data-resolved-theme] body.controller-page {
     width: 96%;
     height: 96%;
     border-radius: 1.15rem;
-    background: #fff;
     object-fit: contain;
     opacity: 0;
-    transform: translateY(0.7rem) scale(0.96);
-    transition: opacity 260ms ease, transform 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform: translateY(1.2rem) rotateX(8deg) scale(0.92);
+    filter: drop-shadow(0 1.4rem 1.4rem rgba(0, 0, 0, 0.32));
+    transition: opacity 280ms ease, transform 520ms cubic-bezier(0.2, 0.85, 0.2, 1), filter 520ms ease;
 }
 
 .controller-catalog-preview:not([hidden]) {
@@ -917,6 +917,7 @@ html[data-resolved-theme] body.controller-page {
 .controller-live-stage[data-upgrade-preview="beyond"] [data-upgrade-preview="beyond"] {
     opacity: 1;
     transform: none;
+    filter: drop-shadow(0 1.8rem 1.8rem rgba(0, 0, 0, 0.4));
 }
 
 .controller-view-toggle {

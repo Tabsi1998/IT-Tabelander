@@ -402,12 +402,12 @@ test('Controller-Konfigurator bleibt auf Upgrades begrenzt und Theme-Korrektur i
     assert_true(str_contains($controller, 'Welche Upgrades möchten Sie?'));
     assert_true(str_contains($controller, 'Reparaturen bleiben bewusst individuelle Anfragen.'));
     assert_true(str_contains($controller, 'controller-dualsense-premium.png'));
-    assert_true(str_contains($controller, 'controller-dualsense-edge-official-front.png'));
+    assert_true(str_contains($controller, 'controller-dualsense-edge-midnight-front.png'));
     assert_true(str_contains($controller, 'controller-dualsense-back.png'));
-    assert_true(str_contains($controller, 'controller-dualsense-edge-official-back.png'));
+    assert_true(str_contains($controller, 'controller-dualsense-edge-midnight-back.png'));
     assert_true(str_contains($controller, 'controller-upgrade-hotspots'));
     assert_true(str_contains($controller, 'Echte Design-Vorschauen'));
-    assert_true(str_contains($controller, 'upgrade-spark-oled.jpg'));
+    assert_true(str_contains($controller, 'upgrade-spark-oled-cutout.png'));
     assert_true(!str_contains($controller, 'controller-paddle-module'));
     assert_true(str_contains($controller, 'Unverbindliches Angebot anfragen'));
     assert_true(str_contains($controller, 'name="first_name"'));
@@ -418,7 +418,7 @@ test('Controller-Konfigurator bleibt auf Upgrades begrenzt und Theme-Korrektur i
     assert_true(is_string($themePolish) && str_contains($themePolish, '.contact-facts dd'));
     assert_true(str_contains($themePolish, 'html[data-resolved-theme="light"] body.controller-page'));
 
-    foreach (['controller-dualsense-premium.png', 'controller-dualsense-edge-official-front.png', 'controller-dualsense-back.png', 'controller-dualsense-edge-official-back.png', 'upgrade-rise4.jpg', 'upgrade-spark-oled.jpg', 'upgrade-beyond-edge.jpg'] as $asset) {
+    foreach (['controller-dualsense-premium.png', 'controller-dualsense-edge-midnight-front.png', 'controller-dualsense-back.png', 'controller-dualsense-edge-midnight-back.png', 'upgrade-rise4-cutout.png', 'upgrade-spark-oled-cutout.png', 'upgrade-beyond-edge-cutout.png'] as $asset) {
         $path = $projectRoot . '/public/assets/img/controller/' . $asset;
         assert_true(is_file($path), 'Controller-Produktvisual fehlt: ' . $asset);
         assert_true(filesize($path) <= 500 * 1024, 'Controller-Produktvisual überschreitet 500 KB: ' . $asset);
