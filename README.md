@@ -21,6 +21,7 @@ Wartbare, auf private Haushalte ausgerichtete IT-Service-Website mit lokaler SEO
 - `private/site-services.php` ist der kompatible Loader für die Fachmodule in `private/services/`: Kontakt, Runtime-Logging, Mail/SMTP und Reviews.
 - `private/page-registry.php` ist die zentrale Quelle für Metadaten, Canonicals, Schema und Sitemap-Einträge.
 - `private/landing-pages.php` enthält die individuellen Inhalte der lokalen Landingpages.
+- `private/controller-config.php` enthält die erweiterbare Modell-, Fehler- und Zusatzoptionen-Liste für den PS5-Controller-Konfigurator.
 - `private/pages/` enthält Seitentemplates; `private/partials/` enthält Head, Header, Footer und Kontakt-CTA-Komponenten.
 - `private/actions/` enthält Formular- und JSON-Endpunkte.
 - `private/cache/` speichert den serverseitigen Google-Review-Cache.
@@ -91,6 +92,7 @@ Leere Pflichtwerte deaktivieren die jeweilige externe Integration kontrolliert. 
 6. Schreibrechte nur für `private/logs/` und `private/cache/` gewähren. Die Verzeichnisse werden bei Bedarf automatisch angelegt; der übrige Code sollte für den Webserver schreibgeschützt sein.
 7. HTTPS und Redirect auf HTTPS vollständig testen, bevor HSTS für eine neue Domain aktiviert wird. CSP, Kontaktformular, Consent und Analytics im Browser ohne Policy-Verstöße prüfen.
 8. Startseite, zwei aktive Privatkunden-Landingpages, Rechtstexte, `/sitemap.xml`, `robots.txt` und Kontaktstatus als Smoke-Test aufrufen. Die frühere Firmen-Landingpage ist bewusst nicht indexierbar und liefert 404.
+   Zusätzlich den Controller-Konfigurator mit DualSense und DualSense Edge sowie die Übernahme in das Kontaktformular prüfen.
 9. Rechtstexte mit den realen technischen Abläufen abgleichen und bei Bedarf juristisch prüfen lassen.
 
 ## Niemals committen

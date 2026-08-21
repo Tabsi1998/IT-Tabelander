@@ -157,6 +157,32 @@ test('SMTP-Konfigurationsvalidierung', function (): void {
     assert_true(!smtp_configured($mail), 'SMTP ohne Passwort wurde als konfiguriert erkannt.');
 });
 
+test('Controller-Konfiguration wird ausschließlich aus dem Katalog aufgebaut', function (): void {
+    $selection = build_controller_selection([
+        'model' => 'dualsense-edge',
+        'issues' => ['stick-left', 'charging', 'nicht-erlaubt'],
+        'extras' => ['cleaning', 'nicht-erlaubt'],
+        'notes' => 'Fehler tritt nicht immer auf.',
+    ]);
+
+    assert_same(true, $selection['valid']);
+    assert_same('PS5 DualSense Edge', $selection['modelLabel']);
+    assert_same(['stick-left', 'charging'], $selection['issueIds']);
+    assert_same(['cleaning'], $selection['extraIds']);
+    assert_true(str_contains($selection['message'], 'Linker Stick, Laden / USB-C'));
+    assert_true(!str_contains($selection['message'], 'nicht-erlaubt'));
+});
+
+test('Unvollständige Controller-Konfiguration wird abgelehnt', function (): void {
+    $selection = build_controller_selection([
+        'model' => 'xbox',
+        'issues' => [],
+    ]);
+
+    assert_same(false, $selection['valid']);
+    assert_same(['model', 'issues'], $selection['errors']);
+});
+
 test('private Pfade und Endpunkte bleiben außerhalb der Sitemap', function () use ($projectRoot): void {
     $rootRules = file_get_contents($projectRoot . '/.htaccess');
     assert_true(is_string($rootRules) && str_contains($rootRules, 'RewriteRule ^private(/|$) - [F,L]'));
@@ -189,6 +215,7 @@ test('Smoke-Rendering der öffentlichen Seiten', function () use ($projectRoot):
     $scripts = [
         'index.php' => 'Ich bringe Ihre Technik wieder in Ordnung.',
         'pc-reparatur-telfs.php' => 'Wenn der Computer streikt',
+        'controller-service-telfs.php' => 'Ihr Controller. Ihr Fehlerbild.',
         'wlan-netzwerk-telfs.php' => 'WLAN &amp; Netzwerk in Telfs',
         'sitemap.php' => '<urlset',
     ];

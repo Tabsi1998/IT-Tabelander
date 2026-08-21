@@ -30,6 +30,9 @@ declare(strict_types=1);
         </dl>
     </div>
     <div class="contact-form-shell" data-reveal>
+        <?php if (!empty($controllerReady)): ?>
+            <p class="form-feedback is-success">Ihre Controller-Auswahl wurde übernommen. Ergänzen Sie jetzt bitte noch Ihre Kontaktdaten und senden Sie die unverbindliche Anfrage ab.</p>
+        <?php endif; ?>
         <?php if ($formMessage !== ''): ?>
             <p class="form-feedback <?= in_array($formStatus, ['success', 'partial'], true) ? 'is-success' : 'is-error'; ?>"><?= e($formMessage); ?></p>
         <?php endif; ?>
@@ -88,10 +91,10 @@ declare(strict_types=1);
                 <div class="form-row form-row-captcha">
                     <label>
                         <span><?= e($contactForm['captchaLabel']); ?></span>
-                        <input type="text" name="captcha_answer" inputmode="numeric" autocomplete="off" <?= $formErrorAttributes('captcha'); ?> required>
+                        <input type="text" name="captcha_answer" inputmode="numeric" autocomplete="off" aria-describedby="contact-captcha-question<?= $formHasError('captcha') ? ' contact-error-captcha' : ''; ?>" <?= $formHasError('captcha') ? 'aria-invalid="true"' : ''; ?> required>
                         <?php if ($formHasError('captcha')): ?><small class="form-field-error" id="contact-error-captcha">Bitte lösen Sie die Sicherheitsfrage erneut.</small><?php endif; ?>
                     </label>
-                    <div class="captcha-question" aria-hidden="true">
+                    <div class="captcha-question" id="contact-captcha-question">
                         <span><?= e($contactForm['captchaQuestion']); ?></span>
                     </div>
                 </div>

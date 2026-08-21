@@ -29,3 +29,7 @@ if (document.getElementById('reviews-track')) {
 if (document.querySelector('.contact-form')) {
     void import('./modules/contact.js');
 }
+
+if (document.querySelector('[data-controller-configurator]')) {
+    void import('./modules/controller-configurator.js');
+}

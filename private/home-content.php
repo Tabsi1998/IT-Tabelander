@@ -99,6 +99,8 @@ return [
             'items' => ['Controller-Fehler prüfen und reparieren', 'Ausgewählte Konsolen warten', 'Wirtschaftlichkeit vorab einschätzen'],
             'audience' => 'Stick-Drift · Tasten · Wartung',
             'groups' => ['gaming'],
+            'url' => 'controller-service-telfs',
+            'cta' => 'PS5-Controller konfigurieren',
         ],
     ],
     'faq' => [
