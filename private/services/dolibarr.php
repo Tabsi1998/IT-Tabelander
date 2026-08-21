@@ -102,11 +102,125 @@ function dolibarr_thirdparty_payload(array $config, array $submission): array
         'name' => trim((string) ($submission['name'] ?? '')),
         'email' => strtolower(trim((string) ($submission['email'] ?? ''))),
         'phone' => trim((string) ($submission['phone'] ?? '')),
-        'client' => 1,
+        // Dolibarr: 2 = prospect. A confirmed order can later turn the record
+        // into a customer without treating every website enquiry as a sale.
+        'client' => 2,
         'code_client' => '-1',
         'country_code' => (string) ($config['countryCode'] ?? 'AT'),
-        'note_private' => 'Automatisch aus einer Anfrage über it.tabelander.co.at angelegt.',
+        'note_private' => 'Automatisch als Interessent aus einer Anfrage über it.tabelander.co.at angelegt.',
         'caller' => 'ittabelanderwebsite',
+    ];
+}
+
+function dolibarr_ticket_payload(int $thirdpartyId, array $submission, string $requestId): array
+{
+    $service = trim((string) ($submission['service'] ?? 'Allgemeine Anfrage'));
+    $audience = trim((string) ($submission['audience'] ?? ''));
+    $subjectParts = array_values(array_filter([$service, $audience]));
+    $subject = 'Website-Anfrage: ' . implode(' / ', $subjectParts);
+    $subject = function_exists('mb_substr') ? mb_substr($subject, 0, 255) : substr($subject, 0, 255);
+
+    $rows = [
+        'Name' => trim((string) ($submission['name'] ?? '')),
+        'E-Mail' => strtolower(trim((string) ($submission['email'] ?? ''))),
+        'Telefon' => trim((string) ($submission['phone'] ?? '')) ?: 'nicht angegeben',
+        'Bereich' => $audience ?: 'nicht angegeben',
+        'Anliegen' => $service ?: 'Allgemeine Anfrage',
+        'Referenz' => $requestId,
+    ];
+    $messageParts = [];
+    foreach ($rows as $label => $value) {
+        $messageParts[] = '<strong>'
+            . htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            . ':</strong> '
+            . htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    $message = trim((string) ($submission['message'] ?? ''));
+    $messageParts[] = '<br><strong>Nachricht:</strong><br>'
+        . nl2br(htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+
+    return [
+        'socid' => $thirdpartyId,
+        'fk_soc' => $thirdpartyId,
+        'subject' => $subject,
+        'message' => implode('<br>', $messageParts),
+        'origin_email' => strtolower(trim((string) ($submission['email'] ?? ''))),
+        'origin_replyto' => strtolower(trim((string) ($submission['email'] ?? ''))),
+        'private' => 1,
+        'notify_tiers_at_create' => 0,
+        'caller' => 'ittabelanderwebsite',
+    ];
+}
+
+function create_dolibarr_contact_ticket(
+    array $siteConfig,
+    array $submission,
+    string $requestId,
+    ?callable $transport = null
+): array {
+    $config = is_array($siteConfig['dolibarr'] ?? null) ? $siteConfig['dolibarr'] : [];
+    $retentionDays = max(0, (int) ($siteConfig['logging']['retentionDays'] ?? 30));
+
+    if (!dolibarr_configured($config)) {
+        if (($config['enabledRequested'] ?? false) === true) {
+            append_dolibarr_log([
+                'requestId' => $requestId,
+                'status' => 'configuration_error',
+                'step' => 'configuration',
+            ], $retentionDays);
+        }
+
+        return ['ok' => false, 'status' => 'disabled'];
+    }
+
+    $thirdparty = dolibarr_find_or_create_thirdparty($config, $submission, $transport);
+    if (($thirdparty['ok'] ?? false) !== true) {
+        append_dolibarr_log([
+            'requestId' => $requestId,
+            'status' => 'error',
+            'step' => (string) ($thirdparty['step'] ?? 'thirdparty'),
+            'httpStatus' => (int) ($thirdparty['httpStatus'] ?? 0),
+        ], $retentionDays);
+
+        return ['ok' => false, 'status' => 'thirdparty_error'];
+    }
+
+    $thirdpartyId = (int) $thirdparty['id'];
+    $ticket = dolibarr_request(
+        $config,
+        'POST',
+        'tickets',
+        dolibarr_ticket_payload($thirdpartyId, $submission, $requestId),
+        $transport
+    );
+    $ticketId = dolibarr_response_id($ticket);
+
+    if (($ticket['ok'] ?? false) !== true || $ticketId <= 0) {
+        append_dolibarr_log([
+            'requestId' => $requestId,
+            'status' => 'error',
+            'step' => 'ticket_create',
+            'httpStatus' => (int) ($ticket['status'] ?? 0),
+            'thirdpartyId' => $thirdpartyId,
+        ], $retentionDays);
+
+        return ['ok' => false, 'status' => 'ticket_error', 'thirdpartyId' => $thirdpartyId];
+    }
+
+    append_dolibarr_log([
+        'requestId' => $requestId,
+        'status' => 'created',
+        'step' => 'ticket_complete',
+        'thirdpartyId' => $thirdpartyId,
+        'ticketId' => $ticketId,
+    ], $retentionDays);
+
+    return [
+        'ok' => true,
+        'status' => 'created',
+        'thirdpartyId' => $thirdpartyId,
+        'ticketId' => $ticketId,
     ];
 }
 
@@ -142,24 +256,16 @@ function dolibarr_controller_lines(array $selection, float $vatRate): array
     $selectedOffers = is_array($selection['offerIds'] ?? null) ? $selection['offerIds'] : [];
     $items = [];
 
-    if ($selectedOffers === []) {
-        $items[] = [
-            'label' => (string) ($catalog['diagnosisLabel'] ?? 'Diagnose & Funktionsprüfung'),
-            'description' => 'Diagnose und Funktionsprüfung für ' . $modelLabel . '. Bei anschließender Reparatur wird die Diagnosepauschale angerechnet.',
-            'priceCents' => max(0, (int) ($catalog['diagnosisPriceCents'] ?? 0)),
-        ];
-    } else {
-        foreach ($selectedOffers as $offerId) {
-            if (!isset($offers[$offerId]) || !is_array($offers[$offerId])) {
-                continue;
-            }
-
-            $items[] = [
-                'label' => (string) ($offers[$offerId]['shortLabel'] ?? $offerId),
-                'description' => (string) ($offers[$offerId]['description'] ?? ''),
-                'priceCents' => max(0, (int) ($offers[$offerId]['priceCents'] ?? 0)),
-            ];
+    foreach ($selectedOffers as $offerId) {
+        if (!isset($offers[$offerId]) || !is_array($offers[$offerId])) {
+            continue;
         }
+
+        $items[] = [
+            'label' => (string) ($offers[$offerId]['shortLabel'] ?? $offerId),
+            'description' => $modelLabel . ': ' . (string) ($offers[$offerId]['description'] ?? ''),
+            'priceCents' => max(0, (int) ($offers[$offerId]['priceCents'] ?? 0)),
+        ];
     }
 
     return array_map(static function (array $item, int $index) use ($vatRate): array {

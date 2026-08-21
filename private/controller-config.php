@@ -2,8 +2,6 @@
 declare(strict_types=1);
 
 return [
-    'diagnosisPriceCents' => 1990,
-    'diagnosisLabel' => 'Diagnose & Funktionsprüfung',
     'models' => [
         'dualsense' => [
             'label' => 'PS5 DualSense',
@@ -16,84 +14,7 @@ return [
             'description' => 'DualSense-Edge-Controller der PlayStation 5',
         ],
     ],
-    'issues' => [
-        'stick-left' => [
-            'label' => 'Linker Stick driftet oder reagiert falsch',
-            'shortLabel' => 'Linker Stick',
-            'zone' => 'stick-left',
-        ],
-        'stick-right' => [
-            'label' => 'Rechter Stick driftet oder reagiert falsch',
-            'shortLabel' => 'Rechter Stick',
-            'zone' => 'stick-right',
-        ],
-        'buttons' => [
-            'label' => 'Tasten klemmen oder reagieren nicht',
-            'shortLabel' => 'Tasten',
-            'zone' => 'buttons',
-        ],
-        'dpad' => [
-            'label' => 'Steuerkreuz reagiert fehlerhaft',
-            'shortLabel' => 'Steuerkreuz',
-            'zone' => 'dpad',
-        ],
-        'triggers' => [
-            'label' => 'Trigger oder Schultertasten sind auffällig',
-            'shortLabel' => 'Trigger / Schultertasten',
-            'zone' => 'triggers',
-        ],
-        'charging' => [
-            'label' => 'Laden oder USB-C-Anschluss funktioniert nicht',
-            'shortLabel' => 'Laden / USB-C',
-            'zone' => 'charging',
-        ],
-        'battery' => [
-            'label' => 'Akku hält nicht mehr oder lädt schlecht',
-            'shortLabel' => 'Akku',
-            'zone' => 'battery',
-        ],
-        'connection' => [
-            'label' => 'Verbindung oder Anmeldung schlägt fehl',
-            'shortLabel' => 'Verbindung',
-            'zone' => 'connection',
-        ],
-        'housing' => [
-            'label' => 'Gehäuse, Sturz- oder mechanischer Schaden',
-            'shortLabel' => 'Gehäuse / Sturzschaden',
-            'zone' => 'housing',
-        ],
-        'liquid' => [
-            'label' => 'Flüssigkeit ist in den Controller gelangt',
-            'shortLabel' => 'Flüssigkeitsschaden',
-            'zone' => 'housing',
-        ],
-        'other' => [
-            'label' => 'Anderes oder noch unklareres Fehlerbild',
-            'shortLabel' => 'Anderes Fehlerbild',
-            'zone' => 'connection',
-        ],
-    ],
     'offers' => [
-        'stick-standard-one' => [
-            'label' => 'Standard-Stick ersetzen – eine Seite',
-            'shortLabel' => '1 Standard-Stick inkl. Kalibrierung',
-            'description' => 'Ein verschlissenes Analogstick-Modul ersetzen, kalibrieren und vollständig testen.',
-            'priceCents' => 4490,
-            'models' => ['dualsense'],
-            'zone' => 'stick-left',
-            'group' => 'stick-solution',
-            'badge' => 'Reparatur',
-        ],
-        'stick-standard-two' => [
-            'label' => 'Standard-Sticks ersetzen – beide Seiten',
-            'shortLabel' => '2 Standard-Sticks inkl. Kalibrierung',
-            'description' => 'Beide Analogstick-Module gemeinsam ersetzen, kalibrieren und testen.',
-            'priceCents' => 6990,
-            'models' => ['dualsense'],
-            'zone' => 'sticks',
-            'group' => 'stick-solution',
-            'badge' => 'Paket',
-        ],
         'hall-pair' => [
             'label' => 'Hall-Effect-Umbau – zwei Sticks',
             'shortLabel' => 'Hall-Effect-Umbau (2 Sticks)',
@@ -113,16 +34,6 @@ return [
             'zone' => 'battery',
             'group' => 'battery-solution',
             'badge' => 'Upgrade',
-        ],
-        'cleaning' => [
-            'label' => 'Innenreinigung & Wartung',
-            'shortLabel' => 'Innenreinigung & Wartung',
-            'description' => 'Controller öffnen, innen reinigen, auffällige Mechanik prüfen und abschließend testen.',
-            'priceCents' => 3490,
-            'models' => ['dualsense', 'dualsense-edge'],
-            'zone' => 'housing',
-            'group' => 'cleaning',
-            'badge' => 'Pflege',
         ],
         'face-clicky' => [
             'label' => 'Clicky-Tasten – D-Pad & Aktionstasten',
@@ -213,26 +124,6 @@ return [
             'zone' => 'back-paddles',
             'group' => 'edge-paddle-upgrade',
             'badge' => 'Edge Upgrade',
-        ],
-        'edge-magnetic-module' => [
-            'label' => 'Edge Rücktasten-Magnetmodule reparieren',
-            'shortLabel' => 'Edge Magnetmodule Rücktasten',
-            'description' => 'Lockere oder verschlissene magnetische Aufnahmen der Edge-Rücktasten ersetzen.',
-            'priceCents' => 4990,
-            'models' => ['dualsense-edge'],
-            'zone' => 'back-paddles',
-            'group' => 'edge-back-repair',
-            'badge' => 'Reparatur',
-        ],
-        'edge-switch-board' => [
-            'label' => 'Edge Rücktasten-Schalterplatine reparieren',
-            'shortLabel' => 'Edge Schalterplatine Rücktasten',
-            'description' => 'Unzuverlässige oder nicht reagierende Rücktasten durch Austausch der Schalterplatine instand setzen.',
-            'priceCents' => 5490,
-            'models' => ['dualsense-edge'],
-            'zone' => 'back-paddles',
-            'group' => 'edge-back-repair',
-            'badge' => 'Reparatur',
         ],
     ],
     'extras' => [

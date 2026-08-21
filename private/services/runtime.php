@@ -55,18 +55,19 @@ function append_dolibarr_log(array $payload, int $retentionDays = 30): void
         'step' => (string) ($payload['step'] ?? ''),
         'httpStatus' => max(0, (int) ($payload['httpStatus'] ?? 0)),
         'thirdpartyId' => max(0, (int) ($payload['thirdpartyId'] ?? 0)),
+        'ticketId' => max(0, (int) ($payload['ticketId'] ?? 0)),
         'proposalId' => max(0, (int) ($payload['proposalId'] ?? 0)),
     ], $retentionDays);
 }
 
 function append_runtime_log(string $path, array $payload, int $retentionDays): void
 {
-    ensure_runtime_directory(dirname($path));
-    prune_runtime_log($path, $retentionDays);
-
     if ($retentionDays <= 0) {
         return;
     }
+
+    ensure_runtime_directory(dirname($path));
+    prune_runtime_log($path, $retentionDays);
 
     $line = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     if ($line !== false) {

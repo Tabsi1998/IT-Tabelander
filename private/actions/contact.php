@@ -34,28 +34,34 @@ if (!$validation['valid']) {
 }
 
 $mailResult = send_contact_mail($siteConfig, $submission);
+$requestId = (string) ($mailResult['requestId'] ?? '');
 
 $controllerSelection = controller_request((string) $submission['controllerRequestId']);
-if ($mailResult['ownerSent'] && $controllerSelection !== []) {
-    create_dolibarr_controller_proposal(
+$dolibarrResult = $controllerSelection !== []
+    ? create_dolibarr_controller_proposal(
         $siteConfig,
         $submission,
         $controllerSelection,
         (string) $submission['controllerRequestId'],
-        (string) ($mailResult['requestId'] ?? '')
-    );
+        $requestId
+    )
+    : create_dolibarr_contact_ticket($siteConfig, $submission, $requestId);
+
+$accepted = (bool) ($mailResult['ownerSent'] ?? false) || (bool) ($dolibarrResult['ok'] ?? false);
+
+if ($accepted && $controllerSelection !== []) {
     controller_request((string) $submission['controllerRequestId'], true);
 }
 
 $status = match (true) {
-    $mailResult['ownerSent'] && $mailResult['customerSent'] => 'success',
-    $mailResult['ownerSent'] => 'partial',
+    $accepted && $mailResult['customerSent'] => 'success',
+    $accepted => 'partial',
     default => 'mail_error',
 };
 
 if ($status === 'mail_error') {
     store_contact_form_flash(contact_submission_values($submission), [], [
-        'requestId' => (string) ($mailResult['requestId'] ?? ''),
+        'requestId' => $requestId,
     ]);
 }
 

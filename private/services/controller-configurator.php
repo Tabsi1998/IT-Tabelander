@@ -96,12 +96,10 @@ function build_controller_selection(array $input): array
 {
     $catalog = controller_catalog();
     $models = is_array($catalog['models'] ?? null) ? $catalog['models'] : [];
-    $issues = is_array($catalog['issues'] ?? null) ? $catalog['issues'] : [];
     $offers = is_array($catalog['offers'] ?? null) ? $catalog['offers'] : [];
     $extras = is_array($catalog['extras'] ?? null) ? $catalog['extras'] : [];
 
     $modelId = trim((string) ($input['model'] ?? ''));
-    $issueIds = array_values(array_intersect(controller_string_list($input['issues'] ?? []), array_keys($issues)));
     $submittedOfferIds = array_values(array_intersect(controller_string_list($input['offers'] ?? []), array_keys($offers)));
     $extraIds = array_values(array_intersect(controller_string_list($input['extras'] ?? []), array_keys($extras)));
     $notes = controller_notes((string) ($input['notes'] ?? ''));
@@ -117,7 +115,7 @@ function build_controller_selection(array $input): array
         return in_array($modelId, $models, true);
     }));
 
-    if ($issueIds === [] && $offerIds === []) {
+    if ($offerIds === []) {
         $errors[] = 'selection';
     }
 
@@ -141,7 +139,6 @@ function build_controller_selection(array $input): array
             'valid' => false,
             'errors' => $errors,
             'modelId' => $modelId,
-            'issueIds' => $issueIds,
             'offerIds' => $offerIds,
             'extraIds' => $extraIds,
             'notes' => $notes,
@@ -149,10 +146,6 @@ function build_controller_selection(array $input): array
     }
 
     $modelLabel = (string) ($models[$modelId]['label'] ?? $modelId);
-    $issueLabels = array_map(
-        static fn (string $id): string => (string) ($issues[$id]['shortLabel'] ?? $id),
-        $issueIds
-    );
     $extraLabels = array_map(
         static fn (string $id): string => (string) ($extras[$id]['shortLabel'] ?? $id),
         $extraIds
@@ -165,26 +158,19 @@ function build_controller_selection(array $input): array
         static fn (string $id): int => max(0, (int) ($offers[$id]['priceCents'] ?? 0)),
         $offerIds
     ));
-    $diagnosisPriceCents = max(0, (int) ($catalog['diagnosisPriceCents'] ?? 0));
-    $totalPriceCents = $offerIds !== [] ? $offerPriceCents : $diagnosisPriceCents;
+    $totalPriceCents = $offerPriceCents;
     $messageLines = [
-        'Controller-Konfiguration:',
+        'Controller-Upgrade-Konfiguration:',
         'Modell: ' . $modelLabel,
-        'Fehlerbild: ' . ($issueLabels !== [] ? implode(', ', $issueLabels) : 'Kein Defekt angegeben – Upgrade-Anfrage'),
+        '',
+        'Gewählte Upgrade-Pakete:',
     ];
 
-    if ($offerIds !== []) {
-        $messageLines[] = '';
-        $messageLines[] = 'Gewählte Pauschalpakete:';
-        foreach ($offerIds as $offerId) {
-            $messageLines[] = '- ' . (string) ($offers[$offerId]['shortLabel'] ?? $offerId)
-                . ': ' . controller_price(max(0, (int) ($offers[$offerId]['priceCents'] ?? 0)));
-        }
-        $messageLines[] = 'Voraussichtliche Paketsumme: ' . controller_price($totalPriceCents);
-    } else {
-        $messageLines[] = 'Diagnosepauschale: ' . controller_price($diagnosisPriceCents)
-            . ' (wird bei anschließender Reparatur angerechnet)';
+    foreach ($offerIds as $offerId) {
+        $messageLines[] = '- ' . (string) ($offers[$offerId]['shortLabel'] ?? $offerId)
+            . ': ' . controller_price(max(0, (int) ($offers[$offerId]['priceCents'] ?? 0)));
     }
+    $messageLines[] = 'Voraussichtliche Paketsumme: ' . controller_price($totalPriceCents);
 
     if ($extraLabels !== []) {
         $messageLines[] = 'Zusatzangaben: ' . implode(', ', $extraLabels);
@@ -197,15 +183,13 @@ function build_controller_selection(array $input): array
     }
 
     $messageLines[] = '';
-    $messageLines[] = 'Die Auswahl ist eine unverbindliche Reparaturanfrage. Die technische Prüfung erfolgt durch IT-Tabelander.';
+    $messageLines[] = 'Die Auswahl ist eine unverbindliche Upgrade-Anfrage. Kompatibilität und Ausführung werden vor der Annahme durch IT-Tabelander geprüft.';
 
     return [
         'valid' => true,
         'errors' => [],
         'modelId' => $modelId,
         'modelLabel' => $modelLabel,
-        'issueIds' => $issueIds,
-        'issueLabels' => $issueLabels,
         'offerIds' => $offerIds,
         'offerLabels' => $offerLabels,
         'extraIds' => $extraIds,
@@ -213,7 +197,6 @@ function build_controller_selection(array $input): array
         'notes' => $notes,
         'totalPriceCents' => $totalPriceCents,
         'totalPriceLabel' => controller_price($totalPriceCents),
-        'isDiagnosisOnly' => $offerIds === [],
         'message' => implode("\n", $messageLines),
     ];
 }

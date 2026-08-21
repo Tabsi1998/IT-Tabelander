@@ -24,25 +24,25 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
         <main id="start">
             <section class="controller-hero section" aria-labelledby="controller-hero-title">
                 <div class="controller-hero-copy" data-reveal>
-                    <p class="section-eyebrow">PS5-Controller-Service in Telfs</p>
-                    <h1 id="controller-hero-title">Zeigen Sie mir direkt, <span>was am Controller nicht stimmt.</span></h1>
-                    <p class="hero-lead">DualSense oder DualSense Edge auswählen, Fehler markieren und die Zusammenfassung in das Kontaktformular übernehmen. Die endgültige Reparaturempfehlung erfolgt nach technischer Prüfung.</p>
+                    <p class="section-eyebrow">PS5-Controller-Upgrades in Telfs</p>
+                    <h1 id="controller-hero-title">Bauen Sie sich Ihr <span>Controller-Upgrade zusammen.</span></h1>
+                    <p class="hero-lead">DualSense oder DualSense Edge auswählen, gewünschte Upgrades kombinieren und eine übersichtliche Angebotsanfrage vorbereiten. Reparaturen bleiben bewusst individuelle Anfragen.</p>
                     <div class="hero-actions">
                         <a class="button button-primary" href="#konfigurator" data-conversion="primary-cta" data-conversion-location="hero">Controller konfigurieren <span aria-hidden="true">↓</span></a>
                         <a class="button button-secondary" href="<?= e($phoneLink); ?>">Direkt anrufen</a>
                     </div>
                     <ul class="controller-hero-facts" aria-label="Vorteile des Controller-Service">
                         <li><strong>2 Modelle</strong><span>DualSense & Edge</span></li>
-                        <li><strong>Mehrfachauswahl</strong><span>Alle Fehler gemeinsam melden</span></li>
-                        <li><strong>Unverbindlich</strong><span>Prüfung vor Reparatur</span></li>
+                        <li><strong>Mehrfachauswahl</strong><span>Upgrades sinnvoll kombinieren</span></li>
+                        <li><strong>Klare Pakete</strong><span>Material, Einbau und Test</span></li>
                     </ul>
                 </div>
                 <div class="controller-hero-art" data-reveal aria-hidden="true">
                     <div class="controller-orbit controller-orbit-one"></div>
                     <div class="controller-orbit controller-orbit-two"></div>
-                    <span class="controller-art-label controller-art-label-one">Stick-Drift</span>
-                    <span class="controller-art-label controller-art-label-two">Tasten</span>
-                    <span class="controller-art-label controller-art-label-three">USB-C</span>
+                    <span class="controller-art-label controller-art-label-one">Hall Effect</span>
+                    <span class="controller-art-label controller-art-label-two">Clicky</span>
+                    <span class="controller-art-label controller-art-label-three">Back Paddles</span>
                     <svg viewBox="0 0 800 520" focusable="false">
                         <path class="controller-silhouette" d="M201 122C132 140 94 215 71 328c-13 65 2 123 48 139 49 17 85-25 119-79l37-58h250l37 58c34 54 70 96 119 79 46-16 61-74 48-139-23-113-61-188-130-206-53-14-91 8-129 8H330c-38 0-76-22-129-8Z"/>
                         <path class="controller-panel" d="M308 143h184l-24 111H332Z"/>
@@ -54,17 +54,17 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                 </div>
             </section>
 
-            <section class="controller-configurator section" id="konfigurator" aria-labelledby="configurator-title" data-controller-configurator data-diagnosis-price-cents="<?= e((string) $catalog['diagnosisPriceCents']); ?>">
+            <section class="controller-configurator section" id="konfigurator" aria-labelledby="configurator-title" data-controller-configurator>
                 <header class="controller-config-head" data-reveal>
                     <div>
-                        <p class="section-eyebrow">Reparaturanfrage zusammenstellen</p>
-                        <h2 id="configurator-title">Ihr Controller. Ihr Fehlerbild.</h2>
+                        <p class="section-eyebrow">Upgrade-Anfrage zusammenstellen</p>
+                        <h2 id="configurator-title">Ihr Controller. Ihr Setup.</h2>
                     </div>
-                    <p>Die Auswahl ersetzt keine Diagnose und ist kein verbindlicher Kostenvoranschlag. Sie hilft mir, Ihr Anliegen vorab schneller einzuordnen.</p>
+                    <p>Wählen Sie nur die Upgrades, die Sie wirklich möchten. Ich prüfe anschließend intern die technische Kompatibilität und erstelle daraus ein kontrollierbares Angebot.</p>
                 </header>
 
                 <?php if (in_array($configStatus, ['invalid', 'incomplete'], true)): ?>
-                    <p class="controller-config-error" role="alert">Die Auswahl war unvollständig oder abgelaufen. Bitte wählen Sie ein Modell sowie mindestens ein Fehlerbild oder Pauschalpaket erneut aus.</p>
+                    <p class="controller-config-error" role="alert">Die Auswahl war unvollständig oder abgelaufen. Bitte wählen Sie ein Modell und mindestens ein Upgrade-Paket erneut aus.</p>
                 <?php endif; ?>
 
                 <form class="controller-config-form" action="<?= e(page_url('controller-request.php')); ?>" method="post" data-controller-form novalidate>
@@ -84,21 +84,8 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                 </div>
                             </fieldset>
 
-                            <fieldset class="config-step" data-config-step="issues">
-                                <legend><span>02</span><strong>Was funktioniert nicht?</strong><small>Optional bei reinem Upgrade</small></legend>
-                                <div class="controller-issue-options">
-                                    <?php foreach ($catalog['issues'] as $issueId => $issue): ?>
-                                        <label class="controller-choice controller-issue-choice">
-                                            <input type="checkbox" name="issues[]" value="<?= e((string) $issueId); ?>" data-label="<?= e((string) $issue['shortLabel']); ?>" data-zone="<?= e((string) $issue['zone']); ?>">
-                                            <span><strong><?= e((string) $issue['label']); ?></strong><small aria-hidden="true">+</small></span>
-                                        </label>
-                                    <?php endforeach; ?>
-                                </div>
-                                <p class="controller-field-error" data-selection-error hidden>Bitte wählen Sie mindestens ein Fehlerbild oder ein Pauschalpaket.</p>
-                            </fieldset>
-
                             <fieldset class="config-step config-step-offers" data-config-step="offers">
-                                <legend><span>03</span><strong>Reparatur oder Upgrade wählen</strong><small>Faire Gesamtpreise</small></legend>
+                                <legend><span>02</span><strong>Welche Upgrades möchten Sie?</strong><small>Faire Gesamtpreise</small></legend>
                                 <p class="controller-offer-intro">Alle angezeigten Preise verstehen sich als Gesamtpreis für das genannte Material, den Einbau und den abschließenden Funktionstest.</p>
                                 <p class="controller-offer-placeholder" data-offer-placeholder>Wählen Sie zuerst DualSense oder DualSense Edge. Danach erscheinen nur passende Pakete.</p>
                                 <div class="controller-offer-options" data-offer-list>
@@ -113,11 +100,12 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                         </label>
                                     <?php endforeach; ?>
                                 </div>
+                                <p class="controller-field-error" data-selection-error hidden>Bitte wählen Sie mindestens ein Upgrade-Paket.</p>
                                 <p class="controller-package-note"><strong>Wichtig:</strong> Pauschalpreise gelten für einen zur gewählten Leistung passenden, nicht schwer vorbeschädigten Controller. Verdeckte Platinen-, Flüssigkeits- oder Fremdreparaturschäden werden nur nach Ihrer Zustimmung zusätzlich bearbeitet. Versand ist nicht enthalten.</p>
                             </fieldset>
 
                             <fieldset class="config-step" data-config-step="extras">
-                                <legend><span>04</span><strong>Was soll ich zusätzlich wissen?</strong><small>Optional</small></legend>
+                                <legend><span>03</span><strong>Was soll ich zusätzlich wissen?</strong><small>Optional</small></legend>
                                 <div class="controller-extra-options">
                                     <?php foreach ($catalog['extras'] as $extraId => $extra): ?>
                                         <label class="controller-choice controller-extra-choice">
@@ -128,7 +116,7 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                 </div>
                                 <label class="controller-notes">
                                     <span>Kurze Ergänzung <small>(optional)</small></span>
-                                    <textarea name="notes" rows="4" maxlength="500" placeholder="Zum Beispiel: Der Fehler tritt nur in bestimmten Spielen auf …"></textarea>
+                                    <textarea name="notes" rows="4" maxlength="500" placeholder="Zum Beispiel: gewünschte Farbe, Spielstil oder besondere Wünsche …"></textarea>
                                 </label>
                             </fieldset>
                         </div>
@@ -138,7 +126,7 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                 <p class="controller-live-kicker"><span></span> Live-Vorschau</p>
                                 <svg class="controller-live-svg" viewBox="0 0 800 520" role="img" aria-labelledby="controller-svg-title controller-svg-description">
                                     <title id="controller-svg-title">Schematische Vorderansicht eines PS5-Controllers</title>
-                                    <desc id="controller-svg-description">Ausgewählte Fehlerbereiche werden farblich hervorgehoben.</desc>
+                                    <desc id="controller-svg-description">Ausgewählte Upgrade-Bereiche werden farblich hervorgehoben.</desc>
                                     <path class="controller-device-shadow" d="M201 122C132 140 94 215 71 328c-13 65 2 123 48 139 49 17 85-25 119-79l37-58h250l37 58c34 54 70 96 119 79 46-16 61-74 48-139-23-113-61-188-130-206-53-14-91 8-129 8H330c-38 0-76-22-129-8Z"/>
                                     <path class="controller-device-body" data-controller-zone="housing" d="M201 110C132 128 94 203 71 316c-13 65 2 123 48 139 49 17 85-25 119-79l37-58h250l37 58c34 54 70 96 119 79 46-16 61-74 48-139-23-113-61-188-130-206-53-14-91 8-129 8H330c-38 0-76-22-129-8Z"/>
                                     <path class="controller-device-center" d="M309 132h182l-23 112H332Z"/>
@@ -183,14 +171,13 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
                                 <p class="controller-summary-eyebrow">Ihre Auswahl</p>
                                 <dl>
                                     <div><dt>Modell</dt><dd data-summary-model>Bitte auswählen</dd></div>
-                                    <div><dt>Fehler</dt><dd data-summary-issues>Noch nichts markiert</dd></div>
-                                    <div><dt>Pakete</dt><dd data-summary-offers>Noch kein Paket gewählt</dd></div>
+                                    <div><dt>Upgrades</dt><dd data-summary-offers>Noch kein Upgrade gewählt</dd></div>
                                     <div><dt>Zusatz</dt><dd data-summary-extras>Keine Zusatzangabe</dd></div>
                                 </dl>
                                 <div class="controller-assessment">
-                                    <span data-price-kicker>Diagnosepauschale</span>
-                                    <strong data-summary-price><?= e(controller_price((int) $catalog['diagnosisPriceCents'])); ?></strong>
-                                    <small data-price-note>Wird bei anschließender Reparatur vollständig angerechnet.</small>
+                                    <span data-price-kicker>Voraussichtliche Paketsumme</span>
+                                    <strong data-summary-price>0,00 €</strong>
+                                    <small data-price-note>Material, Einbau und Funktionstest laut gewählten Paketen.</small>
                                 </div>
                                 <button class="button button-primary controller-submit" type="submit">Ins Kontaktformular übernehmen <span aria-hidden="true">↗</span></button>
                                 <p class="controller-submit-note">Noch keine Beauftragung · keine automatische Bestellung</p>
@@ -203,12 +190,12 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
             <section class="controller-info section" aria-labelledby="controller-info-title">
                 <div data-reveal>
                     <p class="section-eyebrow">Was danach passiert</p>
-                    <h2 id="controller-info-title">Erst ansehen. Dann ehrlich entscheiden.</h2>
+                    <h2 id="controller-info-title">Auswählen. Prüfen. Angebot erhalten.</h2>
                 </div>
                 <ol>
                     <li data-reveal><span>01</span><div><h3>Anfrage vervollständigen</h3><p>Ihre Auswahl wird in das normale Kontaktformular übernommen. Dort ergänzen Sie nur noch Kontaktdaten und bei Bedarf weitere Hinweise.</p></div></li>
-                    <li data-reveal><span>02</span><div><h3>Controller technisch prüfen</h3><p>Nach der Übergabe wird das Fehlerbild nachvollzogen und geprüft, welche Reparatur technisch und wirtschaftlich sinnvoll ist.</p></div></li>
-                    <li data-reveal><span>03</span><div><h3>Freigabe vor der Reparatur</h3><p>Sie erhalten eine verständliche Rückmeldung und entscheiden anschließend, ob die Reparatur durchgeführt werden soll.</p></div></li>
+                    <li data-reveal><span>02</span><div><h3>Kompatibilität intern prüfen</h3><p>Ich prüfe Controller-Ausführung, Kombination und Verfügbarkeit der gewählten Komponenten, ohne technische interne Details von Ihnen zu verlangen.</p></div></li>
+                    <li data-reveal><span>03</span><div><h3>Angebot erhalten</h3><p>Nach meiner Kontrolle erhalten Sie ein nachvollziehbares Angebot. Erst nach Ihrer Freigabe werden Teile bestellt oder Arbeiten begonnen.</p></div></li>
                 </ol>
             </section>
 
@@ -218,8 +205,8 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
             </section>
 
             <section class="controller-price-note section" data-reveal aria-labelledby="controller-price-note-title">
-                <div><p class="section-eyebrow">Preise ohne Überraschung</p><h2 id="controller-price-note-title">Pauschal, wo es technisch fair bleibt.</h2></div>
-                <p>Standardisierte Umbauten erhalten einen klaren Gesamtpreis. Bei unklarem Fehlerbild gilt eine Diagnosepauschale von <?= e(controller_price((int) $catalog['diagnosisPriceCents'])); ?>; entscheiden Sie sich danach für eine Reparatur, wird sie vollständig angerechnet. Bei versteckten Vorschäden erhalten Sie zuerst eine neue Einschätzung – ohne automatische Mehrkosten.</p>
+                <div><p class="section-eyebrow">Upgrades statt Reparaturdiagnose</p><h2 id="controller-price-note-title">Klare Pakete für planbare Umbauten.</h2></div>
+                <p>Der Konfigurator enthält ausschließlich standardisierbare Upgrades mit Gesamtpreisen. Stick-Drift, Ladefehler, Sturz-, Flüssigkeits- und andere Reparaturschäden schildern Sie bitte über die <a href="<?= e(page_url()); ?>#kontakt">individuelle Anfrage</a>. Dafür wird nach Prüfung ein eigener Lösungsweg angeboten.</p>
             </section>
         </main>
 

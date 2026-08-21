@@ -21,7 +21,7 @@ Wartbare, auf private Haushalte ausgerichtete IT-Service-Website mit lokaler SEO
 - `private/site-services.php` ist der kompatible Loader für die Fachmodule in `private/services/`: Kontakt, Runtime-Logging, Mail/SMTP und Reviews.
 - `private/page-registry.php` ist die zentrale Quelle für Metadaten, Canonicals, Schema und Sitemap-Einträge.
 - `private/landing-pages.php` enthält die individuellen Inhalte der lokalen Landingpages.
-- `private/controller-config.php` enthält die erweiterbare Modell-, Fehler- und Zusatzoptionen-Liste für den PS5-Controller-Konfigurator.
+- `private/controller-config.php` enthält die erweiterbare Modell-, Upgrade- und Zusatzoptionen-Liste für den PS5-Controller-Konfigurator.
 - `private/pages/` enthält Seitentemplates; `private/partials/` enthält Head, Header, Footer und Kontakt-CTA-Komponenten.
 - `private/actions/` enthält Formular- und JSON-Endpunkte.
 - `private/cache/` speichert den serverseitigen Google-Review-Cache.
@@ -83,13 +83,13 @@ Die Route `/sitemap.xml` wird durch Apache auf `sitemap.php` abgebildet. Sie ent
 
 Leere Pflichtwerte deaktivieren die jeweilige externe Integration kontrolliert. Secret-Dateien müssen außerhalb des Webroots liegen und nur für den Webserver-Benutzer lesbar sein.
 
-## Dolibarr-Angebotsentwürfe
+## Dolibarr-Anfragen und Angebotsentwürfe
 
-Der PS5-Controller-Konfigurator ist öffentlich unter `/controller-service-telfs` erreichbar und direkt in der Hauptnavigation verlinkt. Nach einer vollständig validierten und erfolgreich per SMTP zugestellten Controller-Anfrage kann die Website zusätzlich einen Angebotsentwurf in Dolibarr anlegen. Der Entwurf wird bewusst weder automatisch validiert noch versendet.
+Der PS5-Controller-Konfigurator ist öffentlich unter `/controller-service-telfs` erreichbar und direkt in der Hauptnavigation verlinkt. Allgemeine Kontaktanfragen werden in Dolibarr als internes Ticket angelegt. Eine Controller-Upgrade-Konfiguration erzeugt dagegen einen Angebotsentwurf mit einer Freitext-Dienstleistungsposition je gewähltem Pauschalpaket. Angebote werden bewusst weder automatisch validiert noch versendet.
 
-Die Integration sucht zuerst anhand der E-Mail-Adresse nach einem vorhandenen Dolibarr-Kunden. Wird keiner gefunden, legt sie einen Privatkunden an. Anschließend entstehen ein Angebotsentwurf und eine Freitext-Dienstleistungsposition je gewähltem Pauschalpaket. Auswahl und Preise werden erneut aus dem serverseitigen Controller-Katalog aufgebaut; Browserwerte werden nicht als Angebotspreise übernommen.
+Die Integration sucht zuerst anhand der E-Mail-Adresse nach einem vorhandenen Dolibarr-Kontakt. Wird keiner gefunden, legt sie einen Privatkontakt als Interessent an. Vorhandene Kunden werden nicht zurückgestuft. Controller-Auswahl und Preise werden erneut aus dem serverseitigen Katalog aufgebaut; Browserwerte werden nicht als Angebotspreise übernommen. E-Mail und Dolibarr sind voneinander unabhängige Zustellwege, sodass ein kurzfristiger SMTP-Fehler die Übergabe an Dolibarr nicht verhindert.
 
-Für die beschriebene Serverstruktur wird als Basisadresse `https://erp.tabelander.co.at` verwendet. Der REST-Endpunkt `/api/index.php` wird automatisch ergänzt. Die Datei `/var/www/it-tabelander-secrets/dolibarr-api-key.txt` enthält ausschließlich den API-Schlüssel eines eigenen Dolibarr-Benutzers mit möglichst kleinen Rechten zum Lesen/Anlegen von Kunden sowie Lesen/Anlegen von Angeboten. Beispielwerte:
+Für die beschriebene Serverstruktur wird als Basisadresse `https://erp.tabelander.co.at` verwendet. Der REST-Endpunkt `/api/index.php` wird automatisch ergänzt. Die Datei `/var/www/it-tabelander-secrets/dolibarr-api-key.txt` enthält ausschließlich den API-Schlüssel eines eigenen Dolibarr-Benutzers mit möglichst kleinen Rechten zum Lesen/Anlegen von Geschäftspartnern und Interessenten, Lesen/Anlegen von Tickets sowie Lesen/Anlegen von Angeboten. Beispielwerte:
 
 ```text
 DOLIBARR_ENABLED=true
@@ -103,6 +103,8 @@ DOLIBARR_TIMEOUT_SECONDS=8
 
 `DOLIBARR_VAT_RATE` muss vor der Aktivierung anhand der tatsächlichen steuerlichen Behandlung festgelegt werden. Ohne API-Schlüssel oder Steuersatz bleibt die Anbindung kontrolliert deaktiviert. Fehlversuche blockieren die normale Kontakt-E-Mail nicht; das datensparsame `private/logs/dolibarr.log` enthält nur technische Statuswerte und Dolibarr-IDs, keine Kontaktdaten oder API-Antworten.
 
+Die empfohlene Produkt-/Leistungsstruktur und alle Controller-Referenzen stehen in [`docs/DOLIBARR-KATALOG.md`](docs/DOLIBARR-KATALOG.md).
+
 ## Deployment-Checkliste
 
 1. Zielbranch und grünen CI-Status prüfen; `php tests/run.php` zusätzlich im Deployment-Artefakt ausführen.
@@ -115,6 +117,8 @@ DOLIBARR_TIMEOUT_SECONDS=8
 8. Startseite, zwei aktive Privatkunden-Landingpages, Rechtstexte, `/sitemap.xml`, `robots.txt` und Kontaktstatus als Smoke-Test aufrufen. Die frühere Firmen-Landingpage ist bewusst nicht indexierbar und liefert 404.
    Zusätzlich den Controller-Konfigurator mit DualSense und DualSense Edge sowie die Übernahme in das Kontaktformular prüfen.
 9. Rechtstexte mit den realen technischen Abläufen abgleichen und bei Bedarf juristisch prüfen lassen.
+
+Wenn `/controller-service-telfs` am Server ein Apache-404 statt der Website liefert, zeigt der VirtualHost sehr wahrscheinlich noch auf `/var/www/html` oder verwendet die Projekt-`.htaccess` nicht. Die konkrete Prüfung und Korrektur steht in [`docs/PRODUKTIV-DEPLOYMENT.md`](docs/PRODUKTIV-DEPLOYMENT.md).
 
 ## Niemals committen
 

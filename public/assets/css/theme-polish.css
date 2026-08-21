@@ -1,0 +1,160 @@
+/* Final cross-page theme and contrast corrections. */
+html[data-resolved-theme="light"] {
+    color-scheme: light;
+}
+
+html[data-resolved-theme="dark"] {
+    color-scheme: dark;
+}
+
+.brand-mobile-mark,
+html[data-resolved-theme="dark"] .brand-mobile-mark,
+html[data-resolved-theme="light"] .brand-mobile-mark {
+    border: 1px solid rgba(23, 27, 23, 0.1);
+    background: #fffdf8;
+}
+
+.site-nav a[aria-current="page"] {
+    background: rgba(255, 106, 50, 0.14);
+    color: inherit;
+}
+
+/* The contact block uses a light surface in both themes. Keep every child on
+   one explicit contrast palette instead of inheriting global dark-mode text. */
+body[data-page-key="home"] .contact-section {
+    color: #171b17;
+}
+
+body[data-page-key="home"] .contact-copy h2,
+body[data-page-key="home"] .contact-copy p,
+body[data-page-key="home"] .contact-facts dd,
+body[data-page-key="home"] .contact-facts a {
+    color: #263027;
+}
+
+body[data-page-key="home"] .contact-facts dt {
+    color: #586458;
+}
+
+body[data-page-key="home"] .contact-form-shell {
+    color: #171b17;
+    color-scheme: light;
+}
+
+body[data-page-key="home"] .contact-form label > span,
+body[data-page-key="home"] .consent-check span,
+body[data-page-key="home"] .captcha-question span,
+body[data-page-key="home"] .form-note,
+body[data-page-key="home"] .form-note a {
+    color: #465147;
+}
+
+body[data-page-key="home"] .contact-form input,
+body[data-page-key="home"] .contact-form select,
+body[data-page-key="home"] .contact-form textarea {
+    border-color: rgba(23, 27, 23, 0.22);
+    background-color: #faf8f2;
+    color: #171b17;
+    caret-color: #171b17;
+}
+
+body[data-page-key="home"] .contact-form input::placeholder,
+body[data-page-key="home"] .contact-form textarea::placeholder {
+    color: #718071;
+    opacity: 1;
+}
+
+body[data-page-key="home"] .contact-form select option {
+    background: #fffdf8;
+    color: #171b17;
+}
+
+body[data-page-key="home"] .form-feedback.is-success {
+    border-color: rgba(31, 116, 68, 0.3);
+    background: #e8f5eb;
+    color: #18532d;
+}
+
+body[data-page-key="home"] .form-feedback.is-error {
+    border-color: rgba(154, 56, 24, 0.3);
+    background: #fff0ea;
+    color: #7b2a10;
+}
+
+/* The configurator is dark by design, but light mode must be genuinely light. */
+html[data-resolved-theme="light"] body.controller-page {
+    --text: #172733;
+    --text-soft: #4d6270;
+    --text-muted: #687d89;
+    --line: rgba(29, 64, 85, 0.18);
+    --controller-panel: rgba(255, 255, 255, 0.9);
+    --controller-line: rgba(29, 64, 85, 0.18);
+    --controller-orange-soft: #b83f16;
+    --controller-blue: #245d91;
+    background:
+        radial-gradient(circle at 78% 12%, rgba(52, 120, 182, 0.12), transparent 27rem),
+        radial-gradient(circle at 16% 34%, rgba(255, 106, 50, 0.1), transparent 28rem),
+        #eef4f7;
+    color: var(--text);
+}
+
+html[data-resolved-theme="light"] body.controller-page .config-step,
+html[data-resolved-theme="light"] body.controller-page .controller-price-note {
+    background: rgba(255, 255, 255, 0.76);
+    box-shadow: 0 24px 70px rgba(30, 57, 73, 0.1);
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-choice > span {
+    border-color: rgba(29, 64, 85, 0.17);
+    background: rgba(255, 255, 255, 0.72);
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-choice:hover > span,
+html[data-resolved-theme="light"] body.controller-page .controller-choice input:focus-visible + span {
+    border-color: rgba(36, 93, 145, 0.5);
+    background: rgba(36, 93, 145, 0.08);
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-choice input:checked + span {
+    border-color: var(--controller-orange);
+    background: rgba(255, 106, 50, 0.1);
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-offer-price,
+html[data-resolved-theme="light"] body.controller-page .controller-summary dd {
+    color: #172733;
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-notes textarea {
+    border-color: rgba(29, 64, 85, 0.2);
+    background: #fff;
+    color: #172733;
+    color-scheme: light;
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-live-panel {
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 35px 90px rgba(30, 57, 73, 0.16);
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-live-stage {
+    background:
+        radial-gradient(circle at 50% 45%, rgba(76, 147, 206, 0.16), transparent 43%),
+        linear-gradient(145deg, rgba(222, 238, 247, 0.9), rgba(244, 248, 250, 0.9));
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-model-badge,
+html[data-resolved-theme="light"] body.controller-page .controller-art-label {
+    border-color: rgba(29, 64, 85, 0.18);
+    background: rgba(255, 255, 255, 0.88);
+    color: #263b49;
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-boundary {
+    background: linear-gradient(135deg, rgba(255, 106, 50, 0.12), rgba(119, 174, 207, 0.18));
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-config-error,
+html[data-resolved-theme="light"] body.controller-page .controller-field-error {
+    color: #7b2a10;
+}
