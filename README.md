@@ -79,15 +79,15 @@ Die Route `/sitemap.xml` wird durch Apache auf `sitemap.php` abgebildet. Sie ent
 - SMTP: `SMTP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_ENCRYPTION`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_PASSWORD_FILE`, `SMTP_ALLOW_SELF_SIGNED`, `SMTP_VERIFY_PEER`, `SMTP_VERIFY_PEER_NAME`, `SMTP_EHLO_DOMAIN`.
 - Analytics: `GOOGLE_ANALYTICS_MEASUREMENT_ID`.
 - Bewertungen: `GOOGLE_PLACE_ID`, `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACES_API_KEY_FILE`.
-- Dolibarr: `DOLIBARR_ENABLED`, `DOLIBARR_BASE_URL`, `DOLIBARR_API_KEY_FILE`, `DOLIBARR_ENTITY`, `DOLIBARR_VAT_RATE`, `DOLIBARR_COUNTRY_CODE`, `DOLIBARR_TIMEOUT_SECONDS`.
+- Dolibarr: `DOLIBARR_ENABLED`, `DOLIBARR_BASE_URL`, `DOLIBARR_API_KEY_FILE`, `DOLIBARR_ENTITY`, `DOLIBARR_COUNTRY_CODE`, `DOLIBARR_TIMEOUT_SECONDS`.
 
 Leere Pflichtwerte deaktivieren die jeweilige externe Integration kontrolliert. Secret-Dateien müssen außerhalb des Webroots liegen und nur für den Webserver-Benutzer lesbar sein.
 
 ## Dolibarr-Anfragen und Angebotsentwürfe
 
-Der PS5-Controller-Konfigurator ist öffentlich unter `/controller-service-telfs` erreichbar und direkt in der Hauptnavigation verlinkt. Allgemeine Kontaktanfragen werden in Dolibarr als internes Ticket angelegt. Eine Controller-Upgrade-Konfiguration erzeugt dagegen einen Angebotsentwurf mit einer Freitext-Dienstleistungsposition je gewähltem Pauschalpaket. Angebote werden bewusst weder automatisch validiert noch versendet.
+Der PS5-Controller-Konfigurator ist öffentlich unter `/controller-service-telfs` erreichbar und direkt in der Hauptnavigation verlinkt. Allgemeine Kontaktanfragen werden ohne Website-Mail als Interessent plus internes Dolibarr-Ticket angelegt. Der Controller-Konfigurator besitzt ein eigenes Datenformular und erzeugt getrennt davon einen Interessenten plus Angebotsentwurf. Controller-Beschaffung, Gehäuse und jedes gewählte Pauschalpaket werden als eigene Positionen übernommen. Angebote werden bewusst weder automatisch validiert noch von der Website versendet; der spätere Versand erfolgt nach Prüfung in Dolibarr.
 
-Die Integration sucht zuerst anhand der E-Mail-Adresse nach einem vorhandenen Dolibarr-Kontakt. Wird keiner gefunden, legt sie einen Privatkontakt als Interessent an. Vorhandene Kunden werden nicht zurückgestuft. Controller-Auswahl und Preise werden erneut aus dem serverseitigen Katalog aufgebaut; Browserwerte werden nicht als Angebotspreise übernommen. E-Mail und Dolibarr sind voneinander unabhängige Zustellwege, sodass ein kurzfristiger SMTP-Fehler die Übergabe an Dolibarr nicht verhindert.
+Die Integration sucht zuerst anhand der E-Mail-Adresse nach einem vorhandenen Dolibarr-Kontakt. Wird keiner gefunden, legt sie einen Privatkontakt als Interessent an. Vorhandene Kunden werden nicht zurückgestuft. Controller-Auswahl und Preise werden erneut aus dem serverseitigen Katalog aufgebaut; Browserwerte werden nicht als Angebotspreise übernommen. Neue Interessenten erhalten `tva_assuj=0`, und alle Controller-Angebotspositionen werden serverseitig unveränderbar mit `tva_tx=0.0` angelegt.
 
 Für die beschriebene Serverstruktur wird als Basisadresse `https://erp.tabelander.co.at` verwendet. Der REST-Endpunkt `/api/index.php` wird automatisch ergänzt. Die Datei `/var/www/it-tabelander-secrets/dolibarr-api-key.txt` enthält ausschließlich den API-Schlüssel eines eigenen Dolibarr-Benutzers mit möglichst kleinen Rechten zum Lesen/Anlegen von Geschäftspartnern und Interessenten, Lesen/Anlegen von Tickets sowie Lesen/Anlegen von Angeboten. Beispielwerte:
 
@@ -96,12 +96,11 @@ DOLIBARR_ENABLED=true
 DOLIBARR_BASE_URL=https://erp.tabelander.co.at
 DOLIBARR_API_KEY_FILE=/var/www/it-tabelander-secrets/dolibarr-api-key.txt
 DOLIBARR_ENTITY=0
-DOLIBARR_VAT_RATE=0
 DOLIBARR_COUNTRY_CODE=AT
 DOLIBARR_TIMEOUT_SECONDS=8
 ```
 
-`DOLIBARR_VAT_RATE=0` entspricht der bestätigten Kleinunternehmerregelung von IT-Tabelander und der vorhandenen Dolibarr-Konfiguration ohne Umsatzsteuerausweis. Falls sich der steuerliche Status später ändert, müssen Dolibarr, Website-Konfiguration, Angebotstexte und Preise gemeinsam angepasst werden. Ohne API-Schlüssel oder Steuersatz bleibt die Anbindung kontrolliert deaktiviert. Fehlversuche blockieren die normale Kontakt-E-Mail nicht; das datensparsame `private/logs/dolibarr.log` enthält nur technische Statuswerte und Dolibarr-IDs, keine Kontaktdaten oder API-Antworten.
+Die 0-%-USt-Regel ist wegen der bestätigten Kleinunternehmerregelung absichtlich fest im serverseitigen Code verankert und kann nicht durch eine fehlerhafte Environment-Variable überschrieben werden. Falls sich der steuerliche Status später ändert, müssen Dolibarr, Website-Code, Angebots-/Rechnungstexte und öffentliche Preise gemeinsam angepasst werden. Ohne API-Schlüssel bleibt die Anbindung kontrolliert deaktiviert. Das datensparsame `private/logs/dolibarr.log` enthält nur technische Statuswerte und Dolibarr-IDs, keine Kontaktdaten oder API-Antworten.
 
 Die empfohlene Produkt-/Leistungsstruktur und alle Controller-Referenzen stehen in [`docs/DOLIBARR-KATALOG.md`](docs/DOLIBARR-KATALOG.md).
 
@@ -115,7 +114,7 @@ Die empfohlene Produkt-/Leistungsstruktur und alle Controller-Referenzen stehen 
 6. Schreibrechte nur für `private/logs/` und `private/cache/` gewähren. Die Verzeichnisse werden bei Bedarf automatisch angelegt; der übrige Code sollte für den Webserver schreibgeschützt sein.
 7. HTTPS und Redirect auf HTTPS vollständig testen, bevor HSTS für eine neue Domain aktiviert wird. CSP, Kontaktformular, Consent und Analytics im Browser ohne Policy-Verstöße prüfen.
 8. Startseite, zwei aktive Privatkunden-Landingpages, Rechtstexte, `/sitemap.xml`, `robots.txt` und Kontaktstatus als Smoke-Test aufrufen. Die frühere Firmen-Landingpage ist bewusst nicht indexierbar und liefert 404.
-   Zusätzlich den Controller-Konfigurator mit DualSense und DualSense Edge sowie die Übernahme in das Kontaktformular prüfen.
+   Zusätzlich den Controller-Konfigurator mit DualSense und DualSense Edge, Vorder-/Rückansicht, Beschaffungsarten, Shell-Farben und direkter Dolibarr-Angebotserstellung prüfen.
 9. Rechtstexte mit den realen technischen Abläufen abgleichen und bei Bedarf juristisch prüfen lassen.
 
 Wenn `/controller-service-telfs` am Server ein Apache-404 statt der Website liefert, zeigt der VirtualHost sehr wahrscheinlich noch auf `/var/www/html` oder verwendet die Projekt-`.htaccess` nicht. Die konkrete Prüfung und Korrektur steht in [`docs/PRODUKTIV-DEPLOYMENT.md`](docs/PRODUKTIV-DEPLOYMENT.md).
@@ -129,43 +128,11 @@ Wenn `/controller-service-telfs` am Server ein Apache-404 statt der Website lief
 
 Vor einem Commit helfen `git status`, `git diff --cached` und `git check-ignore -v <datei>`. Wurde ein Secret oder personenbezogener Inhalt bereits veröffentlicht, reicht Löschen im aktuellen Commit nicht: Git-Historie bereinigen und den betroffenen Wert beziehungsweise die Datenquelle rotieren.
 
-## Kontaktformular
+## Kontakt- und Controller-Formulare
 
-Das Formular versendet Mails per SMTP und ist auf zwei Nachrichten vorbereitet:
+Öffentliche Formulare versenden keine Website-E-Mails. Das allgemeine Startseitenformular erzeugt in Dolibarr einen Interessenten und ein Ticket. Das davon getrennte Controller-Formular erzeugt einen Interessenten und einen unverbindlichen Angebotsentwurf. Rückmeldungen und Angebotsversand erfolgen anschließend direkt aus Dolibarr.
 
-- Eigentümer-Benachrichtigung an `office@tabelander.co.at` beziehungsweise an die konfigurierte Empfängeradresse
-- automatische Eingangsbestätigung an den Absender
-
-Das Anwendungslog enthält ausschließlich Zeitstempel, zufällige Request-ID und Versandstatus. Name, E-Mail-Adresse, Telefonnummer, Nachricht und IP-Adresse werden dort nicht gespeichert. SMTP-Diagnosen enthalten keine Empfänger, Betreffzeilen, Zugangsdaten oder vollständigen Serverantworten.
-
-`RUNTIME_LOG_RETENTION_DAYS` steuert die Aufbewahrung (Standard: `30`). Abgelaufene JSONL-Einträge werden bei jedem neuen Logeintrag entfernt. Der Wert `0` deaktiviert persistente Anwendungslogs und leert vorhandene Runtime-Logs beim nächsten Schreibversuch.
-
-SMTP ist in einem frischen Checkout deaktiviert. Für die lokale Entwicklung kann das Formular damit gefahrlos bis zur kontrollierten Fehlermeldung getestet werden, ohne einen Mailserver anzusprechen. Für echten Versand müssen `SMTP_ENABLED=true` und alle Pflichtwerte gesetzt sein:
-
-- `CONTACT_RECIPIENT` überschreibt die Empfängeradresse aus `site-config.php`.
-- `SMTP_ENABLED` aktiviert den Versand ausdrücklich (`false` als sicherer Standard).
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_ENCRYPTION`
-- `SMTP_USERNAME`
-- `SMTP_PASSWORD`
-- `SMTP_ALLOW_SELF_SIGNED`
-- `SMTP_VERIFY_PEER`
-- `SMTP_VERIFY_PEER_NAME`
-- `SMTP_EHLO_DOMAIN`
-
-Als Vorlage ohne echte Zugangsdaten dient `.env.example`; PHP lädt diese Datei nicht automatisch. Die Werte müssen durch Apache/PHP-FPM, den Prozessmanager oder die Deployment-Umgebung gesetzt werden.
-
-Wichtige Hinweise zu SMTP-Passwörtern und TLS:
-
-- Ein SMTP-Server akzeptiert bei Standard-Authentifizierung kein gehashtes Passwort, sondern das echte Passwort oder ein separates App-Passwort.
-- Das Passwort sollte daher nicht im Klartext in `site-config.php` hinterlegt werden.
-- Empfohlen ist `SMTP_PASSWORD` als Umgebungsvariable oder `SMTP_PASSWORD_FILE` mit einem Dateipfad außerhalb des Webroots.
-- Alternativ zu `SMTP_PASSWORD_FILE` wird eine Datei `it-tabelander-secrets/smtp-password.txt` als Geschwisterpfad des Projektordners unterstützt.
-- Die Passwortdatei sollte nur das SMTP-Passwort enthalten und nicht im Git-Repository liegen. Sinnvolle Rechte sind z.B. `chmod 640 smtp-password.txt` und ein Owner bzw. eine Gruppe, die der Webserver lesen darf.
-- Der Versand erfolgt verschlüsselt über TLS oder SSL, wenn dies im Mailserver so konfiguriert ist.
-- Sichere Standards sind Zertifikatsprüfung und Hostnamenprüfung aktiviert sowie selbstsignierte Zertifikate abgelehnt. Eine unsichere lokale Testumgebung muss Abweichungen ausdrücklich über die drei `SMTP_*`-Schalter setzen und darf diese Werte nicht in Produktion übernehmen.
-- Fehlen Pflichtwerte, bleibt SMTP deaktiviert. Das Formular liefert kontrolliert einen Fehler mit Request-ID; die Diagnose protokolliert nur gesetzte/fehlende Felder und niemals das Passwort.
+Das vorhandene SMTP-Modul bleibt als nicht aufgerufene Infrastruktur im Projekt, ist standardmäßig deaktiviert und darf ohne eine spätere bewusste Prozessänderung nicht an die beiden Formulare angeschlossen werden. `RUNTIME_LOG_RETENTION_DAYS` steuert die Aufbewahrung technischer Dolibarr-Statuslogs (Standard: `30`); der Wert `0` deaktiviert persistente Logs.
 
 Zusätzliche Formular-Schutzmechanismen:
 

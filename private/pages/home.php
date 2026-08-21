@@ -26,15 +26,13 @@ $formErrorAttributes = static fn (string $field): string => $formHasError($field
     : '';
 $initialReviews = manual_reviews_payload($company);
 $hasPublishedReviews = !empty($initialReviews['reviews']) && is_array($initialReviews['reviews']);
-$mailErrorReference = trim((string) ($formMeta['requestId'] ?? ''));
+$erpErrorReference = trim((string) ($formMeta['requestId'] ?? ''));
 
 $formStatus = $_GET['contact'] ?? '';
-$controllerReady = ($_GET['controller'] ?? '') === 'ready';
 $formMessage = match ($formStatus) {
-    'success' => 'Ihre Anfrage wurde gesendet. Ich melde mich so bald wie möglich zurück.',
-    'partial' => 'Ihre Anfrage wurde übermittelt. Die automatische Bestätigungs-E-Mail konnte jedoch nicht zugestellt werden.',
-    'mail_error' => 'Die Formularangaben wurden angenommen, aber der Mailserver konnte die Anfrage nicht versenden. Bitte versuchen Sie es später erneut oder schreiben Sie direkt an office@tabelander.co.at.'
-        . ($mailErrorReference !== '' ? ' Referenz: ' . $mailErrorReference . '.' : ''),
+    'success' => 'Ihre Anfrage wurde als Ticket erfasst. Ich melde mich so bald wie möglich zurück.',
+    'erp_error' => 'Die Anfrage konnte gerade nicht im Ticketsystem angelegt werden. Bitte versuchen Sie es später erneut oder schreiben Sie direkt an office@tabelander.co.at.'
+        . ($erpErrorReference !== '' ? ' Referenz: ' . $erpErrorReference . '.' : ''),
     'error' => contact_error_message($formErrors),
     default => '',
 };

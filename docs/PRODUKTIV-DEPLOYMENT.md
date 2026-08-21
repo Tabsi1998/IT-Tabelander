@@ -55,8 +55,7 @@ DOLIBARR_ENABLED=true
 DOLIBARR_BASE_URL=https://erp.tabelander.co.at
 DOLIBARR_API_KEY_FILE=/var/www/it-tabelander-secrets/dolibarr-api-key.txt
 DOLIBARR_ENTITY=0
-DOLIBARR_VAT_RATE=0
 DOLIBARR_COUNTRY_CODE=AT
 ```
 
-`DOLIBARR_VAT_RATE=0` entspricht der bestätigten Kleinunternehmerregelung von IT-Tabelander und der bereits vorhandenen Dolibarr-Konfiguration. Der bereitgestellte API-Test bestätigt erfolgreichen Lesezugriff auf Geschäftspartner, Angebote und Tickets. Der API-Benutzer benötigt zusätzlich Schreibrechte für Geschäftspartner/Interessenten, Tickets und Angebote. Zum Abschluss je eine normale Anfrage und eine Controller-Konfiguration testen: Erstere muss als Ticket, letztere als Angebotsentwurf erscheinen.
+Die 0-%-USt-Regel ist wegen der bestätigten Kleinunternehmerregelung fest im Website-Code verankert: neue Interessenten erhalten `tva_assuj=0`, Controller-Angebotszeilen immer `tva_tx=0.0`. Eine Servervariable kann dies nicht überschreiben. Der API-Benutzer benötigt Schreibrechte für Geschäftspartner/Interessenten, Tickets und Angebote. Zum Abschluss je eine normale Anfrage und eine Controller-Konfiguration testen: Erstere muss ohne Website-Mail als Ticket, letztere separat als Angebotsentwurf mit ausschließlich 0 % USt. erscheinen.

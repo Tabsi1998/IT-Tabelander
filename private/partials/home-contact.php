@@ -30,19 +30,13 @@ declare(strict_types=1);
         </dl>
     </div>
     <div class="contact-form-shell" data-reveal>
-        <?php if (!empty($controllerReady)): ?>
-            <p class="form-feedback is-success">Ihre Controller-Auswahl wurde übernommen. Ergänzen Sie jetzt bitte noch Ihre Kontaktdaten und senden Sie die unverbindliche Anfrage ab.</p>
-        <?php endif; ?>
         <?php if ($formMessage !== ''): ?>
-            <p class="form-feedback <?= in_array($formStatus, ['success', 'partial'], true) ? 'is-success' : 'is-error'; ?>"><?= e($formMessage); ?></p>
+            <p class="form-feedback <?= $formStatus === 'success' ? 'is-success' : 'is-error'; ?>"><?= e($formMessage); ?></p>
         <?php endif; ?>
         <form class="contact-form" action="<?= e(page_url('contact.php')); ?>" method="post">
             <input type="hidden" name="website" value="">
             <input type="hidden" name="form_rendered_at" value="<?= e((string) $contactForm['renderedAt']); ?>">
             <input type="hidden" name="form_token" value="<?= e($contactForm['formToken']); ?>">
-            <?php if ($formValue('controllerRequestId') !== ''): ?>
-                <input type="hidden" name="controller_request_id" value="<?= e($formValue('controllerRequestId')); ?>">
-            <?php endif; ?>
             <div class="form-row">
                 <label>
                     <span>Name</span>

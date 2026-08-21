@@ -6,8 +6,7 @@ function dolibarr_configured(array $config): bool
     return (bool) ($config['enabled'] ?? false)
         && filter_var((string) ($config['baseUrl'] ?? ''), FILTER_VALIDATE_URL) !== false
         && str_starts_with(strtolower((string) ($config['baseUrl'] ?? '')), 'https://')
-        && trim((string) ($config['apiKey'] ?? '')) !== ''
-        && is_numeric($config['vatRate'] ?? null);
+        && trim((string) ($config['apiKey'] ?? '')) !== '';
 }
 
 function dolibarr_api_url(array $config, string $path): string
@@ -102,11 +101,17 @@ function dolibarr_thirdparty_payload(array $config, array $submission): array
         'name' => trim((string) ($submission['name'] ?? '')),
         'email' => strtolower(trim((string) ($submission['email'] ?? ''))),
         'phone' => trim((string) ($submission['phone'] ?? '')),
+        'address' => trim((string) ($submission['address'] ?? '')),
+        'zip' => trim((string) ($submission['postalCode'] ?? '')),
+        'town' => trim((string) ($submission['city'] ?? '')),
         // Dolibarr: 2 = prospect. A confirmed order can later turn the record
         // into a customer without treating every website enquiry as a sale.
         'client' => 2,
         'code_client' => '-1',
         'country_code' => (string) ($config['countryCode'] ?? 'AT'),
+        // IT-Tabelander applies the Austrian small-business VAT exemption.
+        // New website prospects must therefore never inherit "VAT liable".
+        'tva_assuj' => 0,
         'note_private' => 'Automatisch als Interessent aus einer Anfrage über it.tabelander.co.at angelegt.',
         'caller' => 'ittabelanderwebsite',
     ];
@@ -248,13 +253,37 @@ function dolibarr_find_or_create_thirdparty(array $config, array $submission, ?c
         : ['ok' => false, 'id' => 0, 'step' => 'thirdparty_create', 'httpStatus' => (int) ($created['status'] ?? 0)];
 }
 
-function dolibarr_controller_lines(array $selection, float $vatRate): array
+function dolibarr_controller_lines(array $selection): array
 {
     $catalog = controller_catalog();
+    $sources = is_array($catalog['sources'] ?? null) ? $catalog['sources'] : [];
+    $shells = is_array($catalog['shells'] ?? null) ? $catalog['shells'] : [];
     $offers = is_array($catalog['offers'] ?? null) ? $catalog['offers'] : [];
     $modelLabel = (string) ($selection['modelLabel'] ?? 'PS5 Controller');
     $selectedOffers = is_array($selection['offerIds'] ?? null) ? $selection['offerIds'] : [];
     $items = [];
+
+    $sourceId = trim((string) ($selection['sourceId'] ?? ''));
+    $sourcePriceCents = max(0, (int) ($selection['sourcePriceCents'] ?? 0));
+    if ($sourcePriceCents > 0 && isset($sources[$sourceId]) && is_array($sources[$sourceId])) {
+        $items[] = [
+            'label' => (string) ($sources[$sourceId]['shortLabel'] ?? 'Neuer Controller'),
+            'description' => $modelLabel . ': ' . (string) ($sources[$sourceId]['description'] ?? ''),
+            'priceCents' => $sourcePriceCents,
+            'productType' => 0,
+        ];
+    }
+
+    $shellId = trim((string) ($selection['shellId'] ?? ''));
+    $shellPriceCents = max(0, (int) ($selection['shellPriceCents'] ?? 0));
+    if ($shellPriceCents > 0 && isset($shells[$shellId]) && is_array($shells[$shellId])) {
+        $items[] = [
+            'label' => (string) ($shells[$shellId]['shortLabel'] ?? 'Controller-Gehäuse'),
+            'description' => $modelLabel . ': ' . (string) ($shells[$shellId]['description'] ?? ''),
+            'priceCents' => $shellPriceCents,
+            'productType' => 1,
+        ];
+    }
 
     foreach ($selectedOffers as $offerId) {
         if (!isset($offers[$offerId]) || !is_array($offers[$offerId])) {
@@ -265,23 +294,27 @@ function dolibarr_controller_lines(array $selection, float $vatRate): array
             'label' => (string) ($offers[$offerId]['shortLabel'] ?? $offerId),
             'description' => $modelLabel . ': ' . (string) ($offers[$offerId]['description'] ?? ''),
             'priceCents' => max(0, (int) ($offers[$offerId]['priceCents'] ?? 0)),
+            'productType' => 1,
         ];
     }
 
-    return array_map(static function (array $item, int $index) use ($vatRate): array {
+    return array_map(static function (array $item, int $index): array {
         return [
             'desc' => $item['description'],
             'label' => $item['label'],
             'subprice' => number_format($item['priceCents'] / 100, 2, '.', ''),
             'qty' => 1,
-            'tva_tx' => $vatRate,
+            // Hard business rule: Kleinunternehmer, therefore every website
+            // controller offer line is created with exactly 0 % VAT. This is
+            // intentionally independent of server environment values.
+            'tva_tx' => 0.0,
             'localtax1_tx' => 0,
             'localtax2_tx' => 0,
             'fk_product' => 0,
             'remise_percent' => 0,
             'price_base_type' => 'TTC',
             'info_bits' => 0,
-            'product_type' => 1,
+            'product_type' => (int) ($item['productType'] ?? 1),
             'rang' => $index + 1,
             'special_code' => 0,
             'fk_parent_line' => 0,
@@ -307,7 +340,7 @@ function dolibarr_proposal_payload(int $thirdpartyId, array $selection, string $
         'fin_validite' => time() + (14 * 86400),
         'ref_ext' => 'WEB-CTRL-' . $controllerRequestId,
         'note_private' => (string) ($selection['message'] ?? ''),
-        'note_public' => 'Unverbindlicher Angebotsentwurf vorbehaltlich technischer Prüfung des eingesandten Controllers.',
+        'note_public' => 'Unverbindlicher Angebotsentwurf vorbehaltlich technischer Prüfung. Gemäß Kleinunternehmerregelung wird keine Umsatzsteuer ausgewiesen.',
         'caller' => 'ittabelanderwebsite',
     ];
 }
@@ -369,7 +402,7 @@ function create_dolibarr_controller_proposal(
         return ['ok' => false, 'status' => 'proposal_error', 'thirdpartyId' => $thirdpartyId];
     }
 
-    $lines = dolibarr_controller_lines($selection, (float) $config['vatRate']);
+    $lines = dolibarr_controller_lines($selection);
     foreach ($lines as $line) {
         $lineResult = dolibarr_request($config, 'POST', 'proposals/' . $proposalId . '/line', $line, $transport);
         if (($lineResult['ok'] ?? false) !== true) {

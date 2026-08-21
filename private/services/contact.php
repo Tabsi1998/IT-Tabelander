@@ -64,7 +64,6 @@ function contact_submission_values(array $submission): array
         'service' => trim((string) ($submission['service'] ?? '')),
         'message' => trim((string) ($submission['message'] ?? '')),
         'privacyConfirmation' => trim((string) ($submission['privacyConfirmation'] ?? '')),
-        'controllerRequestId' => trim((string) ($submission['controllerRequestId'] ?? '')),
     ];
 }
 
