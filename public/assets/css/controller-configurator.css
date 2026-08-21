@@ -32,6 +32,11 @@ html[data-resolved-theme] body.controller-page {
     margin-inline: auto;
 }
 
+.controller-price-note {
+    width: var(--section-width);
+    margin-inline: auto;
+}
+
 .controller-hero {
     display: grid;
     grid-template-columns: minmax(0, 0.9fr) minmax(480px, 1.1fr);
@@ -254,10 +259,99 @@ html[data-resolved-theme] body.controller-page {
 
 .controller-model-options,
 .controller-issue-options,
-.controller-extra-options {
+.controller-extra-options,
+.controller-offer-options {
     display: grid;
     gap: 0.7rem;
     margin-top: 1.3rem;
+}
+
+.controller-offer-intro {
+    margin: 1rem 0 0;
+    color: var(--text-soft);
+    font-size: 0.82rem;
+    line-height: 1.65;
+}
+
+.controller-offer-placeholder {
+    margin: 1rem 0 0;
+    padding: 1rem;
+    border: 1px dashed var(--controller-line);
+    border-radius: 1rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.controller-offer-options {
+    grid-template-columns: 1fr;
+}
+
+.controller-offer-choice[hidden] {
+    display: none;
+}
+
+.controller-offer-choice > span {
+    align-items: center;
+    padding: 1.05rem 1.1rem;
+}
+
+.controller-offer-copy {
+    display: grid;
+    gap: 0.28rem;
+    min-width: 0;
+}
+
+.controller-offer-copy > small {
+    width: max-content;
+    padding: 0.22rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(136, 191, 255, 0.1);
+    color: var(--controller-blue);
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.controller-offer-copy em {
+    color: var(--text-muted);
+    font-size: 0.73rem;
+    font-style: normal;
+    line-height: 1.5;
+}
+
+.controller-offer-price {
+    display: grid;
+    flex: 0 0 auto;
+    gap: 0.1rem;
+    margin-left: auto;
+    color: #fff;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.12rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.controller-offer-price small {
+    color: var(--text-muted);
+    font-family: "Manrope", sans-serif;
+    font-size: 0.6rem;
+    font-weight: 400;
+}
+
+.controller-offer-choice input:checked + span .controller-offer-copy > small {
+    background: var(--controller-orange);
+    color: #111;
+}
+
+.controller-package-note {
+    margin: 1rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    line-height: 1.6;
+}
+
+.controller-package-note strong {
+    color: var(--text-soft);
 }
 
 .controller-model-options,
@@ -490,6 +584,18 @@ html[data-resolved-theme] body.controller-page {
     transition: opacity 220ms ease;
 }
 
+.controller-back-paddle-zone {
+    opacity: 0.12;
+}
+
+.controller-back-paddle-zone.is-active {
+    opacity: 1;
+}
+
+.controller-live-stage.is-led-active {
+    animation: controller-stage-led 4s linear infinite;
+}
+
 .controller-live-stage[data-controller-model="dualsense-edge"] .controller-edge-details {
     opacity: 1;
 }
@@ -647,6 +753,33 @@ html[data-resolved-theme] body.controller-page {
     line-height: 1.75;
 }
 
+.controller-price-note {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.7fr);
+    gap: 3rem;
+    align-items: end;
+    margin-bottom: clamp(6rem, 9vw, 9rem);
+    padding: clamp(2rem, 5vw, 4.5rem);
+    border: 1px solid var(--controller-line);
+    border-radius: 2rem;
+    background: rgba(10, 29, 41, 0.64);
+}
+
+.controller-price-note h2 {
+    max-width: 13ch;
+    margin: 0.45rem 0 0;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: clamp(2.4rem, 4.5vw, 4.8rem);
+    line-height: 0.96;
+    letter-spacing: -0.05em;
+}
+
+.controller-price-note > p {
+    margin: 0;
+    color: var(--text-soft);
+    line-height: 1.75;
+}
+
 @keyframes controller-float {
     0%, 100% { transform: translateY(0) rotate(-1deg); }
     50% { transform: translateY(-16px) rotate(1deg); }
@@ -660,6 +793,13 @@ html[data-resolved-theme] body.controller-page {
 @keyframes controller-zone-active {
     0%, 100% { filter: drop-shadow(0 0 10px rgba(255, 106, 50, 0.48)); }
     50% { filter: drop-shadow(0 0 22px rgba(255, 106, 50, 0.82)); }
+}
+
+@keyframes controller-stage-led {
+    0% { box-shadow: inset 0 0 70px rgba(255, 91, 91, 0.22); }
+    33% { box-shadow: inset 0 0 70px rgba(87, 178, 255, 0.25); }
+    66% { box-shadow: inset 0 0 70px rgba(121, 255, 176, 0.22); }
+    100% { box-shadow: inset 0 0 70px rgba(255, 91, 91, 0.22); }
 }
 
 @media (max-width: 1080px) {
@@ -712,7 +852,8 @@ html[data-resolved-theme] body.controller-page {
 
     .controller-hero-facts,
     .controller-config-head,
-    .controller-boundary {
+    .controller-boundary,
+    .controller-price-note {
         grid-template-columns: 1fr;
     }
 
@@ -734,6 +875,14 @@ html[data-resolved-theme] body.controller-page {
     .controller-extra-options,
     .controller-live-panel {
         grid-template-columns: 1fr;
+    }
+
+    .controller-offer-choice > span {
+        align-items: flex-start;
+    }
+
+    .controller-offer-price {
+        font-size: 1rem;
     }
 
     .controller-live-stage {
@@ -758,7 +907,8 @@ html[data-resolved-theme] body.controller-page {
     .controller-hero-art svg,
     .controller-art-label,
     .controller-zone.is-active,
-    .controller-device-body.is-active {
+    .controller-device-body.is-active,
+    .controller-live-stage.is-led-active {
         animation: none;
     }
 }

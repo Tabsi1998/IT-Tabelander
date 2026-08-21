@@ -34,15 +34,22 @@ function controller_notes(string $value, int $maxLength = 500): string
         : substr($clean, 0, $maxLength);
 }
 
+function controller_price(int $priceCents): string
+{
+    return number_format($priceCents / 100, 2, ',', '.') . ' €';
+}
+
 function build_controller_selection(array $input): array
 {
     $catalog = controller_catalog();
     $models = is_array($catalog['models'] ?? null) ? $catalog['models'] : [];
     $issues = is_array($catalog['issues'] ?? null) ? $catalog['issues'] : [];
+    $offers = is_array($catalog['offers'] ?? null) ? $catalog['offers'] : [];
     $extras = is_array($catalog['extras'] ?? null) ? $catalog['extras'] : [];
 
     $modelId = trim((string) ($input['model'] ?? ''));
     $issueIds = array_values(array_intersect(controller_string_list($input['issues'] ?? []), array_keys($issues)));
+    $submittedOfferIds = array_values(array_intersect(controller_string_list($input['offers'] ?? []), array_keys($offers)));
     $extraIds = array_values(array_intersect(controller_string_list($input['extras'] ?? []), array_keys($extras)));
     $notes = controller_notes((string) ($input['notes'] ?? ''));
     $errors = [];
@@ -51,8 +58,29 @@ function build_controller_selection(array $input): array
         $errors[] = 'model';
     }
 
-    if ($issueIds === []) {
-        $errors[] = 'issues';
+    $offerIds = array_values(array_filter($submittedOfferIds, static function (string $offerId) use ($offers, $modelId): bool {
+        $models = is_array($offers[$offerId]['models'] ?? null) ? $offers[$offerId]['models'] : [];
+
+        return in_array($modelId, $models, true);
+    }));
+
+    if ($issueIds === [] && $offerIds === []) {
+        $errors[] = 'selection';
+    }
+
+    $selectedGroups = [];
+    foreach ($offerIds as $offerId) {
+        $group = trim((string) ($offers[$offerId]['group'] ?? ''));
+        if ($group === '') {
+            continue;
+        }
+
+        if (isset($selectedGroups[$group])) {
+            $errors[] = 'offers';
+            break;
+        }
+
+        $selectedGroups[$group] = $offerId;
     }
 
     if ($errors !== []) {
@@ -61,6 +89,7 @@ function build_controller_selection(array $input): array
             'errors' => $errors,
             'modelId' => $modelId,
             'issueIds' => $issueIds,
+            'offerIds' => $offerIds,
             'extraIds' => $extraIds,
             'notes' => $notes,
         ];
@@ -75,11 +104,34 @@ function build_controller_selection(array $input): array
         static fn (string $id): string => (string) ($extras[$id]['shortLabel'] ?? $id),
         $extraIds
     );
+    $offerLabels = array_map(
+        static fn (string $id): string => (string) ($offers[$id]['shortLabel'] ?? $id),
+        $offerIds
+    );
+    $offerPriceCents = array_sum(array_map(
+        static fn (string $id): int => max(0, (int) ($offers[$id]['priceCents'] ?? 0)),
+        $offerIds
+    ));
+    $diagnosisPriceCents = max(0, (int) ($catalog['diagnosisPriceCents'] ?? 0));
+    $totalPriceCents = $offerIds !== [] ? $offerPriceCents : $diagnosisPriceCents;
     $messageLines = [
         'Controller-Konfiguration:',
         'Modell: ' . $modelLabel,
-        'Fehlerbild: ' . implode(', ', $issueLabels),
+        'Fehlerbild: ' . ($issueLabels !== [] ? implode(', ', $issueLabels) : 'Kein Defekt angegeben – Upgrade-Anfrage'),
     ];
+
+    if ($offerIds !== []) {
+        $messageLines[] = '';
+        $messageLines[] = 'Gewählte Pauschalpakete:';
+        foreach ($offerIds as $offerId) {
+            $messageLines[] = '- ' . (string) ($offers[$offerId]['shortLabel'] ?? $offerId)
+                . ': ' . controller_price(max(0, (int) ($offers[$offerId]['priceCents'] ?? 0)));
+        }
+        $messageLines[] = 'Voraussichtliche Paketsumme: ' . controller_price($totalPriceCents);
+    } else {
+        $messageLines[] = 'Diagnosepauschale: ' . controller_price($diagnosisPriceCents)
+            . ' (wird bei anschließender Reparatur angerechnet)';
+    }
 
     if ($extraLabels !== []) {
         $messageLines[] = 'Zusatzangaben: ' . implode(', ', $extraLabels);
@@ -101,9 +153,14 @@ function build_controller_selection(array $input): array
         'modelLabel' => $modelLabel,
         'issueIds' => $issueIds,
         'issueLabels' => $issueLabels,
+        'offerIds' => $offerIds,
+        'offerLabels' => $offerLabels,
         'extraIds' => $extraIds,
         'extraLabels' => $extraLabels,
         'notes' => $notes,
+        'totalPriceCents' => $totalPriceCents,
+        'totalPriceLabel' => controller_price($totalPriceCents),
+        'isDiagnosisOnly' => $offerIds === [],
         'message' => implode("\n", $messageLines),
     ];
 }

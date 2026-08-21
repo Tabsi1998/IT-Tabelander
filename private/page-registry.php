@@ -45,7 +45,7 @@ return [
         'ogImage' => 'img/services/controller-konsolen-service-1200.webp',
         'schemaType' => 'Service',
         'schemaName' => 'PS5 DualSense Controller-Service in Telfs',
-        'serviceTypes' => ['PS5 DualSense Reparatur', 'PS5 DualSense Edge Reparatur', 'Controller-Diagnose', 'Stick-Drift-Prüfung'],
+        'serviceTypes' => ['PS5 DualSense Reparatur', 'PS5 DualSense Edge Reparatur', 'Controller-Diagnose', 'Stick-Drift-Prüfung', 'Hall-Effect-Umbau', 'Controller-Back-Paddles', 'Clicky-Tasten-Umbau'],
         'indexable' => true,
         'changefreq' => 'monthly',
         'priority' => '0.9',

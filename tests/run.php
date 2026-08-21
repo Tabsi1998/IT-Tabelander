@@ -161,14 +161,17 @@ test('Controller-Konfiguration wird ausschließlich aus dem Katalog aufgebaut', 
     $selection = build_controller_selection([
         'model' => 'dualsense-edge',
         'issues' => ['stick-left', 'charging', 'nicht-erlaubt'],
-        'extras' => ['cleaning', 'nicht-erlaubt'],
+        'offers' => ['edge-face-clicky', 'hall-pair', 'nicht-erlaubt'],
+        'extras' => ['opened-before', 'nicht-erlaubt'],
         'notes' => 'Fehler tritt nicht immer auf.',
     ]);
 
     assert_same(true, $selection['valid']);
     assert_same('PS5 DualSense Edge', $selection['modelLabel']);
     assert_same(['stick-left', 'charging'], $selection['issueIds']);
-    assert_same(['cleaning'], $selection['extraIds']);
+    assert_same(['edge-face-clicky'], $selection['offerIds']);
+    assert_same(['opened-before'], $selection['extraIds']);
+    assert_same(5990, $selection['totalPriceCents']);
     assert_true(str_contains($selection['message'], 'Linker Stick, Laden / USB-C'));
     assert_true(!str_contains($selection['message'], 'nicht-erlaubt'));
 });
@@ -180,7 +183,31 @@ test('Unvollständige Controller-Konfiguration wird abgelehnt', function (): voi
     ]);
 
     assert_same(false, $selection['valid']);
-    assert_same(['model', 'issues'], $selection['errors']);
+    assert_same(['model', 'selection'], $selection['errors']);
+});
+
+test('Controller-Pauschalpreise werden serverseitig summiert', function (): void {
+    $selection = build_controller_selection([
+        'model' => 'dualsense',
+        'issues' => [],
+        'offers' => ['hall-pair', 'cleaning'],
+    ]);
+
+    assert_same(true, $selection['valid']);
+    assert_same(13480, $selection['totalPriceCents']);
+    assert_same('134,80 €', $selection['totalPriceLabel']);
+    assert_true(str_contains($selection['message'], 'Hall-Effect-Umbau (2 Sticks): 99,90 €'));
+});
+
+test('Konkurrierende Controller-Pakete werden abgelehnt', function (): void {
+    $selection = build_controller_selection([
+        'model' => 'dualsense',
+        'issues' => [],
+        'offers' => ['hall-pair', 'stick-standard-two'],
+    ]);
+
+    assert_same(false, $selection['valid']);
+    assert_true(in_array('offers', $selection['errors'], true));
 });
 
 test('private Pfade und Endpunkte bleiben außerhalb der Sitemap', function () use ($projectRoot): void {
