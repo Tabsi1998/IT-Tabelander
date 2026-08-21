@@ -359,7 +359,7 @@ body[data-page-key="home"] .contact-copy h2 {
 
 .problem-jump {
     display: grid;
-    grid-template-columns: 1.2fr repeat(4, auto) 2.5rem;
+    grid-template-columns: 1.2fr repeat(5, auto) 2.5rem;
     align-items: center;
     gap: 1.4rem;
     width: min(1460px, calc(100vw - 2rem));

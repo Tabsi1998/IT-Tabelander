@@ -23,6 +23,7 @@ $submission = [
     'captchaAnswer' => trim((string) ($_POST['captcha_answer'] ?? '')),
     'formRenderedAt' => (int) ($_POST['form_rendered_at'] ?? 0),
     'formToken' => trim((string) ($_POST['form_token'] ?? '')),
+    'controllerRequestId' => trim((string) ($_POST['controller_request_id'] ?? '')),
 ];
 
 $validation = validate_contact_submission($siteConfig, $submission);
@@ -33,16 +34,34 @@ if (!$validation['valid']) {
 }
 
 $mailResult = send_contact_mail($siteConfig, $submission);
+$requestId = (string) ($mailResult['requestId'] ?? '');
+
+$controllerSelection = controller_request((string) $submission['controllerRequestId']);
+$dolibarrResult = $controllerSelection !== []
+    ? create_dolibarr_controller_proposal(
+        $siteConfig,
+        $submission,
+        $controllerSelection,
+        (string) $submission['controllerRequestId'],
+        $requestId
+    )
+    : create_dolibarr_contact_ticket($siteConfig, $submission, $requestId);
+
+$accepted = (bool) ($mailResult['ownerSent'] ?? false) || (bool) ($dolibarrResult['ok'] ?? false);
+
+if ($accepted && $controllerSelection !== []) {
+    controller_request((string) $submission['controllerRequestId'], true);
+}
 
 $status = match (true) {
-    $mailResult['ownerSent'] && $mailResult['customerSent'] => 'success',
-    $mailResult['ownerSent'] => 'partial',
+    $accepted && $mailResult['customerSent'] => 'success',
+    $accepted => 'partial',
     default => 'mail_error',
 };
 
 if ($status === 'mail_error') {
     store_contact_form_flash(contact_submission_values($submission), [], [
-        'requestId' => (string) ($mailResult['requestId'] ?? ''),
+        'requestId' => $requestId,
     ]);
 }
 

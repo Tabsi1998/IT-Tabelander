@@ -29,6 +29,7 @@ $hasPublishedReviews = !empty($initialReviews['reviews']) && is_array($initialRe
 $mailErrorReference = trim((string) ($formMeta['requestId'] ?? ''));
 
 $formStatus = $_GET['contact'] ?? '';
+$controllerReady = ($_GET['controller'] ?? '') === 'ready';
 $formMessage = match ($formStatus) {
     'success' => 'Ihre Anfrage wurde gesendet. Ich melde mich so bald wie möglich zurück.',
     'partial' => 'Ihre Anfrage wurde übermittelt. Die automatische Bestätigungs-E-Mail konnte jedoch nicht zugestellt werden.',
@@ -87,6 +88,7 @@ $formMessage = match ($formStatus) {
                 <strong>WLAN zu Hause</strong>
                 <strong>Einrichten & Aufrüsten</strong>
                 <strong>Sicherheit</strong>
+                <strong>Controller</strong>
                 <span class="problem-jump-arrow" aria-hidden="true">↓</span>
             </a>
 
@@ -110,7 +112,11 @@ $formMessage = match ($formStatus) {
                                     <ul>
                                         <?php foreach ($band['items'] as $item): ?><li><?= e((string) $item); ?></li><?php endforeach; ?>
                                     </ul>
-                                    <a href="#kontakt">Dieses Problem schildern <span aria-hidden="true">↗</span></a>
+                                    <?php if (!empty($band['url'])): ?>
+                                        <a href="<?= e(page_url((string) $band['url'])); ?>"><?= e((string) ($band['cta'] ?? 'Mehr erfahren')); ?> <span aria-hidden="true">↗</span></a>
+                                    <?php else: ?>
+                                        <a href="#kontakt">Dieses Problem schildern <span aria-hidden="true">↗</span></a>
+                                    <?php endif; ?>
                                 </div>
                             </details>
                         <?php endforeach; ?>

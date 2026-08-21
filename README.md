@@ -21,6 +21,7 @@ Wartbare, auf private Haushalte ausgerichtete IT-Service-Website mit lokaler SEO
 - `private/site-services.php` ist der kompatible Loader für die Fachmodule in `private/services/`: Kontakt, Runtime-Logging, Mail/SMTP und Reviews.
 - `private/page-registry.php` ist die zentrale Quelle für Metadaten, Canonicals, Schema und Sitemap-Einträge.
 - `private/landing-pages.php` enthält die individuellen Inhalte der lokalen Landingpages.
+- `private/controller-config.php` enthält die erweiterbare Modell-, Upgrade- und Zusatzoptionen-Liste für den PS5-Controller-Konfigurator.
 - `private/pages/` enthält Seitentemplates; `private/partials/` enthält Head, Header, Footer und Kontakt-CTA-Komponenten.
 - `private/actions/` enthält Formular- und JSON-Endpunkte.
 - `private/cache/` speichert den serverseitigen Google-Review-Cache.
@@ -78,8 +79,31 @@ Die Route `/sitemap.xml` wird durch Apache auf `sitemap.php` abgebildet. Sie ent
 - SMTP: `SMTP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_ENCRYPTION`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_PASSWORD_FILE`, `SMTP_ALLOW_SELF_SIGNED`, `SMTP_VERIFY_PEER`, `SMTP_VERIFY_PEER_NAME`, `SMTP_EHLO_DOMAIN`.
 - Analytics: `GOOGLE_ANALYTICS_MEASUREMENT_ID`.
 - Bewertungen: `GOOGLE_PLACE_ID`, `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACES_API_KEY_FILE`.
+- Dolibarr: `DOLIBARR_ENABLED`, `DOLIBARR_BASE_URL`, `DOLIBARR_API_KEY_FILE`, `DOLIBARR_ENTITY`, `DOLIBARR_VAT_RATE`, `DOLIBARR_COUNTRY_CODE`, `DOLIBARR_TIMEOUT_SECONDS`.
 
 Leere Pflichtwerte deaktivieren die jeweilige externe Integration kontrolliert. Secret-Dateien müssen außerhalb des Webroots liegen und nur für den Webserver-Benutzer lesbar sein.
+
+## Dolibarr-Anfragen und Angebotsentwürfe
+
+Der PS5-Controller-Konfigurator ist öffentlich unter `/controller-service-telfs` erreichbar und direkt in der Hauptnavigation verlinkt. Allgemeine Kontaktanfragen werden in Dolibarr als internes Ticket angelegt. Eine Controller-Upgrade-Konfiguration erzeugt dagegen einen Angebotsentwurf mit einer Freitext-Dienstleistungsposition je gewähltem Pauschalpaket. Angebote werden bewusst weder automatisch validiert noch versendet.
+
+Die Integration sucht zuerst anhand der E-Mail-Adresse nach einem vorhandenen Dolibarr-Kontakt. Wird keiner gefunden, legt sie einen Privatkontakt als Interessent an. Vorhandene Kunden werden nicht zurückgestuft. Controller-Auswahl und Preise werden erneut aus dem serverseitigen Katalog aufgebaut; Browserwerte werden nicht als Angebotspreise übernommen. E-Mail und Dolibarr sind voneinander unabhängige Zustellwege, sodass ein kurzfristiger SMTP-Fehler die Übergabe an Dolibarr nicht verhindert.
+
+Für die beschriebene Serverstruktur wird als Basisadresse `https://erp.tabelander.co.at` verwendet. Der REST-Endpunkt `/api/index.php` wird automatisch ergänzt. Die Datei `/var/www/it-tabelander-secrets/dolibarr-api-key.txt` enthält ausschließlich den API-Schlüssel eines eigenen Dolibarr-Benutzers mit möglichst kleinen Rechten zum Lesen/Anlegen von Geschäftspartnern und Interessenten, Lesen/Anlegen von Tickets sowie Lesen/Anlegen von Angeboten. Beispielwerte:
+
+```text
+DOLIBARR_ENABLED=true
+DOLIBARR_BASE_URL=https://erp.tabelander.co.at
+DOLIBARR_API_KEY_FILE=/var/www/it-tabelander-secrets/dolibarr-api-key.txt
+DOLIBARR_ENTITY=0
+DOLIBARR_VAT_RATE=0
+DOLIBARR_COUNTRY_CODE=AT
+DOLIBARR_TIMEOUT_SECONDS=8
+```
+
+`DOLIBARR_VAT_RATE=0` entspricht der bestätigten Kleinunternehmerregelung von IT-Tabelander und der vorhandenen Dolibarr-Konfiguration ohne Umsatzsteuerausweis. Falls sich der steuerliche Status später ändert, müssen Dolibarr, Website-Konfiguration, Angebotstexte und Preise gemeinsam angepasst werden. Ohne API-Schlüssel oder Steuersatz bleibt die Anbindung kontrolliert deaktiviert. Fehlversuche blockieren die normale Kontakt-E-Mail nicht; das datensparsame `private/logs/dolibarr.log` enthält nur technische Statuswerte und Dolibarr-IDs, keine Kontaktdaten oder API-Antworten.
+
+Die empfohlene Produkt-/Leistungsstruktur und alle Controller-Referenzen stehen in [`docs/DOLIBARR-KATALOG.md`](docs/DOLIBARR-KATALOG.md).
 
 ## Deployment-Checkliste
 
@@ -91,7 +115,10 @@ Leere Pflichtwerte deaktivieren die jeweilige externe Integration kontrolliert. 
 6. Schreibrechte nur für `private/logs/` und `private/cache/` gewähren. Die Verzeichnisse werden bei Bedarf automatisch angelegt; der übrige Code sollte für den Webserver schreibgeschützt sein.
 7. HTTPS und Redirect auf HTTPS vollständig testen, bevor HSTS für eine neue Domain aktiviert wird. CSP, Kontaktformular, Consent und Analytics im Browser ohne Policy-Verstöße prüfen.
 8. Startseite, zwei aktive Privatkunden-Landingpages, Rechtstexte, `/sitemap.xml`, `robots.txt` und Kontaktstatus als Smoke-Test aufrufen. Die frühere Firmen-Landingpage ist bewusst nicht indexierbar und liefert 404.
+   Zusätzlich den Controller-Konfigurator mit DualSense und DualSense Edge sowie die Übernahme in das Kontaktformular prüfen.
 9. Rechtstexte mit den realen technischen Abläufen abgleichen und bei Bedarf juristisch prüfen lassen.
+
+Wenn `/controller-service-telfs` am Server ein Apache-404 statt der Website liefert, zeigt der VirtualHost sehr wahrscheinlich noch auf `/var/www/html` oder verwendet die Projekt-`.htaccess` nicht. Die konkrete Prüfung und Korrektur steht in [`docs/PRODUKTIV-DEPLOYMENT.md`](docs/PRODUKTIV-DEPLOYMENT.md).
 
 ## Niemals committen
 

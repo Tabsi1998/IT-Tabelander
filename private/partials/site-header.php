@@ -8,12 +8,13 @@ $homeAnchor = static fn (string $anchor): string => $isHomePage ? '#' . $anchor 
 <header class="site-header">
     <a class="brand-lockup" href="<?= e($isHomePage ? '#start' : page_url()); ?>" aria-label="IT-Tabelander Startseite">
         <span class="brand-mobile-mark" aria-hidden="true">
-            <img class="brand-logo-image" src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" data-theme-logo data-logo-dark-src="<?= e(asset_url('img/logo/IT-Tabelander Logo Hell Transparent.png')); ?>" data-logo-light-src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" alt="" width="560" height="616">
+            <img class="brand-logo-image" src="<?= e(asset_url('img/logo/IT-Tabelander Logo Dunkel Transparent.png')); ?>" alt="" width="560" height="616">
         </span>
         <span class="brand-wordmark"><strong>IT-Tabelander</strong><small>Persönlich · Telfs</small></span>
     </a>
     <div class="header-actions">
         <nav class="site-nav" id="site-navigation" aria-label="Hauptnavigation">
+            <a href="<?= e(page_url('controller-service-telfs')); ?>"<?= $activePageKey === 'controller-service-telfs' ? ' aria-current="page"' : ''; ?>>Controller-Konfigurator</a>
             <a href="<?= e($homeAnchor('hilfe')); ?>">Hilfe finden</a>
             <a href="<?= e($homeAnchor('ablauf')); ?>">So läuft’s</a>
             <a href="<?= e($homeAnchor('ueber-mich')); ?>">Über mich</a>
