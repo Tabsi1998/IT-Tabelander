@@ -120,6 +120,32 @@ html[data-resolved-theme="light"] body.controller-page .controller-choice input:
     background: rgba(255, 106, 50, 0.1);
 }
 
+html[data-resolved-theme="light"] body.controller-page .controller-shell-catalog {
+    border-color: rgba(29, 64, 85, 0.16);
+    background: rgba(255, 255, 255, 0.68);
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-shell-catalog-head input {
+    border-color: rgba(29, 64, 85, 0.2);
+    background: #fff;
+    color: #172733;
+    color-scheme: light;
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-shell-design {
+    border-color: rgba(29, 64, 85, 0.15);
+    background: rgba(255, 255, 255, 0.9);
+    color: #263b49;
+}
+
+html[data-resolved-theme="light"] body.controller-page .controller-shell-design:hover,
+html[data-resolved-theme="light"] body.controller-page .controller-shell-design:focus-visible,
+html[data-resolved-theme="light"] body.controller-page .controller-shell-design.is-selected {
+    border-color: var(--controller-orange);
+    background: #fff;
+    box-shadow: 0 14px 32px rgba(30, 57, 73, 0.12);
+}
+
 html[data-resolved-theme="light"] body.controller-page .controller-offer-price,
 html[data-resolved-theme="light"] body.controller-page .controller-summary dd {
     color: #172733;

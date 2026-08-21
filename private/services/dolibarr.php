@@ -278,8 +278,8 @@ function dolibarr_controller_lines(array $selection): array
     $shellPriceCents = max(0, (int) ($selection['shellPriceCents'] ?? 0));
     if ($shellPriceCents > 0 && isset($shells[$shellId]) && is_array($shells[$shellId])) {
         $items[] = [
-            'label' => (string) ($shells[$shellId]['shortLabel'] ?? 'Controller-Gehäuse'),
-            'description' => $modelLabel . ': ' . (string) ($shells[$shellId]['description'] ?? ''),
+            'label' => (string) ($selection['shellLabel'] ?? $shells[$shellId]['shortLabel'] ?? 'Controller-Gehäuse'),
+            'description' => $modelLabel . ': ' . (string) ($selection['shellLabel'] ?? '') . '. ' . (string) ($shells[$shellId]['description'] ?? ''),
             'priceCents' => $shellPriceCents,
             'productType' => 1,
         ];

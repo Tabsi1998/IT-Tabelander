@@ -45,6 +45,7 @@ function controller_submission_values(array $input): array
         'model' => trim((string) ($input['model'] ?? '')),
         'source' => trim((string) ($input['source'] ?? '')),
         'shell' => trim((string) ($input['shell'] ?? 'original')),
+        'shellDesign' => controller_notes((string) ($input['shell_design'] ?? ''), 160),
         'offers' => controller_string_list($input['offers'] ?? []),
         'extras' => controller_string_list($input['extras'] ?? []),
         'notes' => controller_notes((string) ($input['notes'] ?? '')),
@@ -91,6 +92,7 @@ function build_controller_selection(array $input): array
     $modelId = trim((string) ($input['model'] ?? ''));
     $sourceId = trim((string) ($input['source'] ?? ''));
     $shellId = trim((string) ($input['shell'] ?? 'original'));
+    $shellDesign = controller_notes((string) ($input['shell_design'] ?? ''), 160);
     $submittedOfferIds = array_values(array_intersect(controller_string_list($input['offers'] ?? []), array_keys($offers)));
     $extraIds = array_values(array_intersect(controller_string_list($input['extras'] ?? []), array_keys($extras)));
     $notes = controller_notes((string) ($input['notes'] ?? ''));
@@ -141,6 +143,7 @@ function build_controller_selection(array $input): array
             'modelId' => $modelId,
             'sourceId' => $sourceId,
             'shellId' => $shellId,
+            'shellDesign' => $shellDesign,
             'offerIds' => $offerIds,
             'extraIds' => $extraIds,
             'notes' => $notes,
@@ -152,6 +155,9 @@ function build_controller_selection(array $input): array
     $sourcePrices = is_array($sources[$sourceId]['priceCents'] ?? null) ? $sources[$sourceId]['priceCents'] : [];
     $sourcePriceCents = max(0, (int) ($sourcePrices[$modelId] ?? 0));
     $shellLabel = (string) ($shells[$shellId]['shortLabel'] ?? $shellId);
+    if ($shellId !== 'original' && $shellDesign !== '') {
+        $shellLabel .= ' · ' . $shellDesign;
+    }
     $shellPriceCents = max(0, (int) ($shells[$shellId]['priceCents'] ?? 0));
     $extraLabels = array_map(
         static fn (string $id): string => (string) ($extras[$id]['shortLabel'] ?? $id),
@@ -205,6 +211,7 @@ function build_controller_selection(array $input): array
         'sourceLabel' => $sourceLabel,
         'sourcePriceCents' => $sourcePriceCents,
         'shellId' => $shellId,
+        'shellDesign' => $shellDesign,
         'shellLabel' => $shellLabel,
         'shellPriceCents' => $shellPriceCents,
         'offerIds' => $offerIds,

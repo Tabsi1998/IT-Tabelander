@@ -11,6 +11,12 @@ const offerCards = Array.from(configurator?.querySelectorAll("[data-offer-card]"
 const shellCards = Array.from(configurator?.querySelectorAll("[data-shell-card]") || []);
 const offerPlaceholder = configurator?.querySelector("[data-offer-placeholder]");
 const shellPlaceholder = configurator?.querySelector("[data-shell-placeholder]");
+const shellCatalog = configurator?.querySelector("[data-shell-catalog]");
+const shellGallery = configurator?.querySelector("[data-shell-gallery]");
+const shellCatalogStatus = configurator?.querySelector("[data-shell-catalog-status]");
+const shellSearch = configurator?.querySelector("[data-shell-search]");
+const shellDesignInput = configurator?.querySelector("[data-shell-design]");
+const shellPreview = configurator?.querySelector("[data-shell-preview]");
 const modelBadge = configurator?.querySelector("[data-model-badge]");
 const visualCaption = configurator?.querySelector("[data-visual-caption]");
 const viewToggle = configurator?.querySelector("[data-controller-view-toggle]");
@@ -23,6 +29,8 @@ const summaryExtras = configurator?.querySelector("[data-summary-extras]");
 const summaryPrice = configurator?.querySelector("[data-summary-price]");
 const priceKicker = configurator?.querySelector("[data-price-kicker]");
 const priceNote = configurator?.querySelector("[data-price-note]");
+const shellCatalogCache = new Map();
+let shellCatalogModel = "";
 
 const selectedInput = (inputs) => inputs.find((input) => input.checked);
 const selectedInputs = (inputs) => inputs.filter((input) => input.checked);
@@ -69,15 +77,154 @@ const setControllerView = (showBack) => {
 };
 
 const updateZones = () => {
-    const activeZones = new Set(selectedInputs(offerInputs)
+    const selectedOffers = selectedInputs(offerInputs);
+    const activeZones = new Set(selectedOffers
         .flatMap((input) => expandedZones(input.dataset.zone || "")));
+    const activePreview = selectedOffers
+        .map((input) => input.dataset.upgradePreview || "")
+        .find(Boolean) || "";
 
     configurator?.querySelectorAll("[data-controller-zone]").forEach((zone) => {
         zone.classList.toggle("is-active", activeZones.has(zone.dataset.controllerZone || ""));
     });
 
     stage?.classList.toggle("is-led-active", activeZones.has("led"));
-    stage?.classList.toggle("has-paddle-module", activeZones.has("back-paddles"));
+    if (stage) {
+        stage.dataset.upgradePreview = activePreview;
+    }
+};
+
+const catalogSettings = {
+    dualsense: {
+        url: "/controller-shell-catalog.php?model=dualsense",
+        shellId: "dualsense-design",
+        matches: (title) => /(?:front.*shell|full set shells)/i.test(title)
+            && !/(?:edge|backplate|back shell|decorative trim|buttons only)/i.test(title),
+    },
+    "dualsense-edge": {
+        url: "/controller-shell-catalog.php?model=dualsense-edge",
+        shellId: "edge-design",
+        matches: (title) => /(?:left right front housing shell|full set shells?|beyond-arc full set shell)/i.test(title)
+            && !/replacement full set buttons/i.test(title),
+    },
+};
+
+const shellDesignName = (title) => {
+    const parts = String(title).split(" - ");
+    return (parts[parts.length - 1] || "Design-Shell")
+        .replace(/\bBDM[-\s\d/]+/gi, "")
+        .trim();
+};
+
+const base64Url = (value) => btoa(value)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+
+const mountedProductImage = (product) => {
+    const images = Array.isArray(product.images) ? product.images : [];
+    const source = images[1]?.src || images[0]?.src || "";
+    return source ? `/controller-shell-image.php?src=${encodeURIComponent(base64Url(source))}` : "";
+};
+
+const selectCatalogShell = (product, model) => {
+    const settings = catalogSettings[model];
+    const shell = shellInputs.find((input) => input.value === settings?.shellId);
+    if (!shell) {
+        return;
+    }
+
+    const name = shellDesignName(product.title);
+    const preview = mountedProductImage(product);
+    shell.checked = true;
+    if (shellDesignInput) {
+        shellDesignInput.value = name;
+    }
+    if (shellPreview) {
+        shellPreview.src = preview;
+        shellPreview.alt = `Montierte Produktansicht: ${name}`;
+        shellPreview.hidden = preview === "";
+    }
+    shellGallery?.querySelectorAll("[data-shell-design-card]").forEach((card) => {
+        card.classList.toggle("is-selected", card.dataset.productId === String(product.id));
+    });
+    setControllerView(false);
+    updateSummary();
+};
+
+const renderShellCatalog = (products, model) => {
+    if (!shellGallery) {
+        return;
+    }
+
+    shellGallery.replaceChildren();
+    products.forEach((product) => {
+        const image = mountedProductImage(product);
+        if (!image) {
+            return;
+        }
+        const name = shellDesignName(product.title);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "controller-shell-design";
+        button.dataset.shellDesignCard = "";
+        button.dataset.productId = String(product.id);
+        button.dataset.search = `${name} ${product.title}`.toLocaleLowerCase("de");
+        const thumbnail = document.createElement("img");
+        thumbnail.src = image;
+        thumbnail.alt = "";
+        thumbnail.loading = "lazy";
+        thumbnail.decoding = "async";
+        const label = document.createElement("span");
+        label.textContent = name;
+        const action = document.createElement("i");
+        action.textContent = "ansehen";
+        button.append(thumbnail, label, action);
+        button.addEventListener("click", () => selectCatalogShell(product, model));
+        shellGallery.append(button);
+    });
+
+    if (shellCatalogStatus) {
+        shellCatalogStatus.textContent = `${shellGallery.childElementCount} reale Designs verfügbar`;
+    }
+};
+
+const loadShellCatalog = async (model) => {
+    const settings = catalogSettings[model];
+    shellCatalogModel = model;
+    if (!settings || !shellCatalog || !shellGallery) {
+        if (shellCatalog) {
+            shellCatalog.hidden = true;
+        }
+        return;
+    }
+
+    shellCatalog.hidden = false;
+    if (shellCatalogStatus) {
+        shellCatalogStatus.textContent = "Echte Produktansichten werden geladen …";
+    }
+
+    try {
+        let products = shellCatalogCache.get(model);
+        if (!products) {
+            const response = await fetch(settings.url, { headers: { Accept: "application/json" } });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const payload = await response.json();
+            products = (Array.isArray(payload.products) ? payload.products : [])
+                .filter((product) => settings.matches(String(product.title || "")));
+            shellCatalogCache.set(model, products);
+        }
+        if (shellCatalogModel === model) {
+            renderShellCatalog(products, model);
+        }
+    } catch (error) {
+        shellGallery.replaceChildren();
+        if (shellCatalogStatus) {
+            shellCatalogStatus.textContent = "Die Live-Galerie ist gerade nicht erreichbar. Die Angebotsanfrage funktioniert weiterhin.";
+        }
+    }
 };
 
 const ensureVisibleShell = () => {
@@ -89,6 +236,13 @@ const ensureVisibleShell = () => {
     const original = shellInputs.find((input) => input.value === "original" && !input.closest("[hidden]"));
     if (original) {
         original.checked = true;
+        if (shellDesignInput) {
+            shellDesignInput.value = "";
+        }
+        if (shellPreview) {
+            shellPreview.hidden = true;
+            shellPreview.removeAttribute("src");
+        }
     }
 };
 
@@ -118,6 +272,7 @@ const updateOptionVisibility = () => {
     if (shellPlaceholder) {
         shellPlaceholder.hidden = model !== "";
     }
+    loadShellCatalog(model);
 };
 
 const applyOfferExclusivity = (changedInput) => {
@@ -148,6 +303,7 @@ const updateSummary = () => {
     const sourcePriceCents = sourcePriceForModel(source, model?.value || "");
     const shellPriceCents = Number(shell?.dataset.priceCents || 0);
     const totalCents = sourcePriceCents + shellPriceCents + offerTotalCents;
+    const shellDesign = shellDesignInput?.value.trim() || "";
 
     if (stage) {
         stage.dataset.controllerModel = model?.value || "";
@@ -182,7 +338,8 @@ const updateSummary = () => {
     }
     if (summaryShell) {
         const price = shellPriceCents > 0 ? ` · +${formatPrice(shellPriceCents)}` : "";
-        summaryShell.textContent = shell ? `${shell.dataset.label || shell.value}${price}` : "Bitte auswählen";
+        const design = shellDesign && shell?.value !== "original" ? ` · ${shellDesign}` : "";
+        summaryShell.textContent = shell ? `${shell.dataset.label || shell.value}${design}${price}` : "Bitte auswählen";
     }
     if (summaryOffers) {
         summaryOffers.textContent = offers.length > 0 ? offers.join(", ") : "Noch kein Upgrade gewählt";
@@ -211,7 +368,26 @@ const updateSummary = () => {
 if (form) {
     extraInputs.forEach((input) => input.addEventListener("change", updateSummary));
     sourceInputs.forEach((input) => input.addEventListener("change", updateSummary));
-    shellInputs.forEach((input) => input.addEventListener("change", updateSummary));
+    shellInputs.forEach((input) => input.addEventListener("change", () => {
+        if (input.checked && input.value === "original") {
+            if (shellDesignInput) {
+                shellDesignInput.value = "";
+            }
+            if (shellPreview) {
+                shellPreview.hidden = true;
+                shellPreview.removeAttribute("src");
+            }
+            shellGallery?.querySelectorAll("[data-shell-design-card]").forEach((card) => card.classList.remove("is-selected"));
+        }
+        updateSummary();
+    }));
+
+    shellSearch?.addEventListener("input", () => {
+        const query = shellSearch.value.trim().toLocaleLowerCase("de");
+        shellGallery?.querySelectorAll("[data-shell-design-card]").forEach((card) => {
+            card.hidden = query !== "" && !String(card.dataset.search || "").includes(query);
+        });
+    });
 
     modelInputs.forEach((input) => {
         input.addEventListener("change", () => {
