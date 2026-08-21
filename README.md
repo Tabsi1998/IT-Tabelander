@@ -79,8 +79,29 @@ Die Route `/sitemap.xml` wird durch Apache auf `sitemap.php` abgebildet. Sie ent
 - SMTP: `SMTP_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_ENCRYPTION`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_PASSWORD_FILE`, `SMTP_ALLOW_SELF_SIGNED`, `SMTP_VERIFY_PEER`, `SMTP_VERIFY_PEER_NAME`, `SMTP_EHLO_DOMAIN`.
 - Analytics: `GOOGLE_ANALYTICS_MEASUREMENT_ID`.
 - Bewertungen: `GOOGLE_PLACE_ID`, `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACES_API_KEY_FILE`.
+- Dolibarr: `DOLIBARR_ENABLED`, `DOLIBARR_BASE_URL`, `DOLIBARR_API_KEY_FILE`, `DOLIBARR_ENTITY`, `DOLIBARR_VAT_RATE`, `DOLIBARR_COUNTRY_CODE`, `DOLIBARR_TIMEOUT_SECONDS`.
 
 Leere Pflichtwerte deaktivieren die jeweilige externe Integration kontrolliert. Secret-Dateien müssen außerhalb des Webroots liegen und nur für den Webserver-Benutzer lesbar sein.
+
+## Dolibarr-Angebotsentwürfe
+
+Der PS5-Controller-Konfigurator ist öffentlich unter `/controller-service-telfs` erreichbar und direkt in der Hauptnavigation verlinkt. Nach einer vollständig validierten und erfolgreich per SMTP zugestellten Controller-Anfrage kann die Website zusätzlich einen Angebotsentwurf in Dolibarr anlegen. Der Entwurf wird bewusst weder automatisch validiert noch versendet.
+
+Die Integration sucht zuerst anhand der E-Mail-Adresse nach einem vorhandenen Dolibarr-Kunden. Wird keiner gefunden, legt sie einen Privatkunden an. Anschließend entstehen ein Angebotsentwurf und eine Freitext-Dienstleistungsposition je gewähltem Pauschalpaket. Auswahl und Preise werden erneut aus dem serverseitigen Controller-Katalog aufgebaut; Browserwerte werden nicht als Angebotspreise übernommen.
+
+Für die beschriebene Serverstruktur wird als Basisadresse `https://erp.tabelander.co.at` verwendet. Der REST-Endpunkt `/api/index.php` wird automatisch ergänzt. Die Datei `/var/www/it-tabelander-secrets/dolibarr-api-key.txt` enthält ausschließlich den API-Schlüssel eines eigenen Dolibarr-Benutzers mit möglichst kleinen Rechten zum Lesen/Anlegen von Kunden sowie Lesen/Anlegen von Angeboten. Beispielwerte:
+
+```text
+DOLIBARR_ENABLED=true
+DOLIBARR_BASE_URL=https://erp.tabelander.co.at
+DOLIBARR_API_KEY_FILE=/var/www/it-tabelander-secrets/dolibarr-api-key.txt
+DOLIBARR_ENTITY=0
+DOLIBARR_VAT_RATE=20
+DOLIBARR_COUNTRY_CODE=AT
+DOLIBARR_TIMEOUT_SECONDS=8
+```
+
+`DOLIBARR_VAT_RATE` muss vor der Aktivierung anhand der tatsächlichen steuerlichen Behandlung festgelegt werden. Ohne API-Schlüssel oder Steuersatz bleibt die Anbindung kontrolliert deaktiviert. Fehlversuche blockieren die normale Kontakt-E-Mail nicht; das datensparsame `private/logs/dolibarr.log` enthält nur technische Statuswerte und Dolibarr-IDs, keine Kontaktdaten oder API-Antworten.
 
 ## Deployment-Checkliste
 

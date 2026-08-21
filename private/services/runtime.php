@@ -16,6 +16,11 @@ function review_cache_path(): string
     return dirname(__DIR__) . '/private/cache/google-reviews.json';
 }
 
+function dolibarr_log_path(): string
+{
+    return dirname(__DIR__) . '/logs/dolibarr.log';
+}
+
 function manual_reviews_path(): string
 {
     return dirname(__DIR__) . '/private/data/reviews.json';
@@ -39,6 +44,19 @@ function append_mail_log(array $payload, int $retentionDays = 30): void
     ensure_runtime_directory(dirname(mail_log_path()));
     $payload['loggedAt'] = date('c');
     append_runtime_log(mail_log_path(), $payload, $retentionDays);
+}
+
+function append_dolibarr_log(array $payload, int $retentionDays = 30): void
+{
+    append_runtime_log(dolibarr_log_path(), [
+        'loggedAt' => date('c'),
+        'requestId' => (string) ($payload['requestId'] ?? ''),
+        'status' => (string) ($payload['status'] ?? 'unknown'),
+        'step' => (string) ($payload['step'] ?? ''),
+        'httpStatus' => max(0, (int) ($payload['httpStatus'] ?? 0)),
+        'thirdpartyId' => max(0, (int) ($payload['thirdpartyId'] ?? 0)),
+        'proposalId' => max(0, (int) ($payload['proposalId'] ?? 0)),
+    ], $retentionDays);
 }
 
 function append_runtime_log(string $path, array $payload, int $retentionDays): void

@@ -29,6 +29,8 @@ if (!$selection['valid']) {
     redirect_controller_configurator('incomplete');
 }
 
+$controllerRequestId = store_controller_request($selection);
+
 store_contact_form_flash([
     'name' => '',
     'email' => '',
@@ -37,6 +39,7 @@ store_contact_form_flash([
     'service' => 'Konsole & Controller',
     'message' => (string) $selection['message'],
     'privacyConfirmation' => '',
+    'controllerRequestId' => $controllerRequestId,
 ]);
 
 header('Location: /?controller=ready#kontakt', true, 303);

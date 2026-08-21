@@ -39,6 +39,59 @@ function controller_price(int $priceCents): string
     return number_format($priceCents / 100, 2, ',', '.') . ' €';
 }
 
+function store_controller_request(array $selection): string
+{
+    ensure_contact_session();
+    prune_controller_requests();
+
+    $requestId = bin2hex(random_bytes(16));
+    $_SESSION['controller_requests'][$requestId] = [
+        'createdAt' => time(),
+        'selection' => $selection,
+    ];
+
+    return $requestId;
+}
+
+function controller_request(string $requestId, bool $consume = false): array
+{
+    ensure_contact_session();
+    prune_controller_requests();
+
+    if (!preg_match('/^[a-f0-9]{32}$/', $requestId)) {
+        return [];
+    }
+
+    $entry = $_SESSION['controller_requests'][$requestId] ?? null;
+    if (!is_array($entry) || !is_array($entry['selection'] ?? null)) {
+        return [];
+    }
+
+    if ($consume) {
+        unset($_SESSION['controller_requests'][$requestId]);
+    }
+
+    return $entry['selection'];
+}
+
+function prune_controller_requests(int $maxAgeSeconds = 7200): void
+{
+    $requests = $_SESSION['controller_requests'] ?? [];
+    if (!is_array($requests)) {
+        $_SESSION['controller_requests'] = [];
+        return;
+    }
+
+    $cutoff = time() - max(300, $maxAgeSeconds);
+    foreach ($requests as $requestId => $entry) {
+        if (!is_array($entry) || (int) ($entry['createdAt'] ?? 0) < $cutoff) {
+            unset($requests[$requestId]);
+        }
+    }
+
+    $_SESSION['controller_requests'] = array_slice($requests, -5, null, true);
+}
+
 function build_controller_selection(array $input): array
 {
     $catalog = controller_catalog();

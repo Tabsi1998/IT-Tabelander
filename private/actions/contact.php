@@ -23,6 +23,7 @@ $submission = [
     'captchaAnswer' => trim((string) ($_POST['captcha_answer'] ?? '')),
     'formRenderedAt' => (int) ($_POST['form_rendered_at'] ?? 0),
     'formToken' => trim((string) ($_POST['form_token'] ?? '')),
+    'controllerRequestId' => trim((string) ($_POST['controller_request_id'] ?? '')),
 ];
 
 $validation = validate_contact_submission($siteConfig, $submission);
@@ -33,6 +34,18 @@ if (!$validation['valid']) {
 }
 
 $mailResult = send_contact_mail($siteConfig, $submission);
+
+$controllerSelection = controller_request((string) $submission['controllerRequestId']);
+if ($mailResult['ownerSent'] && $controllerSelection !== []) {
+    create_dolibarr_controller_proposal(
+        $siteConfig,
+        $submission,
+        $controllerSelection,
+        (string) $submission['controllerRequestId'],
+        (string) ($mailResult['requestId'] ?? '')
+    );
+    controller_request((string) $submission['controllerRequestId'], true);
+}
 
 $status = match (true) {
     $mailResult['ownerSent'] && $mailResult['customerSent'] => 'success',

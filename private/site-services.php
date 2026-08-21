@@ -7,3 +7,4 @@ require_once __DIR__ . '/services/mail.php';
 require_once __DIR__ . '/services/reviews.php';
 require_once __DIR__ . '/services/content.php';
 require_once __DIR__ . '/services/controller-configurator.php';
+require_once __DIR__ . '/services/dolibarr.php';

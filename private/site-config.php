@@ -67,6 +67,17 @@ $smtpRequiredConfigurationPresent = $smtpHost !== ''
     && $smtpUsername !== ''
     && $smtpPassword !== '';
 
+$dolibarrBaseUrl = rtrim(config_env_value('DOLIBARR_BASE_URL', 'https://erp.tabelander.co.at'), '/');
+$dolibarrApiKey = config_env_secret('DOLIBARR_API_KEY', '', [
+    config_sibling_secret_file('dolibarr-api-key.txt'),
+]);
+$dolibarrVatRate = config_env_value('DOLIBARR_VAT_RATE');
+$dolibarrEnabledRequested = config_env_bool('DOLIBARR_ENABLED', false);
+$dolibarrConfigurationPresent = filter_var($dolibarrBaseUrl, FILTER_VALIDATE_URL) !== false
+    && str_starts_with(strtolower($dolibarrBaseUrl), 'https://')
+    && $dolibarrApiKey !== ''
+    && is_numeric(str_replace(',', '.', $dolibarrVatRate));
+
 // Zentrale Pflege der öffentlichen Seiteninhalte. Zugangsdaten und
 // umgebungsspezifische Endpunkte werden ausschließlich extern konfiguriert.
 $config = [
@@ -149,6 +160,18 @@ $config = [
     'logging' => [
         // Set to 0 to disable persistent application logs completely.
         'retentionDays' => max(0, (int) config_env_value('RUNTIME_LOG_RETENTION_DAYS', '30')),
+    ],
+    'dolibarr' => [
+        'enabled' => $dolibarrEnabledRequested && $dolibarrConfigurationPresent,
+        'enabledRequested' => $dolibarrEnabledRequested,
+        'baseUrl' => $dolibarrBaseUrl,
+        'apiKey' => $dolibarrApiKey,
+        'entity' => max(0, (int) config_env_value('DOLIBARR_ENTITY', '0')),
+        'vatRate' => is_numeric(str_replace(',', '.', $dolibarrVatRate))
+            ? max(0.0, min(100.0, (float) str_replace(',', '.', $dolibarrVatRate)))
+            : null,
+        'countryCode' => strtoupper(config_env_value('DOLIBARR_COUNTRY_CODE', 'AT')),
+        'timeout' => max(2, min(20, (int) config_env_value('DOLIBARR_TIMEOUT_SECONDS', '8'))),
     ],
     'hero' => [
         'eyebrow' => 'IT-Service in Telfs und Tirol',

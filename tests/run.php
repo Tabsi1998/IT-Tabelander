@@ -139,6 +139,14 @@ test('sichere SMTP-Defaults', function () use ($siteConfig): void {
     assert_same('', $smtp['username']);
 });
 
+test('Dolibarr bleibt ohne bewusste Freigabe deaktiviert', function () use ($siteConfig): void {
+    $dolibarr = $siteConfig['dolibarr'];
+    assert_same(false, $dolibarr['enabled']);
+    assert_same('https://erp.tabelander.co.at', $dolibarr['baseUrl']);
+    assert_same(null, $dolibarr['vatRate']);
+    assert_true(!dolibarr_configured($dolibarr));
+});
+
 test('SMTP-Konfigurationsvalidierung', function (): void {
     $mail = [
         'recipient' => 'office@example.test',
@@ -210,6 +218,62 @@ test('Konkurrierende Controller-Pakete werden abgelehnt', function (): void {
     assert_true(in_array('offers', $selection['errors'], true));
 });
 
+test('Controller-Auswahl bleibt bis zum Kontaktversand serverseitig gespeichert', function (): void {
+    $_SESSION['controller_requests'] = [];
+    $selection = build_controller_selection([
+        'model' => 'dualsense',
+        'issues' => ['stick-left'],
+        'offers' => ['hall-pair'],
+    ]);
+
+    $requestId = store_controller_request($selection);
+    assert_true((bool) preg_match('/^[a-f0-9]{32}$/', $requestId));
+    assert_same('dualsense', controller_request($requestId)['modelId'] ?? '');
+    assert_same('dualsense', controller_request($requestId, true)['modelId'] ?? '');
+    assert_same([], controller_request($requestId));
+});
+
+test('Dolibarr-Positionen verwenden ausschließlich serverseitige Bruttopreise', function (): void {
+    $selection = build_controller_selection([
+        'model' => 'dualsense',
+        'issues' => [],
+        'offers' => ['hall-pair', 'cleaning'],
+    ]);
+    $lines = dolibarr_controller_lines($selection, 20.0);
+
+    assert_same(2, count($lines));
+    assert_same('99.90', $lines[0]['subprice']);
+    assert_same('TTC', $lines[0]['price_base_type']);
+    assert_same(20.0, $lines[0]['tva_tx']);
+    assert_same('34.90', $lines[1]['subprice']);
+});
+
+test('Dolibarr-Kundensuche legt nur bei 404 einen neuen Kunden an', function (): void {
+    $calls = [];
+    $transport = static function (string $method, string $path, ?array $payload) use (&$calls): array {
+        $calls[] = [$method, $path, $payload];
+
+        return count($calls) === 1
+            ? ['ok' => false, 'status' => 404, 'data' => ['error' => 'not found']]
+            : ['ok' => true, 'status' => 200, 'data' => 42];
+    };
+    $result = dolibarr_find_or_create_thirdparty([
+        'countryCode' => 'AT',
+    ], [
+        'name' => 'Test Person',
+        'email' => 'TEST@example.test',
+        'phone' => '+43 123',
+    ], $transport);
+
+    assert_same(true, $result['ok']);
+    assert_same(42, $result['id']);
+    assert_same('GET', $calls[0][0]);
+    assert_same('thirdparties/email/test%40example.test', $calls[0][1]);
+    assert_same('POST', $calls[1][0]);
+    assert_same('thirdparties', $calls[1][1]);
+    assert_same('-1', $calls[1][2]['code_client']);
+});
+
 test('private Pfade und Endpunkte bleiben außerhalb der Sitemap', function () use ($projectRoot): void {
     $rootRules = file_get_contents($projectRoot . '/.htaccess');
     assert_true(is_string($rootRules) && str_contains($rootRules, 'RewriteRule ^private(/|$) - [F,L]'));
@@ -233,6 +297,7 @@ test('Privatkunden-Fokus ohne unbelegte Kennzahlen', function () use ($projectRo
     $home = render_php_script($projectRoot . '/index.php');
     $sitemap = render_php_script($projectRoot . '/sitemap.php');
     assert_true(str_contains($home, 'PC kaputt?'), 'Neue Privatkunden-Ansprache fehlt.');
+    assert_true(str_contains($home, 'Controller-Konfigurator'), 'Direkter Navigationslink zum Controller-Konfigurator fehlt.');
     assert_true(!str_contains($home, 'Für Unternehmen'), 'Firmenansprache ist noch in der sichtbaren Startseite enthalten.');
     assert_true(!str_contains($home, 'data-count-up'), 'Deaktivierte oder unbelegte Kennzahlen wurden ausgegeben.');
     assert_true(!str_contains($sitemap, 'it-betreuung-telfs'), 'Firmen-Landingpage ist noch in der Sitemap enthalten.');

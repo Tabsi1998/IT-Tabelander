@@ -14,6 +14,7 @@ $homeAnchor = static fn (string $anchor): string => $isHomePage ? '#' . $anchor 
     </a>
     <div class="header-actions">
         <nav class="site-nav" id="site-navigation" aria-label="Hauptnavigation">
+            <a href="<?= e(page_url('controller-service-telfs')); ?>"<?= $activePageKey === 'controller-service-telfs' ? ' aria-current="page"' : ''; ?>>Controller-Konfigurator</a>
             <a href="<?= e($homeAnchor('hilfe')); ?>">Hilfe finden</a>
             <a href="<?= e($homeAnchor('ablauf')); ?>">So läuft’s</a>
             <a href="<?= e($homeAnchor('ueber-mich')); ?>">Über mich</a>
