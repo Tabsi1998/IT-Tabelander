@@ -8,6 +8,7 @@ const selectionError = configurator?.querySelector("[data-selection-error]");
 const offerCards = Array.from(configurator?.querySelectorAll("[data-offer-card]") || []);
 const offerPlaceholder = configurator?.querySelector("[data-offer-placeholder]");
 const modelBadge = configurator?.querySelector("[data-model-badge]");
+const visualCaption = configurator?.querySelector("[data-visual-caption]");
 const summaryModel = configurator?.querySelector("[data-summary-model]");
 const summaryOffers = configurator?.querySelector("[data-summary-offers]");
 const summaryExtras = configurator?.querySelector("[data-summary-extras]");
@@ -31,6 +32,10 @@ const expandedZones = (zone) => {
 
     if (zone === "clicky-full") {
         return ["buttons", "dpad", "triggers"];
+    }
+
+    if (zone === "buttons") {
+        return ["buttons", "dpad"];
     }
 
     return zone ? [zone] : [];
@@ -92,10 +97,24 @@ const updateSummary = () => {
 
     if (stage) {
         stage.dataset.controllerModel = model?.value || "";
+        stage.setAttribute(
+            "aria-label",
+            model
+                ? `Live-Vorschau ${model.dataset.label || model.value} mit ${offers.length} gewählten Upgrades`
+                : "Live-Vorschau: Noch kein Controller-Modell gewählt",
+        );
     }
 
     if (modelBadge) {
         modelBadge.textContent = model?.dataset.label || "Noch kein Modell gewählt";
+    }
+
+    if (visualCaption) {
+        visualCaption.textContent = !model
+            ? "Modell auswählen und Upgrades live entdecken"
+            : offers.length === 0
+                ? "Jetzt passende Upgrades auswählen"
+                : `${offers.length} ${offers.length === 1 ? "Upgrade" : "Upgrades"} hervorgehoben`;
     }
 
     if (summaryModel) {

@@ -345,11 +345,21 @@ test('Controller-Konfigurator bleibt auf Upgrades begrenzt und Theme-Korrektur i
 
     assert_true(str_contains($controller, 'Welche Upgrades möchten Sie?'));
     assert_true(str_contains($controller, 'Reparaturen bleiben bewusst individuelle Anfragen.'));
+    assert_true(str_contains($controller, 'controller-dualsense-premium.png'));
+    assert_true(str_contains($controller, 'controller-dualsense-edge-premium.png'));
+    assert_true(str_contains($controller, 'controller-upgrade-hotspots'));
+    assert_true(!str_contains($controller, 'controller-live-svg'));
     assert_true(!str_contains($controller, 'Was funktioniert nicht?'));
     assert_true(!str_contains($controller, 'Diagnosepauschale'));
     assert_true(is_string($styles) && str_contains($styles, 'theme-polish.css'));
     assert_true(is_string($themePolish) && str_contains($themePolish, '.contact-facts dd'));
     assert_true(str_contains($themePolish, 'html[data-resolved-theme="light"] body.controller-page'));
+
+    foreach (['controller-dualsense-premium.png', 'controller-dualsense-edge-premium.png'] as $asset) {
+        $path = $projectRoot . '/public/assets/img/controller/' . $asset;
+        assert_true(is_file($path), 'Controller-Produktvisual fehlt: ' . $asset);
+        assert_true(filesize($path) <= 500 * 1024, 'Controller-Produktvisual überschreitet 500 KB: ' . $asset);
+    }
 });
 
 test('Smoke-Rendering der öffentlichen Seiten', function () use ($projectRoot): void {
