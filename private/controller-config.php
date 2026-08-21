@@ -127,7 +127,7 @@ return [
         'face-clicky' => [
             'label' => 'Clicky-Tasten – D-Pad & Aktionstasten',
             'shortLabel' => 'Clicky-Tasten',
-            'description' => 'Kurzes, taktiles Klickgefühl für Steuerkreuz und Aktionstasten, passend zur verbauten Controller-Revision.',
+            'description' => 'Kurzes, taktiles Klickgefühl für Steuerkreuz und Aktionstasten.',
             'priceCents' => 4990,
             'models' => ['dualsense'],
             'zone' => 'buttons',
@@ -157,7 +157,7 @@ return [
         'back-paddles' => [
             'label' => 'Back-Paddle-Umbau',
             'shortLabel' => 'Back-Paddle-Umbau',
-            'description' => 'Programmierbare Rücktasten mit passendem Rückgehäuse; Ausführung nach Controller-Revision.',
+            'description' => 'Programmierbare Rücktasten mit passendem Rückgehäuse.',
             'priceCents' => 9990,
             'models' => ['dualsense'],
             'zone' => 'back-paddles',

@@ -99,7 +99,7 @@ $phoneLink = 'tel:' . phone_href((string) $company['phone']);
 
                             <fieldset class="config-step config-step-offers" data-config-step="offers">
                                 <legend><span>03</span><strong>Reparatur oder Upgrade wählen</strong><small>Faire Gesamtpreise</small></legend>
-                                <p class="controller-offer-intro">Alle angezeigten Preise verstehen sich als Gesamtpreis für das genannte Material, den Einbau und den abschließenden Funktionstest. Die genaue BDM-Bauversion des DualSense prüfe ich vor dem Einbau für Sie.</p>
+                                <p class="controller-offer-intro">Alle angezeigten Preise verstehen sich als Gesamtpreis für das genannte Material, den Einbau und den abschließenden Funktionstest.</p>
                                 <p class="controller-offer-placeholder" data-offer-placeholder>Wählen Sie zuerst DualSense oder DualSense Edge. Danach erscheinen nur passende Pakete.</p>
                                 <div class="controller-offer-options" data-offer-list>
                                     <?php foreach ($catalog['offers'] as $offerId => $offer): ?>
