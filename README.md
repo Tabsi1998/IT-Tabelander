@@ -96,12 +96,12 @@ DOLIBARR_ENABLED=true
 DOLIBARR_BASE_URL=https://erp.tabelander.co.at
 DOLIBARR_API_KEY_FILE=/var/www/it-tabelander-secrets/dolibarr-api-key.txt
 DOLIBARR_ENTITY=0
-DOLIBARR_VAT_RATE=20
+DOLIBARR_VAT_RATE=0
 DOLIBARR_COUNTRY_CODE=AT
 DOLIBARR_TIMEOUT_SECONDS=8
 ```
 
-`DOLIBARR_VAT_RATE` muss vor der Aktivierung anhand der tatsächlichen steuerlichen Behandlung festgelegt werden. Ohne API-Schlüssel oder Steuersatz bleibt die Anbindung kontrolliert deaktiviert. Fehlversuche blockieren die normale Kontakt-E-Mail nicht; das datensparsame `private/logs/dolibarr.log` enthält nur technische Statuswerte und Dolibarr-IDs, keine Kontaktdaten oder API-Antworten.
+`DOLIBARR_VAT_RATE=0` entspricht der bestätigten Kleinunternehmerregelung von IT-Tabelander und der vorhandenen Dolibarr-Konfiguration ohne Umsatzsteuerausweis. Falls sich der steuerliche Status später ändert, müssen Dolibarr, Website-Konfiguration, Angebotstexte und Preise gemeinsam angepasst werden. Ohne API-Schlüssel oder Steuersatz bleibt die Anbindung kontrolliert deaktiviert. Fehlversuche blockieren die normale Kontakt-E-Mail nicht; das datensparsame `private/logs/dolibarr.log` enthält nur technische Statuswerte und Dolibarr-IDs, keine Kontaktdaten oder API-Antworten.
 
 Die empfohlene Produkt-/Leistungsstruktur und alle Controller-Referenzen stehen in [`docs/DOLIBARR-KATALOG.md`](docs/DOLIBARR-KATALOG.md).
 

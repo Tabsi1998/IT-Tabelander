@@ -59,4 +59,4 @@ DOLIBARR_VAT_RATE=0
 DOLIBARR_COUNTRY_CODE=AT
 ```
 
-`DOLIBARR_VAT_RATE=0` ist hier nur passend, wenn die gezeigte 0-%-Konfiguration steuerlich tatsächlich korrekt ist. Sonst den richtigen Satz setzen. Der API-Benutzer benötigt Rechte für Geschäftspartner/Interessenten, Tickets und Angebote. Zum Abschluss je eine normale Anfrage und eine Controller-Konfiguration testen: Erstere muss als Ticket, letztere als Angebotsentwurf erscheinen.
+`DOLIBARR_VAT_RATE=0` entspricht der bestätigten Kleinunternehmerregelung von IT-Tabelander und der bereits vorhandenen Dolibarr-Konfiguration. Der bereitgestellte API-Test bestätigt erfolgreichen Lesezugriff auf Geschäftspartner, Angebote und Tickets. Der API-Benutzer benötigt zusätzlich Schreibrechte für Geschäftspartner/Interessenten, Tickets und Angebote. Zum Abschluss je eine normale Anfrage und eine Controller-Konfiguration testen: Erstere muss als Ticket, letztere als Angebotsentwurf erscheinen.

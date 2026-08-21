@@ -56,7 +56,8 @@ Für spätere Angebote empfiehlt sich eine kleine, verständliche Basis statt vi
 ## Preis- und Steuereinstellungen
 
 - Website-Pauschalen als **Bruttopreise** pflegen, damit der Betrag im Angebot dem Konfigurator entspricht.
-- Den Steuersatz nicht pauschal von 0 % auf 20 % ändern. Er muss zur tatsächlichen umsatzsteuerlichen Situation des Unternehmens und zum Rechnungshinweis passen; im Zweifel steuerlich abklären.
+- Für IT-Tabelander gilt nach Betreiberangabe die Kleinunternehmerregelung ohne Umsatzsteuerausweis. Deshalb werden Website und Dolibarr mit **0 % USt.** geführt.
+- Wenn sich dieser Status später ändert, müssen Dolibarr, Website-Konfiguration, Angebots-/Rechnungstexte und öffentliche Preise gemeinsam geprüft und angepasst werden.
 - Einkaufspreise nur als reale Netto-Lieferantenpreise inklusive nachvollziehbarer Bezugsquelle pflegen.
 - Mindestverkaufspreise als interne Untergrenze nutzen, nicht als zweiten öffentlichen Preis.
 - Preise regelmäßig prüfen, besonders nach Lieferanten- oder Versandpreisänderungen. Die Website ist die serverseitige Preisquelle der aktuellen Integration; Änderungen daher in `private/controller-config.php` und Dolibarr gemeinsam nachziehen.

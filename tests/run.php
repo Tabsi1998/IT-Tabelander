@@ -233,12 +233,12 @@ test('Dolibarr-Positionen verwenden ausschließlich serverseitige Bruttopreise',
         'model' => 'dualsense',
         'offers' => ['hall-pair', 'battery-upgrade'],
     ]);
-    $lines = dolibarr_controller_lines($selection, 20.0);
+    $lines = dolibarr_controller_lines($selection, 0.0);
 
     assert_same(2, count($lines));
     assert_same('99.90', $lines[0]['subprice']);
     assert_same('TTC', $lines[0]['price_base_type']);
-    assert_same(20.0, $lines[0]['tva_tx']);
+    assert_same(0.0, $lines[0]['tva_tx']);
     assert_same('54.90', $lines[1]['subprice']);
 });
 
