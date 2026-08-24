@@ -1,0 +1,11 @@
+{
+  "short_name": "IT-Tabelander",
+  "name": "IT-Tabelander – IT-Service & Gaming-Hardware",
+  "icons": [
+    { "src": "/assets/img/logo/logo-light.png", "type": "image/png", "sizes": "512x512" }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#070D18",
+  "background_color": "#070D18"
+}

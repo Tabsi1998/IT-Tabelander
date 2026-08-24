@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-canvas: 248 250 252;
+  --bg-surface: 255 255 255;
+  --bg-elevated: 241 245 249;
+  --border-subtle: 226 232 240;
+  --text-primary: 15 23 42;
+  --text-secondary: 51 65 85;
+  --text-muted: 100 116 139;
+  --card-bg: rgba(255, 255, 255, 0.92);
+}
+
+.dark {
+  --bg-canvas: 7 13 24;
+  --bg-surface: 15 23 42;
+  --bg-elevated: 30 41 59;
+  --border-subtle: 30 42 58;
+  --text-primary: 248 250 252;
+  --text-secondary: 148 163 184;
+  --text-muted: 100 116 139;
+  --card-bg: rgba(15, 23, 42, 0.85);
+}
+
+* {
+  border-color: rgb(var(--border-subtle));
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: rgb(var(--bg-canvas));
+  color: rgb(var(--text-primary));
+  font-family: "DM Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Outfit", system-ui, sans-serif;
+}
+
+::selection {
+  background: rgba(242, 101, 34, 0.3);
+  color: var(--text-primary);
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgb(var(--bg-canvas)); }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #F26522; }
+
+/* focus visibility */
+:focus-visible {
+  outline: 2px solid #F26522;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.glass {
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.text-glow {
+  text-shadow: 0 0 24px rgba(242, 101, 34, 0.45);
+}
+
+.hairline {
+  background-image: linear-gradient(90deg, transparent, rgba(242, 101, 34, 0.5), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
