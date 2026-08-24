@@ -85,7 +85,13 @@ async def update_category(cat_id: str, payload: ConfigCategoryInput, _: dict = D
 
 @router.delete("/admin/configurator/categories/{cat_id}")
 async def delete_category(cat_id: str, _: dict = Depends(require_admin)):
-    await get_db().config_categories.delete_one({"_id": to_oid(cat_id)})
+    db = get_db()
+    cat = await db.config_categories.find_one({"_id": to_oid(cat_id)})
+    if not cat:
+        raise HTTPException(status_code=404, detail="Kategorie nicht gefunden")
+    await db.config_categories.delete_one({"_id": to_oid(cat_id)})
+    # cascade: remove options belonging to this category (no orphans)
+    await db.config_options.delete_many({"configurator": cat.get("configurator"), "category_key": cat.get("key")})
     return {"ok": True}
 
 

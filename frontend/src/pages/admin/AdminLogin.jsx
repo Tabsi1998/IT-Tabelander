@@ -7,6 +7,7 @@ import { formatApiError } from "../../lib/api";
 import { Button } from "../../components/ui/button";
 import { Input, Label } from "../../components/ui/input";
 import Seo from "../../components/Seo";
+import Logo from "../../components/Logo";
 
 export default function AdminLogin() {
   const { login } = useAuth();
@@ -34,7 +35,7 @@ export default function AdminLogin() {
       <Seo title="Admin Login" path="/admin" />
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <img src="/assets/img/logo/banner-light.png" alt="IT-Tabelander" className="mx-auto h-10" />
+          <Logo variant="banner" className="mx-auto h-10" />
           <p className="mt-3 font-mono text-xs uppercase tracking-[0.3em] text-faint">Admin-Bereich</p>
         </div>
         <form onSubmit={submit} className="glass rounded-2xl border border-subtle p-8 shadow-card" data-testid="admin-login-form">

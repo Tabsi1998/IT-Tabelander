@@ -8,7 +8,7 @@ import { Button } from "./ui/button";
 
 const MAIN = [
   { label: "Leistungen", to: "/leistungen" },
-  { label: "Gaming-PC", to: "/gaming-pc-konfigurator" },
+  { label: "PC Builder", to: "/gaming-pc-konfigurator" },
   { label: "PS5 Controller", to: "/ps5-controller-konfigurator" },
   { label: "Über mich", to: "/ueber-mich" },
   { label: "Bewertungen", to: "/bewertungen" },
@@ -21,7 +21,7 @@ const MORE = [
   { label: "PC- & Notebook-Upgrades", to: "/pc-aufruestung" },
   { label: "Konsolen-Reparatur", to: "/konsolen-reparatur" },
   { label: "Controller-Reparatur", to: "/controller-reparatur" },
-  { label: "Gaming-PC (Info)", to: "/gaming-pc" },
+  { label: "PC Builder (Info)", to: "/gaming-pc" },
 ];
 
 export function Header() {

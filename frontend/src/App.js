@@ -4,6 +4,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { Toaster } from "sonner";
 
 import { ThemeProvider } from "./context/ThemeContext";
+import { useTheme } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
 import { SettingsProvider } from "./context/SettingsContext";
 import { ConsentProvider } from "./context/ConsentContext";
@@ -42,6 +43,11 @@ const Site = ({ children }) => (
   </Layout>
 );
 
+const ThemedToaster = () => {
+  const { theme } = useTheme();
+  return <Toaster position="bottom-right" richColors theme={theme} />;
+};
+
 function App() {
   return (
     <HelmetProvider>
@@ -50,7 +56,7 @@ function App() {
           <ConsentProvider>
             <AuthProvider>
               <BrowserRouter>
-                <Toaster position="bottom-right" richColors theme="dark" />
+                <ThemedToaster />
                 <Routes>
                   <Route path="/" element={<Site><Home /></Site>} />
                   <Route path="/leistungen" element={<Site><Leistungen /></Site>} />

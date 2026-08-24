@@ -65,6 +65,16 @@ export default function AdminSettings() {
         </Panel>
 
         <Panel>
+          <h3 className="mb-4 font-semibold text-ink">PC Builder – Inhalte</h3>
+          <p className="mb-3 text-xs text-faint">Überschrift, Untertitel und Hinweis der PC-Builder-Seite. Kategorien &amp; Komponenten verwaltest du unter „PC Builder“.</p>
+          <div className="space-y-3">
+            <Field label="Titel"><Input value={s.pc_builder_title || ""} onChange={set("pc_builder_title")} placeholder="PC Builder" data-testid="settings-pcb-title" /></Field>
+            <Field label="Untertitel"><Textarea value={s.pc_builder_subtitle || ""} onChange={set("pc_builder_subtitle")} data-testid="settings-pcb-subtitle" /></Field>
+            <Field label="Hinweis-Box (optional)"><Textarea value={s.pc_builder_note || ""} onChange={set("pc_builder_note")} placeholder="z. B. Lieferzeiten, Beratung, Aktionen …" data-testid="settings-pcb-note" /></Field>
+          </div>
+        </Panel>
+
+        <Panel>
           <h3 className="mb-4 font-semibold text-ink">Integrationen (serverseitig, nie im Browser)</h3>
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={!!s.dolibarr_enabled} onChange={(e) => setS((x) => ({ ...x, dolibarr_enabled: e.target.checked }))} className="h-4 w-4 accent-[#F26522]" data-testid="settings-dolibarr-enabled" /> Dolibarr aktivieren</label>

@@ -31,6 +31,26 @@ Production-ready premium dark-tech website for IT-Tabelander (Austria/Tirol): IT
 ## Config / secrets (env, not hardcoded)
 backend/.env: MONGO_URL, DB_NAME, JWT_SECRET, ADMIN_EMAIL/PASSWORD, DOLIBARR_ENABLED/BASE_URL/API_KEY/TIMEOUT, GOOGLE_PLACES_API_KEY, GOOGLE_PLACE_ID, GA_MEASUREMENT_ID.
 
+## Update 2026-06 (2) – PC Builder, echte Controller-Fotos, Theme & Cleanup
+- **Repo aufgeräumt**: alle alten PHP-Dateien + Verzeichnisse (`/private`, altes `/public`, `/docs`, `/tests`, Root-`*.php`, `sitemap.php`, `.htaccess`) entfernt. Nur noch React (`/frontend`) + FastAPI (`/backend`).
+- **Rename „Gaming-PC" → „PC Builder"** überall: Header-Nav, Home-Hero/Teaser, Footer, PC-Builder-Seite (Hero/SEO), Admin-Sidebar + Tab, Admin-Header. Route `/gaming-pc-konfigurator` bleibt (SEO), nur Anzeige geändert.
+- **PC Builder voll admin-verwaltbar**: AdminConfigurator hat jetzt vollständiges **Kategorie-CRUD** (Hinzufügen/Bearbeiten/Löschen: Name, Schlüssel, Beschreibung, Pflicht/Mehrfach, Sortierung, Aktiv) zusätzlich zum bestehenden Options-/Produkt-Management (Bilder, Preise, Specs, Dolibarr-Link). Kategorie-Löschung kaskadiert jetzt (Optionen werden mitgelöscht, 404 bei unbekannter ID).
+- **Editierbare PC-Builder-Inhalte**: neue Settings-Felder `pc_builder_title / pc_builder_subtitle / pc_builder_note` (Admin-Panel „PC Builder – Inhalte"), live auf der PC-Builder-Seite gerendert. Public in `/api/settings`.
+- **Echte Controller-Fotos** (Nutzer hat Erlaubnis für offizielle Sony/eXtremeRate-Bilder erteilt): ControllerCanvas nutzt jetzt reale transparente Controller-PNGs als Basis (DualSense front/back, Edge official front/back) statt abstraktem SVG. Live-Recoloring via `mix-blend-mode` (color/multiply/screen), maskiert durch die PNG-Silhouette. SVG bleibt Fallback. Controller-Modelle haben `preview_front`/`preview_back` (idempotent geseedet).
+- **Varianten-IDs Fix (war kritisch)**: eingebettete Varianten bekommen jetzt stabile `id` (`{product_id}:{index}`) in `/api/builder/{model}`; Auswahl/Recolor/Preis/Speichern funktionieren. Client hat defensiven Fallback. `/builder/save` rundet Total auf 2 Dezimalstellen.
+- **Theme/Light-Fix**: Admin-Login, Header, Footer, AdminLayout nutzen jetzt die theme-bewusste `Logo`-Komponente (kein hartes weißes Banner mehr → in Light sichtbar). Toaster folgt dem Theme. FinalCTA-Sekundärbutton auf dunkler Karte in Light lesbar (weiße Schrift). Theme persistiert in localStorage.
+- **FAQ** „Gaming-PC-Konfigurator" → „PC Builder" (Seed + bestehendes DB-Dokument aktualisiert).
+
+### Testing (2026-06-2)
+- Backend: 69/69 pytest weiterhin grün; Kategorie-CRUD, Varianten-IDs, Settings-Felder per curl verifiziert.
+- Frontend (Testing-Agent iteration_3 + iteration_4): Rename, Admin-Kategorie-CRUD, PC-Builder-Inhalte, echte Controller-Fotos, Varianten-Auswahl + Live-Tint + Speichern, Cascade-Delete, Light-Theme-CTA, FAQ – alle bestätigt (100% der getesteten Szenarien).
+
+## Offen / Backlog (aktualisiert)
+- Dolibarr echt anbinden: Nutzer-API-Key im Admin hinterlegen, Produkt-Sync + Ticket/Interessent Ende-zu-Ende validieren (aktuell Demo-Modus).
+- Fotorealistische per-Teil-Recolorierung (Buttons/Sticks separat) braucht teil-spezifische transparente Layer-Assets; aktuell recoloriert die Shell die ganze Silhouette + Farbchips in Zusammenfassung.
+- Google Places live reviews + GA4 Measurement ID (Nutzer-Werte fehlen noch).
+- Optional: Admin-eigener Theme-Toggle; Consent-Banner-Offset über sticky CTAs; visueller Drag&Drop-Layer-Editor für Varianten (aktuell JSON).
+
 ## Update 2026-06 – Controller Builder Overhaul
 - Neuer datengetriebener **PS5 Custom Controller Builder** (ersetzt alten PS5-Konfigurator) mit 2 getrennten Modellen: DualSense (BDM-010…060) + DualSense Edge.
 - Backend-Collections: controllers, builder_categories, builder_products (+ eingebettete variants), builder_configs. Router /api/builder/* (public) + /api/admin/builder/* (CRUD). Versions-/Kompatibilitätsfilter, requires/excludes-Felder, Dolibarr-Preis-Verknüpfung.

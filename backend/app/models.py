@@ -143,6 +143,8 @@ class ControllerInput(BaseModel):
     model: str = ""
     base_price: float = 0.0
     preview_image: Optional[str] = ""
+    preview_front: Optional[str] = ""
+    preview_back: Optional[str] = ""
     versions: List[dict] = []  # [{code, label}]
     active: bool = True
     sort: int = 0
@@ -223,6 +225,9 @@ class SettingsInput(BaseModel):
     logo_dark_url: Optional[str] = None
     seo_default_title: Optional[str] = None
     seo_default_description: Optional[str] = None
+    pc_builder_title: Optional[str] = None
+    pc_builder_subtitle: Optional[str] = None
+    pc_builder_note: Optional[str] = None
     impressum_html: Optional[str] = None
     datenschutz_html: Optional[str] = None
     legal_reviewed: Optional[bool] = None

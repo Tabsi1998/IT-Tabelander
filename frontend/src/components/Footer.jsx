@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Mail, Phone, MapPin, ShieldCheck } from "lucide-react";
 import { useSettings } from "../context/SettingsContext";
+import Logo from "./Logo";
 
 export function Footer() {
   const { settings } = useSettings();
@@ -11,7 +12,7 @@ export function Footer() {
     <footer className="relative mt-24 border-t border-subtle bg-[#070d18] text-slate-300">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 md:grid-cols-4 lg:px-8">
         <div className="md:col-span-2">
-          <img src="/assets/img/logo/banner-light.png" alt="IT-Tabelander" className="h-9" />
+          <Logo variant="banner" onDark className="h-9" />
           <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-400">
             {settings.tagline || "IT-Technik, die funktioniert."} PCs, Notebooks, Konsolen und
             Gaming-Hardware – Reparatur, Aufrüstung und individuelle Systeme.
@@ -34,7 +35,7 @@ export function Footer() {
             <li><Link to="/pc-aufruestung" className="hover:text-brand">PC-Aufrüstung</Link></li>
             <li><Link to="/konsolen-reparatur" className="hover:text-brand">Konsolen-Reparatur</Link></li>
             <li><Link to="/controller-reparatur" className="hover:text-brand">Controller-Reparatur</Link></li>
-            <li><Link to="/gaming-pc-konfigurator" className="hover:text-brand">Gaming-PC konfigurieren</Link></li>
+            <li><Link to="/gaming-pc-konfigurator" className="hover:text-brand">PC Builder</Link></li>
           </ul>
         </div>
 

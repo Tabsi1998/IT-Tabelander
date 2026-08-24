@@ -46,7 +46,8 @@ async def get_builder(controller_key: str, version: str | None = None):
                 continue
             p2 = serialize(dict(p))
             dol = await _dolibarr_price(p.get("dolibarr_product_id"))
-            for v in p2.get("variants", []):
+            for i, v in enumerate(p2.get("variants", [])):
+                v["id"] = f"{p2['id']}:{i}"
                 if dol is not None:
                     v["price"] = dol
             c_prods.append(p2)
@@ -62,6 +63,7 @@ async def save_config(payload: BuilderConfigInput):
     doc = payload.model_dump()
     doc["config_id"] = cid
     doc["kind"] = "controller"
+    doc["total"] = round(payload.total, 2)
     doc["created_at"] = now_utc()
     await db.builder_configs.insert_one(doc)
     # optional Dolibarr lead

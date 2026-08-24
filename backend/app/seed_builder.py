@@ -77,20 +77,49 @@ PRODUCTS = {
 }
 
 
+PREVIEWS = {
+    "dualsense": {
+        "preview_front": "/assets/img/controller/controller-dualsense-premium.png",
+        "preview_back": "/assets/img/controller/controller-dualsense-back.png",
+    },
+    "edge": {
+        "preview_front": "/assets/img/controller/controller-dualsense-edge-official-front.png",
+        "preview_back": "/assets/img/controller/controller-dualsense-edge-official-back.png",
+    },
+}
+
+
+async def _ensure_previews(db):
+    """Always keep the two known controllers pointing at the real photo assets
+    (runs even after the initial seed so previews reach an existing DB)."""
+    for key, imgs in PREVIEWS.items():
+        await db.controllers.update_one(
+            {"key": key},
+            {"$set": {"preview_front": imgs["preview_front"], "preview_back": imgs["preview_back"]}},
+        )
+
+
 async def seed_builder():
     db = get_db()
+    await _ensure_previews(db)
     if await db.controllers.count_documents({}) > 0:
         return
     versions_ds = [{"code": c, "label": c} for c in ["BDM-010", "BDM-020", "BDM-030", "BDM-040", "BDM-050", "BDM-060"]]
     versions_edge = [{"code": "Edge", "label": "PS5 Edge"}]
     await db.controllers.insert_one({
         "key": "dualsense", "name": "PS5 DualSense", "model": "DualSense",
-        "base_price": 74.9, "preview_image": "", "versions": versions_ds,
+        "base_price": 74.9, "preview_image": "",
+        "preview_front": PREVIEWS["dualsense"]["preview_front"],
+        "preview_back": PREVIEWS["dualsense"]["preview_back"],
+        "versions": versions_ds,
         "active": True, "sort": 1, "created_at": now_utc(),
     })
     await db.controllers.insert_one({
         "key": "edge", "name": "PS5 DualSense Edge", "model": "DualSense Edge",
-        "base_price": 239.0, "preview_image": "", "versions": versions_edge,
+        "base_price": 239.0, "preview_image": "",
+        "preview_front": PREVIEWS["edge"]["preview_front"],
+        "preview_back": PREVIEWS["edge"]["preview_back"],
+        "versions": versions_edge,
         "active": True, "sort": 2, "created_at": now_utc(),
     })
     for ck, cats in CATS.items():

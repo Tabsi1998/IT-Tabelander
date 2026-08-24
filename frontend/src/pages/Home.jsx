@@ -50,7 +50,7 @@ function Hero() {
                 <Wrench size={18} /> Reparatur anfragen
               </Button>
               <Button as={Link} to="/gaming-pc-konfigurator" variant="secondary" size="lg" data-testid="hero-cta-pc">
-                <Cpu size={18} /> Gaming-PC konfigurieren
+                <Cpu size={18} /> PC Builder öffnen
               </Button>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2">
@@ -156,11 +156,11 @@ function ConfiguratorTeaser() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Reveal>
           <Card className="group relative h-full overflow-hidden">
-            <img src={IMAGES.hero} alt="Gaming-PC konfigurieren" className="h-56 w-full object-cover opacity-70 transition-transform duration-500 group-hover:scale-105" />
+            <img src={IMAGES.hero} alt="PC Builder" className="h-56 w-full object-cover opacity-70 transition-transform duration-500 group-hover:scale-105" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#070d18] via-[#070d18]/60 to-transparent" />
             <div className="absolute inset-x-0 bottom-0 p-7">
-              <Badge tone="brand" className="mb-3"><Sparkles size={12} /> Konfigurator</Badge>
-              <h3 className="font-heading text-2xl font-bold text-white">Gaming-PC konfigurieren</h3>
+              <Badge tone="brand" className="mb-3"><Sparkles size={12} /> PC Builder</Badge>
+              <h3 className="font-heading text-2xl font-bold text-white">Deinen PC selbst bauen</h3>
               <p className="mt-2 max-w-md text-sm text-slate-300">
                 Stelle deinen Wunsch-PC zusammen – mit Kompatibilitäts-Check und übersichtlicher Zusammenfassung.
               </p>
@@ -242,7 +242,7 @@ function FinalCTA() {
             <Button as={Link} to="/reparatur" size="lg" data-testid="final-cta-repair">
               <Wrench size={18} /> Reparatur anfragen
             </Button>
-            <Button as={Link} to="/kontakt" variant="secondary" size="lg" data-testid="final-cta-contact">
+            <Button as={Link} to="/kontakt" variant="secondary" size="lg" className="text-white border-white/40 hover:bg-white/10" data-testid="final-cta-contact">
               Kontakt aufnehmen
             </Button>
           </div>

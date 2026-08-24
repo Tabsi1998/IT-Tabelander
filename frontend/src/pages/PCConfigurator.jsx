@@ -5,6 +5,7 @@ import api, { formatApiError, mediaUrl } from "../lib/api";
 import { EUR } from "../lib/utils";
 import { checkPCCompatibility } from "../lib/compatibility";
 import { trackEvent } from "../context/ConsentContext";
+import { useSettings } from "../context/SettingsContext";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -22,6 +23,7 @@ function specLine(specs) {
 }
 
 export default function PCConfigurator() {
+  const { settings } = useSettings();
   const [cats, setCats] = useState(null);
   const [sel, setSel] = useState({}); // key -> option
   const [saving, setSaving] = useState(false);
@@ -43,6 +45,9 @@ export default function PCConfigurator() {
   const missing = requiredKeys.filter((k) => !sel[k]);
 
   const pick = (key, opt) => { setSavedId(null); setSel((s) => ({ ...s, [key]: s[key]?.id === opt.id ? undefined : opt })); };
+
+  const pcTitle = settings.pc_builder_title || "PC Builder";
+  const pcSubtitle = settings.pc_builder_subtitle || "Stelle deinen PC zusammen – der Builder prüft, soweit die Daten es erlauben, die Kompatibilität.";
 
   const save = async (asRequest) => {
     if (missing.length) return toast.error("Bitte wähle alle Pflichtkomponenten (*).");
@@ -67,19 +72,25 @@ export default function PCConfigurator() {
   return (
     <>
       <Seo
-        title="Gaming-PC Konfigurator"
-        description="Stelle deinen Gaming-PC zusammen: CPU, GPU, Mainboard, RAM, Kühlung und mehr – mit Kompatibilitäts-Check und Zusammenfassung."
+        title={pcTitle}
+        description="Stelle deinen PC zusammen: CPU, GPU, Mainboard, RAM, Kühlung und mehr – mit Kompatibilitäts-Check und Zusammenfassung."
         path="/gaming-pc-konfigurator"
-        jsonLd={breadcrumbJsonLd([{ name: "Start", path: "/" }, { name: "Gaming-PC Konfigurator", path: "/gaming-pc-konfigurator" }])}
+        jsonLd={breadcrumbJsonLd([{ name: "Start", path: "/" }, { name: "PC Builder", path: "/gaming-pc-konfigurator" }])}
       />
       <PageHero
-        eyebrow="Konfigurator"
-        title="Gaming-PC Konfigurator"
-        subtitle="Wähle deine Komponenten – der Konfigurator prüft, soweit die Daten es erlauben, die Kompatibilität."
-        breadcrumbs={[{ name: "Start", to: "/" }, { name: "Gaming-PC Konfigurator" }]}
+        eyebrow="PC Builder"
+        title={pcTitle}
+        subtitle={pcSubtitle}
+        breadcrumbs={[{ name: "Start", to: "/" }, { name: "PC Builder" }]}
       />
 
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        {settings.pc_builder_note && (
+          <div className="mb-8 flex items-start gap-3 rounded-xl border border-brand/20 bg-brand/5 p-4 text-sm text-muted" data-testid="pc-builder-note">
+            <Info size={16} className="mt-0.5 shrink-0 text-brand" />
+            <span>{settings.pc_builder_note}</span>
+          </div>
+        )}
         <div className="grid gap-8 lg:grid-cols-12">
           {/* components */}
           <div className="lg:col-span-8">

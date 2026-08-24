@@ -17,12 +17,18 @@ const optEmpty = (ctype, cat) => ({
   specs: {}, incompatible_with: [], depends_on: [],
 });
 
+const catEmpty = (ctype) => ({
+  configurator: ctype, key: "", name: "", description: "",
+  required: false, multi: false, sort: 0, active: true,
+});
+
 export default function AdminConfigurator() {
   const [ctype, setCtype] = useState("ps5");
   const [cats, setCats] = useState(null);
   const [opts, setOpts] = useState([]);
   const [products, setProducts] = useState([]);
   const [edit, setEdit] = useState(null);
+  const [catEdit, setCatEdit] = useState(null);
   const [specText, setSpecText] = useState("{}");
 
   const load = () => {
@@ -36,6 +42,21 @@ export default function AdminConfigurator() {
     const data = o ? { ...o } : optEmpty(ctype, catKey);
     setSpecText(JSON.stringify(data.specs || {}, null, 2));
     setEdit(data);
+  };
+
+  const saveCat = async () => {
+    if (!catEdit.name || !catEdit.key) return toast.error("Name und Schlüssel sind Pflicht");
+    const payload = { ...catEdit, sort: Number(catEdit.sort) || 0 };
+    try {
+      if (catEdit.id) await api.put(`/admin/configurator/categories/${catEdit.id}`, payload);
+      else await api.post("/admin/configurator/categories", payload);
+      toast.success("Kategorie gespeichert"); setCatEdit(null); load();
+    } catch { toast.error("Fehler beim Speichern"); }
+  };
+
+  const delCat = async (id) => {
+    if (!window.confirm("Kategorie löschen? Alle Optionen dieser Kategorie werden ebenfalls unwiderruflich gelöscht.")) return;
+    await api.delete(`/admin/configurator/categories/${id}`); load();
   };
 
   const save = async () => {
@@ -55,9 +76,10 @@ export default function AdminConfigurator() {
 
   return (
     <>
-      <AdminHeader title="Konfiguratoren" desc="Optionen & Kategorien verwalten, Dolibarr-Produkte verknüpfen" />
+      <AdminHeader title="PC Builder & Konfiguratoren" desc="Kategorien, Optionen & Komponenten verwalten, Dolibarr-Produkte verknüpfen"
+        action={<Button size="sm" onClick={() => setCatEdit(catEmpty(ctype))} data-testid="cfg-add-category"><Plus size={14} /> Kategorie</Button>} />
       <div className="mb-6 inline-flex rounded-xl border border-subtle p-1">
-        {[["ps5", "PS5 Controller"], ["pc", "Gaming-PC"]].map(([k, l]) => (
+        {[["ps5", "PS5 Controller"], ["pc", "PC Builder"]].map(([k, l]) => (
           <button key={k} onClick={() => setCtype(k)} className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${ctype === k ? "bg-brand text-ink" : "text-muted hover:text-ink"}`} data-testid={`cfg-tab-${k}`}>{l}</button>
         ))}
       </div>
@@ -73,7 +95,11 @@ export default function AdminConfigurator() {
                   {c.required && <Badge tone="brand">Pflicht</Badge>}
                   {c.multi && <Badge tone="neutral">Mehrfach</Badge>}
                 </div>
-                <Button size="sm" variant="outline" onClick={() => openEdit(null, c.key)} data-testid={`cfg-add-${c.key}`}><Plus size={14} /> Option</Button>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setCatEdit({ ...c })} className="rounded p-1.5 text-muted hover:text-brand" title="Kategorie bearbeiten" data-testid={`cfg-cat-edit-${c.key}`}><Pencil size={14} /></button>
+                  <button onClick={() => delCat(c.id)} className="rounded p-1.5 text-muted hover:text-red-400" title="Kategorie löschen" data-testid={`cfg-cat-del-${c.key}`}><Trash2 size={14} /></button>
+                  <Button size="sm" variant="outline" onClick={() => openEdit(null, c.key)} data-testid={`cfg-add-${c.key}`}><Plus size={14} /> Option</Button>
+                </div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {byCat(c.key).map((o) => (
@@ -88,8 +114,8 @@ export default function AdminConfigurator() {
                         {!o.active && " · inaktiv"}
                       </p>
                     </div>
-                    <button onClick={() => openEdit(o)} className="rounded p-1 text-muted hover:text-brand"><Pencil size={14} /></button>
-                    <button onClick={() => del(o.id)} className="rounded p-1 text-muted hover:text-red-400"><Trash2 size={14} /></button>
+                    <button onClick={() => openEdit(o)} className="rounded p-1 text-muted hover:text-brand" title="Option bearbeiten" data-testid={`cfg-opt-edit-${o.id}`}><Pencil size={14} /></button>
+                    <button onClick={() => del(o.id)} className="rounded p-1 text-muted hover:text-red-400" title="Option löschen" data-testid={`cfg-opt-del-${o.id}`}><Trash2 size={14} /></button>
                   </div>
                 ))}
                 {byCat(c.key).length === 0 && <p className="text-xs text-faint">Keine Optionen.</p>}
@@ -98,6 +124,25 @@ export default function AdminConfigurator() {
           ))}
         </div>
       )}
+
+      <Dialog open={!!catEdit} onClose={() => setCatEdit(null)} title={catEdit?.id ? "Kategorie bearbeiten" : "Neue Kategorie"} maxWidth="max-w-lg">
+        {catEdit && (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Name"><Input value={catEdit.name} onChange={(e) => setCatEdit({ ...catEdit, name: e.target.value })} data-testid="cfg-cat-name" placeholder="z. B. Grafikkarte (GPU)" /></Field>
+              <Field label="Schlüssel (technisch, eindeutig)"><Input value={catEdit.key} onChange={(e) => setCatEdit({ ...catEdit, key: e.target.value.toLowerCase().replace(/\s+/g, "_") })} data-testid="cfg-cat-key" placeholder="gpu" disabled={!!catEdit.id} /></Field>
+            </div>
+            <Field label="Beschreibung"><Textarea value={catEdit.description} onChange={(e) => setCatEdit({ ...catEdit, description: e.target.value })} /></Field>
+            <Field label="Sortierung"><Input type="number" value={catEdit.sort} onChange={(e) => setCatEdit({ ...catEdit, sort: Number(e.target.value) })} /></Field>
+            <div className="flex flex-wrap gap-4 text-sm text-muted">
+              <label className="flex items-center gap-2"><input type="checkbox" checked={catEdit.active} onChange={(e) => setCatEdit({ ...catEdit, active: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Aktiv</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={catEdit.required} onChange={(e) => setCatEdit({ ...catEdit, required: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Pflichtauswahl</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={catEdit.multi} onChange={(e) => setCatEdit({ ...catEdit, multi: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Mehrfachauswahl</label>
+            </div>
+            <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setCatEdit(null)}>Abbrechen</Button><Button onClick={saveCat} data-testid="cfg-cat-save">Speichern</Button></div>
+          </div>
+        )}
+      </Dialog>
 
       <Dialog open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? "Option bearbeiten" : "Neue Option"} maxWidth="max-w-2xl">
         {edit && (
@@ -109,7 +154,7 @@ export default function AdminConfigurator() {
             <Field label="Beschreibung"><Textarea value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} /></Field>
             <div className="grid gap-4 sm:grid-cols-3">
               {ctype === "ps5" && <Field label="Farbe (Hex)"><Input value={edit.color_hex} onChange={(e) => setEdit({ ...edit, color_hex: e.target.value })} placeholder="#F26522" /></Field>}
-              <Field label="Preis (€)"><Input type="number" value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })} /></Field>
+              <Field label="Preis (€)"><Input type="number" value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })} data-testid="cfg-opt-price" /></Field>
               <Field label="Sortierung"><Input type="number" value={edit.sort} onChange={(e) => setEdit({ ...edit, sort: Number(e.target.value) })} /></Field>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">

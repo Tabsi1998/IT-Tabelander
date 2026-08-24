@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend re-test of iteration_3 CRITICAL fix + 3 regressions. PS5 Controller Builder variant ids are now valid (product_id:index), selection/highlight/summary/total/live photo tint/toggle-deselect and both save flows all work. DualSense + Edge both render real photos with valid variant ids. Admin category cascade delete works (option removed, no orphan; unknown id -> 404). Light-theme FinalCTA button is white-on-dark (readable). FAQ text now 'Wie funktioniert der PC Builder?'. No blocking issues found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/builder/save", "issue": "Stored/returned total has float artefact (111.80000000000001). Round to 2 decimals server-side."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AdminConfigurator.delCat", "issue": "Confirm dialog copy is now wrong/misleading: 'Optionen dieser Kategorie bleiben bestehen...' while backend cascades and deletes the options. Update wording to warn about option deletion.", "selector": "[data-testid^='cfg-cat-del-']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix misleading confirm text in AdminConfigurator.delCat (options ARE deleted now)",
+    "Round builder total to 2 decimals in /api/builder/save"
+  ],
+  "critical_code_review_comments": [
+    "ControllerBuilder relies on variant.id from API; consider a defensive fallback key (product.id + index) in the client so a backend serialization regression cannot silently break selection again."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only run; 2 spot curls passed)", "frontend": "100% of requested scenarios"},
+  "seed_data_creation": "Created + deleted temp PC Builder category 'TEST_Cascade' with option 'TEST_Orphan Option'. Saved 2 builder configs (GUoj3whVfU4, O0gkh7S9xMg) - harmless demo configs. No seeded data touched.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin@it-tabelander.at / ITtabelander2026! (worked, no lockout)",
+  "context_for_next_testing_agent": "Verified: variant testids look like builder-variant-<24hexid>:<idx>, 0 'undefined'. Tint layers over img[alt=Controller] have mixBlendMode color/multiply/screen with the chosen color_hex. Saved config GET /api/builder/config/{id} contains variant_id 'xxxx:4'. Consent banner (consent-accept) must be dismissed. Admin configurator route: /admin/konfigurator, PC tab data-testid cfg-tab-pc.",
+  "rca_of_the_issue": "iteration_3 bug (variant.id undefined) is resolved at source in backend/app/routers/builder.py which now injects v['id'] = f\"{product_id}:{index}\"; frontend pick()/active check by variant.id now behaves correctly."
+}

@@ -35,7 +35,13 @@ export default function ControllerBuilder() {
     if (!model) return;
     setData(null); setSel({}); setSavedId(null);
     api.get(`/builder/${model}${version ? `?version=${version}` : ""}`)
-      .then(({ data }) => setData(data)).catch(() => setData({ categories: [] }));
+      .then(({ data }) => {
+        // defensive: ensure every variant has a stable id even if the API omits it
+        (data.categories || []).forEach((cat) =>
+          (cat.products || []).forEach((p) =>
+            (p.variants || []).forEach((v, i) => { if (!v.id) v.id = `${p.id}:${i}`; })));
+        setData(data);
+      }).catch(() => setData({ categories: [] }));
   }, [model, version]);
 
   const colors = useMemo(() => {
@@ -122,7 +128,9 @@ export default function ControllerBuilder() {
               <Card className="overflow-hidden p-6">
                 <div className="relative rounded-2xl bg-gradient-to-br from-[#0b0f18] to-[#1a2233] p-4">
                   <div className="pointer-events-none absolute inset-0 bg-grid-faint bg-[size:30px_30px] opacity-30" />
-                  <ControllerCanvas model={model} side={side} colors={colors} overlays={overlays} className="relative mx-auto max-w-md" />
+                  <ControllerCanvas model={model} side={side} colors={colors} overlays={overlays}
+                    photoFront={data?.controller?.preview_front} photoBack={data?.controller?.preview_back}
+                    className="relative mx-auto max-w-md" />
                 </div>
                 <div className="mt-4 flex items-center justify-center gap-2">
                   {["front", "back"].map((s) => (

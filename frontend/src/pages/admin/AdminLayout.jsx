@@ -5,6 +5,7 @@ import {
   Image as ImageIcon, HelpCircle, LogOut, Menu, X, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import Logo from "../../components/Logo";
 
 const NAV = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -13,7 +14,7 @@ const NAV = [
   { to: "/admin/leistungen", label: "Leistungen", icon: Layers },
   { to: "/admin/faqs", label: "FAQs", icon: HelpCircle },
   { to: "/admin/bewertungen", label: "Bewertungen", icon: Star },
-  { to: "/admin/konfigurator", label: "PC-Konfigurator", icon: Cpu },
+  { to: "/admin/konfigurator", label: "PC Builder", icon: Cpu },
   { to: "/admin/controller-builder", label: "Controller Builder", icon: Gamepad2 },
   { to: "/admin/medien", label: "Medien", icon: ImageIcon },
   { to: "/admin/dolibarr", label: "Dolibarr Sync", icon: RefreshCw },
@@ -55,14 +56,14 @@ export default function AdminLayout({ children }) {
     <div className="min-h-screen bg-canvas text-ink">
       {/* mobile top bar */}
       <div className="flex items-center justify-between border-b border-subtle px-4 py-3 lg:hidden">
-        <img src="/assets/img/logo/banner-light.png" alt="IT-Tabelander" className="h-7" />
+        <Logo variant="banner" className="h-7" />
         <button onClick={() => setOpen(true)} data-testid="admin-mobile-menu"><Menu size={22} /></button>
       </div>
 
       <div className="flex">
         {/* sidebar desktop */}
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-subtle bg-surface p-4 lg:flex">
-          <Link to="/admin" className="mb-6 mt-2 block"><img src="/assets/img/logo/banner-light.png" alt="IT-Tabelander" className="h-8" /></Link>
+          <Link to="/admin" className="mb-6 mt-2 block"><Logo variant="banner" className="h-8" /></Link>
           <NavItems onNavigate={() => setOpen(false)} />
           <div className="mt-auto space-y-2 border-t border-subtle pt-4">
             <a href="/" target="_blank" rel="noreferrer" className="flex items-center gap-2 px-3 text-xs text-faint hover:text-brand">
@@ -81,7 +82,7 @@ export default function AdminLayout({ children }) {
             <div className="absolute inset-0 bg-black/70" onClick={() => setOpen(false)} />
             <div className="absolute left-0 top-0 h-full w-72 bg-surface p-4">
               <div className="mb-6 flex items-center justify-between">
-                <img src="/assets/img/logo/banner-light.png" alt="IT-Tabelander" className="h-7" />
+                <Logo variant="banner" className="h-7" />
                 <button onClick={() => setOpen(false)}><X size={20} /></button>
               </div>
               <NavItems onNavigate={() => setOpen(false)} />

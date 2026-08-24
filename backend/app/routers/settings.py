@@ -11,6 +11,7 @@ PUBLIC_FIELDS = [
     "company_name", "tagline", "email", "phone", "address", "city", "region",
     "postal_code", "country", "service_area", "opening_hours", "social_links",
     "ga_measurement_id", "seo_default_title", "seo_default_description",
+    "pc_builder_title", "pc_builder_subtitle", "pc_builder_note",
     "impressum_html", "datenschutz_html", "legal_reviewed",
     "logo_light_url", "logo_dark_url",
 ]
