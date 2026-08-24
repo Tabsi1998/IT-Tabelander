@@ -5,7 +5,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-BACKEND_HOST="127.0.0.1"
+BACKEND_HOST="0.0.0.0"
 BACKEND_PORT="8001"
 BACKEND_WORKERS="1"
 PYTHON_BIN="python3"
@@ -48,6 +48,42 @@ green()  { printf "\033[0;32m%s\033[0m\n" "$1"; }
 yellow() { printf "\033[0;33m%s\033[0m\n" "$1"; }
 red()    { printf "\033[0;31m%s\033[0m\n" "$1" >&2; }
 die()    { red "✗ $1"; exit 1; }
+
+reverse_proxy_host() {
+  if [[ "$BACKEND_HOST" != "0.0.0.0" && "$BACKEND_HOST" != "::" ]]; then
+    printf '%s\n' "$BACKEND_HOST"
+    return 0
+  fi
+
+  "$PYTHON_BIN" <<'PY'
+import ipaddress
+import socket
+
+addresses = []
+try:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.connect(("192.0.2.1", 9))
+        addresses.append(sock.getsockname()[0])
+except OSError:
+    pass
+
+try:
+    addresses.extend(
+        entry[4][0]
+        for entry in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+    )
+except OSError:
+    pass
+
+for address in dict.fromkeys(addresses):
+    parsed = ipaddress.ip_address(address)
+    if not parsed.is_loopback and not parsed.is_link_local:
+        print(address)
+        break
+else:
+    print("<SERVER-LAN-IP>")
+PY
+}
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || die "Benötigtes Programm fehlt: $1"
@@ -119,6 +155,7 @@ bootstrap_lock_dependencies() {
 
 [[ "$BACKEND_PORT" =~ ^[0-9]+$ ]] || die "BACKEND_PORT muss eine Zahl sein."
 [[ "$BACKEND_WORKERS" =~ ^[1-9][0-9]*$ ]] || die "BACKEND_WORKERS muss mindestens 1 sein."
+[[ -n "$BACKEND_HOST" ]] || die "BACKEND_HOST darf nicht leer sein."
 [[ "$STARTUP_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || die "STARTUP_TIMEOUT_SECONDS muss mindestens 1 sein."
 
 bootstrap_lock_dependencies
@@ -822,8 +859,9 @@ fi
 echo ""
 green "════════════════════════════════════════════"
 green " IT-Tabelander läuft und ist bereit"
-echo  " Website/Reverse-Proxy-Ziel: http://$HEALTHCHECK_HOST:$BACKEND_PORT"
-echo  " Healthcheck              : http://$HEALTHCHECK_HOST:$BACKEND_PORT/api/health"
+PROXY_TARGET_HOST="$(reverse_proxy_host)"
+echo  " Reverse Proxy (LAN)       : http://$PROXY_TARGET_HOST:$BACKEND_PORT"
+echo  " Lokaler Healthcheck       : http://$HEALTHCHECK_HOST:$BACKEND_PORT/api/health"
 echo  " Admin                     : /admin"
 echo  " Log                       : $LOG_DIR/backend.log"
 if [[ -n "$ADMIN_PASSWORD_DISPLAY" ]]; then

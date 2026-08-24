@@ -35,11 +35,19 @@ Admin-Zugang** ändern.
 
 ## Reverse Proxy
 
-Das einzige Proxy-Ziel ist standardmäßig:
+Wenn der Reverse Proxy auf einem anderen Gerät oder in einem Container läuft,
+ist das einzige Proxy-Ziel die LAN-IP dieses Servers mit Port `8001`, zum
+Beispiel:
 
 ```text
-http://127.0.0.1:8001
+http://192.168.2.123:8001
 ```
+
+`start.sh` erkennt die Server-IP und zeigt das konkrete Ziel am Ende an. Das
+Backend bindet standardmäßig an `0.0.0.0`, damit diese LAN-Verbindung möglich
+ist. `0.0.0.0` wird niemals in den Reverse Proxy eingetragen. Läuft Apache oder
+Nginx direkt auf demselben Server, kann dort weiterhin `127.0.0.1:8001`
+verwendet werden.
 
 Website, Admin und API laufen gemeinsam dort:
 
@@ -150,16 +158,19 @@ Verbindung benötigt.
 ### Selten nötig: `deploy.config`
 
 ```bash
-BACKEND_HOST="127.0.0.1"
+BACKEND_HOST="0.0.0.0"
 BACKEND_PORT="8001"
 PYTHON_BIN="python3"
 STARTUP_TIMEOUT_SECONDS="30"
 BACKEND_WORKERS="1"
 ```
 
-Der Port ist eine Prozess-/Reverse-Proxy-Einstellung und kann deshalb nicht im
-laufenden Online-Admin geändert werden. Mit dem Standardwert muss im Proxy nur
-`127.0.0.1:8001` eingetragen werden.
+Host und Port sind Prozess-/Reverse-Proxy-Einstellungen und können deshalb
+nicht im laufenden Online-Admin geändert werden. Bei einem getrennten Reverse
+Proxy wird die von `start.sh` ausgegebene `192.168.2.xxx:8001`-Adresse
+eingetragen. Der Port sollte in einer aktiven Firewall nur für die IP des
+Reverse Proxys oder zumindest nur für das lokale Netz freigegeben werden; eine
+Portweiterleitung am Internet-Router ist nicht erforderlich.
 
 ## Logs und Diagnose
 
