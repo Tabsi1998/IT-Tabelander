@@ -31,6 +31,12 @@ Production-ready premium dark-tech website for IT-Tabelander (Austria/Tirol): IT
 ## Config / secrets (env, not hardcoded)
 backend/.env: MONGO_URL, DB_NAME, JWT_SECRET, ADMIN_EMAIL/PASSWORD, DOLIBARR_ENABLED/BASE_URL/API_KEY/TIMEOUT, GOOGLE_PLACES_API_KEY, GOOGLE_PLACE_ID, GA_MEASUREMENT_ID.
 
+## Deployment (Self-Host, 2026-06)
+- `deploy.config` (zentral), `start.sh` / `stop.sh` / `update.sh` (Backend uvicorn :8001 + Frontend `serve` :3000 im Hintergrund, PID in `run/`, Logs in `logs/`). `update.sh` = git pull + Deps + Frontend-Build + Neustart.
+- README.md komplett neu: Architektur, Ubuntu-Schnellstart, Apache-Reverse-Proxy (neben bestehendem Dolibarr), Env-Vars, Admin, Integrationen, Troubleshooting.
+- `.gitignore` neu (venv/build/node_modules/run/logs/.env ausgeschlossen).
+- Hinweis: `emergentintegrations` + `litellm`-Zeile in requirements.txt werden vom Code NICHT genutzt; Skripte filtern sie beim Install automatisch. HTTPS ist Pflicht (Secure-Cookies für Admin-Login).
+
 ## Update 2026-06 (2) – PC Builder, echte Controller-Fotos, Theme & Cleanup
 - **Repo aufgeräumt**: alle alten PHP-Dateien + Verzeichnisse (`/private`, altes `/public`, `/docs`, `/tests`, Root-`*.php`, `sitemap.php`, `.htaccess`) entfernt. Nur noch React (`/frontend`) + FastAPI (`/backend`).
 - **Rename „Gaming-PC" → „PC Builder"** überall: Header-Nav, Home-Hero/Teaser, Footer, PC-Builder-Seite (Hero/SEO), Admin-Sidebar + Tab, Admin-Header. Route `/gaming-pc-konfigurator` bleibt (SEO), nur Anzeige geändert.

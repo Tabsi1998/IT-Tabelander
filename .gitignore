@@ -1,21 +1,29 @@
-# Runtime data can contain personal data or environment-specific state.
-/private/logs/
-/private/cache/
-
-# Local configuration and secrets.
+# ── Secrets & lokale Umgebungsdateien ────────────────────────────────────
 .env
 .env.*
 !.env.example
-
-# Local tooling noise.
-/.phpunit.cache/
-/.phpunit.result.cache
-/.idea/
-/.vscode/
-Thumbs.db
-.DS_Store
-*.env
-credentials.json
 *.pem
 *.key
+credentials.json
 .credentials
+
+# ── Python / Backend ─────────────────────────────────────────────────────
+backend/venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ── Node / Frontend ──────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/build/
+frontend/.yarn/
+
+# ── Laufzeit (von start.sh erzeugt) ──────────────────────────────────────
+run/
+logs/
+
+# ── Tooling-Rauschen ─────────────────────────────────────────────────────
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
