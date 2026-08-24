@@ -680,13 +680,13 @@ validate_backend_runtime() {
 check_mongodb() {
   if ! (
     cd "$BACKEND_DIR"
-    "$VENV_DIR/bin/python" <<'PY'
+    "$VENV_DIR/bin/python" - "$BACKEND_DIR/.env" <<'PY'
 import asyncio
 import sys
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(sys.argv[1])
 
 from app.db import close_client, get_db
 
