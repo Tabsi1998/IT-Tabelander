@@ -14,6 +14,8 @@ REFRESH_DAYS = 7
 
 
 def hash_password(password: str) -> str:
+    if len(password.encode("utf-8")) > 72:
+        raise HTTPException(status_code=422, detail="Passwort darf höchstens 72 Bytes lang sein")
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 

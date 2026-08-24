@@ -5,8 +5,9 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from ..db import get_db, now_utc, serialize
-from ..models import (ForgotPasswordInput, LoginInput, ResetPasswordInput,
-                      UserCreate)
+from ..models import (AccountUpdate, ForgotPasswordInput, LoginInput,
+                      ResetPasswordInput, UserCreate)
+from ..runtime_env import update_backend_env
 from ..security import (clear_auth_cookies, create_access_token,
                         create_refresh_token, get_current_user, hash_password,
                         require_admin, set_auth_cookies, verify_password)
@@ -19,9 +20,10 @@ LOCK_MINUTES = 15
 
 def _client_ip(request: Request) -> str:
     xff = request.headers.get("x-forwarded-for")
-    if xff:
+    peer = request.client.host if request.client else "unknown"
+    if xff and peer in ("127.0.0.1", "::1"):
         return xff.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    return peer
 
 
 def _as_aware(dt):
@@ -83,6 +85,37 @@ async def logout(response: Response, _: dict = Depends(get_current_user)):
 @router.get("/me")
 async def me(user: dict = Depends(get_current_user)):
     return {"user": serialize(user)}
+
+
+@router.put("/account")
+async def update_account(payload: AccountUpdate,
+                         current_user: dict = Depends(get_current_user)):
+    db = get_db()
+    user_id = ObjectId(current_user["_id"])
+    user = await db.users.find_one({"_id": user_id})
+    if not user or not verify_password(payload.current_password, user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Aktuelles Passwort ist falsch")
+
+    updates = {}
+    if payload.email:
+        email = str(payload.email).lower().strip()
+        owner = await db.users.find_one({"email": email})
+        if owner and owner["_id"] != user_id:
+            raise HTTPException(status_code=400, detail="E-Mail bereits vergeben")
+        updates["email"] = email
+    if payload.new_password:
+        if len(payload.new_password.encode("utf-8")) > 72:
+            raise HTTPException(status_code=400, detail="Passwort darf höchstens 72 Bytes lang sein")
+        updates["password_hash"] = hash_password(payload.new_password)
+    if not updates:
+        raise HTTPException(status_code=400, detail="Keine Änderung angegeben")
+
+    if "email" in updates:
+        update_backend_env({"ADMIN_EMAIL": updates["email"]})
+    updates["updated_at"] = now_utc()
+    await db.users.update_one({"_id": user_id}, {"$set": updates})
+    updated = await db.users.find_one({"_id": user_id})
+    return {"user": serialize(updated)}
 
 
 @router.post("/refresh")

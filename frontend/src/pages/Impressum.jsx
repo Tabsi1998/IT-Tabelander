@@ -6,7 +6,6 @@ import PageHero from "../components/PageHero";
 
 export default function Impressum() {
   const { settings } = useSettings();
-  const hasData = settings.company_name && (settings.address || settings.email);
 
   return (
     <>

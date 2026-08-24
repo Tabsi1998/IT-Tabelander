@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../../lib/api";
@@ -32,12 +32,12 @@ export default function AdminBuilder() {
     api.get("/admin/dolibarr/products").then(({ data }) => setDolProds(data)).catch(() => {});
   }, []);
 
-  const load = () => {
+  const load = useCallback(() => {
     if (!ck) return;
     api.get(`/admin/builder/${ck}/categories`).then(({ data }) => setCats(data)).catch(() => setCats([]));
     api.get(`/admin/builder/${ck}/products`).then(({ data }) => setProds(data)).catch(() => setProds([]));
-  };
-  useEffect(() => { load(); }, [ck]);
+  }, [ck]);
+  useEffect(() => { load(); }, [load]);
 
   const openEdit = (p, catKey) => {
     const d = p ? { ...p } : emptyProduct(ck, catKey);

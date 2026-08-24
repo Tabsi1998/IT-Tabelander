@@ -13,46 +13,69 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  php:
-    name: PHP ${{ matrix.php-version }}
+  backend:
+    name: Backend (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        php-version: ['8.2', '8.4', '8.5']
+        python-version: ['3.10', '3.14']
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
-          php-version: ${{ matrix.php-version }}
-          coverage: none
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
 
-      - name: Lint PHP
-        run: find . -type f -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
+      - name: Install backend dependencies
+        run: python -m pip install --requirement backend/requirements-dev.txt
 
-      - name: Run tests
-        run: php tests/run.php
-
-      - name: Check JavaScript syntax
-        run: find public/assets/js -type f -name '*.js' -print0 | xargs -0 -n1 node --check
-
-      - name: Validate JSON
-        run: php -r 'foreach (glob("private/data/*.json") as $file) { json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR); }'
-
-      - name: Validate editable website content
-        run: php private/tools/content-check.php
-
-      - name: Validate generated sitemap XML
+      - name: Validate dependencies and Python sources
         run: |
-          php sitemap.php > /tmp/it-tabelander-sitemap.xml
-          php -r '$xml = simplexml_load_file("/tmp/it-tabelander-sitemap.xml"); if ($xml === false) { exit(1); }'
+          python -m pip check
+          python -m compileall -q backend
+          cd backend
+          python -c "import server; print(server.app.title)"
+          python -m pytest tests/test_unit_runtime.py -q -p no:cacheprovider
 
-      - name: Reject tracked runtime data
-        run: test -z "$(git ls-files 'private/logs/**' 'private/cache/**')"
+  frontend:
+    name: Frontend (Node 24)
+    runs-on: ubuntu-latest
 
-      - name: Enforce image budget
-        run: test -z "$(find public/assets/img -type f -size +500k -print)"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install pinned Yarn
+        run: npm install --global yarn@1.22.22
+
+      - name: Install from lockfile
+        working-directory: frontend
+        run: yarn install --frozen-lockfile --non-interactive --production=false
+
+      - name: Build production frontend
+        working-directory: frontend
+        run: yarn build
+
+  deployment-scripts:
+    name: Deployment scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check Bash syntax and whitespace
+        run: |
+          bash -n start.sh stop.sh update.sh
+          git diff --check

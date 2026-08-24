@@ -6,24 +6,65 @@ import Skeleton from "../../components/ui/skeleton";
 import { AdminHeader, Panel, Field } from "../../components/admin/AdminUI";
 import { Button } from "../../components/ui/button";
 import { Input, Textarea } from "../../components/ui/input";
+import { useAuth } from "../../context/AuthContext";
+
+const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
 export default function AdminSettings() {
+  const { user, refresh } = useAuth();
   const [s, setS] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [account, setAccount] = useState({ email: "", current_password: "", new_password: "", confirm_password: "" });
 
   useEffect(() => {
-    api.get("/admin/settings").then(({ data }) => setS({ opening_hours: [], social_links: {}, ...data })).catch(() => setS({}));
+    api.get("/admin/settings").then(({ data }) => setS({
+      ...data,
+      social_links: data.social_links || {},
+      opening_hours: WEEKDAYS.map((day) => data.opening_hours?.find((item) => item.day === day) || { day, hours: "" }),
+    })).catch(() => setS({ opening_hours: WEEKDAYS.map((day) => ({ day, hours: "" })), social_links: {} }));
   }, []);
+
+  useEffect(() => {
+    if (user?.email) setAccount((x) => ({ ...x, email: user.email }));
+  }, [user]);
 
   const set = (k) => (e) => setS((x) => ({ ...x, [k]: e.target.value }));
   const setSocial = (k) => (e) => setS((x) => ({ ...x, social_links: { ...x.social_links, [k]: e.target.value } }));
+  const setHours = (day) => (e) => setS((x) => ({ ...x, opening_hours: x.opening_hours.map((item) => item.day === day ? { ...item, hours: e.target.value } : item) }));
 
   const save = async () => {
     setSaving(true);
     try {
-      await api.put("/admin/settings", s);
+      const payload = { ...s, opening_hours: s.opening_hours.filter((item) => item.hours.trim()) };
+      const { data } = await api.put("/admin/settings", payload);
+      setS({
+        ...data,
+        social_links: data.social_links || {},
+        opening_hours: WEEKDAYS.map((day) => data.opening_hours?.find((item) => item.day === day) || { day, hours: "" }),
+      });
       toast.success("Einstellungen gespeichert");
     } catch { toast.error("Fehler beim Speichern"); } finally { setSaving(false); }
+  };
+
+  const saveAccount = async () => {
+    if (account.new_password && account.new_password !== account.confirm_password) {
+      toast.error("Die neuen Passwörter stimmen nicht überein");
+      return;
+    }
+    setSavingAccount(true);
+    try {
+      await api.put("/auth/account", {
+        current_password: account.current_password,
+        email: account.email || undefined,
+        new_password: account.new_password || undefined,
+      });
+      await refresh();
+      setAccount((x) => ({ ...x, current_password: "", new_password: "", confirm_password: "" }));
+      toast.success("Admin-Zugang aktualisiert");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Admin-Zugang konnte nicht geändert werden");
+    } finally { setSavingAccount(false); }
   };
 
   if (!s) return (<><AdminHeader title="Einstellungen" /><Skeleton className="h-96" /></>);
@@ -49,6 +90,7 @@ export default function AdminSettings() {
               <Field label="Ort"><Input value={s.city || ""} onChange={set("city")} /></Field>
               <Field label="Region"><Input value={s.region || ""} onChange={set("region")} /></Field>
             </div>
+            <Field label="Land"><Input value={s.country || ""} onChange={set("country")} /></Field>
             <Field label="Servicegebiet"><Input value={s.service_area || ""} onChange={set("service_area")} /></Field>
           </div>
         </Panel>
@@ -59,8 +101,9 @@ export default function AdminSettings() {
             <Field label="SEO Standard-Titel"><Input value={s.seo_default_title || ""} onChange={set("seo_default_title")} /></Field>
             <Field label="SEO Standard-Beschreibung"><Textarea value={s.seo_default_description || ""} onChange={set("seo_default_description")} /></Field>
             <Field label="Google Analytics 4 Measurement ID"><Input value={s.ga_measurement_id || ""} onChange={set("ga_measurement_id")} placeholder="G-XXXXXXX" data-testid="settings-ga" /></Field>
+            <Field label="Öffentliche Website-URL"><Input value={s.canonical_base_url || ""} onChange={set("canonical_base_url")} placeholder="https://it.tabelander.co.at" /></Field>
             <Field label="Google Place ID (für Reviews)"><Input value={s.google_place_id || ""} onChange={set("google_place_id")} placeholder="ChIJ..." /></Field>
-            <p className="text-xs text-faint">Der Google Places API-Key wird ausschließlich serverseitig (Env) gesetzt und nie im Browser gespeichert.</p>
+            <p className="text-xs text-faint">Die öffentliche URL wird für Sitemap und robots.txt verwendet.</p>
           </div>
         </Panel>
 
@@ -75,12 +118,40 @@ export default function AdminSettings() {
         </Panel>
 
         <Panel>
-          <h3 className="mb-4 font-semibold text-ink">Integrationen (serverseitig, nie im Browser)</h3>
+          <h3 className="mb-4 font-semibold text-ink">Integrationen</h3>
+          <p className="mb-3 text-xs text-faint">API-Keys sind reine Schreibfelder. Gespeicherte Werte werden niemals wieder an den Browser ausgegeben.</p>
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={!!s.dolibarr_enabled} onChange={(e) => setS((x) => ({ ...x, dolibarr_enabled: e.target.checked }))} className="h-4 w-4 accent-[#F26522]" data-testid="settings-dolibarr-enabled" /> Dolibarr aktivieren</label>
             <Field label="Dolibarr Basis-URL"><Input value={s.dolibarr_base_url || ""} onChange={set("dolibarr_base_url")} placeholder="https://erp.tabelander.co.at" /></Field>
-            <Field label="Dolibarr API-Key (DOLAPIKEY)"><Input type="password" value={s.dolibarr_api_key || ""} onChange={set("dolibarr_api_key")} placeholder="••••••" data-testid="settings-dolibarr-key" /></Field>
-            <Field label="Google Places API-Key"><Input type="password" value={s.google_places_api_key || ""} onChange={set("google_places_api_key")} placeholder="••••••" /></Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Timeout in Sekunden"><Input type="number" min="1" max="60" value={s.dolibarr_timeout_seconds || 8} onChange={(e) => setS((x) => ({ ...x, dolibarr_timeout_seconds: Number(e.target.value) }))} /></Field>
+              <Field label="Ländercode"><Input maxLength={2} value={s.dolibarr_country_code || "AT"} onChange={(e) => setS((x) => ({ ...x, dolibarr_country_code: e.target.value.toUpperCase() }))} /></Field>
+            </div>
+            <Field label={`Dolibarr API-Key (${s.clear_dolibarr_api_key ? "wird entfernt" : s.dolibarr_api_key_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.dolibarr_api_key || ""} onChange={(e) => setS((x) => ({ ...x, dolibarr_api_key: e.target.value, clear_dolibarr_api_key: false }))} placeholder={s.dolibarr_api_key_configured ? "Neuen Key eingeben, um ihn zu ersetzen" : "DOLAPIKEY"} autoComplete="new-password" data-testid="settings-dolibarr-key" /></Field>
+            {s.dolibarr_api_key_configured && <Button type="button" variant="outline" onClick={() => setS((x) => ({ ...x, dolibarr_api_key: "", clear_dolibarr_api_key: true }))}>Dolibarr-Key entfernen</Button>}
+            <Field label={`Google Places API-Key (${s.clear_google_places_api_key ? "wird entfernt" : s.google_places_api_key_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.google_places_api_key || ""} onChange={(e) => setS((x) => ({ ...x, google_places_api_key: e.target.value, clear_google_places_api_key: false }))} placeholder={s.google_places_api_key_configured ? "Neuen Key eingeben, um ihn zu ersetzen" : "API-Key"} autoComplete="new-password" /></Field>
+            {s.google_places_api_key_configured && <Button type="button" variant="outline" onClick={() => setS((x) => ({ ...x, google_places_api_key: "", clear_google_places_api_key: true }))}>Google-Key entfernen</Button>}
+          </div>
+        </Panel>
+
+        <Panel>
+          <h3 className="mb-4 font-semibold text-ink">Öffnungszeiten</h3>
+          <div className="space-y-2">
+            {s.opening_hours.map((item) => (
+              <Field key={item.day} label={item.day}><Input value={item.hours || ""} onChange={setHours(item.day)} placeholder="z. B. 09:00–17:00 oder nach Vereinbarung" /></Field>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel>
+          <h3 className="mb-4 font-semibold text-ink">Admin-Zugang</h3>
+          <p className="mb-3 text-xs text-faint">Hier änderst du die automatisch angelegten Start-Zugangsdaten. Das aktuelle Passwort ist zur Bestätigung erforderlich.</p>
+          <div className="space-y-3">
+            <Field label="Login-E-Mail"><Input type="email" value={account.email} onChange={(e) => setAccount((x) => ({ ...x, email: e.target.value }))} autoComplete="email" /></Field>
+            <Field label="Aktuelles Passwort"><Input type="password" value={account.current_password} onChange={(e) => setAccount((x) => ({ ...x, current_password: e.target.value }))} autoComplete="current-password" /></Field>
+            <Field label="Neues Passwort (optional, mindestens 12 Zeichen)"><Input type="password" value={account.new_password} onChange={(e) => setAccount((x) => ({ ...x, new_password: e.target.value }))} autoComplete="new-password" /></Field>
+            <Field label="Neues Passwort wiederholen"><Input type="password" value={account.confirm_password} onChange={(e) => setAccount((x) => ({ ...x, confirm_password: e.target.value }))} autoComplete="new-password" /></Field>
+            <Button onClick={saveAccount} disabled={savingAccount || !account.current_password}>{savingAccount ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} Zugang speichern</Button>
           </div>
         </Panel>
 
@@ -108,6 +179,7 @@ export default function AdminSettings() {
           <div className="space-y-3">
             <Field label="Impressum (HTML)"><Textarea value={s.impressum_html || ""} onChange={set("impressum_html")} className="min-h-[120px]" /></Field>
             <Field label="Datenschutz (HTML)"><Textarea value={s.datenschutz_html || ""} onChange={set("datenschutz_html")} className="min-h-[120px]" /></Field>
+            <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={!!s.legal_reviewed} onChange={(e) => setS((x) => ({ ...x, legal_reviewed: e.target.checked }))} className="h-4 w-4 accent-[#F26522]" /> Rechtliche Texte wurden geprüft</label>
           </div>
         </Panel>
       </div>

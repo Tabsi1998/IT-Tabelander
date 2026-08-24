@@ -3,7 +3,7 @@ real service catalogue, FAQs and demo configurator data (clearly flagged)."""
 import os
 
 from .db import get_db, now_utc
-from .security import hash_password, verify_password
+from .security import hash_password
 
 
 async def ensure_indexes():
@@ -18,17 +18,23 @@ async def ensure_indexes():
 
 async def seed_admin():
     db = get_db()
-    email = os.environ.get("ADMIN_EMAIL", "admin@it-tabelander.at")
+    email = os.environ.get("ADMIN_EMAIL", "admin@it-tabelander.at").lower().strip()
     password = os.environ.get("ADMIN_PASSWORD", "changeme123")
-    existing = await db.users.find_one({"email": email})
+    existing = await db.users.find_one({"role": "super_admin"})
+    if existing is None:
+        existing = await db.users.find_one({"email": email})
     if existing is None:
         await db.users.insert_one({
             "email": email, "password_hash": hash_password(password),
             "name": "Administrator", "role": "super_admin", "created_at": now_utc(),
         })
-    elif not verify_password(password, existing["password_hash"]):
-        await db.users.update_one({"email": email},
-                                  {"$set": {"password_hash": hash_password(password)}})
+    elif os.environ.get("IT_TABELANDER_RESET_ADMIN", "0") == "1":
+        updates = {"password_hash": hash_password(password), "role": "super_admin"}
+        email_owner = await db.users.find_one({"email": email})
+        if email_owner is None or email_owner["_id"] == existing["_id"]:
+            updates["email"] = email
+        await db.users.update_one({"_id": existing["_id"]}, {"$set": updates})
+    os.environ.pop("IT_TABELANDER_RESET_ADMIN", None)
 
 
 async def seed_settings():
@@ -49,6 +55,9 @@ async def seed_settings():
         "opening_hours": [],
         "social_links": {},
         "ga_measurement_id": os.environ.get("GA_MEASUREMENT_ID", ""),
+        "canonical_base_url": os.environ.get("CANONICAL_BASE_URL", "https://it.tabelander.co.at"),
+        "dolibarr_timeout_seconds": 8,
+        "dolibarr_country_code": "AT",
         "google_place_id": os.environ.get("GOOGLE_PLACE_ID", ""),
         "seo_default_title": "IT-Tabelander – IT-Service, Reparatur & Gaming-Hardware in Tirol",
         "seo_default_description": "Professionelle IT-Technik, Reparatur und individuelle Gaming-Hardware aus einer Hand. CompTIA A+ zertifiziert, Ausbildung am WIFI Tirol.",

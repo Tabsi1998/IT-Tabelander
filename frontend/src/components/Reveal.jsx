@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 
 export function Reveal({ children, delay = 0, className, as: Comp = "div" }) {

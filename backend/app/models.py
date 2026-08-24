@@ -1,5 +1,6 @@
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr, Field
+from urllib.parse import urlparse
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 # ---------- Auth ----------
@@ -10,7 +11,7 @@ class LoginInput(BaseModel):
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=12, max_length=72)
     name: str
     role: str = "staff"
 
@@ -21,7 +22,13 @@ class ForgotPasswordInput(BaseModel):
 
 class ResetPasswordInput(BaseModel):
     token: str
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=12, max_length=72)
+
+
+class AccountUpdate(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
+    email: Optional[EmailStr] = None
+    new_password: Optional[str] = Field(default=None, min_length=12, max_length=72)
 
 
 # ---------- Services ----------
@@ -216,11 +223,16 @@ class SettingsInput(BaseModel):
     opening_hours: Optional[List[dict]] = None
     social_links: Optional[dict] = None
     ga_measurement_id: Optional[str] = None
+    canonical_base_url: Optional[str] = None
     google_place_id: Optional[str] = None
     google_places_api_key: Optional[str] = None
+    clear_google_places_api_key: Optional[bool] = None
     dolibarr_enabled: Optional[bool] = None
     dolibarr_base_url: Optional[str] = None
     dolibarr_api_key: Optional[str] = None
+    clear_dolibarr_api_key: Optional[bool] = None
+    dolibarr_timeout_seconds: Optional[float] = Field(default=None, ge=1, le=60)
+    dolibarr_country_code: Optional[str] = Field(default=None, min_length=2, max_length=2)
     logo_light_url: Optional[str] = None
     logo_dark_url: Optional[str] = None
     seo_default_title: Optional[str] = None
@@ -231,3 +243,14 @@ class SettingsInput(BaseModel):
     impressum_html: Optional[str] = None
     datenschutz_html: Optional[str] = None
     legal_reviewed: Optional[bool] = None
+
+    @field_validator("canonical_base_url")
+    @classmethod
+    def validate_canonical_base_url(cls, value):
+        if not value:
+            return value
+        cleaned = value.strip().rstrip("/")
+        parsed = urlparse(cleaned)
+        if parsed.scheme not in ("https", "http") or not parsed.netloc or "\n" in cleaned or "\r" in cleaned:
+            raise ValueError("Website-URL muss eine vollständige http(s)-URL sein")
+        return cleaned

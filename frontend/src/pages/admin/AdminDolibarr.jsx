@@ -48,7 +48,7 @@ export default function AdminDolibarr() {
           <p className="mt-1 text-xs text-faint">{conn.message}</p>
           {!status.enabled && (
             <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">
-              API-Key in backend/.env (DOLIBARR_API_KEY) & DOLIBARR_ENABLED=true setzen.
+              Dolibarr unter „Einstellungen“ aktivieren und dort URL sowie API-Key hinterlegen.
             </p>
           )}
         </Panel>

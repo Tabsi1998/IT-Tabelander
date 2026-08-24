@@ -433,12 +433,15 @@ class TestSettings:
         assert r.status_code == 200
         d = r.json()
         assert d["company_name"] == "IT-Tabelander"
-        for secret in ("google_place_id", "dolibarr_api_key", "jwt_secret"):
+        for secret in ("google_place_id", "google_places_api_key", "dolibarr_api_key", "jwt_secret"):
             assert secret not in d
 
     def test_admin_settings_update(self, admin_client):
         cur = admin_client.get(f"{BASE_URL}/api/admin/settings", timeout=30)
         assert cur.status_code == 200
+        for secret in ("google_places_api_key", "dolibarr_api_key"):
+            assert secret not in cur.json()
+            assert isinstance(cur.json()[f"{secret}_configured"], bool)
         original_phone = cur.json().get("phone") or ""
         u = admin_client.put(f"{BASE_URL}/api/admin/settings",
                              json={"phone": "+43 660 TEST"}, timeout=30)

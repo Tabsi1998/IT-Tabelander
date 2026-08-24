@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { Trash2, Eye, ChevronDown } from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
+import { Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import api, { mediaUrl } from "../../lib/api";
+import api from "../../lib/api";
 import Skeleton from "../../components/ui/skeleton";
 import { AdminHeader, Panel, Empty } from "../../components/admin/AdminUI";
 import { Select } from "../../components/ui/input";
@@ -18,11 +18,11 @@ export default function AdminRepairs() {
   const [expanded, setExpanded] = useState(null);
   const [filter, setFilter] = useState("");
 
-  const load = () => {
+  const load = useCallback(() => {
     const q = filter ? `?status=${filter}` : "";
     api.get(`/admin/repairs${q}`).then(({ data }) => setItems(data)).catch(() => setItems([]));
-  };
-  useEffect(() => { load(); }, [filter]);
+  }, [filter]);
+  useEffect(() => { load(); }, [load]);
 
   const setStatus = async (id, status) => {
     try {

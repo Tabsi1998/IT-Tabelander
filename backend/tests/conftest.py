@@ -1,16 +1,20 @@
 import os
-import re
 from pathlib import Path
 
 import pytest
 import requests
 from dotenv import dotenv_values
 
-frontend_env = dotenv_values("/app/frontend/.env")
-_base = os.environ.get("REACT_APP_BACKEND_URL") or frontend_env.get("REACT_APP_BACKEND_URL")
-if not _base:
-    raise RuntimeError("REACT_APP_BACKEND_URL missing")
-BASE_URL = _base.rstrip("/")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+FRONTEND_ENV_PATH = REPO_ROOT / "frontend" / ".env"
+BACKEND_ENV_PATH = REPO_ROOT / "backend" / ".env"
+
+frontend_env = dotenv_values(FRONTEND_ENV_PATH)
+BASE_URL = (
+    os.environ.get("REACT_APP_BACKEND_URL")
+    or frontend_env.get("REACT_APP_BACKEND_URL")
+    or "http://localhost:8001"
+).rstrip("/")
 
 
 @pytest.fixture(scope="session")
@@ -20,15 +24,12 @@ def base_url():
 
 @pytest.fixture(scope="session")
 def test_credentials():
-    p = Path("/app/memory/test_credentials.md")
-    if not p.exists():
-        pytest.skip("Missing /app/memory/test_credentials.md")
-    content = p.read_text(encoding="utf-8")
-    e = re.search(r'(?im)^\s*(?:[-*]\s*)?(?:\*\*)?email(?:\*\*)?\s*:\s*`?([^`\s]+)', content)
-    pw = re.search(r'(?im)^\s*(?:[-*]\s*)?(?:\*\*)?password(?:\*\*)?\s*:\s*`?([^`\s]+)', content)
-    if not e or not pw:
-        pytest.skip("No credentials found in test_credentials.md")
-    return {"email": e.group(1), "password": pw.group(1)}
+    env = dotenv_values(BACKEND_ENV_PATH)
+    email = str(env.get("ADMIN_EMAIL") or "").strip()
+    password = str(env.get("ADMIN_PASSWORD") or "").strip()
+    if not email or not password:
+        pytest.skip(f"ADMIN_EMAIL/ADMIN_PASSWORD fehlen in {BACKEND_ENV_PATH}")
+    return {"email": email, "password": password}
 
 
 @pytest.fixture(scope="session")

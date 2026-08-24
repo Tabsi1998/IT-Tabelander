@@ -21,14 +21,13 @@ async def get_config() -> dict:
     enabled_flag = s.get("dolibarr_enabled")
     if enabled_flag is None:
         enabled_flag = os.environ.get("DOLIBARR_ENABLED", "false").lower() == "true"
-    return {"api_key": api_key, "base": base, "enabled": bool(enabled_flag) and bool(api_key)}
-
-
-def _timeout() -> float:
     try:
-        return float(os.environ.get("DOLIBARR_TIMEOUT_SECONDS", "8"))
-    except ValueError:
-        return 8.0
+        timeout = float(s.get("dolibarr_timeout_seconds") or os.environ.get("DOLIBARR_TIMEOUT_SECONDS", "8"))
+    except (TypeError, ValueError):
+        timeout = 8.0
+    country_code = str(s.get("dolibarr_country_code") or os.environ.get("DOLIBARR_COUNTRY_CODE", "AT")).upper()
+    return {"api_key": api_key, "base": base, "enabled": bool(enabled_flag) and bool(api_key),
+            "timeout": min(max(timeout, 1), 60), "country_code": country_code}
 
 
 def _headers(cfg):
@@ -45,7 +44,7 @@ async def test_connection() -> dict:
         return {"connected": False, "demo": True,
                 "message": "Dolibarr im Demo-Modus. API-Key in den Einstellungen hinterlegen."}
     try:
-        async with httpx.AsyncClient(timeout=_timeout()) as c:
+        async with httpx.AsyncClient(timeout=cfg["timeout"]) as c:
             r = await c.get(f"{cfg['base']}/api/index.php/status", headers=_headers(cfg))
             r.raise_for_status()
             return {"connected": True, "demo": False, "message": "Verbindung erfolgreich."}
@@ -74,7 +73,7 @@ async def sync_products() -> dict:
                "updated_count": 0, "started_at": started, "finished_at": now_utc()}
         await db.sync_logs.insert_one(dict(log)); return log
     try:
-        async with httpx.AsyncClient(timeout=_timeout()) as c:
+        async with httpx.AsyncClient(timeout=cfg["timeout"]) as c:
             r = await c.get(f"{cfg['base']}/api/index.php/products",
                             headers=_headers(cfg), params={"limit": 200, "sortfield": "t.ref"})
             r.raise_for_status(); products = r.json()
@@ -104,7 +103,7 @@ async def _create_thirdparty(client, cfg, contact) -> str | None:
             "phone": contact.get("phone", ""),
             "client": "2",           # 2 = prospect
             "code_client": "-1",
-            "country_code": os.environ.get("DOLIBARR_COUNTRY_CODE", "AT"),
+            "country_code": cfg["country_code"],
         }
         r = await client.post(f"{cfg['base']}/api/index.php/thirdparties",
                               headers=_headers(cfg), json=payload)
@@ -122,7 +121,7 @@ async def create_lead(data: dict, kind: str = "repair") -> dict:
         return {"created": False, "demo": True, "thirdparty_id": None, "ticket_ref": None}
     contact = data.get("contact", {})
     try:
-        async with httpx.AsyncClient(timeout=_timeout()) as client:
+        async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
             tp_id = await _create_thirdparty(client, cfg, contact)
             ticket = {
                 "subject": data.get("subject", "Website-Anfrage"),

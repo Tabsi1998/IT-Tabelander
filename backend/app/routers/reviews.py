@@ -12,7 +12,9 @@ router = APIRouter(prefix="/api", tags=["reviews"])
 @router.get("/reviews")
 async def list_reviews():
     """Public: only visible reviews (admin-curated). No fabricated data."""
-    docs = await get_db().reviews.find({"visible": True}).sort([("featured", -1), ("sort", 1)]).to_list(100)
+    db = get_db()
+    docs = await db.reviews.find({"visible": True}).sort([("featured", -1), ("sort", 1)]).to_list(100)
+    settings = await db.settings.find_one({"_id": "site"}) or {}
     reviews = [serialize(d) for d in docs]
     visible = [r for r in reviews if not r.get("is_demo")]
     avg = round(sum(r["rating"] for r in visible) / len(visible), 1) if visible else None
@@ -20,8 +22,10 @@ async def list_reviews():
         "reviews": reviews,
         "average": avg,
         "count": len(visible),
-        "google_place_configured": bool(os.environ.get("GOOGLE_PLACES_API_KEY", "").strip()
-                                         and os.environ.get("GOOGLE_PLACE_ID", "").strip()),
+        "google_place_configured": bool(
+            (settings.get("google_places_api_key") or os.environ.get("GOOGLE_PLACES_API_KEY", "")).strip()
+            and (settings.get("google_place_id") or os.environ.get("GOOGLE_PLACE_ID", "")).strip()
+        ),
     }
 
 

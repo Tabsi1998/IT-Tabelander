@@ -1,14 +1,22 @@
 """Iteration-2 regression tests: lockout 429 + clear, admin id guards, PC per-category images, auth playbook checks."""
 import os
 import uuid
+from pathlib import Path
 
 import pytest
 import requests
 from dotenv import dotenv_values
 
-frontend_env = dotenv_values("/app/frontend/.env")
-BASE_URL = (os.environ.get("REACT_APP_BACKEND_URL")
-            or frontend_env.get("REACT_APP_BACKEND_URL")).rstrip("/")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ENV_PATH = REPO_ROOT / "backend" / ".env"
+FRONTEND_ENV_PATH = REPO_ROOT / "frontend" / ".env"
+
+frontend_env = dotenv_values(FRONTEND_ENV_PATH)
+BASE_URL = (
+    os.environ.get("REACT_APP_BACKEND_URL")
+    or frontend_env.get("REACT_APP_BACKEND_URL")
+    or "http://localhost:8001"
+).rstrip("/")
 
 FAKE_OID = "0123456789abcdef01234567"   # valid ObjectId format, non-existent
 BAD_OID = "not-an-objectid"
@@ -18,37 +26,40 @@ BAD_OID = "not-an-objectid"
 class TestLockout:
     def test_real_admin_lockout_then_recovery(self, test_credentials):
         """5 wrong passwords -> 401s, 6th -> 429 (not 500). Then clear attempts and login works."""
-        email = test_credentials["email"]
-        codes = []
-        for _ in range(5):
-            r = requests.post(f"{BASE_URL}/api/auth/login",
-                              json={"email": email, "password": "DefinitelyWrong123!"}, timeout=30)
-            codes.append(r.status_code)
-        r6 = requests.post(f"{BASE_URL}/api/auth/login",
-                           json={"email": email, "password": "DefinitelyWrong123!"}, timeout=30)
-        codes.append(r6.status_code)
-        assert 500 not in codes, f"500 returned during lockout flow: {codes}"
-        assert codes[:5] == [401] * 5, codes
-        assert codes[5] == 429, f"expected 429 lockout, got {codes}"
-
-        # While locked, even the CORRECT password must be blocked with 429 (not 500)
-        rl = requests.post(f"{BASE_URL}/api/auth/login", json=test_credentials, timeout=30)
-        assert rl.status_code == 429, f"expected 429 while locked, got {rl.status_code}"
-
-        # cleanup: clear login_attempts so admin stays usable
         import asyncio
-        import sys
-        sys.path.insert(0, "/app/backend")
-        from motor.motor_asyncio import AsyncIOMotorClient
+        from pymongo import AsyncMongoClient
 
         async def _clear():
-            env = dotenv_values("/app/backend/.env")
-            cli = AsyncIOMotorClient(env["MONGO_URL"])
-            res = await cli[env["DB_NAME"]].login_attempts.delete_many({})
-            cli.close()
-            return res.deleted_count
-        cleared = asyncio.get_event_loop().run_until_complete(_clear()) \
-            if False else asyncio.run(_clear())
+            env = dotenv_values(BACKEND_ENV_PATH)
+            cli = AsyncMongoClient(env["MONGO_URL"])
+            try:
+                res = await cli[env["DB_NAME"]].login_attempts.delete_many({})
+                return res.deleted_count
+            finally:
+                await cli.close()
+
+        email = test_credentials["email"]
+        codes = []
+        cleared = 0
+        try:
+            for _ in range(5):
+                r = requests.post(f"{BASE_URL}/api/auth/login",
+                                  json={"email": email, "password": "DefinitelyWrong123!"}, timeout=30)
+                codes.append(r.status_code)
+            r6 = requests.post(f"{BASE_URL}/api/auth/login",
+                               json={"email": email, "password": "DefinitelyWrong123!"}, timeout=30)
+            codes.append(r6.status_code)
+            assert 500 not in codes, f"500 returned during lockout flow: {codes}"
+            assert codes[:5] == [401] * 5, codes
+            assert codes[5] == 429, f"expected 429 lockout, got {codes}"
+
+            # While locked, even the CORRECT password must be blocked with 429 (not 500)
+            rl = requests.post(f"{BASE_URL}/api/auth/login", json=test_credentials, timeout=30)
+            assert rl.status_code == 429, f"expected 429 while locked, got {rl.status_code}"
+        finally:
+            # Always clear attempts so a failed assertion/request cannot leave the admin locked.
+            cleared = asyncio.run(_clear())
+
         assert cleared >= 1
 
         ok = requests.post(f"{BASE_URL}/api/auth/login", json=test_credentials, timeout=30)
@@ -59,14 +70,17 @@ class TestLockout:
 class TestAuthPlaybook:
     def test_bcrypt_hash_format(self):
         import asyncio
-        from motor.motor_asyncio import AsyncIOMotorClient
+        from pymongo import AsyncMongoClient
 
         async def _get():
-            env = dotenv_values("/app/backend/.env")
-            cli = AsyncIOMotorClient(env["MONGO_URL"])
-            u = await cli[env["DB_NAME"]].users.find_one({"email": env["ADMIN_EMAIL"].lower()})
-            cli.close()
-            return u
+            env = dotenv_values(BACKEND_ENV_PATH)
+            cli = AsyncMongoClient(env["MONGO_URL"])
+            try:
+                return await cli[env["DB_NAME"]].users.find_one(
+                    {"email": env["ADMIN_EMAIL"].lower()}
+                )
+            finally:
+                await cli.close()
         user = asyncio.run(_get())
         assert user is not None, "admin user not seeded"
         assert user["password_hash"].startswith("$2b$"), user["password_hash"][:10]
@@ -81,7 +95,7 @@ class TestAuthPlaybook:
 
     def test_cors_allows_credentials_with_origin(self):
         """Verified against the app itself (ingress intercepts OPTIONS and answers with '*')."""
-        origin = frontend_env.get("REACT_APP_BACKEND_URL")
+        origin = frontend_env.get("REACT_APP_BACKEND_URL") or BASE_URL
         r = requests.options("http://localhost:8001/api/auth/login",
                              headers={"Origin": origin,
                                       "Access-Control-Request-Method": "POST"}, timeout=30)

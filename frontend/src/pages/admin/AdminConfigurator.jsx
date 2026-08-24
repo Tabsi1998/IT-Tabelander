@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../../lib/api";
@@ -31,12 +31,12 @@ export default function AdminConfigurator() {
   const [catEdit, setCatEdit] = useState(null);
   const [specText, setSpecText] = useState("{}");
 
-  const load = () => {
+  const load = useCallback(() => {
     api.get(`/admin/configurator/${ctype}/categories`).then(({ data }) => setCats(data)).catch(() => setCats([]));
     api.get(`/admin/configurator/${ctype}/options`).then(({ data }) => setOpts(data)).catch(() => setOpts([]));
     api.get("/admin/dolibarr/products").then(({ data }) => setProducts(data)).catch(() => {});
-  };
-  useEffect(() => { load(); }, [ctype]);
+  }, [ctype]);
+  useEffect(() => { load(); }, [load]);
 
   const openEdit = (o, catKey) => {
     const data = o ? { ...o } : optEmpty(ctype, catKey);

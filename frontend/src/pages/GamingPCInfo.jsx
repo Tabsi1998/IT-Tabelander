@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Cpu, Gauge, ShieldCheck, Wrench, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Cpu, Gauge, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import Reveal from "../components/Reveal";

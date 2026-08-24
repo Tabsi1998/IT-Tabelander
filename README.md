@@ -1,247 +1,231 @@
 # IT-Tabelander
 
-Premium Website & Web-App für **IT-Tabelander** (Tirol/Österreich): IT-Service &
-Reparatur, individueller **PC Builder**, **PS5 Custom Controller Builder** mit
-Live-Vorschau, Admin-CMS und Dolibarr-Anbindung.
+React-Website mit FastAPI-Backend, MongoDB und integriertem Online-Admin. In
+Produktion liefert FastAPI sowohl die Website als auch `/api` über **einen
+einzigen internen Port** aus.
 
-**Stack:** React (CRA) · FastAPI · MongoDB · Tailwind · JWT-Auth
+## Schnellstart – ein Befehl
 
----
-
-## Inhalt
-- [Architektur](#architektur)
-- [Schnellstart (Server)](#schnellstart-server)
-- [Skripte](#skripte)
-- [Konfiguration](#konfiguration)
-- [Apache Reverse-Proxy](#apache-reverse-proxy)
-- [Admin-Bereich](#admin-bereich)
-- [Dolibarr / Google / GA4](#integrationen)
-- [Lokale Entwicklung](#lokale-entwicklung)
-- [Troubleshooting](#troubleshooting)
-
----
-
-## Architektur
-
-```
-Browser ──HTTPS──▶ Apache (VHost it.tabelander.co.at)
-                     ├── /            → statischer Frontend-Build  (Port 3000)
-                     └── /api         → FastAPI Backend            (Port 8001)
-                                          └── MongoDB (localhost:27017)
-```
-
-- Alle Backend-Routen sind mit **`/api`** geprefixt.
-- Das Frontend spricht das Backend über `REACT_APP_BACKEND_URL` an (gleiche Origin).
-- Admin-Login nutzt JWT + `Secure`-Cookies → **HTTPS ist Pflicht**.
-
-```
-.
-├── backend/            FastAPI (app/ = Router, Models, Security, Seeds)
-├── frontend/           React (src/pages, src/components, src/context)
-├── start.sh            Backend + Frontend im Hintergrund starten
-├── stop.sh             beide Dienste stoppen
-├── update.sh           git pull + Deps + Build + Neustart
-├── deploy.config       zentrale Deployment-Einstellungen
-└── memory/             PRD & Test-Credentials
-```
-
----
-
-## Schnellstart (Server)
-
-Einmalige Voraussetzungen auf Ubuntu:
+Empfohlen ist Ubuntu 24.04 LTS. Im Projektverzeichnis genügt:
 
 ```bash
-# MongoDB 7
-curl -fsSL https://pgp.mongodb.com/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
-echo "deb [signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-sudo apt update && sudo apt install -y mongodb-org && sudo systemctl enable --now mongod
-
-# Node 20 + yarn, Python 3.11
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs python3 python3-venv python3-pip
-sudo npm install -g yarn
+cd /var/www/IT-Tabelander
+./start.sh
 ```
 
-App holen und Backend-`.env` anlegen:
+`start.sh` erledigt automatisch:
+
+1. fehlende Ubuntu-Grundpakete installieren;
+2. Node.js 24 LTS und Yarn 1.22.22 installieren;
+3. MongoDB 8.0 Community installieren, aktivieren und starten, wenn eine lokale
+   MongoDB konfiguriert ist;
+4. `backend/.env` mit sicheren Zufallswerten anlegen;
+5. Python-venv erstellen/reparieren und Runtime-Pakete installieren;
+6. Frontend exakt aus `frontend/yarn.lock` installieren und bauen;
+7. den bestehenden App-Prozess sauber neu starten;
+8. MongoDB, API und Website per Healthcheck prüfen.
+
+Für Systempakete sind `root`-Rechte oder `sudo` erforderlich. Bereits korrekt
+installierte Komponenten werden nicht erneut installiert. Ein mit `Ctrl-C`
+abgebrochener Lauf kann einfach mit `./start.sh` fortgesetzt werden.
+
+Beim ersten Start werden einmalig sichere Admin-Zugangsdaten ausgegeben. Danach
+unter `/admin` anmelden und E-Mail/Passwort unter **Einstellungen →
+Admin-Zugang** ändern.
+
+## Reverse Proxy
+
+Das einzige Proxy-Ziel ist standardmäßig:
+
+```text
+http://127.0.0.1:8001
+```
+
+Website, Admin und API laufen gemeinsam dort:
+
+```text
+/                 Website
+/admin            Online-Admin
+/api/*            Backend-API
+/api/health       Healthcheck
+/robots.txt       dynamisch
+/sitemap.xml      dynamisch
+```
+
+### Apache
+
+Benötigte Module einmalig aktivieren:
 
 ```bash
-git clone <REPO> /var/www/it-tabelander && cd /var/www/it-tabelander
-
-# Backend-Secrets setzen (JWT_SECRET & Admin-Passwort unbedingt ändern!)
-cat > backend/.env <<'EOF'
-MONGO_URL="mongodb://localhost:27017"
-DB_NAME="it_tabelander"
-JWT_SECRET="HIER_LANGER_ZUFALLSWERT"        # z.B. openssl rand -hex 48
-ADMIN_EMAIL="admin@it-tabelander.at"
-ADMIN_PASSWORD="DEIN_SICHERES_PASSWORT"
-DOLIBARR_ENABLED="false"
-DOLIBARR_BASE_URL="https://erp.tabelander.co.at"
-DOLIBARR_API_KEY=""
-EOF
-
-# Öffentliche URL in deploy.config eintragen (Standard: it.tabelander.co.at)
-nano deploy.config
+sudo a2enmod proxy proxy_http headers ssl
 ```
 
-Starten:
-
-```bash
-./start.sh          # baut beim ersten Mal Frontend + venv automatisch
-```
-
-Danach → Apache-VHost einrichten ([siehe unten](#apache-reverse-proxy)) und
-`https://it.tabelander.co.at` aufrufen.
-
----
-
-## Skripte
-
-| Skript        | Zweck                                                                 |
-|---------------|-----------------------------------------------------------------------|
-| `./start.sh`  | Startet Backend (uvicorn) **und** Frontend (statischer `serve`) im Hintergrund. Legt beim ersten Lauf venv an, installiert Deps, baut das Frontend. |
-| `./stop.sh`   | Stoppt beide Dienste sauber (PID-Dateien + Fallback-pkill).           |
-| `./update.sh` | `git pull` → Backend-Deps → Frontend neu bauen → Neustart.            |
-
-- **Logs:** `logs/backend.log`, `logs/frontend.log`
-- **PIDs:** `run/backend.pid`, `run/frontend.pid`
-- Beide Ordner sind in `.gitignore`.
-
-```bash
-tail -f logs/backend.log        # Backend-Log live
-./update.sh                     # nach jedem Git-Push
-```
-
----
-
-## Konfiguration
-
-**`deploy.config`** (zentral, wird von allen Skripten gelesen):
-
-```ini
-PUBLIC_BACKEND_URL="https://it.tabelander.co.at"   # öffentliche URL = Origin für /api
-BACKEND_HOST="127.0.0.1"
-BACKEND_PORT="8001"
-FRONTEND_PORT="3000"
-BACKEND_WORKERS="2"
-```
-
-**`backend/.env`** (Secrets, **nicht** committen – ist in `.gitignore`):
-
-| Variable            | Beschreibung                                  |
-|---------------------|-----------------------------------------------|
-| `MONGO_URL`         | `mongodb://localhost:27017`                   |
-| `DB_NAME`           | z.B. `it_tabelander`                          |
-| `JWT_SECRET`        | langer Zufallswert (`openssl rand -hex 48`)   |
-| `ADMIN_EMAIL`       | Admin-Login-Adresse                           |
-| `ADMIN_PASSWORD`    | Admin-Passwort (beim 1. Start angelegt)       |
-| `DOLIBARR_*`        | optional, besser im Admin-Bereich pflegen     |
-
-> Der Frontend-Build liest `REACT_APP_BACKEND_URL` (aus `PUBLIC_BACKEND_URL`).
-> `start.sh`/`update.sh` schreiben dafür automatisch `frontend/.env.production`.
-
----
-
-## Apache Reverse-Proxy
-
-Dein bestehendes Dolibarr bleibt unberührt – dies ist ein eigener VHost.
-
-```bash
-sudo a2enmod proxy proxy_http rewrite ssl headers
-```
-
-`/etc/apache2/sites-available/it-tabelander.conf`:
+Im HTTPS-VHost:
 
 ```apache
-<VirtualHost *:80>
-    ServerName it.tabelander.co.at
-    Redirect permanent / https://it.tabelander.co.at/
-</VirtualHost>
+ProxyPreserveHost On
+RequestHeader set X-Forwarded-Proto "https"
 
-<VirtualHost *:443>
-    ServerName it.tabelander.co.at
-
-    # Frontend (statischer serve auf Port 3000)
-    ProxyPreserveHost On
-    ProxyPass        /api  http://127.0.0.1:8001/api
-    ProxyPassReverse /api  http://127.0.0.1:8001/api
-    ProxyPass        /      http://127.0.0.1:3000/
-    ProxyPassReverse /      http://127.0.0.1:3000/
-
-    # SSL-Zeilen fügt Certbot automatisch ein
-</VirtualHost>
+ProxyPass        / http://127.0.0.1:8001/
+ProxyPassReverse / http://127.0.0.1:8001/
 ```
+
+Danach:
 
 ```bash
-sudo a2ensite it-tabelander && sudo apache2ctl configtest && sudo systemctl reload apache2
-sudo certbot --apache -d it.tabelander.co.at
+sudo apachectl configtest
+sudo systemctl reload apache2
 ```
 
-> **Alternative ohne zweiten Node-Prozess:** Statt das Frontend über Port 3000 zu
-> proxen, kann Apache den Build-Ordner auch direkt ausliefern
-> (`DocumentRoot /var/www/it-tabelander/frontend/build` + SPA-Rewrite auf
-> `index.html`). Dann braucht `start.sh` nur das Backend zu starten.
+### Nginx
 
-**Autostart nach Reboot** (optional) – Cron des Deploy-Users:
-```bash
-crontab -e
-# @reboot /var/www/it-tabelander/start.sh
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
 ```
 
----
+HTTPS ist für den Admin-Login erforderlich, weil die Auth-Cookies absichtlich
+nur sicher über HTTPS übertragen werden.
 
-## Admin-Bereich
-
-- URL: `https://it.tabelander.co.at/admin`
-- Login: `ADMIN_EMAIL` / `ADMIN_PASSWORD` aus `backend/.env`
-- Verwaltbar: Reparaturen, Nachrichten, Leistungen, FAQs, Bewertungen,
-  **PC Builder** (Kategorien/Komponenten/Bilder/Texte), **Controller Builder**
-  (Modelle/Kategorien/Produkte/Varianten), Medien, Dolibarr-Sync, Einstellungen.
-
----
-
-## Integrationen
-
-Alle Keys werden **serverseitig** gespeichert und nie an den Browser gesendet.
-Am besten im Admin unter **Einstellungen** pflegen:
-
-- **Dolibarr:** aktivieren, Basis-URL + DOLAPIKEY eintragen → Produkt-Sync +
-  Interessent/Ticket bei Anfragen. *(Hinweis: bis ein echter Key hinterlegt ist,
-  läuft alles im Demo-Modus.)*
-- **Google Places:** Place ID + API-Key → echte Google-Bewertungen.
-- **Google Analytics 4:** Measurement ID → lädt erst nach Cookie-Zustimmung.
-
----
-
-## Lokale Entwicklung
+## Start, Stop und Updates
 
 ```bash
-# Backend
-cd backend && python3 -m venv venv && source venv/bin/activate
-grep -vE 'emergentintegrations|litellm @' requirements.txt > /tmp/req.txt && pip install -r /tmp/req.txt
-uvicorn server:app --reload --port 8001
-
-# Frontend
-cd frontend && yarn install
-echo 'REACT_APP_BACKEND_URL=http://localhost:8001' > .env
-yarn start        # http://localhost:3000
-
-# Backend-Tests
-cd backend && python -m pytest tests/ -q
+./start.sh                 # installieren/bauen und aktuellen Stand starten
+./stop.sh                  # nur IT-Tabelander stoppen; MongoDB bleibt aktiv
+./update.sh                # git pull, vorbereiten, sauber neu starten
+./start.sh --refresh       # Dependencies und Build vollständig erneuern
+./start.sh --reset-admin   # neues Admin-Passwort erzeugen
 ```
 
----
+`update.sh` lädt ausschließlich Fast-Forward-Updates. Dependencies und ein neuer
+Frontend-Build werden vor dem Stoppen vorbereitet. Schlägt die Vorbereitung
+fehl, bleibt die bisherige Website aktiv. Nach erfolgreicher Vorbereitung wird
+automatisch gestoppt, der neue Build aktiviert und wieder gestartet.
 
-## Troubleshooting
+Wer Systempakete bewusst selbst verwaltet, kann verwenden:
+
+```bash
+./start.sh --no-system-install
+```
+
+## Was wird wo eingestellt?
+
+### Online unter `/admin/einstellungen`
+
+- Unternehmensname, Adresse, Land, E-Mail, Telefon, Servicegebiet und Öffnungszeiten
+- SEO-Titel, Beschreibung und öffentliche Website-URL
+- Google Analytics Measurement-ID und Google Place-ID
+- Google Places API-Key als geschütztes Schreibfeld
+- Dolibarr aktiv/inaktiv, Basis-URL, API-Key, Timeout und Ländercode
+- Light-/Dark-Logos und Social-Media-Links
+- PC-Builder-Texte
+- Impressum und Datenschutz
+- Admin-Login-E-Mail und Admin-Passwort
+
+Gespeicherte API-Keys werden vom Backend niemals wieder an den Browser
+ausgegeben. Der Admin zeigt nur an, ob ein Key vorhanden ist. Ein neuer Wert
+ersetzt den bisherigen Key; vorhandene Keys können dort auch entfernt werden.
+
+### Automatisch in `backend/.env`
+
+Diese Datei enthält nur Start-/Infrastrukturwerte und wird von `start.sh`
+automatisch mit Dateimodus `600` erzeugt:
+
+- `MONGO_URL` und `DB_NAME`
+- MongoDB-Timeouts
+- `JWT_SECRET`
+- initiale Admin-Zugangsdaten
+- CORS-/Canonical-Fallback für den ersten Datenbank-Seed
+
+Normalerweise muss dort nichts geändert werden. Nur eine externe MongoDB muss
+vor dem Start über `MONGO_URL` eingetragen werden. Die Datenbankverbindung kann
+nicht sinnvoll im Online-Admin umgestellt werden, weil der Admin selbst diese
+Verbindung benötigt.
+
+### Selten nötig: `deploy.config`
+
+```bash
+BACKEND_HOST="127.0.0.1"
+BACKEND_PORT="8001"
+PYTHON_BIN="python3"
+STARTUP_TIMEOUT_SECONDS="30"
+BACKEND_WORKERS="1"
+```
+
+Der Port ist eine Prozess-/Reverse-Proxy-Einstellung und kann deshalb nicht im
+laufenden Online-Admin geändert werden. Mit dem Standardwert muss im Proxy nur
+`127.0.0.1:8001` eingetragen werden.
+
+## Logs und Diagnose
+
+```bash
+cat run/backend.pid
+tail -f logs/backend.log
+curl http://127.0.0.1:8001/api/health
+systemctl status mongod
+```
+
+Ein gesunder Healthcheck liefert:
+
+```json
+{"status":"ok","db":true}
+```
 
 | Problem | Lösung |
 |---|---|
-| **Admin-Login klappt nicht** | HTTPS aktiv? `Secure`-Cookies brauchen TLS. Zertifikat via Certbot prüfen. |
-| `{"db":false}` bei `/api/health` | MongoDB läuft nicht: `sudo systemctl start mongod`. |
-| Frontend zeigt alte Version | `./update.sh` (Build neu erzeugen). |
-| Port belegt | Ports in `deploy.config` ändern und Apache-Proxy anpassen. |
-| Dienste-Status | `cat run/*.pid`, `tail -f logs/backend.log`. |
+| MongoDB startet nicht | `systemctl status mongod` und `/var/log/mongodb/mongod.log` prüfen |
+| Port 8001 ist belegt | fremden Dienst stoppen oder `BACKEND_PORT` in `deploy.config` und im Reverse Proxy gemeinsam ändern |
+| Admin-Passwort vergessen | `./start.sh --reset-admin` ausführen |
+| Installation wurde abgebrochen | `./start.sh` erneut ausführen |
+| Frontend zeigt alten Stand | `./update.sh` oder `./start.sh --refresh` |
+| Start schlägt fehl | letzte Zeilen aus `logs/backend.log` prüfen |
 
-> Hinweis: `emergentintegrations` und die `litellm`-Zeile in
-> `backend/requirements.txt` werden vom Code **nicht** verwendet; die Skripte
-> überspringen sie automatisch beim Installieren.
+## Lokale Entwicklung
+
+Backend:
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install -r requirements-dev.txt
+uvicorn server:app --reload --port 8001
+```
+
+Frontend-Entwicklungsserver:
+
+```bash
+cd frontend
+yarn install --frozen-lockfile
+echo 'REACT_APP_BACKEND_URL=http://localhost:8001' > .env
+yarn start
+```
+
+Prüfungen:
+
+```bash
+cd backend && python -m pytest tests -q
+cd frontend && CI=true yarn build
+bash -n start.sh stop.sh update.sh
+```
+
+## Dateien und Laufzeitdaten
+
+```text
+backend/             FastAPI, MongoDB-Zugriff und Tests
+frontend/            React-App und festes Yarn-Lockfile
+deploy.config        interner Host/Port und Startparameter
+start.sh             Bootstrap, Build, Start und Healthchecks
+stop.sh              sicherer Prozess-Stopp per PID/Prozessgruppe
+update.sh            Fast-Forward-Update mit vorbereitetem Build
+run/                 PID, Lock und temporäre Deployment-Artefakte (ignoriert)
+logs/                Backend-Log (ignoriert)
+```
+
+Secrets, `backend/.env`, venv, `node_modules`, Builds, Logs und PID-Dateien werden
+nicht committed.

@@ -1,12 +1,21 @@
 """Remove TEST_QA_* data created during UI testing."""
 import os
+from pathlib import Path
 
 import requests
 from dotenv import dotenv_values
 
-BASE = (os.environ.get("REACT_APP_BACKEND_URL")
-        or dotenv_values("/app/frontend/.env")["REACT_APP_BACKEND_URL"]).rstrip("/")
-env = dotenv_values("/app/backend/.env")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ENV_PATH = REPO_ROOT / "backend" / ".env"
+FRONTEND_ENV_PATH = REPO_ROOT / "frontend" / ".env"
+
+frontend_env = dotenv_values(FRONTEND_ENV_PATH)
+BASE = (
+    os.environ.get("REACT_APP_BACKEND_URL")
+    or frontend_env.get("REACT_APP_BACKEND_URL")
+    or "http://localhost:8001"
+).rstrip("/")
+env = dotenv_values(BACKEND_ENV_PATH)
 
 s = requests.Session()
 r = s.post(f"{BASE}/api/auth/login",

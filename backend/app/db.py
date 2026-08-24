@@ -2,16 +2,28 @@ import os
 from datetime import datetime, timezone
 
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 
-_client: AsyncIOMotorClient | None = None
+_client: AsyncMongoClient | None = None
 _db = None
 
 
-def get_client() -> AsyncIOMotorClient:
+def _timeout_ms(name: str, default: int = 3000) -> int:
+    try:
+        return max(500, int(os.environ.get(name, default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def get_client() -> AsyncMongoClient:
     global _client
     if _client is None:
-        _client = AsyncIOMotorClient(os.environ["MONGO_URL"])
+        _client = AsyncMongoClient(
+            os.environ["MONGO_URL"],
+            serverSelectionTimeoutMS=_timeout_ms("MONGO_SERVER_SELECTION_TIMEOUT_MS"),
+            connectTimeoutMS=_timeout_ms("MONGO_CONNECT_TIMEOUT_MS"),
+            timeoutMS=_timeout_ms("MONGO_OPERATION_TIMEOUT_MS", 5000),
+        )
     return _client
 
 
@@ -20,6 +32,14 @@ def get_db():
     if _db is None:
         _db = get_client()[os.environ["DB_NAME"]]
     return _db
+
+
+async def close_client() -> None:
+    global _client, _db
+    if _client is not None:
+        await _client.close()
+    _client = None
+    _db = None
 
 
 def now_utc() -> datetime:

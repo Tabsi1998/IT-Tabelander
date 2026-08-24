@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /admin
 
-Sitemap: https://it.tabelander.co.at/api/seo/sitemap.xml
+Sitemap: https://it.tabelander.co.at/sitemap.xml
