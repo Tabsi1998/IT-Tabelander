@@ -11,7 +11,8 @@ from fastapi.responses import PlainTextResponse, Response  # noqa: E402
 
 from app.db import get_db  # noqa: E402
 from app.seed import run_all_seeds  # noqa: E402
-from app.routers import (auth, configurator, contact, dashboard,  # noqa: E402
+from app.seed_builder import seed_builder  # noqa: E402
+from app.routers import (auth, builder, configurator, contact, dashboard,  # noqa: E402
                          dolibarr_router, faqs, media, repairs, reviews,
                          services, settings)
 
@@ -31,7 +32,7 @@ app.add_middleware(
 )
 
 for r in (auth, services, faqs, reviews, settings, repairs, contact,
-          configurator, media, dolibarr_router, dashboard):
+          configurator, builder, media, dolibarr_router, dashboard):
     app.include_router(r.router)
 
 
@@ -39,6 +40,7 @@ for r in (auth, services, faqs, reviews, settings, repairs, contact,
 async def startup():
     try:
         await run_all_seeds()
+        await seed_builder()
         logger.info("Seeding completed")
     except Exception as exc:  # noqa: BLE001
         logger.error("Seeding failed: %s", exc)

@@ -1,23 +1,25 @@
 import React from "react";
 import { useTheme } from "../context/ThemeContext";
+import { useSettings } from "../context/SettingsContext";
+import { mediaUrl } from "../lib/api";
 
-// Banner = wordmark (icon + text), Mark = shield icon only.
-// "light" asset = white version for dark backgrounds.
-// "dark" asset = navy/orange version for light backgrounds.
-const ASSETS = {
-  bannerDark: "/assets/img/logo/banner-light.png", // used in dark theme
-  bannerLight: "/assets/img/logo/banner-dark.png", // used in light theme
+const DEFAULTS = {
+  bannerDark: "/assets/img/logo/banner-light.png", // dark theme -> white banner
+  bannerLight: "/assets/img/logo/banner-dark.png", // light theme -> navy banner
   markDark: "/assets/img/logo/logo-light.png",
   markLight: "/assets/img/logo/logo-dark.png",
 };
 
 export function Logo({ variant = "banner", className = "h-9", onDark }) {
   const { isDark } = useTheme();
-  // allow forcing a background context (e.g. footer is always dark)
+  const { settings } = useSettings();
   const dark = onDark != null ? onDark : isDark;
+  // admin-uploaded overrides (logo_dark_url shown on dark bg, logo_light_url on light bg)
+  const override = dark ? settings.logo_dark_url : settings.logo_light_url;
   let src;
-  if (variant === "mark") src = dark ? ASSETS.markDark : ASSETS.markLight;
-  else src = dark ? ASSETS.bannerDark : ASSETS.bannerLight;
+  if (override) src = mediaUrl(override);
+  else if (variant === "mark") src = dark ? DEFAULTS.markDark : DEFAULTS.markLight;
+  else src = dark ? DEFAULTS.bannerDark : DEFAULTS.bannerLight;
   return <img src={src} alt="IT-Tabelander" className={className} loading="eager" />;
 }
 

@@ -42,15 +42,15 @@ export default function AdminServices() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-white">{s.title}</p>
+                    <p className="font-medium text-ink">{s.title}</p>
                     {!s.active && <Badge tone="warning">Inaktiv</Badge>}
                     <Badge tone="neutral">/{s.slug}</Badge>
                   </div>
-                  <p className="mt-1 text-sm text-slate-400">{s.short_description}</p>
+                  <p className="mt-1 text-sm text-muted">{s.short_description}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setEdit({ ...s, bullets: (s.bullets || []).join("\n") })} className="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-brand" data-testid={`service-edit-${s.slug}`}><Pencil size={16} /></button>
-                  <button onClick={() => del(s.id)} className="rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-400"><Trash2 size={16} /></button>
+                  <button onClick={() => setEdit({ ...s, bullets: (s.bullets || []).join("\n") })} className="rounded-lg p-2 text-muted hover:bg-elevated hover:text-brand" data-testid={`service-edit-${s.slug}`}><Pencil size={16} /></button>
+                  <button onClick={() => del(s.id)} className="rounded-lg p-2 text-muted hover:bg-red-500/10 hover:text-red-400"><Trash2 size={16} /></button>
                 </div>
               </div>
             </Panel>
@@ -74,7 +74,7 @@ export default function AdminServices() {
               <Field label="Sortierung"><Input type="number" value={edit.sort} onChange={(e) => setEdit({ ...edit, sort: Number(e.target.value) })} /></Field>
             </div>
             <Field label="SEO Description"><Textarea value={edit.seo_description} onChange={(e) => setEdit({ ...edit, seo_description: e.target.value })} /></Field>
-            <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Aktiv</label>
+            <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Aktiv</label>
             <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setEdit(null)}>Abbrechen</Button><Button onClick={save} data-testid="service-save">Speichern</Button></div>
           </div>
         )}

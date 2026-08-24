@@ -12,6 +12,7 @@ PUBLIC_FIELDS = [
     "postal_code", "country", "service_area", "opening_hours", "social_links",
     "ga_measurement_id", "seo_default_title", "seo_default_description",
     "impressum_html", "datenschutz_html", "legal_reviewed",
+    "logo_light_url", "logo_dark_url",
 ]
 
 

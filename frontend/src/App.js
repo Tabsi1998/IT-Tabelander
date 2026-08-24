@@ -15,7 +15,7 @@ const Leistungen = lazy(() => import("./pages/Leistungen"));
 const ServiceLanding = lazy(() => import("./pages/ServiceLanding"));
 const GamingPCInfo = lazy(() => import("./pages/GamingPCInfo"));
 const PCConfigurator = lazy(() => import("./pages/PCConfigurator"));
-const PS5Configurator = lazy(() => import("./pages/PS5Configurator"));
+const PS5Configurator = lazy(() => import("./pages/ControllerBuilder"));
 const UeberMich = lazy(() => import("./pages/UeberMich"));
 const Bewertungen = lazy(() => import("./pages/Bewertungen"));
 const Kontakt = lazy(() => import("./pages/Kontakt"));

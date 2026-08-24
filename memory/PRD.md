@@ -31,6 +31,19 @@ Production-ready premium dark-tech website for IT-Tabelander (Austria/Tirol): IT
 ## Config / secrets (env, not hardcoded)
 backend/.env: MONGO_URL, DB_NAME, JWT_SECRET, ADMIN_EMAIL/PASSWORD, DOLIBARR_ENABLED/BASE_URL/API_KEY/TIMEOUT, GOOGLE_PLACES_API_KEY, GOOGLE_PLACE_ID, GA_MEASUREMENT_ID.
 
+## Update 2026-06 – Controller Builder Overhaul
+- Neuer datengetriebener **PS5 Custom Controller Builder** (ersetzt alten PS5-Konfigurator) mit 2 getrennten Modellen: DualSense (BDM-010…060) + DualSense Edge.
+- Backend-Collections: controllers, builder_categories, builder_products (+ eingebettete variants), builder_configs. Router /api/builder/* (public) + /api/admin/builder/* (CRUD). Versions-/Kompatibilitätsfilter, requires/excludes-Felder, Dolibarr-Preis-Verknüpfung.
+- Frontend: ControllerCanvas (SVG-Master Vorder-/Rückseite, Live-Recolor per region_key, framer-motion Crossfade/Rotation, Overlay-PNG-Support je Variante mit x/y/scale/rotation/z/side), ControllerBuilder-Seite (Modell+Version-Wahl, Kategorien/Produkte/Farbvarianten, Live-Preis, Zusammenfassung, Speichern/Anfrage), Admin „Controller Builder" (Modelle/Kategorien/Produkte + Varianten-JSON, Dolibarr-Link, Kompatibilität).
+- Dolibarr: Config jetzt aus Admin-Einstellungen (Key/URL/enabled) statt nur Env; Reparatur- UND Kontaktanfrage legen best-effort Interessent (thirdparty/prospect) + Ticket an (Demo-Modus ohne Key).
+- Admin-Einstellungen: Dolibarr-Key/URL, Google-Places-Key, GA4/Place-ID, Logo Light/Dark (URL). Secrets nur admin-seitig, nie public.
+- Theme-Fix: Admin nutzt jetzt Theme-Tokens (Light/Dark), kein erzwungenes Dark. Logo-Komponente nutzt Admin-Logos (light/dark) falls gesetzt. Theme in localStorage gespeichert.
+
+## Deferred / bewusst offen (Controller Builder)
+- Visueller Drag&Drop-Layer-Editor: aktuell numerische Layer-Felder (x/y/scale/rotation/z/side) via Varianten-JSON im Admin. 
+- Fotorealistische transparente PNG/WebP-Layer aus eXtremeRate NICHT automatisch gescraped (Rechte/Feasibility) – System unterstützt Upload solcher Overlays je Variante; Standard sind hochwertige recolorbare SVG-Master.
+- Variantenpflege im Admin derzeit als JSON-Editor (funktional, ohne Code); komfortablere Einzelfeld-UI + Medien-Picker als nächster Schritt.
+
 ## Backlog / next
 - P1: Wire real Dolibarr API key -> live product sync + repair ticket creation; Google Places live reviews; GA4 id
 - P1: Idempotent/versioned seed (currently seeds only when empty)

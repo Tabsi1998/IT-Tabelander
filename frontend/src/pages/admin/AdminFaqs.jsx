@@ -37,12 +37,12 @@ export default function AdminFaqs() {
             <Panel key={f.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2"><p className="font-medium text-white">{f.question}</p><Badge tone="neutral">{f.category}</Badge>{!f.active && <Badge tone="warning">Inaktiv</Badge>}</div>
-                  <p className="mt-1 text-sm text-slate-400">{f.answer}</p>
+                  <div className="flex items-center gap-2"><p className="font-medium text-ink">{f.question}</p><Badge tone="neutral">{f.category}</Badge>{!f.active && <Badge tone="warning">Inaktiv</Badge>}</div>
+                  <p className="mt-1 text-sm text-muted">{f.answer}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setEdit({ ...f })} className="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-brand"><Pencil size={16} /></button>
-                  <button onClick={() => del(f.id)} className="rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-400"><Trash2 size={16} /></button>
+                  <button onClick={() => setEdit({ ...f })} className="rounded-lg p-2 text-muted hover:bg-elevated hover:text-brand"><Pencil size={16} /></button>
+                  <button onClick={() => del(f.id)} className="rounded-lg p-2 text-muted hover:bg-red-500/10 hover:text-red-400"><Trash2 size={16} /></button>
                 </div>
               </div>
             </Panel>
@@ -58,7 +58,7 @@ export default function AdminFaqs() {
               <Field label="Kategorie"><Input value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value })} /></Field>
               <Field label="Sortierung"><Input type="number" value={edit.sort} onChange={(e) => setEdit({ ...edit, sort: Number(e.target.value) })} /></Field>
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Aktiv</label>
+            <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Aktiv</label>
             <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setEdit(null)}>Abbrechen</Button><Button onClick={save} data-testid="faq-save">Speichern</Button></div>
           </div>
         )}

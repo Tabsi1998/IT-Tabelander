@@ -35,7 +35,7 @@ export default function AdminSettings() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel>
-          <h3 className="mb-4 font-semibold text-white">Unternehmen & Kontakt</h3>
+          <h3 className="mb-4 font-semibold text-ink">Unternehmen & Kontakt</h3>
           <div className="space-y-3">
             <Field label="Unternehmensname"><Input value={s.company_name || ""} onChange={set("company_name")} data-testid="settings-company" /></Field>
             <Field label="Tagline"><Input value={s.tagline || ""} onChange={set("tagline")} /></Field>
@@ -54,18 +54,37 @@ export default function AdminSettings() {
         </Panel>
 
         <Panel>
-          <h3 className="mb-4 font-semibold text-white">SEO & Analytics</h3>
+          <h3 className="mb-4 font-semibold text-ink">SEO & Analytics</h3>
           <div className="space-y-3">
             <Field label="SEO Standard-Titel"><Input value={s.seo_default_title || ""} onChange={set("seo_default_title")} /></Field>
             <Field label="SEO Standard-Beschreibung"><Textarea value={s.seo_default_description || ""} onChange={set("seo_default_description")} /></Field>
             <Field label="Google Analytics 4 Measurement ID"><Input value={s.ga_measurement_id || ""} onChange={set("ga_measurement_id")} placeholder="G-XXXXXXX" data-testid="settings-ga" /></Field>
             <Field label="Google Place ID (für Reviews)"><Input value={s.google_place_id || ""} onChange={set("google_place_id")} placeholder="ChIJ..." /></Field>
-            <p className="text-xs text-slate-500">Der Google Places API-Key wird ausschließlich serverseitig (Env) gesetzt und nie im Browser gespeichert.</p>
+            <p className="text-xs text-faint">Der Google Places API-Key wird ausschließlich serverseitig (Env) gesetzt und nie im Browser gespeichert.</p>
           </div>
         </Panel>
 
         <Panel>
-          <h3 className="mb-4 font-semibold text-white">Social Media</h3>
+          <h3 className="mb-4 font-semibold text-ink">Integrationen (serverseitig, nie im Browser)</h3>
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={!!s.dolibarr_enabled} onChange={(e) => setS((x) => ({ ...x, dolibarr_enabled: e.target.checked }))} className="h-4 w-4 accent-[#F26522]" data-testid="settings-dolibarr-enabled" /> Dolibarr aktivieren</label>
+            <Field label="Dolibarr Basis-URL"><Input value={s.dolibarr_base_url || ""} onChange={set("dolibarr_base_url")} placeholder="https://erp.tabelander.co.at" /></Field>
+            <Field label="Dolibarr API-Key (DOLAPIKEY)"><Input type="password" value={s.dolibarr_api_key || ""} onChange={set("dolibarr_api_key")} placeholder="••••••" data-testid="settings-dolibarr-key" /></Field>
+            <Field label="Google Places API-Key"><Input type="password" value={s.google_places_api_key || ""} onChange={set("google_places_api_key")} placeholder="••••••" /></Field>
+          </div>
+        </Panel>
+
+        <Panel>
+          <h3 className="mb-4 font-semibold text-ink">Logos (Light / Dark)</h3>
+          <p className="mb-3 text-xs text-faint">URL eines im Medienmanager hochgeladenen Logos eintragen. Leer = mitgeliefertes Logo.</p>
+          <div className="space-y-3">
+            <Field label="Logo für Light Mode (dunkles Logo)"><Input value={s.logo_light_url || ""} onChange={set("logo_light_url")} placeholder="/api/media/…" /></Field>
+            <Field label="Logo für Dark Mode (helles Logo)"><Input value={s.logo_dark_url || ""} onChange={set("logo_dark_url")} placeholder="/api/media/…" /></Field>
+          </div>
+        </Panel>
+
+        <Panel>
+          <h3 className="mb-4 font-semibold text-ink">Social Media</h3>
           <div className="space-y-3">
             <Field label="Instagram"><Input value={s.social_links?.instagram || ""} onChange={setSocial("instagram")} /></Field>
             <Field label="Facebook"><Input value={s.social_links?.facebook || ""} onChange={setSocial("facebook")} /></Field>
@@ -74,7 +93,7 @@ export default function AdminSettings() {
         </Panel>
 
         <Panel>
-          <h3 className="mb-4 font-semibold text-white">Rechtliche Texte</h3>
+          <h3 className="mb-4 font-semibold text-ink">Rechtliche Texte</h3>
           <p className="mb-3 text-xs text-amber-300">Diese Texte sind vom Betreiber rechtlich zu prüfen.</p>
           <div className="space-y-3">
             <Field label="Impressum (HTML)"><Textarea value={s.impressum_html || ""} onChange={set("impressum_html")} className="min-h-[120px]" /></Field>

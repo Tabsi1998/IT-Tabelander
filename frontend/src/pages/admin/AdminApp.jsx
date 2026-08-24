@@ -11,6 +11,7 @@ import AdminServices from "./AdminServices";
 import AdminFaqs from "./AdminFaqs";
 import AdminReviews from "./AdminReviews";
 import AdminConfigurator from "./AdminConfigurator";
+import AdminBuilder from "./AdminBuilder";
 import AdminMedia from "./AdminMedia";
 import AdminDolibarr from "./AdminDolibarr";
 import AdminSettings from "./AdminSettings";
@@ -20,7 +21,7 @@ export default function AdminApp() {
 
   if (!ready) {
     return (
-      <div className="dark min-h-screen bg-[#070d18] p-10">
+      <div className="min-h-screen bg-canvas p-10">
         <Skeleton className="mx-auto h-96 max-w-4xl" />
       </div>
     );
@@ -38,6 +39,7 @@ export default function AdminApp() {
         <Route path="faqs" element={<AdminFaqs />} />
         <Route path="bewertungen" element={<AdminReviews />} />
         <Route path="konfigurator" element={<AdminConfigurator />} />
+        <Route path="controller-builder" element={<AdminBuilder />} />
         <Route path="medien" element={<AdminMedia />} />
         <Route path="dolibarr" element={<AdminDolibarr />} />
         <Route path="einstellungen" element={<AdminSettings />} />

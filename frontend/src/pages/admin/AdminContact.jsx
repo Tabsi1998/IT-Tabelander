@@ -24,16 +24,16 @@ export default function AdminContact() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-white">{m.name}</p>
+                    <p className="font-medium text-ink">{m.name}</p>
                     {m.status === "neu" && <Badge tone="brand">Neu</Badge>}
                   </div>
-                  <p className="text-xs text-slate-500">{m.email} {m.phone && `· ${m.phone}`} · {new Date(m.created_at).toLocaleString("de-AT")}</p>
-                  {m.subject && <p className="mt-2 text-sm font-medium text-slate-300">{m.subject}</p>}
-                  <p className="mt-1 text-sm text-slate-400">{m.message}</p>
+                  <p className="text-xs text-faint">{m.email} {m.phone && `· ${m.phone}`} · {new Date(m.created_at).toLocaleString("de-AT")}</p>
+                  {m.subject && <p className="mt-2 text-sm font-medium text-muted">{m.subject}</p>}
+                  <p className="mt-1 text-sm text-muted">{m.message}</p>
                 </div>
                 <div className="flex gap-2">
-                  {m.status === "neu" && <button onClick={() => markRead(m.id)} className="rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-emerald-400" title="Als gelesen"><MailOpen size={16} /></button>}
-                  <button onClick={() => del(m.id)} className="rounded-lg p-2 text-slate-500 hover:bg-red-500/10 hover:text-red-400"><Trash2 size={16} /></button>
+                  {m.status === "neu" && <button onClick={() => markRead(m.id)} className="rounded-lg p-2 text-faint hover:bg-elevated hover:text-emerald-400" title="Als gelesen"><MailOpen size={16} /></button>}
+                  <button onClick={() => del(m.id)} className="rounded-lg p-2 text-faint hover:bg-red-500/10 hover:text-red-400"><Trash2 size={16} /></button>
                 </div>
               </div>
             </Panel>

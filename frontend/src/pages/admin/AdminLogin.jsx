@@ -30,12 +30,12 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="dark flex min-h-screen items-center justify-center bg-[#070d18] p-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
       <Seo title="Admin Login" path="/admin" />
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <img src="/assets/img/logo/banner-light.png" alt="IT-Tabelander" className="mx-auto h-10" />
-          <p className="mt-3 font-mono text-xs uppercase tracking-[0.3em] text-slate-500">Admin-Bereich</p>
+          <p className="mt-3 font-mono text-xs uppercase tracking-[0.3em] text-faint">Admin-Bereich</p>
         </div>
         <form onSubmit={submit} className="glass rounded-2xl border border-subtle p-8 shadow-card" data-testid="admin-login-form">
           <div className="mb-5 flex items-center gap-2 text-brand">

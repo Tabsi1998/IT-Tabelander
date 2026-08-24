@@ -42,19 +42,19 @@ export default function AdminReviews() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-white">{r.author}</p>
-                    <span className="flex">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={13} className={i < r.rating ? "fill-brand text-brand" : "text-slate-600"} />)}</span>
+                    <p className="font-medium text-ink">{r.author}</p>
+                    <span className="flex">{Array.from({ length: 5 }).map((_, i) => <Star key={i} size={13} className={i < r.rating ? "fill-brand text-brand" : "text-faint"} />)}</span>
                     {r.featured && <Badge tone="brand">Featured</Badge>}
                     {r.is_demo && <Badge tone="demo">Demo</Badge>}
                     {!r.visible && <Badge tone="warning">Verborgen</Badge>}
                   </div>
-                  <p className="mt-1 text-sm text-slate-400">"{r.text}"</p>
+                  <p className="mt-1 text-sm text-muted">"{r.text}"</p>
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => quick(r, { visible: !r.visible })} className="rounded-lg p-2 text-slate-400 hover:bg-white/5" title="Sichtbar umschalten">{r.visible ? <Eye size={16} /> : <EyeOff size={16} />}</button>
-                  <button onClick={() => quick(r, { featured: !r.featured })} className="rounded-lg p-2 text-slate-400 hover:bg-white/5" title="Featured umschalten"><Star size={16} className={r.featured ? "fill-brand text-brand" : ""} /></button>
-                  <button onClick={() => setEdit({ ...r })} className="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-brand"><Pencil size={16} /></button>
-                  <button onClick={() => del(r.id)} className="rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-400"><Trash2 size={16} /></button>
+                  <button onClick={() => quick(r, { visible: !r.visible })} className="rounded-lg p-2 text-muted hover:bg-elevated" title="Sichtbar umschalten">{r.visible ? <Eye size={16} /> : <EyeOff size={16} />}</button>
+                  <button onClick={() => quick(r, { featured: !r.featured })} className="rounded-lg p-2 text-muted hover:bg-elevated" title="Featured umschalten"><Star size={16} className={r.featured ? "fill-brand text-brand" : ""} /></button>
+                  <button onClick={() => setEdit({ ...r })} className="rounded-lg p-2 text-muted hover:bg-elevated hover:text-brand"><Pencil size={16} /></button>
+                  <button onClick={() => del(r.id)} className="rounded-lg p-2 text-muted hover:bg-red-500/10 hover:text-red-400"><Trash2 size={16} /></button>
                 </div>
               </div>
             </Panel>
@@ -70,7 +70,7 @@ export default function AdminReviews() {
             </div>
             <Field label="Text"><Textarea value={edit.text} onChange={(e) => setEdit({ ...edit, text: e.target.value })} data-testid="review-text" /></Field>
             <Field label="Quelle"><Input value={edit.source} onChange={(e) => setEdit({ ...edit, source: e.target.value })} placeholder="manuell / Google" /></Field>
-            <div className="flex flex-wrap gap-4 text-sm text-slate-300">
+            <div className="flex flex-wrap gap-4 text-sm text-muted">
               <label className="flex items-center gap-2"><input type="checkbox" checked={edit.visible} onChange={(e) => setEdit({ ...edit, visible: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Sichtbar</label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={edit.featured} onChange={(e) => setEdit({ ...edit, featured: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Featured</label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={edit.is_demo} onChange={(e) => setEdit({ ...edit, is_demo: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Demo</label>

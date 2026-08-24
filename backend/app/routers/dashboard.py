@@ -28,6 +28,6 @@ async def dashboard(_: dict = Depends(require_admin)):
         "ps5_options": ps5_options,
         "pc_options": pc_options,
         "reviews_visible": reviews_visible,
-        "dolibarr_enabled": dolibarr.is_enabled(),
+        "dolibarr_enabled": await dolibarr.is_enabled(),
         "last_sync": serialize(last_sync) if last_sync else None,
     }

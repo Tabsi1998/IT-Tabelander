@@ -15,7 +15,7 @@ async def status(_: dict = Depends(require_admin)):
     conn = await dolibarr.test_connection()
     product_count = await db.dolibarr_product_cache.count_documents({})
     return {
-        "enabled": dolibarr.is_enabled(),
+        "enabled": await dolibarr.is_enabled(),
         "connection": conn,
         "last_sync": serialize(last) if last else None,
         "cached_products": product_count,

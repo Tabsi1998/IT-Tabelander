@@ -136,6 +136,69 @@ class SavedConfigInput(BaseModel):
     contact: Optional[RepairContact] = None
 
 
+# ---------- Controller Builder ----------
+class ControllerInput(BaseModel):
+    key: str
+    name: str
+    model: str = ""
+    base_price: float = 0.0
+    preview_image: Optional[str] = ""
+    versions: List[dict] = []  # [{code, label}]
+    active: bool = True
+    sort: int = 0
+
+
+class BuilderCategoryInput(BaseModel):
+    controller_key: str
+    key: str
+    name: str
+    region_key: str = ""      # which SVG region this recolors
+    side: str = "front"       # front | back | both
+    required: bool = False
+    multi: bool = False
+    sort: int = 0
+    active: bool = True
+
+
+class BuilderVariantInput(BaseModel):
+    name: str
+    color_hex: Optional[str] = ""
+    overlay_image_url: Optional[str] = ""
+    thumb_url: Optional[str] = ""
+    price: float = 0.0
+    sku: Optional[str] = ""
+    available: bool = True
+    active: bool = True
+    is_demo: bool = False
+    sort: int = 0
+    layer: dict = {}          # {x,y,scale,rotation,z,side}
+
+
+class BuilderProductInput(BaseModel):
+    controller_key: str
+    category_key: str
+    name: str
+    description: Optional[str] = ""
+    sku: Optional[str] = ""
+    dolibarr_product_id: Optional[str] = ""
+    compatible_versions: List[str] = []   # empty = all versions
+    requires: List[str] = []              # product ids
+    excludes: List[str] = []              # product ids
+    active: bool = True
+    is_demo: bool = False
+    sort: int = 0
+    variants: List[BuilderVariantInput] = []
+
+
+class BuilderConfigInput(BaseModel):
+    controller_key: str
+    version: Optional[str] = ""
+    selections: dict                      # {category_key: {product_id, variant_id, name, price}}
+    total: float = 0.0
+    note: Optional[str] = ""
+    contact: Optional[RepairContact] = None
+
+
 # ---------- Settings ----------
 class SettingsInput(BaseModel):
     company_name: Optional[str] = None
@@ -152,6 +215,12 @@ class SettingsInput(BaseModel):
     social_links: Optional[dict] = None
     ga_measurement_id: Optional[str] = None
     google_place_id: Optional[str] = None
+    google_places_api_key: Optional[str] = None
+    dolibarr_enabled: Optional[bool] = None
+    dolibarr_base_url: Optional[str] = None
+    dolibarr_api_key: Optional[str] = None
+    logo_light_url: Optional[str] = None
+    logo_dark_url: Optional[str] = None
     seo_default_title: Optional[str] = None
     seo_default_description: Optional[str] = None
     impressum_html: Optional[str] = None

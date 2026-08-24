@@ -58,7 +58,7 @@ export default function AdminConfigurator() {
       <AdminHeader title="Konfiguratoren" desc="Optionen & Kategorien verwalten, Dolibarr-Produkte verknüpfen" />
       <div className="mb-6 inline-flex rounded-xl border border-subtle p-1">
         {[["ps5", "PS5 Controller"], ["pc", "Gaming-PC"]].map(([k, l]) => (
-          <button key={k} onClick={() => setCtype(k)} className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${ctype === k ? "bg-brand text-white" : "text-slate-400 hover:text-white"}`} data-testid={`cfg-tab-${k}`}>{l}</button>
+          <button key={k} onClick={() => setCtype(k)} className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${ctype === k ? "bg-brand text-ink" : "text-muted hover:text-ink"}`} data-testid={`cfg-tab-${k}`}>{l}</button>
         ))}
       </div>
 
@@ -68,7 +68,7 @@ export default function AdminConfigurator() {
             <Panel key={c.id}>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-heading font-semibold text-white">{c.name}</h3>
+                  <h3 className="font-heading font-semibold text-ink">{c.name}</h3>
                   <Badge tone="neutral">{c.key}</Badge>
                   {c.required && <Badge tone="brand">Pflicht</Badge>}
                   {c.multi && <Badge tone="neutral">Mehrfach</Badge>}
@@ -80,19 +80,19 @@ export default function AdminConfigurator() {
                   <div key={o.id} className="flex items-center gap-2 rounded-lg border border-subtle p-2.5">
                     {o.color_hex && <span className="h-6 w-6 shrink-0 rounded-full border border-white/20" style={{ background: o.color_hex }} />}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-white">{o.name}</p>
-                      <p className="truncate text-xs text-slate-500">
+                      <p className="truncate text-sm text-ink">{o.name}</p>
+                      <p className="truncate text-xs text-faint">
                         {o.price_on_request ? "auf Anfrage" : o.price ? EUR(o.price) : "inkl."}
                         {o.dolibarr_product_id && <span className="ml-1 text-brand"><Link2 size={10} className="inline" /> Dolibarr</span>}
                         {o.is_demo && " · Demo"}
                         {!o.active && " · inaktiv"}
                       </p>
                     </div>
-                    <button onClick={() => openEdit(o)} className="rounded p-1 text-slate-400 hover:text-brand"><Pencil size={14} /></button>
-                    <button onClick={() => del(o.id)} className="rounded p-1 text-slate-400 hover:text-red-400"><Trash2 size={14} /></button>
+                    <button onClick={() => openEdit(o)} className="rounded p-1 text-muted hover:text-brand"><Pencil size={14} /></button>
+                    <button onClick={() => del(o.id)} className="rounded p-1 text-muted hover:text-red-400"><Trash2 size={14} /></button>
                   </div>
                 ))}
-                {byCat(c.key).length === 0 && <p className="text-xs text-slate-500">Keine Optionen.</p>}
+                {byCat(c.key).length === 0 && <p className="text-xs text-faint">Keine Optionen.</p>}
               </div>
             </Panel>
           ))}
@@ -126,7 +126,7 @@ export default function AdminConfigurator() {
               <Field label="Overlay-Bild-URL"><Input value={edit.overlay_image_url} onChange={(e) => setEdit({ ...edit, overlay_image_url: e.target.value })} /></Field>
             </div>
             <Field label="Technische Daten (JSON, für Kompatibilität)"><Textarea value={specText} onChange={(e) => setSpecText(e.target.value)} className="min-h-[100px] font-mono text-xs" /></Field>
-            <div className="flex flex-wrap gap-4 text-sm text-slate-300">
+            <div className="flex flex-wrap gap-4 text-sm text-muted">
               <label className="flex items-center gap-2"><input type="checkbox" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Aktiv</label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={edit.available} onChange={(e) => setEdit({ ...edit, available: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Verfügbar</label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={edit.price_on_request} onChange={(e) => setEdit({ ...edit, price_on_request: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Preis auf Anfrage</label>

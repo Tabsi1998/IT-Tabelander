@@ -20,6 +20,13 @@ async def create_contact(payload: ContactInput):
     data["status"] = "neu"
     data["created_at"] = now_utc()
     res = await db.contact_messages.insert_one(data)
+    from .. import dolibarr
+    dol = await dolibarr.create_lead({
+        "subject": f"Kontaktanfrage: {payload.subject or 'Website'}",
+        "message": payload.message,
+        "contact": {"name": payload.name, "email": payload.email, "phone": payload.phone},
+    }, kind="contact")
+    await db.contact_messages.update_one({"_id": res.inserted_id}, {"$set": {"dolibarr": dol}})
     return {"ok": True, "id": str(res.inserted_id)}
 
 

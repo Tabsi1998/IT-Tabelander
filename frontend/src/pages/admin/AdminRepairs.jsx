@@ -54,36 +54,36 @@ export default function AdminRepairs() {
             <Panel key={r.id} className="p-0">
               <div className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <button onClick={() => setExpanded(expanded === r.id ? null : r.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left" data-testid={`repair-row-${r.ref}`}>
-                  <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform ${expanded === r.id ? "rotate-180" : ""}`} />
+                  <ChevronDown size={16} className={`shrink-0 text-faint transition-transform ${expanded === r.id ? "rotate-180" : ""}`} />
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-white">{r.ref} · {r.device_type} {r.model && `– ${r.model}`}</p>
-                    <p className="truncate text-xs text-slate-500">{r.contact?.name} · {r.contact?.email} · {new Date(r.created_at).toLocaleDateString("de-AT")}</p>
+                    <p className="truncate font-medium text-ink">{r.ref} · {r.device_type} {r.model && `– ${r.model}`}</p>
+                    <p className="truncate text-xs text-faint">{r.contact?.name} · {r.contact?.email} · {new Date(r.created_at).toLocaleDateString("de-AT")}</p>
                   </div>
                 </button>
                 <div className="flex items-center gap-2">
                   <Select value={r.status} onChange={(e) => setStatus(r.id, e.target.value)} className="w-44 py-2 text-sm" data-testid={`repair-status-${r.ref}`}>
                     {STATUSES.map((s) => <option key={s} value={s}>{LABEL[s]}</option>)}
                   </Select>
-                  <button onClick={() => del(r.id)} className="rounded-lg p-2 text-slate-500 hover:bg-red-500/10 hover:text-red-400" data-testid={`repair-delete-${r.ref}`}><Trash2 size={16} /></button>
+                  <button onClick={() => del(r.id)} className="rounded-lg p-2 text-faint hover:bg-red-500/10 hover:text-red-400" data-testid={`repair-delete-${r.ref}`}><Trash2 size={16} /></button>
                 </div>
               </div>
               {expanded === r.id && (
                 <div className="border-t border-subtle bg-black/20 p-4 text-sm">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <p className="text-slate-400">Hersteller: <span className="text-white">{r.manufacturer || "–"}</span></p>
-                      <p className="text-slate-400">Fehler: <span className="text-white">{r.issues?.join(", ") || "–"}</span></p>
-                      <p className="mt-2 text-slate-400">Beschreibung:</p>
-                      <p className="text-white">{r.description || "–"}</p>
-                      <p className="mt-2 text-slate-400">Kontakt bevorzugt: <span className="text-white">{r.contact?.preferred_contact}</span> {r.contact?.phone && `· ${r.contact.phone}`}</p>
+                      <p className="text-muted">Hersteller: <span className="text-ink">{r.manufacturer || "–"}</span></p>
+                      <p className="text-muted">Fehler: <span className="text-ink">{r.issues?.join(", ") || "–"}</span></p>
+                      <p className="mt-2 text-muted">Beschreibung:</p>
+                      <p className="text-ink">{r.description || "–"}</p>
+                      <p className="mt-2 text-muted">Kontakt bevorzugt: <span className="text-ink">{r.contact?.preferred_contact}</span> {r.contact?.phone && `· ${r.contact.phone}`}</p>
                       <p className="mt-2"><Badge tone={r.dolibarr?.demo ? "demo" : r.dolibarr?.created ? "success" : "neutral"}>Dolibarr: {r.dolibarr?.created ? "Ticket erstellt" : r.dolibarr?.demo ? "Demo" : "nicht verknüpft"}</Badge></p>
                     </div>
                     <div>
                       {r.attachment_ids?.length > 0 ? (
                         <div className="grid grid-cols-3 gap-2">
-                          {r.attachment_ids.map((_, i) => <div key={i} className="rounded-lg border border-subtle p-2 text-center text-xs text-slate-500">Anhang {i + 1}</div>)}
+                          {r.attachment_ids.map((_, i) => <div key={i} className="rounded-lg border border-subtle p-2 text-center text-xs text-faint">Anhang {i + 1}</div>)}
                         </div>
-                      ) : <p className="text-slate-500">Keine Anhänge</p>}
+                      ) : <p className="text-faint">Keine Anhänge</p>}
                     </div>
                   </div>
                 </div>

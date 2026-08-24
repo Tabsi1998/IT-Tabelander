@@ -48,15 +48,15 @@ export default function AdminMedia() {
       {!items ? <Skeleton className="h-64" /> : items.length === 0 ? <Empty>Noch keine Medien hochgeladen.</Empty> : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((m) => (
-            <div key={m.id} className="group overflow-hidden rounded-xl border border-subtle bg-[#0b1220]">
+            <div key={m.id} className="group overflow-hidden rounded-xl border border-subtle bg-surface">
               <div className="aspect-square overflow-hidden bg-black/30">
                 <img src={mediaUrl(m.url)} alt={m.alt} className="h-full w-full object-cover" loading="lazy" />
               </div>
               <div className="p-2">
-                <p className="truncate text-xs text-slate-400" title={m.alt}>{m.alt || m.filename}</p>
+                <p className="truncate text-xs text-muted" title={m.alt}>{m.alt || m.filename}</p>
                 <div className="mt-2 flex justify-between">
-                  <button onClick={() => copy(mediaUrl(m.url))} className="rounded p-1.5 text-slate-500 hover:text-brand" title="URL kopieren">{copied === mediaUrl(m.url) ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}</button>
-                  <button onClick={() => del(m.id)} className="rounded p-1.5 text-slate-500 hover:text-red-400"><Trash2 size={14} /></button>
+                  <button onClick={() => copy(mediaUrl(m.url))} className="rounded p-1.5 text-faint hover:text-brand" title="URL kopieren">{copied === mediaUrl(m.url) ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}</button>
+                  <button onClick={() => del(m.id)} className="rounded p-1.5 text-faint hover:text-red-400"><Trash2 size={14} /></button>
                 </div>
               </div>
             </div>
