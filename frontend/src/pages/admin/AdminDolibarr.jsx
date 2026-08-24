@@ -32,6 +32,7 @@ export default function AdminDolibarr() {
   if (!status) return (<><AdminHeader title="Dolibarr Sync" /><Skeleton className="h-64" /></>);
 
   const conn = status.connection || {};
+  const healthy = status.enabled && conn.connected;
 
   return (
     <>
@@ -41,11 +42,12 @@ export default function AdminDolibarr() {
       <div className="grid gap-4 md:grid-cols-3">
         <Panel>
           <div className="flex items-center gap-2">
-            {status.enabled ? <CheckCircle2 size={18} className="text-emerald-400" /> : <XCircle size={18} className="text-faint" />}
+            {healthy ? <CheckCircle2 size={18} className="text-emerald-400" /> : <XCircle size={18} className="text-amber-400" />}
             <h3 className="font-semibold text-ink">Status</h3>
           </div>
-          <p className="mt-2 text-sm text-muted">{status.enabled ? "Dolibarr aktiv" : "Demo-Modus"}</p>
+          <p className="mt-2 text-sm text-muted">{healthy ? "Dolibarr bereit" : status.enabled ? "Dolibarr konfiguriert – Prüfung fehlgeschlagen" : "Demo-Modus"}</p>
           <p className="mt-1 text-xs text-faint">{conn.message}</p>
+          {conn.detail && <p className="mt-2 break-words rounded-lg bg-red-500/10 p-2 font-mono text-xs text-red-300">{conn.detail}</p>}
           {!status.enabled && (
             <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-300">
               Dolibarr unter „Einstellungen“ aktivieren und dort URL sowie API-Key hinterlegen.
@@ -58,6 +60,7 @@ export default function AdminDolibarr() {
             <>
               <Badge tone={status.last_sync.status === "success" ? "success" : status.last_sync.status === "error" ? "warning" : "demo"} className="mt-2">{status.last_sync.status}</Badge>
               <p className="mt-2 text-xs text-faint">{new Date(status.last_sync.finished_at).toLocaleString("de-AT")}</p>
+              <p className="mt-2 text-xs text-muted">{status.last_sync.message}</p>
             </>
           ) : <p className="mt-2 text-sm text-faint">Noch kein Sync.</p>}
         </Panel>
@@ -88,9 +91,12 @@ export default function AdminDolibarr() {
         {logs.length === 0 ? <Empty>Keine Einträge.</Empty> : (
           <div className="space-y-2">
             {logs.map((l) => (
-              <div key={l.id} className="flex items-center justify-between rounded-lg border border-subtle p-3 text-sm">
-                <span className="text-muted">{l.message}</span>
-                <div className="flex items-center gap-3">
+              <div key={l.id} className="flex flex-col gap-2 rounded-lg border border-subtle p-3 text-sm sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-muted">{l.message}</p>
+                  {l.detail && <p className="mt-1 break-words font-mono text-xs text-red-300">{l.detail}</p>}
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
                   <Badge tone={l.status === "success" ? "success" : l.status === "error" ? "warning" : "demo"}>{l.status}</Badge>
                   <span className="text-xs text-faint">{new Date(l.finished_at).toLocaleString("de-AT")}</span>
                 </div>

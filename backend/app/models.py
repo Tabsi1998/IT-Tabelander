@@ -206,6 +206,8 @@ class BuilderConfigInput(BaseModel):
     total: float = 0.0
     note: Optional[str] = ""
     contact: Optional[RepairContact] = None
+    consent: bool = False
+    honeypot: Optional[str] = ""
 
 
 # ---------- Settings ----------

@@ -1,14 +1,17 @@
 import asyncio
 from pathlib import Path
 
+import httpx
 import pytest
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
 import server
+from app import dolibarr
 from app.models import SettingsInput
 from app import runtime_env
+from app.routers.builder import _public_controller
 from app.routers.settings import _admin_response
 from dotenv import dotenv_values
 
@@ -64,3 +67,53 @@ def test_frontend_spa_and_static_files_are_served(tmp_path, monkeypatch):
     with pytest.raises(HTTPException) as exc:
         asyncio.run(server.frontend_app("api/does-not-exist"))
     assert exc.value.status_code == 404
+
+
+def test_dolibarr_permission_error_is_actionable_and_safe():
+    request = httpx.Request("GET", "https://erp.example.test/api/index.php/products")
+    response = httpx.Response(403, request=request, json={"error": {"message": "Forbidden"}})
+    error = httpx.HTTPStatusError("forbidden", request=request, response=response)
+
+    info = dolibarr._error_info(
+        error,
+        {"timeout": 8, "api_key": "must-not-leak"},
+        "Produktsync",
+    )
+
+    assert info["http_status"] == 403
+    assert "Produkte/Dienstleistungen lesen" in info["message"]
+    assert "must-not-leak" not in str(info)
+
+
+def test_dolibarr_product_sync_paginates_and_accepts_rowid():
+    async def run():
+        async def handler(request):
+            page = int(request.url.params["page"])
+            start = page * dolibarr.PRODUCT_PAGE_SIZE
+            count = dolibarr.PRODUCT_PAGE_SIZE if page == 0 else 1
+            return httpx.Response(200, json=[
+                {"rowid": start + index + 1, "ref": f"P-{start + index + 1}", "price": "invalid"}
+                for index in range(count)
+            ])
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await dolibarr._fetch_products(client, {
+                "base": "https://erp.example.test",
+                "api_key": "secret",
+            })
+
+    products = asyncio.run(run())
+    normalized = dolibarr._normalize(products[-1])
+    assert len(products) == dolibarr.PRODUCT_PAGE_SIZE + 1
+    assert normalized["dolibarr_product_id"] == str(dolibarr.PRODUCT_PAGE_SIZE + 1)
+    assert normalized["price"] == 0.0
+
+
+def test_public_controller_does_not_expose_bdm_revisions():
+    result = _public_controller({
+        "key": "dualsense",
+        "name": "PS5 DualSense",
+        "versions": [{"code": "BDM-030", "label": "BDM-030"}],
+    })
+
+    assert "versions" not in result

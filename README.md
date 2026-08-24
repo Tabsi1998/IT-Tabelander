@@ -131,7 +131,7 @@ Wer Systempakete bewusst selbst verwaltet, kann verwenden:
 - Google Places API-Key als geschütztes Schreibfeld
 - Dolibarr aktiv/inaktiv, Basis-URL, API-Key, Timeout und Ländercode
 - Light-/Dark-Logos und Social-Media-Links
-- PC-Builder-Texte
+- PC-Builder-Texte sowie Controller-Produkte, Live-Farben, Preise und Bilder
 - Impressum und Datenschutz
 - Admin-Login-E-Mail und Admin-Passwort
 
@@ -190,11 +190,18 @@ Ein gesunder Healthcheck liefert:
 | Problem | Lösung |
 |---|---|
 | MongoDB startet nicht | `systemctl status mongod` und `/var/log/mongodb/mongod.log` prüfen |
+| Dolibarr-Verbindung klappt, Produktsync aber nicht | Im Dolibarr-Admin für den API-Benutzer **Produkte/Dienstleistungen lesen** aktivieren; der Sync-Bildschirm zeigt HTTP-Status und Dolibarr-Fehlertext |
+| Dolibarr meldet HTTP 404 | Als Basis-URL nur die Dolibarr-Installation eintragen, z. B. `https://erp.example.at/dolibarr`, nicht `/api/index.php` anhängen |
 | Port 8001 ist belegt | fremden Dienst stoppen oder `BACKEND_PORT` in `deploy.config` und im Reverse Proxy gemeinsam ändern |
 | Admin-Passwort vergessen | `./start.sh --reset-admin` ausführen |
 | Installation wurde abgebrochen | `./start.sh` erneut ausführen |
 | Frontend zeigt alten Stand | `./update.sh` oder `./start.sh --refresh` |
 | Start schlägt fehl | letzte Zeilen aus `logs/backend.log` prüfen |
+
+Beim öffentlichen Controller-Builder wählen Kunden nur `DualSense` oder
+`DualSense Edge`. BDM-/Hardware-Revisionen und die dazugehörige
+Teilekompatibilität bleiben bewusst intern im Admin und werden nach einer
+Anfrage geprüft.
 
 ## Lokale Entwicklung
 

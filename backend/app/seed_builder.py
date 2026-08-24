@@ -83,8 +83,8 @@ PREVIEWS = {
         "preview_back": "/assets/img/controller/controller-dualsense-back.png",
     },
     "edge": {
-        "preview_front": "/assets/img/controller/controller-dualsense-edge-official-front.png",
-        "preview_back": "/assets/img/controller/controller-dualsense-edge-official-back.png",
+        "preview_front": "/assets/img/controller/controller-dualsense-edge-premium.png",
+        "preview_back": "/assets/img/controller/controller-dualsense-edge-back.png",
     },
 }
 

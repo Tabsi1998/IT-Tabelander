@@ -22,14 +22,15 @@ export default function AdminBuilder() {
   const [cats, setCats] = useState([]);
   const [prods, setProds] = useState([]);
   const [dolProds, setDolProds] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [edit, setEdit] = useState(null);
-  const [variantsText, setVariantsText] = useState("[]");
 
   useEffect(() => {
     api.get("/admin/builder/controllers").then(({ data }) => {
       setControllers(data); if (data[0]) setCk(data[0].key);
     }).catch(() => setControllers([]));
     api.get("/admin/dolibarr/products").then(({ data }) => setDolProds(data)).catch(() => {});
+    api.get("/admin/builder/requests").then(({ data }) => setRequests(data)).catch(() => {});
   }, []);
 
   const load = useCallback(() => {
@@ -41,14 +42,12 @@ export default function AdminBuilder() {
 
   const openEdit = (p, catKey) => {
     const d = p ? { ...p } : emptyProduct(ck, catKey);
-    setVariantsText(JSON.stringify(d.variants || [], null, 2));
-    setEdit(d);
+    setEdit({ ...d, variants: (d.variants || []).map((variant) => ({ ...variant })) });
   };
 
   const save = async () => {
-    let variants = [];
-    try { variants = JSON.parse(variantsText || "[]"); } catch { return toast.error("Varianten: ungültiges JSON"); }
-    const payload = { ...edit, variants };
+    if (!(edit.variants || []).every((variant) => variant.name?.trim())) return toast.error("Jede Variante benötigt einen Namen");
+    const payload = { ...edit, variants: edit.variants || [] };
     try {
       if (edit.id) await api.put(`/admin/builder/products/${edit.id}`, payload);
       else await api.post("/admin/builder/products", payload);
@@ -57,6 +56,21 @@ export default function AdminBuilder() {
   };
 
   const del = async (id) => { if (!window.confirm("Produkt löschen?")) return; await api.delete(`/admin/builder/products/${id}`); load(); };
+  const addVariant = () => setEdit((current) => ({
+    ...current,
+    variants: [...(current.variants || []), {
+      name: "Neue Variante", color_hex: "#1A1D22", overlay_image_url: "", thumb_url: "",
+      price: 0, sku: "", available: true, active: true, is_demo: false, sort: current.variants?.length || 0, layer: {},
+    }],
+  }));
+  const updateVariant = (index, patch) => setEdit((current) => ({
+    ...current,
+    variants: current.variants.map((variant, variantIndex) => variantIndex === index ? { ...variant, ...patch } : variant),
+  }));
+  const removeVariant = (index) => setEdit((current) => ({
+    ...current,
+    variants: current.variants.filter((_, variantIndex) => variantIndex !== index),
+  }));
 
   const controller = controllers?.find((c) => c.key === ck);
 
@@ -81,6 +95,30 @@ export default function AdminBuilder() {
               </div>
             </Panel>
           )}
+
+          <Panel className="mb-6">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-heading font-semibold text-ink">Controller-Anfragen</h3>
+              <Badge tone={requests.length ? "brand" : "neutral"}>{requests.length}</Badge>
+            </div>
+            {requests.length === 0 ? <p className="text-sm text-faint">Noch keine Kundenanfragen.</p> : (
+              <div className="max-h-80 space-y-2 overflow-y-auto">
+                {requests.map((request) => (
+                  <div key={request.id} className="rounded-xl border border-subtle p-3 text-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-ink">{request.contact?.name || "Unbekannt"} · <a href={`mailto:${request.contact?.email || ""}`} className="text-brand hover:underline">{request.contact?.email}</a></p>
+                        <p className="text-xs text-faint">{request.contact?.phone || "Keine Telefonnummer"} · ID {request.config_id}</p>
+                      </div>
+                      <div className="text-right"><p className="font-semibold text-brand">{EUR(request.total)}</p><p className="text-xs text-faint">{new Date(request.created_at).toLocaleString("de-AT")}</p></div>
+                    </div>
+                    <p className="mt-2 text-xs text-muted">{Object.values(request.selections || {}).map((selection) => selection.name).join(" · ") || "Basismodell ohne Zusatzoptionen"}</p>
+                    {request.note && <p className="mt-2 rounded-lg bg-elevated/60 p-2 text-xs text-muted">{request.note}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
 
           {cats.length === 0 ? <Empty>Keine Kategorien.</Empty> : (
             <div className="space-y-5">
@@ -135,9 +173,40 @@ export default function AdminBuilder() {
             <Field label="Kompatible Revisionen (Komma, leer = alle)">
               <Input value={(edit.compatible_versions || []).join(",")} onChange={(e) => setEdit({ ...edit, compatible_versions: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} placeholder="BDM-030, BDM-040" />
             </Field>
-            <Field label="Varianten (JSON: name, color_hex, price, overlay_image_url, layer{x,y,scale,rotation,z,side})">
-              <Textarea value={variantsText} onChange={(e) => setVariantsText(e.target.value)} className="min-h-[160px] font-mono text-xs" />
-            </Field>
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-ink">Varianten und Live-Farben</p>
+                  <p className="text-xs text-faint">Der Hexwert färbt das gewählte Bauteil direkt in der Kundenvorschau.</p>
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={addVariant}><Plus size={14} /> Variante</Button>
+              </div>
+              <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                {(edit.variants || []).map((variant, index) => {
+                  const validColor = /^#[0-9a-f]{6}$/i.test(variant.color_hex || "") ? variant.color_hex : "#1A1D22";
+                  return (
+                    <div key={index} className="rounded-xl border border-subtle p-3">
+                      <div className="grid gap-3 sm:grid-cols-[1fr_7rem_auto]">
+                        <Field label="Name"><Input value={variant.name || ""} onChange={(e) => updateVariant(index, { name: e.target.value })} /></Field>
+                        <Field label="Aufpreis"><Input type="number" step="0.01" value={variant.price ?? 0} onChange={(e) => updateVariant(index, { price: Number(e.target.value) || 0 })} /></Field>
+                        <button type="button" onClick={() => removeVariant(index)} className="mt-6 rounded-lg p-2 text-faint hover:bg-red-500/10 hover:text-red-400" aria-label="Variante entfernen"><Trash2 size={16} /></button>
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-[3rem_1fr_1fr]">
+                        <input type="color" value={validColor} onChange={(e) => updateVariant(index, { color_hex: e.target.value })} className="h-11 w-12 cursor-pointer rounded-lg border border-subtle bg-elevated p-1" aria-label="Farbe wählen" />
+                        <Field label="Farbe (Hex)"><Input value={variant.color_hex || ""} onChange={(e) => updateVariant(index, { color_hex: e.target.value })} placeholder="#F26522" /></Field>
+                        <Field label="SKU"><Input value={variant.sku || ""} onChange={(e) => updateVariant(index, { sku: e.target.value })} /></Field>
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <Field label="Vorschaubild (optional)"><Input value={variant.thumb_url || ""} onChange={(e) => updateVariant(index, { thumb_url: e.target.value })} placeholder="/api/media/..." /></Field>
+                        <Field label="Overlay-Bild (optional)"><Input value={variant.overlay_image_url || ""} onChange={(e) => updateVariant(index, { overlay_image_url: e.target.value })} placeholder="/api/media/..." /></Field>
+                      </div>
+                      <label className="mt-3 flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={variant.active !== false} onChange={(e) => updateVariant(index, { active: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Für Kunden auswählbar</label>
+                    </div>
+                  );
+                })}
+                {(edit.variants || []).length === 0 && <p className="rounded-xl border border-dashed border-subtle p-4 text-center text-xs text-faint">Noch keine Varianten angelegt.</p>}
+              </div>
+            </div>
             <div className="flex flex-wrap gap-4 text-sm text-muted">
               <label className="flex items-center gap-2"><input type="checkbox" checked={edit.active} onChange={(e) => setEdit({ ...edit, active: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Aktiv</label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={edit.is_demo} onChange={(e) => setEdit({ ...edit, is_demo: e.target.checked })} className="h-4 w-4 accent-[#F26522]" /> Demo</label>

@@ -10,6 +10,12 @@ from ..security import require_admin
 router = APIRouter(prefix="/api", tags=["builder"])
 
 
+def _public_controller(document: dict) -> dict:
+    item = serialize(document)
+    item.pop("versions", None)  # BDM/hardware revisions are an internal assessment.
+    return item
+
+
 async def _dolibarr_price(pid):
     if not pid:
         return None
@@ -22,27 +28,28 @@ async def _dolibarr_price(pid):
 @router.get("/builder/controllers")
 async def list_controllers():
     docs = await get_db().controllers.find({"active": True}).sort("sort", 1).to_list(50)
-    return [serialize(d) for d in docs]
+    public = []
+    for document in docs:
+        public.append(_public_controller(document))
+    return public
 
 
 @router.get("/builder/{controller_key}")
-async def get_builder(controller_key: str, version: str | None = None):
+async def get_builder(controller_key: str):
     db = get_db()
     ctrl = await db.controllers.find_one({"key": controller_key, "active": True})
     if not ctrl:
         raise HTTPException(status_code=404, detail="Controller nicht gefunden")
     cats = await db.builder_categories.find({"controller_key": controller_key, "active": True}).sort("sort", 1).to_list(100)
     prods = await db.builder_products.find({"controller_key": controller_key, "active": True}).sort("sort", 1).to_list(500)
-    # attach variants + filter by version compatibility
+    # Hardware/BDM compatibility is intentionally not a customer choice. The
+    # internal compatibility metadata remains available in the admin area.
     out_cats = []
     for c in cats:
         c = serialize(c)
         c_prods = []
         for p in prods:
             if p.get("category_key") != c["key"]:
-                continue
-            comp = p.get("compatible_versions") or []
-            if version and comp and version not in comp:
                 continue
             p2 = serialize(dict(p))
             dol = await _dolibarr_price(p.get("dolibarr_product_id"))
@@ -53,17 +60,23 @@ async def get_builder(controller_key: str, version: str | None = None):
             c_prods.append(p2)
         c["products"] = c_prods
         out_cats.append(c)
-    return {"controller": serialize(ctrl), "categories": out_cats}
+    return {"controller": _public_controller(ctrl), "categories": out_cats}
 
 
 @router.post("/builder/save")
 async def save_config(payload: BuilderConfigInput):
+    if payload.honeypot:
+        raise HTTPException(status_code=400, detail="Anfrage konnte nicht gespeichert werden")
+    if payload.contact and not payload.consent:
+        raise HTTPException(status_code=400, detail="Bitte der Datenverarbeitung zustimmen")
     db = get_db()
     cid = secrets.token_urlsafe(8)
     doc = payload.model_dump()
     doc["config_id"] = cid
     doc["kind"] = "controller"
     doc["total"] = round(payload.total, 2)
+    doc["request_status"] = "new" if payload.contact else "saved"
+    doc.pop("honeypot", None)
     doc["created_at"] = now_utc()
     await db.builder_configs.insert_one(doc)
     # optional Dolibarr lead
@@ -84,6 +97,14 @@ async def get_saved(config_id: str):
     if not doc:
         raise HTTPException(status_code=404, detail="Konfiguration nicht gefunden")
     return serialize(doc)
+
+
+@router.get("/admin/builder/requests")
+async def admin_requests(_: dict = Depends(require_admin)):
+    docs = await get_db().builder_configs.find(
+        {"kind": "controller", "contact": {"$exists": True, "$ne": None}}
+    ).sort("created_at", -1).to_list(200)
+    return [serialize(document) for document in docs]
 
 
 # ---------------- Admin: controllers ----------------

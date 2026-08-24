@@ -12,6 +12,7 @@ backend/venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+backend/pytest-*/
 
 # ── Node / Frontend ──────────────────────────────────────────────────────
 frontend/node_modules/
