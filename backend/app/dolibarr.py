@@ -7,7 +7,7 @@ Dolibarr directly. Demo mode is used when no API key is configured.
 import logging
 import os
 import re
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 import httpx
 
@@ -33,9 +33,12 @@ async def get_config() -> dict:
         s.get("canonical_base_url")
         or os.environ.get("CANONICAL_BASE_URL", "https://it.tabelander.co.at")
     ).rstrip("/")
+    public_ticket_enabled = bool(s.get("dolibarr_public_ticket_enabled", False))
+    ticket_categories = s.get("dolibarr_ticket_categories") or {}
     return {"api_key": api_key, "base": base, "enabled": bool(enabled_flag) and bool(api_key),
             "timeout": min(max(timeout, 1), 60), "country_code": country_code,
-            "site_base": site_base}
+            "site_base": site_base, "public_ticket_enabled": public_ticket_enabled,
+            "ticket_categories": ticket_categories}
 
 
 def _headers(cfg):
@@ -220,13 +223,26 @@ async def _lookup_thirdparty(client: httpx.AsyncClient, cfg: dict, email: str) -
 async def _create_thirdparty(client: httpx.AsyncClient, cfg: dict, contact: dict) -> str:
     """Create a prospect (client=2) using Dolibarr's automatic customer code."""
     payload = {
-        "name": contact.get("name") or contact.get("email"),
+        "name": contact.get("company_name") or contact.get("name") or contact.get("email"),
         "email": contact.get("email", ""),
-        "phone": contact.get("phone", ""),
+        "phone_mobile": contact.get("phone", ""),
         "client": 2,
         # Dolibarr interprets -1 as "generate with the configured module".
         "code_client": "-1",
-        "country_code": cfg["country_code"],
+        "country_code": contact.get("country_code") or cfg["country_code"],
+        "address": contact.get("address", ""),
+        "zip": contact.get("postal_code", ""),
+        "town": contact.get("city", ""),
+        "url": contact.get("website", ""),
+        "tva_intra": contact.get("vat_id", ""),
+        # Austrian labels: idprof1 tax number, idprof2 court,
+        # idprof3 company-register number and idprof5 EORI.
+        "idprof1": contact.get("tax_number", ""),
+        "idprof2": contact.get("court", ""),
+        "idprof3": contact.get("company_registration", ""),
+        "idprof5": contact.get("eori", ""),
+        "particulier": 0 if contact.get("contact_type") == "business" else 1,
+        "status": 1,
     }
     response = await client.post(
         f"{cfg['base']}/api/index.php/thirdparties",
@@ -236,9 +252,48 @@ async def _create_thirdparty(client: httpx.AsyncClient, cfg: dict, contact: dict
     return _remote_id(response.json())
 
 
+async def _enrich_thirdparty(
+    client: httpx.AsyncClient, cfg: dict, thirdparty_id: str, contact: dict,
+) -> None:
+    """Fill customer-supplied details without clearing existing Dolibarr data."""
+    detail_fields = (
+        "company_name", "address", "postal_code", "city", "website", "vat_id",
+        "tax_number", "company_registration", "court", "eori",
+    )
+    if not any(str(contact.get(field) or "").strip() for field in detail_fields):
+        return
+    mapping = {
+        "company_name": "name",
+        "phone": "phone_mobile",
+        "address": "address",
+        "postal_code": "zip",
+        "city": "town",
+        "country_code": "country_code",
+        "website": "url",
+        "vat_id": "tva_intra",
+        "tax_number": "idprof1",
+        "court": "idprof2",
+        "company_registration": "idprof3",
+        "eori": "idprof5",
+    }
+    payload = {
+        remote: str(contact.get(local) or "").strip()
+        for local, remote in mapping.items()
+        if str(contact.get(local) or "").strip()
+    }
+    if not payload:
+        return
+    response = await client.put(
+        f"{cfg['base']}/api/index.php/thirdparties/{quote(str(thirdparty_id), safe='')}",
+        headers=_headers(cfg), json=payload,
+    )
+    response.raise_for_status()
+
+
 async def _create_ticket(client: httpx.AsyncClient, cfg: dict, *, subject: str,
                          message: str, email: str, thirdparty_id: str,
-                         track_id: str | None = None) -> str:
+                         track_id: str | None = None,
+                         classification: dict | None = None) -> str:
     payload = {
         "subject": subject,
         "message": message,
@@ -247,6 +302,7 @@ async def _create_ticket(client: httpx.AsyncClient, cfg: dict, *, subject: str,
     }
     if track_id:
         payload["track_id"] = track_id
+    payload.update(classification or {})
     response = await client.post(
         f"{cfg['base']}/api/index.php/tickets",
         headers=_headers(cfg), json=payload,
@@ -275,7 +331,8 @@ async def _lookup_ticket_by_track_id(
 async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
                                    subject: str, message: str, contact: dict,
                                    previous: dict | None = None,
-                                   track_id: str | None = None) -> dict:
+                                   track_id: str | None = None,
+                                   classification: dict | None = None) -> dict:
     previous = previous or {}
     if previous.get("synced") or previous.get("ticket_id") or previous.get("ticket_ref"):
         return {**previous, "created": True, "synced": True, "stage": "complete",
@@ -321,15 +378,33 @@ async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
             thirdparty_id = await _create_thirdparty(client, cfg, contact)
         except Exception as exc:  # noqa: BLE001
             return _sync_error(exc, cfg, "thirdparty_create", "Anlegen des Interessenten")
+    else:
+        try:
+            await _enrich_thirdparty(client, cfg, str(thirdparty_id), contact)
+        except Exception as exc:  # noqa: BLE001
+            # The customer and their local inquiry already exist. Optional
+            # profile enrichment must not prevent creating the actual ticket.
+            logger.info("Dolibarr third-party enrichment skipped: %s", type(exc).__name__)
 
     try:
         ticket_id = await _create_ticket(
             client, cfg, subject=subject, message=message,
             email=email, thirdparty_id=str(thirdparty_id), track_id=track_id,
+            classification=classification,
         )
     except Exception as exc:  # noqa: BLE001
         return _sync_error(exc, cfg, "ticket_create", "Anlegen des Tickets", str(thirdparty_id))
 
+    ticket_ref = ticket_id
+    if track_id:
+        try:
+            created_ticket = await _lookup_ticket_by_track_id(client, cfg, track_id)
+            if created_ticket:
+                ticket_ref = str(created_ticket.get("ref") or ticket_id)
+        except Exception:  # noqa: BLE001
+            # The ticket is already created. A cosmetic reference lookup must
+            # never turn a successful sync into a failed customer inquiry.
+            logger.info("Dolibarr ticket reference lookup failed after creation")
     return {
         "created": True,
         "synced": True,
@@ -340,7 +415,7 @@ async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
         "thirdparty_id": str(thirdparty_id),
         "ticket_id": ticket_id,
         # Preserve the old response key used by existing admin code.
-        "ticket_ref": ticket_id,
+        "ticket_ref": ticket_ref,
         "ticket_track_id": track_id,
         "attempted_at": now_utc(),
         "synced_at": now_utc(),
@@ -362,6 +437,35 @@ def inquiry_track_id(inquiry: dict) -> str:
     if not cleaned:
         cleaned = re.sub(r"[^A-Za-z0-9]", "", str(inquiry.get("request_id") or "")).upper()
     return f"IT{cleaned}"[:16]
+
+
+TICKET_TYPE_CODES = {
+    "repair": "ISSUE",
+    "pc_build": "COM",
+    "pc_upgrade": "REQUEST",
+    "controller_custom": "REQUEST",
+    "consulting": "COM",
+    "other": "OTHER",
+}
+
+
+def _ticket_classification(inquiry: dict, cfg: dict) -> dict:
+    request_type = str(inquiry.get("request_type") or "other")
+    result = {
+        "type_code": TICKET_TYPE_CODES.get(request_type, "OTHER"),
+        "severity_code": "NORMAL",
+    }
+    category = str((cfg.get("ticket_categories") or {}).get(request_type) or "").strip()
+    if category:
+        result["category_code"] = category.upper()
+    return result
+
+
+def _public_ticket_url(cfg: dict, track_id: str, email: str) -> str | None:
+    if not cfg.get("public_ticket_enabled") or not cfg.get("base") or not email:
+        return None
+    query = urlencode({"track_id": track_id, "email": email})
+    return f"{cfg['base']}/public/ticket/view.php?{query}"
 
 
 def format_inquiry_message(inquiry: dict) -> str:
@@ -404,6 +508,20 @@ def format_inquiry_message(inquiry: dict) -> str:
         f"Telefon: {contact.get('phone') or '–'}",
         f"Bevorzugter Kontakt: {contact.get('preferred_contact') or '–'}",
     ]
+    optional_contact = [
+        ("Kontaktart", "Firma" if contact.get("contact_type") == "business" else "Privatperson"),
+        ("Firma", contact.get("company_name")),
+        ("Adresse", contact.get("address")),
+        ("PLZ / Ort", " ".join(filter(None, [contact.get("postal_code"), contact.get("city")]))),
+        ("Land", contact.get("country_code")),
+        ("Website", contact.get("website")),
+        ("UID", contact.get("vat_id")),
+        ("Firmenbuchnummer", contact.get("company_registration")),
+        ("Steuernummer", contact.get("tax_number")),
+        ("Gerichtsstand", contact.get("court")),
+        ("EORI", contact.get("eori")),
+    ]
+    lines.extend(f"{label}: {value}" for label, value in optional_contact if value)
     if inquiry.get("request_id"):
         lines.extend(["", f"Request-ID: {inquiry['request_id']}"])
     return "\n".join(lines)
@@ -423,14 +541,20 @@ async def create_ticket_for_inquiry(inquiry: dict, previous: dict | None = None)
         ticket_inquiry = {**inquiry, "_site_base": cfg.get("site_base", "")}
         track_id = inquiry_track_id(ticket_inquiry)
         async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
-            return await _sync_ticket_with_client(
+            result = await _sync_ticket_with_client(
                 client, cfg,
                 subject=inquiry_subject(ticket_inquiry),
                 message=format_inquiry_message(ticket_inquiry),
                 contact=inquiry.get("contact") or {},
                 previous=previous,
                 track_id=track_id or None,
+                classification=_ticket_classification(ticket_inquiry, cfg),
             )
+            if result.get("synced") and track_id:
+                result["ticket_public_url"] = _public_ticket_url(
+                    cfg, track_id, str((inquiry.get("contact") or {}).get("email") or ""),
+                )
+            return result
     except Exception as exc:  # noqa: BLE001
         return _sync_error(exc, cfg, stage, action,
                            (previous or {}).get("thirdparty_id"))

@@ -90,6 +90,65 @@ def test_dolibarr_creates_prospect_after_404_then_creates_ticket():
     assert posted[1][1]["fk_soc"] == "77"
 
 
+def test_business_details_fill_new_dolibarr_prospect():
+    contact = {
+        **CONTACT,
+        "contact_type": "business",
+        "company_name": "Mustertechnik GmbH",
+        "address": "Testgasse 12",
+        "postal_code": "1010",
+        "city": "Wien",
+        "country_code": "AT",
+        "website": "https://muster.example",
+        "vat_id": "ATU12345678",
+        "company_registration": "FN 123456a",
+        "tax_number": "12-345/6789",
+        "court": "Handelsgericht Wien",
+        "eori": "ATEOS1234567890",
+    }
+    posted = {}
+
+    def handler(request: httpx.Request):
+        posted.update(json.loads(request.content))
+        return httpx.Response(200, json=77)
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await dolibarr._create_thirdparty(client, CFG, contact)
+
+    assert asyncio.run(run()) == "77"
+    assert posted["name"] == "Mustertechnik GmbH"
+    assert posted["address"] == "Testgasse 12"
+    assert posted["zip"] == "1010"
+    assert posted["town"] == "Wien"
+    assert posted["phone_mobile"] == CONTACT["phone"]
+    assert posted["tva_intra"] == "ATU12345678"
+    assert posted["idprof1"] == "12-345/6789"
+    assert posted["idprof2"] == "Handelsgericht Wien"
+    assert posted["idprof3"] == "FN 123456a"
+    assert posted["idprof5"] == "ATEOS1234567890"
+    assert posted["client"] == 2
+
+
+def test_ticket_classification_and_public_url_are_safe_and_configurable():
+    cfg = {
+        **CFG,
+        "public_ticket_enabled": True,
+        "ticket_categories": {"controller_custom": "controller"},
+    }
+    assert dolibarr._ticket_classification({"request_type": "controller_custom"}, cfg) == {
+        "type_code": "REQUEST",
+        "severity_code": "NORMAL",
+        "category_code": "CONTROLLER",
+    }
+    url = dolibarr._public_ticket_url(cfg, "ITANF123", "max+portal@example.com")
+    assert url == (
+        "https://erp.example.test/public/ticket/view.php?"
+        "track_id=ITANF123&email=max%2Bportal%40example.com"
+    )
+    assert dolibarr._public_ticket_url({**cfg, "public_ticket_enabled": False}, "x", "a@b.at") is None
+
+
 def test_dolibarr_error_is_structured_and_never_leaks_api_key():
     def handler(_request: httpx.Request):
         return httpx.Response(
@@ -290,6 +349,26 @@ def test_inquiry_model_limits_attachments_and_request_types():
         InquiryInput(**base, request_type="unsupported")
     with pytest.raises(ValidationError):
         InquiryInput(**base, attachment_ids=[str(index) for index in range(6)])
+
+
+def test_business_contact_requires_company_and_normalizes_optional_data():
+    base = {
+        "consent": True,
+        "description": "Ausführliche geschäftliche Anfrage",
+        "request_type": "consulting",
+        "request_id": "business-request-1234",
+    }
+    with pytest.raises(ValidationError):
+        InquiryInput(**base, contact={**CONTACT, "contact_type": "business"})
+    inquiry = InquiryInput(**base, contact={
+        **CONTACT,
+        "contact_type": "business",
+        "company_name": " Muster GmbH ",
+        "country_code": "at",
+        "website": "https://muster.example",
+    })
+    assert inquiry.contact.company_name == "Muster GmbH"
+    assert inquiry.contact.country_code == "AT"
 
 
 def test_repeated_request_id_returns_same_local_inquiry_without_second_sync(monkeypatch):

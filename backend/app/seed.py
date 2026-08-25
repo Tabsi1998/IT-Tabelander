@@ -82,6 +82,8 @@ async def seed_settings():
         ),
         "dolibarr_timeout_seconds": 8,
         "dolibarr_country_code": "AT",
+        "dolibarr_public_ticket_enabled": False,
+        "dolibarr_ticket_categories": {},
         "google_place_id": os.environ.get("GOOGLE_PLACE_ID", ""),
         "seo_default_title": (
             "IT-Tabelander – IT-Service, Reparatur & Gaming-Hardware in Tirol"

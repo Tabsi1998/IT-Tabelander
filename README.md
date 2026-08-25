@@ -158,8 +158,11 @@ erhält eine Referenz `ANF-XXXXXXXX`. Wenn Dolibarr aktiv ist, passiert danach
 automatisch Folgendes:
 
 1. vorhandenen Interessenten anhand der E-Mail-Adresse suchen und wiederverwenden;
-2. andernfalls einen neuen Interessenten anlegen;
-3. ein Ticket mit allen Angaben erstellen und mit dem Interessenten verknüpfen.
+2. andernfalls einen neuen Interessenten mit den freiwillig angegebenen Firmen-,
+   Adress-, Telefon-, UID-, Firmenbuch-, Gerichtsstand-, EORI- und Steuerdaten
+   anlegen;
+3. ein Ticket mit allen Angaben erstellen, klassifizieren und mit dem
+   Interessenten verknüpfen.
 
 Ein Dolibarr-Fehler verliert deshalb keine Kundenanfrage. Unter
 `/admin/anfragen` bleiben Fehlermeldung und Zwischenstand sichtbar und die
@@ -177,6 +180,23 @@ werden ausdrücklich nicht in Git aufgenommen.
 3. Unter `/admin/einstellungen` Dolibarr aktivieren, die Basis-URL der
    Installation (ohne `/api/index.php`) und den API-Key eintragen.
 4. Unter `/admin/dolibarr` auf **Verbindung prüfen** klicken.
+
+Die Anfrageart wird ohne weitere Einrichtung passend gesetzt: Reparaturen als
+`ISSUE`, Neubau/Beratung als `COM`, Umbau/Upgrade als `REQUEST` und Sonstiges als
+`OTHER`; die Dringlichkeit ist zunächst `NORMAL`. Eigene Themengruppen können in
+Dolibarr angelegt und deren Codes unter `/admin/einstellungen` je Anfrageart
+zugeordnet werden. Sinnvolle Codes sind `REPARATUR`, `PC_BAU`, `PC_UPGRADE`,
+`CONTROLLER`, `BERATUNG` und `SONSTIGES`. Leere Zuordnungen werden nicht an
+Dolibarr gesendet und können den Sync daher nicht stören.
+
+Für einen Link auf der Danke-Seite zusätzlich in Dolibarr unter **Ticket →
+Einstellungen → Öffentliches Interface** die öffentliche Oberfläche aktivieren
+und danach im Website-Admin **Öffentlichen Dolibarr-Ticketlink anzeigen**
+einschalten. Die Website erzeugt ausschließlich den öffentlichen Link mit
+Tracking-ID und Kunden-E-Mail; interne Karten-URLs oder Admin-Token werden nie
+an Kunden ausgegeben. Wenn Dolibarr das öffentliche Interface nicht aktiviert
+hat oder der Sync fehlschlägt, bleibt die Danke-Seite bewusst bei der lokalen
+`ANF-…`-Referenz.
 
 Die genaue Bezeichnung der Rechte kann je nach Dolibarr-Version/Sprache leicht
 abweichen. Entscheidend ist, dass der API-Benutzer Dritte suchen und anlegen

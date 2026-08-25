@@ -9,6 +9,10 @@ import { Input, Textarea } from "../../components/ui/input";
 import { useAuth } from "../../context/AuthContext";
 
 const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+const DOLIBARR_CATEGORIES = [
+  ["repair", "Reparatur"], ["pc_build", "PC-Neubau"], ["pc_upgrade", "PC-Upgrade"],
+  ["controller_custom", "Controller-Umbau"], ["consulting", "Beratung"], ["other", "Sonstiges"],
+];
 
 export default function AdminSettings() {
   const { user, refresh } = useAuth();
@@ -22,8 +26,9 @@ export default function AdminSettings() {
     api.get("/admin/settings").then(({ data }) => setS({
       ...data,
       social_links: data.social_links || {},
+      dolibarr_ticket_categories: data.dolibarr_ticket_categories || {},
       opening_hours: WEEKDAYS.map((day) => data.opening_hours?.find((item) => item.day === day) || { day, hours: "" }),
-    })).catch(() => setS({ opening_hours: WEEKDAYS.map((day) => ({ day, hours: "" })), social_links: {} }));
+    })).catch(() => setS({ opening_hours: WEEKDAYS.map((day) => ({ day, hours: "" })), social_links: {}, dolibarr_ticket_categories: {} }));
   }, []);
 
   useEffect(() => {
@@ -42,6 +47,7 @@ export default function AdminSettings() {
       setS({
         ...data,
         social_links: data.social_links || {},
+        dolibarr_ticket_categories: data.dolibarr_ticket_categories || {},
         opening_hours: WEEKDAYS.map((day) => data.opening_hours?.find((item) => item.day === day) || { day, hours: "" }),
       });
       toast.success("Einstellungen gespeichert");
@@ -117,6 +123,14 @@ export default function AdminSettings() {
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Timeout in Sekunden"><Input type="number" min="1" max="60" value={s.dolibarr_timeout_seconds || 8} onChange={(e) => setS((x) => ({ ...x, dolibarr_timeout_seconds: Number(e.target.value) }))} /></Field>
               <Field label="Ländercode"><Input maxLength={2} value={s.dolibarr_country_code || "AT"} onChange={(e) => setS((x) => ({ ...x, dolibarr_country_code: e.target.value.toUpperCase() }))} /></Field>
+            </div>
+            <label className="flex items-start gap-2 text-sm text-muted"><input type="checkbox" checked={!!s.dolibarr_public_ticket_enabled} onChange={(e) => setS((x) => ({ ...x, dolibarr_public_ticket_enabled: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-[#F26522]" /><span>Öffentlichen Dolibarr-Ticketlink nach dem Absenden anzeigen<span className="mt-1 block text-xs text-faint">Nur aktivieren, wenn in Dolibarr unter Ticket → Einstellungen → Öffentliches Interface ebenfalls aktiviert.</span></span></label>
+            <div className="rounded-xl border border-subtle p-3">
+              <p className="mb-3 text-sm font-medium text-ink">Dolibarr-Themengruppen <span className="font-normal text-faint">(optional)</span></p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {DOLIBARR_CATEGORIES.map(([key, label]) => <Field key={key} label={label}><Input value={s.dolibarr_ticket_categories?.[key] || ""} onChange={(e) => setS((x) => ({ ...x, dolibarr_ticket_categories: { ...(x.dolibarr_ticket_categories || {}), [key]: e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "") } }))} placeholder="z. B. REPARATUR" maxLength={32} /></Field>)}
+              </div>
+              <p className="mt-3 text-xs text-faint">Leer lassen, wenn nur „Sonstige“ vorhanden ist. Sobald eigene Themengruppen in Dolibarr angelegt sind, hier deren Codes eintragen.</p>
             </div>
             <Field label={`Dolibarr API-Key (${s.clear_dolibarr_api_key ? "wird entfernt" : s.dolibarr_api_key_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.dolibarr_api_key || ""} onChange={(e) => setS((x) => ({ ...x, dolibarr_api_key: e.target.value, clear_dolibarr_api_key: false }))} placeholder={s.dolibarr_api_key_configured ? "Neuen Key eingeben, um ihn zu ersetzen" : "DOLAPIKEY"} autoComplete="new-password" data-testid="settings-dolibarr-key" disabled={!canManageDolibarrCredentials} /></Field>
             {!canManageDolibarrCredentials && <p className="text-xs text-amber-300">Dolibarr-URL und API-Key können nur vom Super-Admin geändert werden.</p>}

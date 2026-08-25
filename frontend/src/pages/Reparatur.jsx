@@ -83,7 +83,11 @@ function createInitialForm(requestType = "") {
     device_type: requestType === "pc_build" ? "pc" : requestType === "controller_custom" ? "controller" : "",
     controller_variant: "", device_source: "", manufacturer: "", model: "", issues: [],
     desired_services: [], budget: "", timeframe: "", description: "", attachment_ids: [], attachments: [],
-    contact: { name: "", email: "", phone: "", preferred_contact: "email" }, consent: false, honeypot: "",
+    contact: {
+      name: "", email: "", phone: "", preferred_contact: "email", contact_type: "private",
+      company_name: "", address: "", postal_code: "", city: "", country_code: "AT",
+      website: "", vat_id: "", company_registration: "", tax_number: "", court: "", eori: "",
+    }, consent: false, honeypot: "",
   };
 }
 
@@ -179,6 +183,7 @@ export default function Reparatur() {
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contact.email.trim());
   const nameValid = form.contact.name.trim().length >= 2;
   const phoneValid = form.contact.preferred_contact !== "phone" || Boolean(form.contact.phone.trim());
+  const companyValid = form.contact.contact_type !== "business" || form.contact.company_name.trim().length >= 2;
   const canContinue = useMemo(() => {
     if (step === 0) return Boolean(form.request_type);
     if (step === 1) {
@@ -192,9 +197,9 @@ export default function Reparatur() {
       return true;
     }
     if (step === 3) return form.description.trim().length >= 10;
-    if (step === 5) return Boolean(nameValid && emailValid && phoneValid && form.consent);
+    if (step === 5) return Boolean(nameValid && emailValid && phoneValid && companyValid && form.consent);
     return true;
-  }, [emailValid, form, nameValid, phoneValid, step]);
+  }, [companyValid, emailValid, form, nameValid, phoneValid, step]);
 
   const next = () => {
     if (!canContinue) return;
@@ -299,11 +304,11 @@ export default function Reparatur() {
         request_id: requestId, request_type: form.request_type, device_type: form.device_type, device_source: form.device_source,
         manufacturer: form.manufacturer.trim(), model: form.model.trim(), issues: form.issues, desired_services: form.desired_services,
         budget: form.budget, timeframe: form.timeframe, description: form.description.trim(), attachment_ids: form.attachment_ids,
-        contact: { name: form.contact.name.trim(), email: form.contact.email.trim(), phone: form.contact.phone.trim(), preferred_contact: form.contact.preferred_contact },
+        contact: Object.fromEntries(Object.entries(form.contact).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value])),
         consent: form.consent, honeypot: form.honeypot,
       };
       const { data } = await api.post("/inquiries", payload);
-      setDone(data.ref || data.request_id || requestId);
+      setDone({ ref: data.ref || data.request_id || requestId, ticketRef: data.ticket_ref, ticketUrl: data.ticket_public_url });
       trackEvent("inquiry_submitted", { request_type: form.request_type });
     } catch (error) {
       toast.error(formatApiError(error.response?.data?.detail));
@@ -319,9 +324,10 @@ export default function Reparatur() {
           <CheckCircle2 size={52} className="mx-auto text-emerald-400" />
           <h2 className="mt-4 font-heading text-2xl font-bold text-ink">Danke für deine Anfrage!</h2>
           <p className="mt-2 text-muted">Deine Referenznummer lautet:</p>
-          <p className="mt-2 break-all font-mono text-xl font-bold text-brand sm:text-2xl">{done}</p>
+          <p className="mt-2 break-all font-mono text-xl font-bold text-brand sm:text-2xl">{done.ref}</p>
           <p className="mt-4 text-sm text-muted">Deine Angaben sind angekommen. Du erhältst nach der Prüfung eine persönliche Rückmeldung.</p>
-          <Button as={Link} to="/" className="mt-6">Zur Startseite</Button>
+          {done.ticketUrl && <a href={done.ticketUrl} target="_blank" rel="noopener noreferrer" className="mt-6 inline-flex min-h-10 items-center justify-center rounded-lg border border-brand px-4 py-2 text-sm font-medium text-brand transition-colors hover:bg-brand/10">{done.ticketRef ? `Dolibarr-Ticket ${done.ticketRef} öffnen` : "Ticketstatus öffnen"}</a>}
+          <Button as={Link} to="/" className={done.ticketUrl ? "ml-0 mt-3 sm:ml-3 sm:mt-6" : "mt-6"}>Zur Startseite</Button>
         </Card>
       </section>
     </>
@@ -430,6 +436,8 @@ export default function Reparatur() {
               {step === 5 && (
                 <div><h2 className="font-heading text-xl font-bold text-ink">Wie kann ich dich erreichen?</h2><p className="mt-1 text-sm text-muted">Die Angaben werden ausschließlich zur Bearbeitung deiner Anfrage verwendet.</p>
                   <div className="mt-5 space-y-4">
+                    <fieldset><legend className="text-sm font-medium text-muted">Anfrage als</legend><div className="mt-2 grid grid-cols-2 gap-3"><ChoiceButton active={form.contact.contact_type === "private"} onClick={() => set({ contact: { ...form.contact, contact_type: "private" } })} className="text-center font-medium">Privatperson</ChoiceButton><ChoiceButton active={form.contact.contact_type === "business"} onClick={() => set({ contact: { ...form.contact, contact_type: "business" } })} className="text-center font-medium">Unternehmen</ChoiceButton></div></fieldset>
+                    {form.contact.contact_type === "business" && <div><Label htmlFor="inquiry-company">Unternehmensname *</Label><Input id="inquiry-company" autoComplete="organization" required value={form.contact.company_name} onChange={setContact("company_name")} aria-invalid={form.contact.company_name && !companyValid ? "true" : undefined} />{form.contact.company_name && !companyValid && <p className="mt-1 text-xs text-red-400">Bitte gib mindestens 2 Zeichen ein.</p>}</div>}
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
                         <Label htmlFor="inquiry-name">Name *</Label>
@@ -453,6 +461,15 @@ export default function Reparatur() {
                         <Select id="inquiry-contact-method" value={form.contact.preferred_contact} onChange={setContact("preferred_contact")}><option value="email">E-Mail</option><option value="phone">Telefon</option></Select>
                       </div>
                     </div>
+                    <details className="rounded-xl border border-subtle p-4">
+                      <summary className="cursor-pointer font-medium text-ink">Adresse und Firmendaten ergänzen <span className="font-normal text-faint">(optional)</span></summary>
+                      <p className="mt-2 text-xs text-faint">Diese Angaben füllen den Dolibarr-Interessenten vollständiger aus und sind für eine Anfrage nicht erforderlich.</p>
+                      <div className="mt-4 space-y-4">
+                        <div><Label htmlFor="inquiry-address">Straße und Hausnummer</Label><Input id="inquiry-address" autoComplete="street-address" value={form.contact.address} onChange={setContact("address")} /></div>
+                        <div className="grid gap-4 sm:grid-cols-[0.7fr_1.6fr_0.5fr]"><div><Label htmlFor="inquiry-postal">PLZ</Label><Input id="inquiry-postal" autoComplete="postal-code" value={form.contact.postal_code} onChange={setContact("postal_code")} /></div><div><Label htmlFor="inquiry-city">Ort</Label><Input id="inquiry-city" autoComplete="address-level2" value={form.contact.city} onChange={setContact("city")} /></div><div><Label htmlFor="inquiry-country">Land</Label><Input id="inquiry-country" autoComplete="country" maxLength={2} value={form.contact.country_code} onChange={(event) => set({ contact: { ...form.contact, country_code: event.target.value.toUpperCase() } })} /></div></div>
+                        {form.contact.contact_type === "business" && <><div><Label htmlFor="inquiry-website">Website</Label><Input id="inquiry-website" type="url" autoComplete="url" value={form.contact.website} onChange={setContact("website")} placeholder="https://…" /></div><div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="inquiry-vat">UID-Nummer</Label><Input id="inquiry-vat" value={form.contact.vat_id} onChange={setContact("vat_id")} placeholder="ATU…" /></div><div><Label htmlFor="inquiry-tax">Steuernummer</Label><Input id="inquiry-tax" value={form.contact.tax_number} onChange={setContact("tax_number")} /></div><div><Label htmlFor="inquiry-register">Firmenbuchnummer</Label><Input id="inquiry-register" value={form.contact.company_registration} onChange={setContact("company_registration")} /></div><div><Label htmlFor="inquiry-court">Gerichtsstand</Label><Input id="inquiry-court" value={form.contact.court} onChange={setContact("court")} /></div><div><Label htmlFor="inquiry-eori">EORI-Nummer</Label><Input id="inquiry-eori" value={form.contact.eori} onChange={setContact("eori")} /></div></div></>}
+                      </div>
+                    </details>
                     <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-subtle p-4 text-sm text-muted outline-none focus-within:ring-2 focus-within:ring-brand"><input type="checkbox" checked={form.consent} onChange={(event) => set({ consent: event.target.checked })} className="mt-0.5 h-4 w-4 shrink-0 accent-[#F26522]" /><span>Ich stimme der Verarbeitung meiner Angaben und hochgeladenen Fotos zur Bearbeitung dieser Anfrage zu. Weitere Informationen stehen in der <Link to="/datenschutz" target="_blank" rel="noreferrer" className="text-brand underline hover:text-brand-bright">Datenschutzerklärung</Link>. *</span></label>
                   </div>
                 </div>
@@ -460,7 +477,7 @@ export default function Reparatur() {
 
               {step === 6 && (
                 <div><div className="flex items-start gap-3"><ShieldCheck size={28} className="mt-0.5 shrink-0 text-brand" /><div><h2 className="font-heading text-xl font-bold text-ink">Anfrage prüfen und senden</h2><p className="mt-1 text-sm text-muted">Kontrolliere deine Angaben. Mit „Anfrage senden“ wird noch kein kostenpflichtiger Auftrag erteilt.</p></div></div>
-                  <dl className="mt-6 rounded-xl border border-subtle bg-elevated/30 px-4 sm:px-5"><SummaryRow label="Anfrage-ID">{requestId}</SummaryRow><SummaryRow label="Anliegen">{REQUEST_LABELS[form.request_type]}</SummaryRow><SummaryRow label="Gerät">{[DEVICE_LABELS[form.device_type], form.manufacturer, form.model].filter(Boolean).join(" · ")}</SummaryRow>{form.device_source && <SummaryRow label="Controller">{SOURCE_OPTIONS.find((item) => item.key === form.device_source)?.label}</SummaryRow>}{form.issues.length > 0 && <SummaryRow label="Fehler">{form.issues.join(", ")}</SummaryRow>}<SummaryRow label="Wünsche">{form.desired_services.join(", ")}</SummaryRow>{showBudget && <SummaryRow label="Budget">{form.budget}</SummaryRow>}<SummaryRow label="Zeitraum">{form.timeframe}</SummaryRow><SummaryRow label="Beschreibung">{form.description}</SummaryRow><SummaryRow label="Fotos">{form.attachment_ids.length ? `${form.attachment_ids.length} hochgeladen` : "Keine Fotos"}</SummaryRow><SummaryRow label="Kontakt">{`${form.contact.name}\n${form.contact.email}${form.contact.phone ? ` · ${form.contact.phone}` : ""}\nBevorzugt per ${form.contact.preferred_contact === "phone" ? "Telefon" : "E-Mail"}`}</SummaryRow></dl>
+                  <dl className="mt-6 rounded-xl border border-subtle bg-elevated/30 px-4 sm:px-5"><SummaryRow label="Anfrage-ID">{requestId}</SummaryRow><SummaryRow label="Anliegen">{REQUEST_LABELS[form.request_type]}</SummaryRow><SummaryRow label="Gerät">{[DEVICE_LABELS[form.device_type], form.manufacturer, form.model].filter(Boolean).join(" · ")}</SummaryRow>{form.device_source && <SummaryRow label="Controller">{SOURCE_OPTIONS.find((item) => item.key === form.device_source)?.label}</SummaryRow>}{form.issues.length > 0 && <SummaryRow label="Fehler">{form.issues.join(", ")}</SummaryRow>}<SummaryRow label="Wünsche">{form.desired_services.join(", ")}</SummaryRow>{showBudget && <SummaryRow label="Budget">{form.budget}</SummaryRow>}<SummaryRow label="Zeitraum">{form.timeframe}</SummaryRow><SummaryRow label="Beschreibung">{form.description}</SummaryRow><SummaryRow label="Fotos">{form.attachment_ids.length ? `${form.attachment_ids.length} hochgeladen` : "Keine Fotos"}</SummaryRow><SummaryRow label="Kontakt">{`${form.contact.contact_type === "business" ? `${form.contact.company_name}\n` : ""}${form.contact.name}\n${form.contact.email}${form.contact.phone ? ` · ${form.contact.phone}` : ""}\nBevorzugt per ${form.contact.preferred_contact === "phone" ? "Telefon" : "E-Mail"}`}</SummaryRow>{(form.contact.address || form.contact.city) && <SummaryRow label="Adresse">{`${form.contact.address}${form.contact.address ? "\n" : ""}${form.contact.postal_code} ${form.contact.city}\n${form.contact.country_code}`}</SummaryRow>}</dl>
                   <div className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-3 text-sm text-emerald-300"><CheckCircle2 size={18} className="mt-0.5 shrink-0" /><span>Unverbindliche Anfrage – ein Preis oder Auftrag entsteht erst nach persönlicher Abstimmung und deiner ausdrücklichen Zustimmung.</span></div>
                 </div>
               )}

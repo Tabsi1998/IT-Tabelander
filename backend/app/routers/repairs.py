@@ -44,6 +44,7 @@ def _inquiry_ref() -> str:
 
 
 def _created_response(doc: dict, duplicate: bool = False) -> dict:
+    dolibarr_data = doc.get("dolibarr") or {}
     return {
         "ok": True,
         "ref": doc["ref"],
@@ -51,7 +52,11 @@ def _created_response(doc: dict, duplicate: bool = False) -> dict:
         "duplicate": duplicate,
         # Do not expose ERP error details on this public endpoint. They remain
         # available to authenticated staff in the admin area.
-        "dolibarr_synced": bool((doc.get("dolibarr") or {}).get("synced")),
+        "dolibarr_synced": bool(dolibarr_data.get("synced")),
+        "ticket_ref": dolibarr_data.get("ticket_ref") if dolibarr_data.get("synced") else None,
+        "ticket_public_url": (
+            dolibarr_data.get("ticket_public_url") if dolibarr_data.get("synced") else None
+        ),
     }
 
 

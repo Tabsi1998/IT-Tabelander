@@ -1,3 +1,4 @@
+import re
 from typing import List, Literal, Optional
 from urllib.parse import urlparse
 
@@ -77,8 +78,25 @@ class RepairContact(BaseModel):
     email: EmailStr
     phone: Optional[str] = Field(default="", max_length=40)
     preferred_contact: Literal["email", "phone"] = "email"
+    contact_type: Literal["private", "business"] = "private"
+    company_name: Optional[str] = Field(default="", max_length=128)
+    address: Optional[str] = Field(default="", max_length=255)
+    postal_code: Optional[str] = Field(default="", max_length=25)
+    city: Optional[str] = Field(default="", max_length=80)
+    country_code: Optional[str] = Field(default="AT", max_length=2)
+    website: Optional[str] = Field(default="", max_length=255)
+    vat_id: Optional[str] = Field(default="", max_length=40)
+    company_registration: Optional[str] = Field(default="", max_length=80)
+    tax_number: Optional[str] = Field(default="", max_length=80)
+    court: Optional[str] = Field(default="", max_length=120)
+    eori: Optional[str] = Field(default="", max_length=40)
 
-    @field_validator("name", "phone", mode="before")
+    @field_validator(
+        "name", "phone", "company_name", "address", "postal_code", "city",
+        "country_code", "website", "vat_id", "company_registration", "tax_number",
+        "court", "eori",
+        mode="before",
+    )
     @classmethod
     def strip_contact_text(cls, value):
         return value.strip() if isinstance(value, str) else value
@@ -87,6 +105,16 @@ class RepairContact(BaseModel):
     def require_preferred_phone(self):
         if self.preferred_contact == "phone" and not self.phone:
             raise ValueError("Telefonnummer fehlt für den bevorzugten Telefonkontakt")
+        if self.contact_type == "business" and not self.company_name:
+            raise ValueError("Firmenname fehlt für eine geschäftliche Anfrage")
+        if self.country_code:
+            if len(self.country_code) != 2:
+                raise ValueError("Ländercode muss aus zwei Zeichen bestehen")
+            self.country_code = self.country_code.upper()
+        if self.website:
+            parsed = urlparse(self.website)
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                raise ValueError("Website muss eine vollständige http(s)-URL sein")
         return self
 
 
@@ -183,6 +211,8 @@ class SettingsInput(BaseModel):
     clear_dolibarr_api_key: Optional[bool] = None
     dolibarr_timeout_seconds: Optional[float] = Field(default=None, ge=1, le=60)
     dolibarr_country_code: Optional[str] = Field(default=None, min_length=2, max_length=2)
+    dolibarr_public_ticket_enabled: Optional[bool] = None
+    dolibarr_ticket_categories: Optional[dict] = None
     logo_light_url: Optional[str] = None
     logo_dark_url: Optional[str] = None
     seo_default_title: Optional[str] = None
@@ -235,4 +265,23 @@ class SettingsInput(BaseModel):
         suffix = "/api/index.php"
         if cleaned.lower().endswith(suffix):
             cleaned = cleaned[:-len(suffix)].rstrip("/")
+        return cleaned
+
+    @field_validator("dolibarr_ticket_categories")
+    @classmethod
+    def validate_dolibarr_ticket_categories(cls, value):
+        if value is None:
+            return value
+        allowed = {
+            "repair", "pc_build", "pc_upgrade", "controller_custom", "consulting", "other"
+        }
+        cleaned = {}
+        for key, code in value.items():
+            if key not in allowed:
+                raise ValueError("Unbekannte Anfrageart in der Dolibarr-Themengruppen-Zuordnung")
+            code = str(code or "").strip().upper()
+            if code and not re.fullmatch(r"[A-Z0-9_-]{1,32}", code):
+                raise ValueError("Dolibarr-Themengruppen-Codes dürfen nur A-Z, 0-9, _ und - enthalten")
+            if code:
+                cleaned[key] = code
         return cleaned
