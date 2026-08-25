@@ -68,8 +68,8 @@ export default function ServiceLanding({ slug }) {
                 <p>{c.note}</p>
               </div>
             )}
-            <Button as={Link} to="/reparatur" size="lg" className="mt-7" data-testid="landing-cta-repair">
-              <Wrench size={18} /> Reparatur anfragen
+            <Button as={Link} to={`/anfrage?type=${slug === "pc-aufruestung" ? "pc_upgrade" : "repair"}`} size="lg" className="mt-7" data-testid="landing-cta-inquiry">
+              <Wrench size={18} /> Anfrage starten
             </Button>
           </Reveal>
         </div>

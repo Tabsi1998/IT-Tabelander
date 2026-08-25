@@ -16,7 +16,7 @@ const TYPES = [
 ];
 
 const STEPS = [
-  { icon: Cpu, t: "Komponenten wählen", d: "Konfiguriere deinen PC im Konfigurator oder lass dich beraten." },
+  { icon: Cpu, t: "Wünsche senden", d: "Nenne Einsatzzweck, Budget und alles, was dir bei deinem neuen PC wichtig ist." },
   { icon: ShieldCheck, t: "Kompatibilität prüfen", d: "Jede Konfiguration wird vor Bestellung geprüft und freigegeben." },
   { icon: Gauge, t: "Bau & Stresstest", d: "Sauberer Zusammenbau, Systemtest und Optimierung." },
 ];
@@ -38,10 +38,10 @@ export default function GamingPCInfo() {
         breadcrumbs={[{ name: "Start", to: "/" }, { name: "Gaming-PC" }]}
       >
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Button as={Link} to="/gaming-pc-konfigurator" size="lg" data-testid="gamingpc-cta-configurator">
-            <Cpu size={18} /> Jetzt konfigurieren
+          <Button as={Link} to="/anfrage?type=pc_build" size="lg" data-testid="gamingpc-cta-inquiry">
+            <Cpu size={18} /> PC unverbindlich anfragen
           </Button>
-          <Button as={Link} to="/kontakt" variant="secondary" size="lg">Beratung anfragen</Button>
+          <Button as={Link} to="/anfrage?type=consulting" variant="secondary" size="lg">Beratung anfragen</Button>
         </div>
       </PageHero>
 

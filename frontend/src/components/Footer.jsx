@@ -35,7 +35,8 @@ export function Footer() {
             <li><Link to="/pc-aufruestung" className="hover:text-brand">PC-Aufrüstung</Link></li>
             <li><Link to="/konsolen-reparatur" className="hover:text-brand">Konsolen-Reparatur</Link></li>
             <li><Link to="/controller-reparatur" className="hover:text-brand">Controller-Reparatur</Link></li>
-            <li><Link to="/gaming-pc-konfigurator" className="hover:text-brand">PC Builder</Link></li>
+            <li><Link to="/gaming-pc" className="hover:text-brand">Gaming-PC nach Wunsch</Link></li>
+            <li><Link to="/anfrage" className="hover:text-brand">Anfrage senden</Link></li>
           </ul>
         </div>
 

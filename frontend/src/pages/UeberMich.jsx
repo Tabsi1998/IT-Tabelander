@@ -52,8 +52,8 @@ export default function UeberMich() {
               </p>
             </div>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button as={Link} to="/reparatur" size="lg" data-testid="about-cta-repair">
-                <Wrench size={18} /> Reparatur anfragen
+              <Button as={Link} to="/anfrage" size="lg" data-testid="about-cta-inquiry">
+                <Wrench size={18} /> Anfrage starten
               </Button>
               <Button as={Link} to="/leistungen" variant="secondary" size="lg">Leistungen ansehen</Button>
             </div>

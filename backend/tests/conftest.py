@@ -1,9 +1,18 @@
+import asyncio
 import os
+import re
+import secrets
+import uuid
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 import requests
 from dotenv import dotenv_values
+from pymongo import AsyncMongoClient
+
+from app.db import now_utc
+from app.security import hash_password
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_ENV_PATH = REPO_ROOT / "frontend" / ".env"
@@ -16,6 +25,30 @@ BASE_URL = (
     or "http://localhost:8001"
 ).rstrip("/")
 
+INTEGRATION_FILES = {"test_api.py", "test_regression_iter2.py"}
+
+
+def _integration_safety_error() -> str | None:
+    if os.environ.get("IT_TABELANDER_RUN_INTEGRATION") != "1":
+        return "Integrationstests benötigen IT_TABELANDER_RUN_INTEGRATION=1"
+    host = (urlparse(BASE_URL).hostname or "").lower()
+    if host not in {"localhost", "127.0.0.1", "::1"}:
+        return "Integrationstests sind nur gegen localhost erlaubt"
+    database_name = str(dotenv_values(BACKEND_ENV_PATH).get("DB_NAME") or "")
+    if "test" not in database_name.lower():
+        return "Integrationstests benötigen eine DB_NAME mit 'test' im Namen"
+    return None
+
+
+def pytest_collection_modifyitems(items):
+    safety_error = _integration_safety_error()
+    if not safety_error:
+        return
+    skip = pytest.mark.skip(reason=safety_error)
+    for item in items:
+        if Path(str(item.fspath)).name in INTEGRATION_FILES:
+            item.add_marker(skip)
+
 
 @pytest.fixture(scope="session")
 def base_url():
@@ -25,11 +58,39 @@ def base_url():
 @pytest.fixture(scope="session")
 def test_credentials():
     env = dotenv_values(BACKEND_ENV_PATH)
-    email = str(env.get("ADMIN_EMAIL") or "").strip()
-    password = str(env.get("ADMIN_PASSWORD") or "").strip()
-    if not email or not password:
-        pytest.skip(f"ADMIN_EMAIL/ADMIN_PASSWORD fehlen in {BACKEND_ENV_PATH}")
-    return {"email": email, "password": password}
+    safety_error = _integration_safety_error()
+    if safety_error:
+        pytest.skip(safety_error)
+    email = f"integration-{uuid.uuid4().hex}@example.test"
+    password = f"Test-{secrets.token_urlsafe(18)}"
+
+    async def create_test_admin():
+        client = AsyncMongoClient(env["MONGO_URL"])
+        try:
+            await client[env["DB_NAME"]].users.insert_one({
+                "email": email,
+                "password_hash": hash_password(password),
+                "name": "Integration Test Admin",
+                "role": "super_admin",
+                "created_at": now_utc(),
+            })
+        finally:
+            await client.close()
+
+    async def remove_test_admin():
+        client = AsyncMongoClient(env["MONGO_URL"])
+        try:
+            database = client[env["DB_NAME"]]
+            await database.users.delete_one({"email": email})
+            await database.login_attempts.delete_many({
+                "identifier": {"$regex": re.escape(email)}
+            })
+        finally:
+            await client.close()
+
+    asyncio.run(create_test_admin())
+    yield {"email": email, "password": password}
+    asyncio.run(remove_test_admin())
 
 
 @pytest.fixture(scope="session")

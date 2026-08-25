@@ -206,6 +206,7 @@ class TestReviews:
 class TestRepairs:
     def _payload(self, consent=True, honeypot=""):
         return {
+            "request_id": f"integration-{uuid.uuid4().hex}",
             "device_type": "pc", "manufacturer": "Custom", "model": "TEST_Modell",
             "issues": ["startet nicht"], "description": "TEST_Beschreibung",
             "contact": {"name": "TEST_Max", "email": "test_max@example.com",
@@ -218,7 +219,7 @@ class TestRepairs:
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["ok"] is True
-        assert d["ref"].startswith("REP-") and len(d["ref"]) == 10
+        assert d["ref"].startswith("ANF-") and len(d["ref"]) == 12
         rid = d["id"]
         lst = admin_client.get(f"{BASE_URL}/api/admin/repairs", timeout=30)
         assert lst.status_code == 200
@@ -261,100 +262,29 @@ class TestRepairs:
         assert requests.get(f"{BASE_URL}/api/admin/repairs", timeout=30).status_code == 401
 
 
-# ---------------- Contact ----------------
+# ---------------- Legacy contact inbox ----------------
 class TestContact:
-    def test_contact_create_and_admin(self, api_client, admin_client):
-        p = {"name": "TEST_Anna", "email": "test_anna@example.com", "phone": "+43",
-             "subject": "TEST_Betreff", "message": "TEST_Nachricht", "consent": True}
-        r = api_client.post(f"{BASE_URL}/api/contact", json=p, timeout=30)
-        assert r.status_code == 200 and r.json()["ok"] is True
-        cid = r.json()["id"]
-        lst = admin_client.get(f"{BASE_URL}/api/admin/contact", timeout=30)
-        assert lst.status_code == 200
-        item = next((x for x in lst.json() if x["id"] == cid), None)
-        assert item and item["status"] == "neu" and item["message"] == "TEST_Nachricht"
-        assert admin_client.patch(f"{BASE_URL}/api/admin/contact/{cid}/read", timeout=30).status_code == 200
-        lst2 = admin_client.get(f"{BASE_URL}/api/admin/contact", timeout=30).json()
-        assert next(x for x in lst2 if x["id"] == cid)["status"] == "gelesen"
-        assert admin_client.delete(f"{BASE_URL}/api/admin/contact/{cid}", timeout=30).status_code == 200
+    def test_public_contact_submission_is_replaced_by_central_inquiry(self, api_client):
+        r = api_client.post(
+            f"{BASE_URL}/api/contact",
+            json={"name": "TEST_Anna", "email": "test_anna@example.com", "message": "Test"},
+            timeout=30,
+        )
+        assert r.status_code == 404
 
-    def test_contact_no_consent(self, api_client):
-        r = api_client.post(f"{BASE_URL}/api/contact",
-                            json={"name": "T", "email": "t@example.com", "message": "m",
-                                  "consent": False}, timeout=30)
-        assert r.status_code == 400
-
-    def test_contact_honeypot(self, api_client):
-        r = api_client.post(f"{BASE_URL}/api/contact",
-                            json={"name": "T", "email": "t@example.com", "message": "m",
-                                  "consent": True, "honeypot": "x"}, timeout=30)
-        assert r.status_code == 400
+    def test_legacy_admin_inbox_requires_auth(self):
+        assert requests.get(f"{BASE_URL}/api/admin/contact", timeout=30).status_code == 401
 
 
-# ---------------- Configurator ----------------
-class TestConfigurator:
-    def test_ps5_config(self, api_client):
-        r = api_client.get(f"{BASE_URL}/api/configurator/ps5", timeout=30)
-        assert r.status_code == 200
-        d = r.json()
-        assert d["configurator"] == "ps5"
-        assert len(d["categories"]) == 7
-        keys = {c["key"] for c in d["categories"]}
-        assert {"shell_front", "buttons", "special"}.issubset(keys)
-        for c in d["categories"]:
-            assert len(c["options"]) > 0, f"category {c['key']} has no options"
-        front = next(c for c in d["categories"] if c["key"] == "shell_front")
-        assert all(o.get("color_hex") for o in front["options"])
+# ---------------- Removed builder APIs ----------------
+class TestRemovedBuilderApis:
+    def test_public_configurators_are_removed(self, api_client):
+        assert api_client.get(f"{BASE_URL}/api/configurator/ps5", timeout=30).status_code == 404
+        assert api_client.get(f"{BASE_URL}/api/builder/controllers", timeout=30).status_code == 404
 
-    def test_pc_config(self, api_client):
-        r = api_client.get(f"{BASE_URL}/api/configurator/pc", timeout=30)
-        assert r.status_code == 200
-        d = r.json()
-        assert len(d["categories"]) == 9
-        cpu = next(c for c in d["categories"] if c["key"] == "cpu")
-        assert any(o["specs"].get("socket") == "AM5" for o in cpu["options"])
-        mb = next(c for c in d["categories"] if c["key"] == "mainboard")
-        assert any(o["specs"].get("socket") == "LGA1700" for o in mb["options"])
-
-    def test_unknown_configurator(self, api_client):
-        assert api_client.get(f"{BASE_URL}/api/configurator/xbox", timeout=30).status_code == 404
-
-    def test_save_and_fetch_config(self, api_client):
-        p = {"configurator": "ps5", "selections": {"shell_front": "Cyber-Orange"},
-             "note": "TEST_note",
-             "contact": {"name": "TEST_U", "email": "test_u@example.com"}}
-        r = api_client.post(f"{BASE_URL}/api/configurator/save", json=p, timeout=30)
-        assert r.status_code == 200
-        cid = r.json()["config_id"]
-        assert isinstance(cid, str) and len(cid) > 4
-        g = api_client.get(f"{BASE_URL}/api/configurator/saved/{cid}", timeout=30)
-        assert g.status_code == 200
-        assert g.json()["selections"]["shell_front"] == "Cyber-Orange"
-        assert g.json()["note"] == "TEST_note"
-
-    def test_saved_config_404(self, api_client):
-        assert api_client.get(f"{BASE_URL}/api/configurator/saved/zzzz-none", timeout=30).status_code == 404
-
-    def test_admin_configurator_lists(self, admin_client):
-        for ctype, n in (("ps5", 7), ("pc", 9)):
-            r = admin_client.get(f"{BASE_URL}/api/admin/configurator/{ctype}/categories", timeout=30)
-            assert r.status_code == 200 and len(r.json()) == n
-            o = admin_client.get(f"{BASE_URL}/api/admin/configurator/{ctype}/options", timeout=30)
-            assert o.status_code == 200 and len(o.json()) > 0
-
-    def test_admin_option_crud(self, admin_client):
-        p = {"configurator": "ps5", "category_key": "buttons", "name": "TEST_Option",
-             "price": 12.5, "color_hex": "#ABCDEF", "sort": 900}
-        r = admin_client.post(f"{BASE_URL}/api/admin/configurator/options", json=p, timeout=30)
-        assert r.status_code == 200
-        oid = r.json()["id"]
-        pub = requests.get(f"{BASE_URL}/api/configurator/ps5", timeout=30).json()
-        btn = next(c for c in pub["categories"] if c["key"] == "buttons")
-        assert any(o["id"] == oid for o in btn["options"])
-        p["price"] = 20.0
-        u = admin_client.put(f"{BASE_URL}/api/admin/configurator/options/{oid}", json=p, timeout=30)
-        assert u.status_code == 200 and u.json()["price"] == 20.0
-        assert admin_client.delete(f"{BASE_URL}/api/admin/configurator/options/{oid}", timeout=30).status_code == 200
+    def test_admin_configurators_are_removed(self, admin_client):
+        assert admin_client.get(f"{BASE_URL}/api/admin/configurator/pc/categories", timeout=30).status_code == 404
+        assert admin_client.get(f"{BASE_URL}/api/admin/builder/controllers", timeout=30).status_code == 404
 
 
 # ---------------- Dolibarr (demo mode) ----------------
@@ -366,14 +296,7 @@ class TestDolibarr:
         assert d["enabled"] is False
         assert d["connection"] is not None
 
-    def test_sync_demo(self, admin_client):
-        r = admin_client.post(f"{BASE_URL}/api/admin/dolibarr/sync", timeout=30)
-        assert r.status_code == 200
-        assert r.json().get("status") == "demo", r.text
-
-    def test_products_empty(self, admin_client):
-        r = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/products", timeout=30)
-        assert r.status_code == 200 and isinstance(r.json(), list)
+        assert set(d["inquiries"]) == {"total", "synced", "pending", "failed"}
 
     def test_requires_auth(self):
         assert requests.get(f"{BASE_URL}/api/admin/dolibarr/status", timeout=30).status_code == 401
@@ -412,11 +335,25 @@ class TestMedia:
         assert r.status_code == 400
 
     def test_public_repair_attachment(self):
+        request_id = "integration-upload-12345678"
         files = {"file": ("attach.png", _png_bytes("blue"), "image/png")}
-        r = requests.post(f"{BASE_URL}/api/uploads/repair-attachment", files=files, timeout=60)
+        r = requests.post(
+            f"{BASE_URL}/api/uploads/repair-attachment",
+            files=files,
+            data={"request_id": request_id},
+            timeout=60,
+        )
         assert r.status_code == 200, r.text
-        assert r.json()["url"].startswith("/api/media/")
-        assert requests.get(f"{BASE_URL}{r.json()['url']}", timeout=30).status_code == 200
+        uploaded = r.json()
+        assert uploaded["url"].startswith("/api/media/")
+        assert requests.get(f"{BASE_URL}{uploaded['url']}", timeout=30).status_code == 200
+        deleted = requests.delete(
+            f"{BASE_URL}/api/uploads/repair-attachment/{uploaded['id']}",
+            params={"request_id": request_id},
+            timeout=30,
+        )
+        assert deleted.status_code == 200
+        assert requests.get(f"{BASE_URL}{uploaded['url']}", timeout=30).status_code == 404
 
     def test_media_404(self):
         assert requests.get(f"{BASE_URL}/api/media/nonexistent.webp", timeout=30).status_code == 404
@@ -462,11 +399,10 @@ class TestDashboard:
         assert r.status_code == 200
         d = r.json()
         for k in ("new_repairs", "total_repairs", "contact_new", "active_services",
-                  "ps5_options", "pc_options", "reviews_visible", "dolibarr_enabled"):
+                  "reviews_visible", "dolibarr_enabled"):
             assert k in d
         assert isinstance(d["total_repairs"], int)
         assert d["active_services"] >= 6
-        assert d["ps5_options"] > 0 and d["pc_options"] > 0
         assert d["dolibarr_enabled"] is False
 
     def test_dashboard_requires_auth(self):

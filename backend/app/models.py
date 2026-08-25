@@ -1,6 +1,9 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 from urllib.parse import urlparse
-from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from pydantic import (
+    BaseModel, EmailStr, Field, ValidationInfo, field_validator, model_validator,
+)
 
 
 # ---------- Auth ----------
@@ -40,7 +43,7 @@ class ServiceInput(BaseModel):
     image_url: Optional[str] = ""
     icon: Optional[str] = "wrench"
     slug: Optional[str] = ""
-    bullets: List[str] = []
+    bullets: List[str] = Field(default_factory=list)
     seo_title: Optional[str] = ""
     seo_description: Optional[str] = ""
     sort: int = 0
@@ -68,146 +71,91 @@ class ReviewInput(BaseModel):
     sort: int = 0
 
 
-# ---------- Repair request ----------
+# ---------- Website inquiries ----------
 class RepairContact(BaseModel):
-    name: str
+    name: str = Field(min_length=2, max_length=128)
     email: EmailStr
-    phone: Optional[str] = ""
-    preferred_contact: str = "email"
+    phone: Optional[str] = Field(default="", max_length=40)
+    preferred_contact: Literal["email", "phone"] = "email"
+
+    @field_validator("name", "phone", mode="before")
+    @classmethod
+    def strip_contact_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def require_preferred_phone(self):
+        if self.preferred_contact == "phone" and not self.phone:
+            raise ValueError("Telefonnummer fehlt für den bevorzugten Telefonkontakt")
+        return self
 
 
-class RepairInput(BaseModel):
-    device_type: str
-    manufacturer: Optional[str] = ""
-    model: Optional[str] = ""
-    issues: List[str] = []
-    description: str = ""
-    attachment_ids: List[str] = []
+class InquiryInput(BaseModel):
+    request_type: Literal[
+        "repair", "pc_build", "pc_upgrade", "controller_custom", "consulting", "other"
+    ] = "repair"
+    source: Optional[str] = Field(default="website", max_length=80)
+    device_type: Optional[str] = Field(default="", max_length=120)
+    device_source: Optional[Literal["new_controller", "send_in", "unsure", ""]] = ""
+    manufacturer: Optional[str] = Field(default="", max_length=160)
+    model: Optional[str] = Field(default="", max_length=160)
+    issues: List[str] = Field(default_factory=list, max_length=20)
+    desired_services: List[str] = Field(default_factory=list, max_length=20)
+    budget: Optional[str] = Field(default="", max_length=120)
+    timeframe: Optional[str] = Field(default="", max_length=120)
+    description: str = Field(min_length=10, max_length=10000)
+    attachment_ids: List[str] = Field(default_factory=list, max_length=5)
     contact: RepairContact
     consent: bool
-    honeypot: Optional[str] = ""
+    honeypot: Optional[str] = Field(default="", max_length=500)
+    request_id: str = Field(
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+    )
+
+    @field_validator(
+        "source", "device_type", "manufacturer", "model", "budget", "timeframe",
+        "description", "honeypot", "request_id", mode="before",
+    )
+    @classmethod
+    def strip_inquiry_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("issues", "desired_services", "attachment_ids")
+    @classmethod
+    def clean_inquiry_lists(cls, values, info: ValidationInfo):
+        cleaned = []
+        max_item_length = 128 if info.field_name == "attachment_ids" else 300
+        for value in values:
+            text = str(value).strip()
+            if len(text) > max_item_length:
+                raise ValueError(
+                    f"Ein Eintrag in {info.field_name} ist länger als {max_item_length} Zeichen"
+                )
+            if text and text not in cleaned:
+                cleaned.append(text)
+        return cleaned
+
+    @model_validator(mode="after")
+    def validate_inquiry_details(self):
+        if self.request_type in ("repair", "pc_upgrade", "other") and not self.device_type:
+            raise ValueError("Gerätetyp fehlt für diese Anfrageart")
+        if self.request_type == "controller_custom":
+            if not self.device_source or not self.manufacturer or not self.model:
+                raise ValueError("Controller, Herkunft, Hersteller und Modell müssen angegeben werden")
+        return self
 
 
-class RepairStatusUpdate(BaseModel):
+# Backwards-compatible names for old clients using /repairs.
+RepairInput = InquiryInput
+
+
+class InquiryStatusUpdate(BaseModel):
     status: str
 
 
-# ---------- Contact ----------
-class ContactInput(BaseModel):
-    name: str
-    email: EmailStr
-    phone: Optional[str] = ""
-    subject: str = ""
-    message: str
-    consent: bool
-    honeypot: Optional[str] = ""
-
-
-# ---------- Configurator ----------
-class ConfigCategoryInput(BaseModel):
-    configurator: str  # 'ps5' | 'pc'
-    key: str
-    name: str
-    description: Optional[str] = ""
-    required: bool = False
-    multi: bool = False
-    sort: int = 0
-    active: bool = True
-
-
-class ConfigOptionInput(BaseModel):
-    configurator: str
-    category_key: str
-    name: str
-    description: Optional[str] = ""
-    image_url: Optional[str] = ""
-    overlay_image_url: Optional[str] = ""
-    color_hex: Optional[str] = ""
-    dolibarr_product_id: Optional[str] = ""
-    sku: Optional[str] = ""
-    price: Optional[float] = None
-    price_on_request: bool = False
-    available: bool = True
-    active: bool = True
-    is_demo: bool = False
-    sort: int = 0
-    specs: dict = {}
-    incompatible_with: List[str] = []
-    depends_on: List[str] = []
-
-
-class SavedConfigInput(BaseModel):
-    configurator: str
-    selections: dict
-    note: Optional[str] = ""
-    contact: Optional[RepairContact] = None
-
-
-# ---------- Controller Builder ----------
-class ControllerInput(BaseModel):
-    key: str
-    name: str
-    model: str = ""
-    base_price: float = 0.0
-    preview_image: Optional[str] = ""
-    preview_front: Optional[str] = ""
-    preview_back: Optional[str] = ""
-    versions: List[dict] = []  # [{code, label}]
-    active: bool = True
-    sort: int = 0
-
-
-class BuilderCategoryInput(BaseModel):
-    controller_key: str
-    key: str
-    name: str
-    region_key: str = ""      # which SVG region this recolors
-    side: str = "front"       # front | back | both
-    required: bool = False
-    multi: bool = False
-    sort: int = 0
-    active: bool = True
-
-
-class BuilderVariantInput(BaseModel):
-    name: str
-    color_hex: Optional[str] = ""
-    overlay_image_url: Optional[str] = ""
-    thumb_url: Optional[str] = ""
-    price: float = 0.0
-    sku: Optional[str] = ""
-    available: bool = True
-    active: bool = True
-    is_demo: bool = False
-    sort: int = 0
-    layer: dict = {}          # {x,y,scale,rotation,z,side}
-
-
-class BuilderProductInput(BaseModel):
-    controller_key: str
-    category_key: str
-    name: str
-    description: Optional[str] = ""
-    sku: Optional[str] = ""
-    dolibarr_product_id: Optional[str] = ""
-    compatible_versions: List[str] = []   # empty = all versions
-    requires: List[str] = []              # product ids
-    excludes: List[str] = []              # product ids
-    active: bool = True
-    is_demo: bool = False
-    sort: int = 0
-    variants: List[BuilderVariantInput] = []
-
-
-class BuilderConfigInput(BaseModel):
-    controller_key: str
-    version: Optional[str] = ""
-    selections: dict                      # {category_key: {product_id, variant_id, name, price}}
-    total: float = 0.0
-    note: Optional[str] = ""
-    contact: Optional[RepairContact] = None
-    consent: bool = False
-    honeypot: Optional[str] = ""
+RepairStatusUpdate = InquiryStatusUpdate
 
 
 # ---------- Settings ----------
@@ -230,7 +178,7 @@ class SettingsInput(BaseModel):
     google_places_api_key: Optional[str] = None
     clear_google_places_api_key: Optional[bool] = None
     dolibarr_enabled: Optional[bool] = None
-    dolibarr_base_url: Optional[str] = None
+    dolibarr_base_url: Optional[str] = Field(default=None, max_length=2048)
     dolibarr_api_key: Optional[str] = None
     clear_dolibarr_api_key: Optional[bool] = None
     dolibarr_timeout_seconds: Optional[float] = Field(default=None, ge=1, le=60)
@@ -239,9 +187,6 @@ class SettingsInput(BaseModel):
     logo_dark_url: Optional[str] = None
     seo_default_title: Optional[str] = None
     seo_default_description: Optional[str] = None
-    pc_builder_title: Optional[str] = None
-    pc_builder_subtitle: Optional[str] = None
-    pc_builder_note: Optional[str] = None
     impressum_html: Optional[str] = None
     datenschutz_html: Optional[str] = None
     legal_reviewed: Optional[bool] = None
@@ -253,6 +198,41 @@ class SettingsInput(BaseModel):
             return value
         cleaned = value.strip().rstrip("/")
         parsed = urlparse(cleaned)
-        if parsed.scheme not in ("https", "http") or not parsed.netloc or "\n" in cleaned or "\r" in cleaned:
+        if (
+            parsed.scheme not in ("https", "http")
+            or not parsed.netloc
+            or "\n" in cleaned
+            or "\r" in cleaned
+        ):
             raise ValueError("Website-URL muss eine vollständige http(s)-URL sein")
+        return cleaned
+
+    @field_validator("dolibarr_base_url")
+    @classmethod
+    def validate_dolibarr_base_url(cls, value):
+        if not value:
+            return value
+        cleaned = value.strip().rstrip("/")
+        parsed = urlparse(cleaned)
+        try:
+            _port = parsed.port
+        except ValueError as exc:
+            raise ValueError("Dolibarr-URL enthält einen ungültigen Port") from exc
+        if (
+            parsed.scheme not in ("https", "http")
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or any(character.isspace() for character in cleaned)
+        ):
+            raise ValueError(
+                "Dolibarr-URL muss eine vollständige http(s)-URL ohne Zugangsdaten, Query oder Fragment sein"
+            )
+        # HTTP and private/LAN hosts are intentional: Dolibarr commonly runs on
+        # the same internal network as this application.
+        suffix = "/api/index.php"
+        if cleaned.lower().endswith(suffix):
+            cleaned = cleaned[:-len(suffix)].rstrip("/")
         return cleaned

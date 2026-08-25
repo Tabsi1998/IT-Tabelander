@@ -78,7 +78,7 @@ export default function Leistungen() {
           <h3 className="font-heading text-2xl font-bold text-ink">Nicht sicher, was du brauchst?</h3>
           <p className="max-w-xl text-muted">Schildere dein Anliegen – du bekommst eine ehrliche Einschätzung, ohne Fachchinesisch.</p>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button as={Link} to="/reparatur" size="lg" data-testid="leistungen-cta-repair">Reparatur anfragen</Button>
+            <Button as={Link} to="/anfrage" size="lg" data-testid="leistungen-cta-inquiry">Anfrage starten</Button>
             <Button as={Link} to="/kontakt" variant="secondary" size="lg">Kontakt aufnehmen</Button>
           </div>
         </div>

@@ -7,14 +7,13 @@ Dolibarr directly. Demo mode is used when no API key is configured.
 import logging
 import os
 import re
+from urllib.parse import quote
 
 import httpx
 
 from .db import get_db, now_utc
 
 logger = logging.getLogger("dolibarr")
-PRODUCT_PAGE_SIZE = 50
-MAX_PRODUCT_PAGES = 100
 
 
 async def get_config() -> dict:
@@ -30,8 +29,13 @@ async def get_config() -> dict:
     except (TypeError, ValueError):
         timeout = 8.0
     country_code = str(s.get("dolibarr_country_code") or os.environ.get("DOLIBARR_COUNTRY_CODE", "AT")).upper()
+    site_base = str(
+        s.get("canonical_base_url")
+        or os.environ.get("CANONICAL_BASE_URL", "https://it.tabelander.co.at")
+    ).rstrip("/")
     return {"api_key": api_key, "base": base, "enabled": bool(enabled_flag) and bool(api_key),
-            "timeout": min(max(timeout, 1), 60), "country_code": country_code}
+            "timeout": min(max(timeout, 1), 60), "country_code": country_code,
+            "site_base": site_base}
 
 
 def _headers(cfg):
@@ -66,7 +70,7 @@ def _error_info(exc: Exception, cfg: dict, action: str) -> dict:
         if status == 401:
             message = "Dolibarr lehnt den API-Key ab (HTTP 401)."
         elif status == 403:
-            message = "Dolibarr verweigert den Produktzugriff (HTTP 403). Dem API-Benutzer fehlt „Produkte/Dienstleistungen lesen“ (produit/lire)."
+            message = f"Dolibarr verweigert den Zugriff beim {action} (HTTP 403). Bitte die Berechtigungen des API-Benutzers prüfen."
         elif status == 404:
             message = "Dolibarr-API nicht gefunden (HTTP 404). Bitte die Basis-URL prüfen; sie darf nicht mit /api/index.php enden."
         else:
@@ -76,7 +80,7 @@ def _error_info(exc: Exception, cfg: dict, action: str) -> dict:
     elif isinstance(exc, httpx.RequestError):
         message = f"Dolibarr ist beim {action} nicht erreichbar ({type(exc).__name__})."
     elif isinstance(exc, ValueError):
-        message = f"Dolibarr lieferte beim {action} unerwartete Produktdaten."
+        message = f"Dolibarr lieferte beim {action} unerwartete Daten."
         detail = str(exc)
     else:
         message = f"{action.capitalize()} fehlgeschlagen ({type(exc).__name__})."
@@ -96,161 +100,342 @@ async def test_connection() -> dict:
         return {"connected": False, "demo": True,
                 "message": "Dolibarr im Demo-Modus. API-Key in den Einstellungen hinterlegen."}
     try:
+        action = "Prüfen der Dolibarr-API"
         async with httpx.AsyncClient(timeout=cfg["timeout"]) as c:
-            r = await c.get(f"{cfg['base']}/api/index.php/status", headers=_headers(cfg))
-            r.raise_for_status()
-            products = await c.get(
-                f"{cfg['base']}/api/index.php/products", headers=_headers(cfg),
-                params={"limit": 1, "page": 0, "sortfield": "t.ref", "sortorder": "ASC"},
-            )
-            products.raise_for_status()
-            payload = products.json()
-            if not (isinstance(payload, list) or
-                    (isinstance(payload, dict) and isinstance(payload.get("data"), list))):
-                raise ValueError("Die Produkt-API liefert weder eine Liste noch ein Datenobjekt.")
+            checks = {}
+            for key, label, path in (
+                ("api", "Dolibarr-API", "status"),
+                ("thirdparties", "Interessenten/Firmen", "thirdparties"),
+                ("tickets", "Tickets", "tickets"),
+            ):
+                action = f"Prüfen von {label}"
+                response = await c.get(
+                    f"{cfg['base']}/api/index.php/{path}",
+                    headers=_headers(cfg),
+                    params=None if path == "status" else {"limit": 1, "page": 0},
+                )
+                if key == "thirdparties" and response.status_code == 404:
+                    detail = _response_detail(response)
+                    if re.search(
+                        r"\bno third part(?:y|ies) found\b", detail, re.IGNORECASE
+                    ):
+                        # Dolibarr returns 404 (instead of []) for an empty
+                        # third-party collection. The endpoint itself is valid.
+                        checks[key] = True
+                        continue
+                response.raise_for_status()
+                checks[key] = True
             return {"connected": True, "demo": False,
-                    "message": "Verbindung und Produktzugriff erfolgreich."}
+                    "checks": checks,
+                    "message": "API, Interessenten/Firmen und Tickets sind erreichbar."}
     except Exception as exc:  # noqa: BLE001
-        info = _error_info(exc, cfg, "Verbindungstest")
+        info = _error_info(exc, cfg, action)
         logger.warning("Dolibarr connection failed: %s: %s", info["error_type"], info["detail"])
         return {"connected": False, "demo": False, **info}
 
 
-def _as_float(value) -> float:
-    if value in (None, ""):
-        return 0.0
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0
+REQUEST_TYPE_LABELS = {
+    "repair": "Reparatur",
+    "pc_build": "PC-Neubau",
+    "pc_upgrade": "PC-Aufrüstung",
+    "controller_custom": "Controller-Umbau",
+    "consulting": "Beratung",
+    "other": "Sonstige Anfrage",
+}
+
+DEVICE_SOURCE_LABELS = {
+    "new_controller": "Neuen Controller mitbestellen",
+    "send_in": "Vorhandenen Controller einsenden",
+    "unsure": "Noch unsicher",
+}
 
 
-def _normalize(p: dict) -> dict:
-    product_id = str(p.get("id") or p.get("rowid") or "").strip()
-    if not product_id:
-        raise ValueError(f"Produkt ohne ID (Ref: {p.get('ref') or 'unbekannt'})")
+def _remote_id(payload) -> str:
+    """Extract the id returned by the different supported Dolibarr versions."""
+    if isinstance(payload, (str, int)) and str(payload).strip():
+        return str(payload).strip()
+    if isinstance(payload, dict):
+        for key in ("id", "rowid", "ref"):
+            if payload.get(key) not in (None, ""):
+                return str(payload[key]).strip()
+    if isinstance(payload, list) and payload:
+        return _remote_id(payload[0])
+    raise ValueError("Dolibarr-Antwort enthält keine ID.")
+
+
+def _sync_error(exc: Exception, cfg: dict, stage: str, action: str,
+                thirdparty_id: str | None = None) -> dict:
+    info = _error_info(exc, cfg, action)
+    error = {
+        "type": info["error_type"],
+        "message": info["message"],
+        "detail": info["detail"],
+    }
+    logger.warning("Dolibarr inquiry sync failed at %s: %s: %s",
+                   stage, error["type"], error["detail"])
     return {
-        "dolibarr_product_id": product_id, "ref": p.get("ref", ""),
-        "label": p.get("label", ""), "description": p.get("description", "") or "",
-        "price": _as_float(p.get("price")), "price_ttc": _as_float(p.get("price_ttc")),
-        "vat_rate": p.get("tva_tx", ""), "stock": p.get("stock_reel"),
-        "status": p.get("status"), "updated_at": now_utc(),
+        "created": False,
+        "synced": False,
+        "demo": False,
+        "stage": stage,
+        "error": error,
+        "http_status": info["http_status"],
+        "thirdparty_id": thirdparty_id,
+        "ticket_id": None,
+        "ticket_ref": None,
+        "attempted_at": now_utc(),
     }
 
 
-async def _fetch_products(client: httpx.AsyncClient, cfg: dict) -> list[dict]:
-    products: list[dict] = []
-    for page in range(MAX_PRODUCT_PAGES):
-        response = await client.get(
-            f"{cfg['base']}/api/index.php/products", headers=_headers(cfg),
-            params={
-                "limit": PRODUCT_PAGE_SIZE, "page": page, "sortfield": "t.ref",
-                # Full warehouse stock expansion is very slow on larger
-                # Dolibarr installations and is not required for pricing.
-                "sortorder": "ASC", "includestockdata": 0,
-            },
-        )
-        response.raise_for_status()
-        payload = response.json()
-        if isinstance(payload, dict) and isinstance(payload.get("data"), list):
-            batch = payload["data"]
-        elif isinstance(payload, list):
-            batch = payload
-        else:
-            raise ValueError("Die Produkt-API liefert keine Produktliste.")
-        if any(not isinstance(product, dict) for product in batch):
-            raise ValueError("Die Produktliste enthält ungültige Einträge.")
-        products.extend(batch)
-        if len(batch) < PRODUCT_PAGE_SIZE:
-            return products
-    raise ValueError(f"Produktliste überschreitet {PRODUCT_PAGE_SIZE * MAX_PRODUCT_PAGES} Einträge.")
+def _sync_disabled() -> dict:
+    return {
+        "created": False,
+        "synced": False,
+        "demo": True,
+        "stage": "disabled",
+        "error": None,
+        "http_status": None,
+        "thirdparty_id": None,
+        "ticket_id": None,
+        "ticket_ref": None,
+        "attempted_at": now_utc(),
+    }
 
 
-async def sync_products() -> dict:
-    db = get_db()
-    cfg = await get_config()
-    started = now_utc()
-    if not cfg["enabled"]:
-        log = {"type": "product_sync", "status": "demo", "demo": True,
-               "message": "Demo-Sync: Kein Dolibarr-API-Key konfiguriert.",
-               "updated_count": 0, "started_at": started, "finished_at": now_utc()}
-        await db.sync_logs.insert_one(dict(log)); return log
-    try:
-        async with httpx.AsyncClient(timeout=cfg["timeout"]) as c:
-            products = await _fetch_products(c, cfg)
-        count = 0
-        imported_ids = []
-        for p in products:
-            n = _normalize(p)
-            await db.dolibarr_product_cache.update_one(
-                {"dolibarr_product_id": n["dolibarr_product_id"]}, {"$set": n}, upsert=True)
-            imported_ids.append(n["dolibarr_product_id"])
-            count += 1
-        stale_filter = ({"dolibarr_product_id": {"$nin": imported_ids}} if imported_ids else {})
-        stale = await db.dolibarr_product_cache.delete_many(stale_filter)
-        log = {"type": "product_sync", "status": "success", "demo": False,
-               "message": f"{count} Produkte synchronisiert; {stale.deleted_count} veraltete Cache-Einträge entfernt.",
-               "updated_count": count, "removed_count": stale.deleted_count,
-               "started_at": started, "finished_at": now_utc()}
-    except Exception as exc:  # noqa: BLE001
-        info = _error_info(exc, cfg, "Produktsync")
-        logger.error("Dolibarr sync error: %s: %s", info["error_type"], info["detail"])
-        log = {"type": "product_sync", "status": "error", "demo": False,
-               **info, "updated_count": 0,
-               "started_at": started, "finished_at": now_utc()}
-    await db.sync_logs.insert_one(dict(log)); return log
-
-
-async def _create_thirdparty(client, cfg, contact) -> str | None:
-    """Create a prospect (thirdparty) and return its id."""
-    try:
-        payload = {
-            "name": contact.get("name") or contact.get("email"),
-            "email": contact.get("email", ""),
-            "phone": contact.get("phone", ""),
-            "client": "2",           # 2 = prospect
-            "code_client": "-1",
-            "country_code": cfg["country_code"],
-        }
-        r = await client.post(f"{cfg['base']}/api/index.php/thirdparties",
-                              headers=_headers(cfg), json=payload)
-        r.raise_for_status()
-        return str(r.json())
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Dolibarr thirdparty failed: %s", type(exc).__name__)
+async def _lookup_thirdparty(client: httpx.AsyncClient, cfg: dict, email: str) -> str | None:
+    """Use Dolibarr's official email endpoint; a 404 means no match."""
+    response = await client.get(
+        f"{cfg['base']}/api/index.php/thirdparties/email/{quote(email, safe='')}",
+        headers=_headers(cfg),
+    )
+    if response.status_code == 404:
         return None
+    response.raise_for_status()
+    payload = response.json()
+    if payload in (None, [], {}):
+        return None
+    return _remote_id(payload)
 
 
-async def create_lead(data: dict, kind: str = "repair") -> dict:
-    """Best-effort: create a prospect + ticket in Dolibarr. Never raises."""
-    cfg = await get_config()
-    if not cfg["enabled"]:
-        return {"created": False, "demo": True, "thirdparty_id": None, "ticket_ref": None}
-    contact = data.get("contact", {})
-    try:
-        async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
-            tp_id = await _create_thirdparty(client, cfg, contact)
-            ticket = {
-                "subject": data.get("subject", "Website-Anfrage"),
-                "message": data.get("message", ""),
-                "type_code": "COM_REQUEST", "category_code": "OTHER",
-                "severity_code": "NORMAL", "email": contact.get("email", ""),
+async def _create_thirdparty(client: httpx.AsyncClient, cfg: dict, contact: dict) -> str:
+    """Create a prospect (client=2) using Dolibarr's automatic customer code."""
+    payload = {
+        "name": contact.get("name") or contact.get("email"),
+        "email": contact.get("email", ""),
+        "phone": contact.get("phone", ""),
+        "client": 2,
+        # Dolibarr interprets -1 as "generate with the configured module".
+        "code_client": "-1",
+        "country_code": cfg["country_code"],
+    }
+    response = await client.post(
+        f"{cfg['base']}/api/index.php/thirdparties",
+        headers=_headers(cfg), json=payload,
+    )
+    response.raise_for_status()
+    return _remote_id(response.json())
+
+
+async def _create_ticket(client: httpx.AsyncClient, cfg: dict, *, subject: str,
+                         message: str, email: str, thirdparty_id: str,
+                         track_id: str | None = None) -> str:
+    payload = {
+        "subject": subject,
+        "message": message,
+        "fk_soc": thirdparty_id,
+        "origin_email": email,
+    }
+    if track_id:
+        payload["track_id"] = track_id
+    response = await client.post(
+        f"{cfg['base']}/api/index.php/tickets",
+        headers=_headers(cfg), json=payload,
+    )
+    response.raise_for_status()
+    return _remote_id(response.json())
+
+
+async def _lookup_ticket_by_track_id(
+    client: httpx.AsyncClient, cfg: dict, track_id: str
+) -> dict | None:
+    """Recover a ticket created before a lost/timeout response."""
+    response = await client.get(
+        f"{cfg['base']}/api/index.php/tickets/track_id/{quote(track_id, safe='')}",
+        headers=_headers(cfg),
+    )
+    if response.status_code == 404:
+        return None
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError("Die Ticket-Suche liefert kein Ticketobjekt.")
+    return payload
+
+
+async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
+                                   subject: str, message: str, contact: dict,
+                                   previous: dict | None = None,
+                                   track_id: str | None = None) -> dict:
+    previous = previous or {}
+    if previous.get("synced") or previous.get("ticket_id") or previous.get("ticket_ref"):
+        return {**previous, "created": True, "synced": True, "stage": "complete",
+                "error": None, "http_status": None}
+
+    if track_id:
+        try:
+            existing_ticket = await _lookup_ticket_by_track_id(client, cfg, track_id)
+        except Exception as exc:  # noqa: BLE001
+            return _sync_error(
+                exc, cfg, "ticket_lookup", "Suchen des bestehenden Tickets",
+                previous.get("thirdparty_id"),
+            )
+        if existing_ticket:
+            ticket_id = _remote_id(existing_ticket)
+            thirdparty_id = existing_ticket.get("fk_soc") or previous.get("thirdparty_id")
+            timestamp = now_utc()
+            return {
+                "created": True,
+                "synced": True,
+                "recovered": True,
+                "demo": False,
+                "stage": "complete",
+                "error": None,
+                "http_status": None,
+                "thirdparty_id": str(thirdparty_id) if thirdparty_id else None,
+                "ticket_id": ticket_id,
+                "ticket_ref": str(existing_ticket.get("ref") or ticket_id),
+                "ticket_track_id": track_id,
+                "attempted_at": timestamp,
+                "synced_at": timestamp,
             }
-            if tp_id:
-                ticket["fk_soc"] = tp_id
-            r = await client.post(f"{cfg['base']}/api/index.php/tickets",
-                                  headers=_headers(cfg), json=ticket)
-            r.raise_for_status()
-            return {"created": True, "demo": False, "thirdparty_id": tp_id, "ticket_ref": r.json()}
+
+    email = str(contact.get("email") or "").strip().lower()
+    thirdparty_id = previous.get("thirdparty_id")
+    if not thirdparty_id:
+        try:
+            thirdparty_id = await _lookup_thirdparty(client, cfg, email)
+        except Exception as exc:  # noqa: BLE001
+            return _sync_error(exc, cfg, "thirdparty_lookup", "Suchen des Interessenten")
+    if not thirdparty_id:
+        try:
+            thirdparty_id = await _create_thirdparty(client, cfg, contact)
+        except Exception as exc:  # noqa: BLE001
+            return _sync_error(exc, cfg, "thirdparty_create", "Anlegen des Interessenten")
+
+    try:
+        ticket_id = await _create_ticket(
+            client, cfg, subject=subject, message=message,
+            email=email, thirdparty_id=str(thirdparty_id), track_id=track_id,
+        )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Dolibarr lead failed: %s", type(exc).__name__)
-        return {"created": False, "demo": False, "thirdparty_id": None, "ticket_ref": None}
+        return _sync_error(exc, cfg, "ticket_create", "Anlegen des Tickets", str(thirdparty_id))
+
+    return {
+        "created": True,
+        "synced": True,
+        "demo": False,
+        "stage": "complete",
+        "error": None,
+        "http_status": None,
+        "thirdparty_id": str(thirdparty_id),
+        "ticket_id": ticket_id,
+        # Preserve the old response key used by existing admin code.
+        "ticket_ref": ticket_id,
+        "ticket_track_id": track_id,
+        "attempted_at": now_utc(),
+        "synced_at": now_utc(),
+    }
 
 
-async def create_ticket_for_repair(repair: dict) -> dict:
-    c = repair.get("contact", {})
-    return await create_lead({
-        "subject": f"Reparaturanfrage: {repair.get('device_type', 'Gerät')} ({repair.get('ref','')})",
-        "message": f"Fehler: {', '.join(repair.get('issues', []))}\n{repair.get('description', '')}",
-        "contact": c,
-    }, kind="repair")
+def inquiry_subject(inquiry: dict) -> str:
+    kind = REQUEST_TYPE_LABELS.get(inquiry.get("request_type"), "Website-Anfrage")
+    device = str(inquiry.get("device_type") or "").strip()
+    suffix = f": {device}" if device else ""
+    reference = str(inquiry.get("ref") or "").strip()
+    return f"{kind}{suffix} ({reference})" if reference else f"{kind}{suffix}"
+
+
+def inquiry_track_id(inquiry: dict) -> str:
+    """Stable Dolibarr tracking id for retry-safe ticket creation."""
+    reference = str(inquiry.get("ref") or "")
+    cleaned = re.sub(r"[^A-Za-z0-9]", "", reference).upper()
+    if not cleaned:
+        cleaned = re.sub(r"[^A-Za-z0-9]", "", str(inquiry.get("request_id") or "")).upper()
+    return f"IT{cleaned}"[:16]
+
+
+def format_inquiry_message(inquiry: dict) -> str:
+    """Build the complete, readable plain-text ticket body."""
+    contact = inquiry.get("contact") or {}
+    type_label = REQUEST_TYPE_LABELS.get(inquiry.get("request_type"), inquiry.get("request_type") or "–")
+    attachment_lines = []
+    site_base = str(inquiry.get("_site_base") or "").rstrip("/")
+    for attachment in inquiry.get("attachments") or []:
+        url = attachment.get("url") if isinstance(attachment, dict) else str(attachment)
+        if url:
+            attachment_lines.append(f"- {site_base + url if site_base and url.startswith('/') else url}")
+    if not attachment_lines:
+        attachment_lines = [
+            f"- Medien-ID {attachment_id}"
+            for attachment_id in inquiry.get("attachment_ids") or []
+        ]
+    lines = [
+        f"Anfrage-Referenz: {inquiry.get('ref') or '–'}",
+        f"Anfrageart: {type_label}",
+        f"Quelle: {inquiry.get('source') or '–'}",
+        f"Gerät / Bereich: {inquiry.get('device_type') or '–'}",
+        f"Geräteherkunft: {DEVICE_SOURCE_LABELS.get(inquiry.get('device_source'), inquiry.get('device_source')) or '–'}",
+        f"Hersteller: {inquiry.get('manufacturer') or '–'}",
+        f"Modell: {inquiry.get('model') or '–'}",
+        f"Probleme / Symptome: {', '.join(inquiry.get('issues') or []) or '–'}",
+        f"Gewünschte Leistungen: {', '.join(inquiry.get('desired_services') or []) or '–'}",
+        f"Budget: {inquiry.get('budget') or '–'}",
+        f"Zeitrahmen: {inquiry.get('timeframe') or '–'}",
+        "",
+        "Beschreibung:",
+        str(inquiry.get("description") or "–"),
+        "",
+        "Anhänge:",
+        *(attachment_lines or ["–"]),
+        "",
+        "Kontakt:",
+        f"Name: {contact.get('name') or '–'}",
+        f"E-Mail: {contact.get('email') or '–'}",
+        f"Telefon: {contact.get('phone') or '–'}",
+        f"Bevorzugter Kontakt: {contact.get('preferred_contact') or '–'}",
+    ]
+    if inquiry.get("request_id"):
+        lines.extend(["", f"Request-ID: {inquiry['request_id']}"])
+    return "\n".join(lines)
+
+
+async def create_ticket_for_inquiry(inquiry: dict, previous: dict | None = None) -> dict:
+    """Best-effort Dolibarr sync. The local inquiry must already be persisted."""
+    cfg = {"api_key": "", "timeout": 8.0}
+    stage = "configuration"
+    action = "Laden der Dolibarr-Konfiguration"
+    try:
+        cfg = await get_config()
+        if not cfg["enabled"]:
+            return _sync_disabled()
+        stage = "connection"
+        action = "Synchronisieren der Anfrage"
+        ticket_inquiry = {**inquiry, "_site_base": cfg.get("site_base", "")}
+        track_id = inquiry_track_id(ticket_inquiry)
+        async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
+            return await _sync_ticket_with_client(
+                client, cfg,
+                subject=inquiry_subject(ticket_inquiry),
+                message=format_inquiry_message(ticket_inquiry),
+                contact=inquiry.get("contact") or {},
+                previous=previous,
+                track_id=track_id or None,
+            )
+    except Exception as exc:  # noqa: BLE001
+        return _sync_error(exc, cfg, stage, action,
+                           (previous or {}).get("thirdparty_id"))
+
+
+async def create_ticket_for_repair(repair: dict, previous: dict | None = None) -> dict:
+    """Legacy alias retained for old imports."""
+    return await create_ticket_for_inquiry(repair, previous=previous)

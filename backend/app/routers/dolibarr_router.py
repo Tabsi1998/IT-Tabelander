@@ -1,4 +1,3 @@
-from bson import ObjectId
 from fastapi import APIRouter, Depends
 
 from .. import dolibarr
@@ -10,31 +9,30 @@ router = APIRouter(prefix="/api/admin/dolibarr", tags=["dolibarr"])
 
 @router.get("/status")
 async def status(_: dict = Depends(require_admin)):
+    """Show the health of the inquiry integration without exposing secrets."""
     db = get_db()
-    last = await db.sync_logs.find_one({"type": "product_sync"}, sort=[("finished_at", -1)])
-    conn = await dolibarr.test_connection()
-    product_count = await db.dolibarr_product_cache.count_documents({})
+    total = await db.repair_requests.count_documents({})
+    synced = await db.repair_requests.count_documents({"dolibarr.synced": True})
+    failed = await db.repair_requests.count_documents({"dolibarr.error": {"$type": "object"}})
+    latest = await db.repair_requests.find_one(
+        {"dolibarr.attempted_at": {"$exists": True}},
+        sort=[("dolibarr.attempted_at", -1)],
+    )
+    latest_activity = None
+    if latest:
+        latest_activity = {
+            "id": str(latest["_id"]),
+            "ref": latest.get("ref"),
+            "dolibarr": serialize(latest.get("dolibarr") or {}),
+        }
     return {
         "enabled": await dolibarr.is_enabled(),
-        "connection": conn,
-        "last_sync": serialize(last) if last else None,
-        "cached_products": product_count,
+        "connection": await dolibarr.test_connection(),
+        "inquiries": {
+            "total": total,
+            "synced": synced,
+            "pending": max(total - synced, 0),
+            "failed": failed,
+        },
+        "latest_activity": latest_activity,
     }
-
-
-@router.post("/sync")
-async def sync(_: dict = Depends(require_admin)):
-    log = await dolibarr.sync_products()
-    return serialize(log)
-
-
-@router.get("/products")
-async def products(_: dict = Depends(require_admin)):
-    docs = await get_db().dolibarr_product_cache.find().sort("ref", 1).to_list(500)
-    return [serialize(d) for d in docs]
-
-
-@router.get("/logs")
-async def logs(_: dict = Depends(require_admin)):
-    docs = await get_db().sync_logs.find().sort("finished_at", -1).to_list(50)
-    return [serialize(d) for d in docs]

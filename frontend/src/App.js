@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { Toaster } from "sonner";
 
@@ -15,8 +15,6 @@ const Home = lazy(() => import("./pages/Home"));
 const Leistungen = lazy(() => import("./pages/Leistungen"));
 const ServiceLanding = lazy(() => import("./pages/ServiceLanding"));
 const GamingPCInfo = lazy(() => import("./pages/GamingPCInfo"));
-const PCConfigurator = lazy(() => import("./pages/PCConfigurator"));
-const PS5Configurator = lazy(() => import("./pages/ControllerBuilder"));
 const UeberMich = lazy(() => import("./pages/UeberMich"));
 const Bewertungen = lazy(() => import("./pages/Bewertungen"));
 const Kontakt = lazy(() => import("./pages/Kontakt"));
@@ -66,12 +64,13 @@ function App() {
                   <Route path="/konsolen-reparatur" element={<Site><ServiceLanding slug="konsolen-reparatur" /></Site>} />
                   <Route path="/controller-reparatur" element={<Site><ServiceLanding slug="controller-reparatur" /></Site>} />
                   <Route path="/gaming-pc" element={<Site><GamingPCInfo /></Site>} />
-                  <Route path="/gaming-pc-konfigurator" element={<Site><PCConfigurator /></Site>} />
-                  <Route path="/ps5-controller-konfigurator" element={<Site><PS5Configurator /></Site>} />
+                  <Route path="/gaming-pc-konfigurator" element={<Navigate to="/anfrage?type=pc_build" replace />} />
+                  <Route path="/ps5-controller-konfigurator" element={<Navigate to="/anfrage?type=controller_custom" replace />} />
                   <Route path="/ueber-mich" element={<Site><UeberMich /></Site>} />
                   <Route path="/bewertungen" element={<Site><Bewertungen /></Site>} />
                   <Route path="/kontakt" element={<Site><Kontakt /></Site>} />
-                  <Route path="/reparatur" element={<Site><Reparatur /></Site>} />
+                  <Route path="/anfrage" element={<Site><Reparatur /></Site>} />
+                  <Route path="/reparatur" element={<Navigate to="/anfrage?type=repair" replace />} />
                   <Route path="/impressum" element={<Site><Impressum /></Site>} />
                   <Route path="/datenschutz" element={<Site><Datenschutz /></Site>} />
                   <Route

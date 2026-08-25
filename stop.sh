@@ -70,7 +70,19 @@ process_belongs_to_project() {
 }
 
 target_is_alive() {
-  kill -0 -- "$1" 2>/dev/null
+  local target="$1" group
+  if [[ "$target" == -* ]]; then
+    group="${target#-}"
+    ps -eo pgid= 2>/dev/null | awk -v wanted="$group" '$1 == wanted { found=1 } END { exit !found }'
+  else
+    process_exists "$target"
+  fi
+}
+
+process_exists() {
+  local pid="$1"
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 1
+  [[ -d "/proc/$pid" ]] || ps -p "$pid" -o pid= >/dev/null 2>&1
 }
 
 STOP_FAILURES=0
@@ -88,7 +100,7 @@ stop_one() {
     rm -f -- "$pidfile"
     return
   fi
-  if ! kill -0 "$pid" 2>/dev/null; then
+  if ! process_exists "$pid"; then
     yellow "· $label lief nicht mehr (veraltete PID $pid)"
     rm -f -- "$pidfile"
     return
@@ -100,7 +112,7 @@ stop_one() {
   fi
 
   pgid="$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d '[:space:]' || true)"
-  if ! kill -0 "$pid" 2>/dev/null; then
+  if ! process_exists "$pid"; then
     yellow "· $label endete bereits (PID $pid)"
     rm -f -- "$pidfile"
     return

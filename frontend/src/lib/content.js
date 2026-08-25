@@ -16,9 +16,7 @@ export const IMAGES = {
   network2: "/assets/img/services/netzwerk-wlan-1200.webp",
   overview: "/assets/img/services/service-overview-1200.webp",
   controllerFront: "/assets/img/controller/controller-dualsense-edge-official-front.png",
-  controllerPremium: "/assets/img/controller/controller-dualsense-premium.png",
 };
-
 // Rich, natural German content for the SEO landing pages.
 export const LANDING = {
   "pc-reparatur": {
@@ -40,7 +38,7 @@ export const LANDING = {
     ],
     note: "Ob eine Reparatur wirtschaftlich sinnvoll ist, bespreche ich vorher ehrlich mit dir.",
     faqCategory: "reparatur",
-    related: [["Notebook-Reparatur", "/notebook-reparatur"], ["PC-Aufrüstung", "/pc-aufruestung"], ["Gaming-PC konfigurieren", "/gaming-pc-konfigurator"]],
+    related: [["Notebook-Reparatur", "/notebook-reparatur"], ["PC-Aufrüstung", "/pc-aufruestung"], ["Gaming-PC anfragen", "/anfrage?type=pc_build"]],
   },
   "notebook-reparatur": {
     title: "Notebook-Reparatur in Tirol",
@@ -82,7 +80,7 @@ export const LANDING = {
     ],
     note: "Nicht jedes Gerät lässt sich beliebig aufrüsten. IT-Tabelander prüft Kompatibilität und Sinnhaftigkeit vor dem Umbau.",
     faqCategory: "upgrades",
-    related: [["PC-Reparatur", "/pc-reparatur"], ["Gaming-PC konfigurieren", "/gaming-pc-konfigurator"], ["Notebook-Reparatur", "/notebook-reparatur"]],
+    related: [["PC-Reparatur", "/pc-reparatur"], ["Gaming-PC anfragen", "/anfrage?type=pc_build"], ["Notebook-Reparatur", "/notebook-reparatur"]],
   },
   "konsolen-reparatur": {
     title: "Konsolenreparatur (PlayStation, Xbox, Nintendo)",
@@ -103,7 +101,7 @@ export const LANDING = {
     ],
     note: "Die konkret unterstützten Geräte werden laufend gepflegt. Eine Reparatur wird erst nach Prüfung des Geräts zugesagt.",
     faqCategory: "konsolen",
-    related: [["Controller-Reparatur", "/controller-reparatur"], ["PS5 Controller konfigurieren", "/ps5-controller-konfigurator"], ["Kontakt", "/kontakt"]],
+    related: [["Controller-Reparatur", "/controller-reparatur"], ["Controller-Umbau anfragen", "/anfrage?type=controller_custom"], ["Anfrage senden", "/anfrage"]],
   },
   "controller-reparatur": {
     title: "Controller-Reparatur",
@@ -124,21 +122,7 @@ export const LANDING = {
     ],
     note: "Keine Reparatur wird als garantiert dargestellt, bevor das Gerät geprüft wurde.",
     faqCategory: "controller",
-    related: [["PS5 Controller konfigurieren", "/ps5-controller-konfigurator"], ["Konsolen-Reparatur", "/konsolen-reparatur"], ["Reparatur anfragen", "/reparatur"]],
+    related: [["Controller-Umbau anfragen", "/anfrage?type=controller_custom"], ["Konsolen-Reparatur", "/konsolen-reparatur"], ["Anfrage starten", "/anfrage"]],
   },
 };
-
-export const DEVICE_TYPES = [
-  { key: "pc", label: "PC" },
-  { key: "notebook", label: "Notebook" },
-  { key: "playstation", label: "PlayStation" },
-  { key: "xbox", label: "Xbox" },
-  { key: "switch", label: "Nintendo Switch" },
-  { key: "controller", label: "Controller" },
-  { key: "sonstiges", label: "Sonstiges" },
-];
-
-export const COMMON_ISSUES = [
-  "Startet nicht", "Überhitzt", "Langsam", "Kein Bild", "Geräusche",
-  "Stick Drift", "Ladeproblem", "Unbekannter Fehler", "Sonstiges",
-];
+// End of landing-page content.

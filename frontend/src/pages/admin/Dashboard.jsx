@@ -1,23 +1,33 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Wrench, Mail, Layers, Star, Cpu, Gamepad2, RefreshCw, ArrowRight } from "lucide-react";
+import { Inbox, Mail, Layers, Star, RefreshCw, ArrowRight } from "lucide-react";
 import api from "../../lib/api";
 import Skeleton from "../../components/ui/skeleton";
 import { AdminHeader, Panel } from "../../components/admin/AdminUI";
 import { Badge } from "../../components/ui/badge";
 
 const STAT_META = [
-  { key: "new_repairs", label: "Neue Reparaturen", icon: Wrench, to: "/admin/reparaturen", tone: "brand" },
+  { key: "new_repairs", label: "Neue Anfragen", icon: Inbox, to: "/admin/anfragen", tone: "brand" },
   { key: "contact_new", label: "Neue Nachrichten", icon: Mail, to: "/admin/kontakt" },
   { key: "active_services", label: "Aktive Leistungen", icon: Layers, to: "/admin/leistungen" },
   { key: "reviews_visible", label: "Sichtbare Reviews", icon: Star, to: "/admin/bewertungen" },
-  { key: "ps5_options", label: "PS5-Optionen", icon: Gamepad2, to: "/admin/konfigurator" },
-  { key: "pc_options", label: "PC-Komponenten", icon: Cpu, to: "/admin/konfigurator" },
 ];
 
 const STATUS_LABEL = {
-  eingegangen: "Eingegangen", in_diagnose: "In Diagnose", warten_auf_teile: "Warten auf Teile",
-  in_reparatur: "In Reparatur", fertig: "Fertig", abgeschlossen: "Abgeschlossen", abgelehnt: "Abgelehnt",
+  eingegangen: "Eingegangen", in_bearbeitung: "In Bearbeitung", wartet_auf_kunde: "Wartet auf Kunde",
+  angebot_erstellt: "Angebot erstellt", beauftragt: "Beauftragt", abgeschlossen: "Abgeschlossen",
+  abgelehnt: "Abgelehnt", in_diagnose: "In Diagnose", warten_auf_teile: "Warten auf Teile",
+  in_reparatur: "In Reparatur", fertig: "Fertig",
+};
+
+const REQUEST_TYPE_LABEL = {
+  repair: "Reparatur", pc_build: "PC-Neubau", pc_upgrade: "PC-/Notebook-Upgrade",
+  controller_custom: "Controller-Umbau", consulting: "Beratung", other: "Sonstiges",
+};
+
+const DEVICE_TYPE_LABEL = {
+  pc: "Desktop-PC", notebook: "Notebook", playstation: "PlayStation", xbox: "Xbox",
+  switch: "Nintendo Switch", controller: "Controller", storage: "Datenträger", other: "Sonstiges",
 };
 
 export default function Dashboard() {
@@ -57,8 +67,8 @@ export default function Dashboard() {
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <Panel className="lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-heading font-semibold text-ink">Letzte Reparaturanfragen</h2>
-            <Link to="/admin/reparaturen" className="text-sm text-brand hover:underline">Alle</Link>
+            <h2 className="font-heading font-semibold text-ink">Letzte Anfragen</h2>
+            <Link to="/admin/anfragen" className="text-sm text-brand hover:underline">Alle</Link>
           </div>
           {data.recent_repairs.length === 0 ? (
             <p className="text-sm text-faint">Noch keine Anfragen.</p>
@@ -67,7 +77,7 @@ export default function Dashboard() {
               {data.recent_repairs.map((r) => (
                 <div key={r.id} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-ink">{r.ref} · {r.device_type} {r.model && `– ${r.model}`}</p>
+                    <p className="truncate text-sm font-medium text-ink">{r.ref} · {REQUEST_TYPE_LABEL[r.request_type] || r.request_type || "Anfrage"} {r.device_type && `– ${DEVICE_TYPE_LABEL[r.device_type] || r.device_type}`} {r.model && `· ${r.model}`}</p>
                     <p className="truncate text-xs text-faint">{r.contact?.name} · {r.contact?.email}</p>
                   </div>
                   <Badge tone={r.status === "eingegangen" ? "brand" : "neutral"}>{STATUS_LABEL[r.status] || r.status}</Badge>
@@ -81,12 +91,12 @@ export default function Dashboard() {
           <h2 className="mb-4 font-heading font-semibold text-ink">Dolibarr</h2>
           <div className="flex items-center gap-2">
             <RefreshCw size={16} className={data.dolibarr_enabled ? "text-emerald-400" : "text-faint"} />
-            <span className="text-sm text-muted">{data.dolibarr_enabled ? "Aktiv" : "Demo-Modus"}</span>
+            <span className="text-sm text-muted">{data.dolibarr_enabled ? "Aktiv" : "Nicht aktiviert"}</span>
           </div>
           <p className="mt-2 text-xs text-faint">
-            {data.last_sync ? `Letzter Sync: ${data.last_sync.status} (${data.last_sync.updated_count} Produkte)` : "Noch kein Sync durchgeführt."}
+            {data.dolibarr_enabled ? "Neue Anfragen werden als Interessent und Ticket übertragen." : "Die Verbindung kann in den Einstellungen aktiviert werden."}
           </p>
-          <Link to="/admin/dolibarr" className="mt-4 inline-flex items-center gap-1 text-sm text-brand hover:underline">Zur Sync-Seite <ArrowRight size={14} /></Link>
+          <Link to="/admin/dolibarr" className="mt-4 inline-flex items-center gap-1 text-sm text-brand hover:underline">Zur Dolibarr-Seite <ArrowRight size={14} /></Link>
         </Panel>
       </div>
     </>

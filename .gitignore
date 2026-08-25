@@ -6,9 +6,12 @@
 *.key
 credentials.json
 .credentials
+deploy.config.local
 
 # ── Python / Backend ─────────────────────────────────────────────────────
 backend/venv/
+backend/uploads/*
+!backend/uploads/.gitkeep
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -25,7 +28,6 @@ run/
 logs/
 
 # ── Tooling-Rauschen ─────────────────────────────────────────────────────
-.emergent/
 .gitconfig
 auth_testing.md
 design_guidelines.json

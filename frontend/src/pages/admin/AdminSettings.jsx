@@ -12,6 +12,7 @@ const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Sa
 
 export default function AdminSettings() {
   const { user, refresh } = useAuth();
+  const canManageDolibarrCredentials = user?.role === "super_admin";
   const [s, setS] = useState(null);
   const [saving, setSaving] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
@@ -108,27 +109,18 @@ export default function AdminSettings() {
         </Panel>
 
         <Panel>
-          <h3 className="mb-4 font-semibold text-ink">PC Builder – Inhalte</h3>
-          <p className="mb-3 text-xs text-faint">Überschrift, Untertitel und Hinweis der PC-Builder-Seite. Kategorien &amp; Komponenten verwaltest du unter „PC Builder“.</p>
-          <div className="space-y-3">
-            <Field label="Titel"><Input value={s.pc_builder_title || ""} onChange={set("pc_builder_title")} placeholder="PC Builder" data-testid="settings-pcb-title" /></Field>
-            <Field label="Untertitel"><Textarea value={s.pc_builder_subtitle || ""} onChange={set("pc_builder_subtitle")} data-testid="settings-pcb-subtitle" /></Field>
-            <Field label="Hinweis-Box (optional)"><Textarea value={s.pc_builder_note || ""} onChange={set("pc_builder_note")} placeholder="z. B. Lieferzeiten, Beratung, Aktionen …" data-testid="settings-pcb-note" /></Field>
-          </div>
-        </Panel>
-
-        <Panel>
           <h3 className="mb-4 font-semibold text-ink">Integrationen</h3>
           <p className="mb-3 text-xs text-faint">API-Keys sind reine Schreibfelder. Gespeicherte Werte werden niemals wieder an den Browser ausgegeben.</p>
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={!!s.dolibarr_enabled} onChange={(e) => setS((x) => ({ ...x, dolibarr_enabled: e.target.checked }))} className="h-4 w-4 accent-[#F26522]" data-testid="settings-dolibarr-enabled" /> Dolibarr aktivieren</label>
-            <Field label="Dolibarr Basis-URL"><Input value={s.dolibarr_base_url || ""} onChange={set("dolibarr_base_url")} placeholder="https://erp.tabelander.co.at" /></Field>
+            <Field label="Dolibarr Basis-URL"><Input value={s.dolibarr_base_url || ""} onChange={set("dolibarr_base_url")} placeholder="https://erp.tabelander.co.at" disabled={!canManageDolibarrCredentials} /></Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Timeout in Sekunden"><Input type="number" min="1" max="60" value={s.dolibarr_timeout_seconds || 8} onChange={(e) => setS((x) => ({ ...x, dolibarr_timeout_seconds: Number(e.target.value) }))} /></Field>
               <Field label="Ländercode"><Input maxLength={2} value={s.dolibarr_country_code || "AT"} onChange={(e) => setS((x) => ({ ...x, dolibarr_country_code: e.target.value.toUpperCase() }))} /></Field>
             </div>
-            <Field label={`Dolibarr API-Key (${s.clear_dolibarr_api_key ? "wird entfernt" : s.dolibarr_api_key_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.dolibarr_api_key || ""} onChange={(e) => setS((x) => ({ ...x, dolibarr_api_key: e.target.value, clear_dolibarr_api_key: false }))} placeholder={s.dolibarr_api_key_configured ? "Neuen Key eingeben, um ihn zu ersetzen" : "DOLAPIKEY"} autoComplete="new-password" data-testid="settings-dolibarr-key" /></Field>
-            {s.dolibarr_api_key_configured && <Button type="button" variant="outline" onClick={() => setS((x) => ({ ...x, dolibarr_api_key: "", clear_dolibarr_api_key: true }))}>Dolibarr-Key entfernen</Button>}
+            <Field label={`Dolibarr API-Key (${s.clear_dolibarr_api_key ? "wird entfernt" : s.dolibarr_api_key_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.dolibarr_api_key || ""} onChange={(e) => setS((x) => ({ ...x, dolibarr_api_key: e.target.value, clear_dolibarr_api_key: false }))} placeholder={s.dolibarr_api_key_configured ? "Neuen Key eingeben, um ihn zu ersetzen" : "DOLAPIKEY"} autoComplete="new-password" data-testid="settings-dolibarr-key" disabled={!canManageDolibarrCredentials} /></Field>
+            {!canManageDolibarrCredentials && <p className="text-xs text-amber-300">Dolibarr-URL und API-Key können nur vom Super-Admin geändert werden.</p>}
+            {canManageDolibarrCredentials && s.dolibarr_api_key_configured && <Button type="button" variant="outline" onClick={() => setS((x) => ({ ...x, dolibarr_api_key: "", clear_dolibarr_api_key: true }))}>Dolibarr-Key entfernen</Button>}
             <Field label={`Google Places API-Key (${s.clear_google_places_api_key ? "wird entfernt" : s.google_places_api_key_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.google_places_api_key || ""} onChange={(e) => setS((x) => ({ ...x, google_places_api_key: e.target.value, clear_google_places_api_key: false }))} placeholder={s.google_places_api_key_configured ? "Neuen Key eingeben, um ihn zu ersetzen" : "API-Key"} autoComplete="new-password" /></Field>
             {s.google_places_api_key_configured && <Button type="button" variant="outline" onClick={() => setS((x) => ({ ...x, google_places_api_key: "", clear_google_places_api_key: true }))}>Google-Key entfernen</Button>}
           </div>

@@ -16,7 +16,7 @@ export default function AdminContact() {
 
   return (
     <>
-      <AdminHeader title="Nachrichten" desc="Kontaktformular-Anfragen" />
+      <AdminHeader title="Alte Nachrichten" desc="Archiv des früheren Kontaktformulars. Neue Anliegen findest du gesammelt unter Anfragen." />
       {!items ? <Skeleton className="h-64" /> : items.length === 0 ? <Empty>Keine Nachrichten.</Empty> : (
         <div className="space-y-3">
           {items.map((m) => (

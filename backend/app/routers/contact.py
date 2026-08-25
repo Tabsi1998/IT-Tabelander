@@ -1,34 +1,10 @@
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
-from ..db import get_db, now_utc, serialize
-from ..models import ContactInput
+from ..db import get_db, serialize
 from ..security import require_admin
 
 router = APIRouter(prefix="/api", tags=["contact"])
-
-
-@router.post("/contact")
-async def create_contact(payload: ContactInput):
-    if payload.honeypot:
-        raise HTTPException(status_code=400, detail="Ungültige Anfrage")
-    if not payload.consent:
-        raise HTTPException(status_code=400, detail="Zustimmung zum Datenschutz erforderlich")
-    db = get_db()
-    data = payload.model_dump()
-    data.pop("honeypot", None)
-    data["status"] = "neu"
-    data["created_at"] = now_utc()
-    res = await db.contact_messages.insert_one(data)
-    from .. import dolibarr
-    dol = await dolibarr.create_lead({
-        "subject": f"Kontaktanfrage: {payload.subject or 'Website'}",
-        "message": payload.message,
-        "contact": {"name": payload.name, "email": payload.email, "phone": payload.phone},
-    }, kind="contact")
-    await db.contact_messages.update_one({"_id": res.inserted_id}, {"$set": {"dolibarr": dol}})
-    return {"ok": True, "id": str(res.inserted_id)}
-
 
 @router.get("/admin/contact")
 async def list_contact(_: dict = Depends(require_admin)):

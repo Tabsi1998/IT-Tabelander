@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Navigate, Routes, Route } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import Skeleton from "../../components/ui/skeleton";
 import AdminLogin from "./AdminLogin";
@@ -10,8 +10,6 @@ import AdminContact from "./AdminContact";
 import AdminServices from "./AdminServices";
 import AdminFaqs from "./AdminFaqs";
 import AdminReviews from "./AdminReviews";
-import AdminConfigurator from "./AdminConfigurator";
-import AdminBuilder from "./AdminBuilder";
 import AdminMedia from "./AdminMedia";
 import AdminDolibarr from "./AdminDolibarr";
 import AdminSettings from "./AdminSettings";
@@ -33,16 +31,18 @@ export default function AdminApp() {
     <AdminLayout>
       <Routes>
         <Route index element={<Dashboard />} />
-        <Route path="reparaturen" element={<AdminRepairs />} />
+        <Route path="anfragen" element={<AdminRepairs />} />
+        <Route path="reparaturen" element={<Navigate to="/admin/anfragen" replace />} />
+        <Route path="konfigurator" element={<Navigate to="/admin/anfragen" replace />} />
+        <Route path="controller-builder" element={<Navigate to="/admin/anfragen" replace />} />
         <Route path="kontakt" element={<AdminContact />} />
         <Route path="leistungen" element={<AdminServices />} />
         <Route path="faqs" element={<AdminFaqs />} />
         <Route path="bewertungen" element={<AdminReviews />} />
-        <Route path="konfigurator" element={<AdminConfigurator />} />
-        <Route path="controller-builder" element={<AdminBuilder />} />
         <Route path="medien" element={<AdminMedia />} />
         <Route path="dolibarr" element={<AdminDolibarr />} />
         <Route path="einstellungen" element={<AdminSettings />} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>
   );

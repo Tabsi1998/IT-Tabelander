@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Wrench, Cpu, Gamepad2, ArrowRight, ShieldCheck, CheckCircle2, Star, Sparkles,
+  Send, Cpu, Gamepad2, ArrowRight, ShieldCheck, CheckCircle2, Star, Sparkles,
 } from "lucide-react";
 import api from "../lib/api";
 import { TRUST, IMAGES } from "../lib/content";
@@ -14,7 +14,6 @@ import Reveal from "../components/Reveal";
 import Accordion from "../components/ui/accordion";
 import Seo, { orgJsonLd } from "../components/Seo";
 import { useSettings } from "../context/SettingsContext";
-import { trackEvent } from "../context/ConsentContext";
 
 function Hero() {
   return (
@@ -42,15 +41,14 @@ function Hero() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Button
                 as={Link}
-                to="/reparatur"
+                to="/anfrage"
                 size="lg"
-                data-testid="hero-cta-repair"
-                onClick={() => trackEvent("repair_request_started", { source: "hero" })}
+                data-testid="hero-cta-inquiry"
               >
-                <Wrench size={18} /> Reparatur anfragen
+                <Send size={18} /> Anfrage starten
               </Button>
-              <Button as={Link} to="/gaming-pc-konfigurator" variant="secondary" size="lg" data-testid="hero-cta-pc">
-                <Cpu size={18} /> PC Builder öffnen
+              <Button as={Link} to="/gaming-pc" variant="secondary" size="lg" data-testid="hero-cta-pc">
+                <Cpu size={18} /> Gaming-PC ansehen
               </Button>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2">
@@ -150,22 +148,22 @@ function ServicesSection({ services }) {
   );
 }
 
-function ConfiguratorTeaser() {
+function InquiryTeaser() {
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="grid gap-6 lg:grid-cols-2">
         <Reveal>
           <Card className="group relative h-full overflow-hidden">
-            <img src={IMAGES.hero} alt="PC Builder" className="h-56 w-full object-cover opacity-70 transition-transform duration-500 group-hover:scale-105" />
+            <img src={IMAGES.hero} alt="Individueller PC nach Wunsch" className="h-56 w-full object-cover opacity-70 transition-transform duration-500 group-hover:scale-105" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#070d18] via-[#070d18]/60 to-transparent" />
             <div className="absolute inset-x-0 bottom-0 p-7">
-              <Badge tone="brand" className="mb-3"><Sparkles size={12} /> PC Builder</Badge>
-              <h3 className="font-heading text-2xl font-bold text-white">Deinen PC selbst bauen</h3>
+              <Badge tone="brand" className="mb-3"><Sparkles size={12} /> Individuell geplant</Badge>
+              <h3 className="font-heading text-2xl font-bold text-white">PC nach Wunsch anfragen</h3>
               <p className="mt-2 max-w-md text-sm text-slate-300">
-                Stelle deinen Wunsch-PC zusammen – mit Kompatibilitäts-Check und übersichtlicher Zusammenfassung.
+                Nenne Einsatzzweck, Budget und Wünsche. Du bekommst eine persönlich geprüfte Zusammenstellung statt einer anonymen Teileliste.
               </p>
-              <Button as={Link} to="/gaming-pc-konfigurator" className="mt-4" size="sm" data-testid="teaser-pc-configurator">
-                Jetzt konfigurieren <ArrowRight size={15} />
+              <Button as={Link} to="/anfrage?type=pc_build" className="mt-4" size="sm" data-testid="teaser-pc-inquiry">
+                PC anfragen <ArrowRight size={15} />
               </Button>
             </div>
           </Card>
@@ -173,17 +171,17 @@ function ConfiguratorTeaser() {
         <Reveal delay={0.1}>
           <Card className="group relative h-full overflow-hidden">
             <div className="flex h-56 items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e293b]">
-              <img src={IMAGES.controllerFront} alt="PS5 DualSense Controller konfigurieren" className="h-48 object-contain transition-transform duration-500 group-hover:scale-105" />
+              <img src={IMAGES.controllerFront} alt="PS5 DualSense Controller-Umbau" className="h-48 object-contain transition-transform duration-500 group-hover:scale-105" />
             </div>
             <div className="absolute inset-0 bg-gradient-to-t from-[#070d18] via-transparent to-transparent" />
             <div className="absolute inset-x-0 bottom-0 p-7">
               <Badge tone="brand" className="mb-3"><Gamepad2 size={12} /> DualSense</Badge>
-              <h3 className="font-heading text-2xl font-bold text-white">PS5 Controller gestalten</h3>
+              <h3 className="font-heading text-2xl font-bold text-white">Controller-Umbau anfragen</h3>
               <p className="mt-2 max-w-md text-sm text-slate-300">
-                Wähle Gehäuse, Buttons, Sticks und Spezialoptionen – mit Live-Vorschau.
+                Beschreibe gewünschte Optik, Tasten und Funktionen. Details und Machbarkeit werden anschließend persönlich abgestimmt.
               </p>
-              <Button as={Link} to="/ps5-controller-konfigurator" className="mt-4" size="sm" data-testid="teaser-ps5-configurator">
-                Controller konfigurieren <ArrowRight size={15} />
+              <Button as={Link} to="/anfrage?type=controller_custom" className="mt-4" size="sm" data-testid="teaser-controller-inquiry">
+                Umbau anfragen <ArrowRight size={15} />
               </Button>
             </div>
           </Card>
@@ -233,14 +231,14 @@ function FinalCTA() {
         <div className="pointer-events-none absolute -right-20 -top-20 h-80 w-80 rounded-full bg-brand/20 blur-3xl" />
         <div className="relative max-w-2xl">
           <h2 className="font-heading text-3xl font-bold text-white md:text-4xl">
-            Dein Gerät macht Probleme? Lass es prüfen.
+            Reparatur, Wunsch-PC oder Controller-Umbau geplant?
           </h2>
           <p className="mt-4 text-slate-300">
-            Beschreibe dein Anliegen in wenigen Schritten – du bekommst eine ehrliche Einschätzung.
+            Beschreibe dein Anliegen in wenigen Schritten. Du bekommst eine persönliche Rückmeldung und eine ehrliche Einschätzung.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Button as={Link} to="/reparatur" size="lg" data-testid="final-cta-repair">
-              <Wrench size={18} /> Reparatur anfragen
+            <Button as={Link} to="/anfrage" size="lg" data-testid="final-cta-inquiry">
+              <Send size={18} /> Anfrage starten
             </Button>
             <Button as={Link} to="/kontakt" variant="secondary" size="lg" className="text-white border-white/40 hover:bg-white/10" data-testid="final-cta-contact">
               Kontakt aufnehmen
@@ -270,7 +268,7 @@ export default function Home() {
       <Hero />
       <TrustBar />
       <ServicesSection services={services} />
-      <ConfiguratorTeaser />
+      <InquiryTeaser />
       <ReviewsTeaser data={reviews} />
       {faqs.length > 0 && (
         <section className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">

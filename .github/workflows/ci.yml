@@ -41,7 +41,7 @@ jobs:
           python -m compileall -q backend
           cd backend
           python -c "import server; print(server.app.title)"
-          python -m pytest tests/test_unit_runtime.py -q -p no:cacheprovider
+          python -m pytest tests/test_unit_runtime.py tests/test_inquiry_dolibarr.py -q -p no:cacheprovider
 
   frontend:
     name: Frontend (Node 24)

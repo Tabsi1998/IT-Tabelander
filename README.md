@@ -89,6 +89,7 @@ sudo systemctl reload apache2
 
 ```nginx
 location / {
+    client_max_body_size 10m;
     proxy_pass http://127.0.0.1:8001;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -131,13 +132,55 @@ Wer Systempakete bewusst selbst verwaltet, kann verwenden:
 - Google Places API-Key als geschütztes Schreibfeld
 - Dolibarr aktiv/inaktiv, Basis-URL, API-Key, Timeout und Ländercode
 - Light-/Dark-Logos und Social-Media-Links
-- PC-Builder-Texte sowie Controller-Produkte, Live-Farben, Preise und Bilder
 - Impressum und Datenschutz
 - Admin-Login-E-Mail und Admin-Passwort
 
 Gespeicherte API-Keys werden vom Backend niemals wieder an den Browser
 ausgegeben. Der Admin zeigt nur an, ob ein Key vorhanden ist. Ein neuer Wert
 ersetzt den bisherigen Key; vorhandene Keys können dort auch entfernt werden.
+Dolibarr-Basis-URL und -API-Key dürfen aus Sicherheitsgründen nur vom
+`super_admin` geändert werden.
+
+## Anfrageformular und Dolibarr
+
+Alle Kundenanliegen laufen zentral über `/anfrage`. Dort stehen Reparatur,
+PC-Neubau, PC-/Notebook-Upgrade, Controller-Umbau, Beratung und Sonstiges zur
+Auswahl. Je nach Anfrageart werden passende Geräte-, Wunsch-, Budget- und
+Zeitraumfelder angezeigt; außerdem können bis zu fünf Fotos mit jeweils maximal
+8 MB hochgeladen werden.
+Auch die Kontaktseite führt für neue schriftliche Anliegen in dieses zentrale
+Formular; direkte E-Mail- und Telefonlinks bleiben dort erhalten.
+Die früheren Builder-Adressen leiten auf die passende vorausgewählte Anfrageart
+weiter.
+
+Eine abgesendete Anfrage wird immer zuerst lokal in MongoDB gespeichert und
+erhält eine Referenz `ANF-XXXXXXXX`. Wenn Dolibarr aktiv ist, passiert danach
+automatisch Folgendes:
+
+1. vorhandenen Interessenten anhand der E-Mail-Adresse suchen und wiederverwenden;
+2. andernfalls einen neuen Interessenten anlegen;
+3. ein Ticket mit allen Angaben erstellen und mit dem Interessenten verknüpfen.
+
+Ein Dolibarr-Fehler verliert deshalb keine Kundenanfrage. Unter
+`/admin/anfragen` bleiben Fehlermeldung und Zwischenstand sichtbar und die
+Übertragung kann per Klick erneut gestartet werden. Die vom Browser erzeugte
+Anfrage-ID verhindert Doppelanlagen bei einem Netzwerk-Retry.
+Nicht abgesendete Foto-Entwürfe laufen nach 24 Stunden ab und werden samt Datei
+automatisch bereinigt. Kunden-Uploads liegen nur unter `backend/uploads/` und
+werden ausdrücklich nicht in Git aufgenommen.
+
+### Dolibarr einmalig vorbereiten
+
+1. In Dolibarr die REST-API und das Ticket-Modul aktivieren.
+2. Dem API-Benutzer Lese- und Schreibrechte für **Dritte/Firmen** sowie
+   **Tickets** geben. Produktrechte werden für den Anfrageablauf nicht benötigt.
+3. Unter `/admin/einstellungen` Dolibarr aktivieren, die Basis-URL der
+   Installation (ohne `/api/index.php`) und den API-Key eintragen.
+4. Unter `/admin/dolibarr` auf **Verbindung prüfen** klicken.
+
+Die genaue Bezeichnung der Rechte kann je nach Dolibarr-Version/Sprache leicht
+abweichen. Entscheidend ist, dass der API-Benutzer Dritte suchen und anlegen
+sowie Tickets lesen und anlegen darf.
 
 ### Automatisch in `backend/.env`
 
@@ -155,14 +198,18 @@ vor dem Start über `MONGO_URL` eingetragen werden. Die Datenbankverbindung kann
 nicht sinnvoll im Online-Admin umgestellt werden, weil der Admin selbst diese
 Verbindung benötigt.
 
-### Selten nötig: `deploy.config`
+### Selten nötig: `deploy.config.local`
+
+Die versionierte `deploy.config` enthält die Projekt-Standardwerte. Für eine
+serverlokale Abweichung wird `deploy.config.local` angelegt; diese Datei wird
+danach geladen, von Git ignoriert und deshalb bei `./update.sh` nicht
+überschrieben. Es müssen nur die abweichenden Werte enthalten sein, zum
+Beispiel:
 
 ```bash
-BACKEND_HOST="0.0.0.0"
-BACKEND_PORT="8001"
-PYTHON_BIN="python3"
-STARTUP_TIMEOUT_SECONDS="30"
-BACKEND_WORKERS="1"
+BACKEND_PORT="8010"
+# Nur nötig, wenn der Reverse Proxy auf einem anderen LAN-Gerät läuft:
+FORWARDED_ALLOW_IPS="127.0.0.1,192.168.2.20"
 ```
 
 Host und Port sind Prozess-/Reverse-Proxy-Einstellungen und können deshalb
@@ -171,6 +218,9 @@ Proxy wird die von `start.sh` ausgegebene `192.168.2.xxx:8001`-Adresse
 eingetragen. Der Port sollte in einer aktiven Firewall nur für die IP des
 Reverse Proxys oder zumindest nur für das lokale Netz freigegeben werden; eine
 Portweiterleitung am Internet-Router ist nicht erforderlich.
+`FORWARDED_ALLOW_IPS` enthält ausschließlich vertrauenswürdige Proxy-IP-Adressen,
+niemals pauschal `*`. So zählt der Schutz gegen zu viele Anfragen pro echte
+Kunden-IP statt alle Besucher unter der Proxy-IP zusammenzufassen.
 
 ## Logs und Diagnose
 
@@ -190,18 +240,13 @@ Ein gesunder Healthcheck liefert:
 | Problem | Lösung |
 |---|---|
 | MongoDB startet nicht | `systemctl status mongod` und `/var/log/mongodb/mongod.log` prüfen |
-| Dolibarr-Verbindung klappt, Produktsync aber nicht | Im Dolibarr-Admin für den API-Benutzer **Produkte/Dienstleistungen lesen** aktivieren; der Sync-Bildschirm zeigt HTTP-Status und Dolibarr-Fehlertext |
+| Dolibarr meldet HTTP 403 | API-Benutzerrechte für **Dritte/Firmen** und **Tickets** prüfen; die genaue fehlgeschlagene Stufe steht unter `/admin/anfragen` |
 | Dolibarr meldet HTTP 404 | Als Basis-URL nur die Dolibarr-Installation eintragen, z. B. `https://erp.example.at/dolibarr`, nicht `/api/index.php` anhängen |
-| Port 8001 ist belegt | fremden Dienst stoppen oder `BACKEND_PORT` in `deploy.config` und im Reverse Proxy gemeinsam ändern |
+| Port 8001 ist belegt | fremden Dienst stoppen oder `BACKEND_PORT` in `deploy.config.local` und im Reverse Proxy gemeinsam ändern |
 | Admin-Passwort vergessen | `./start.sh --reset-admin` ausführen |
 | Installation wurde abgebrochen | `./start.sh` erneut ausführen |
 | Frontend zeigt alten Stand | `./update.sh` oder `./start.sh --refresh` |
 | Start schlägt fehl | letzte Zeilen aus `logs/backend.log` prüfen |
-
-Beim öffentlichen Controller-Builder wählen Kunden nur `DualSense` oder
-`DualSense Edge`. BDM-/Hardware-Revisionen und die dazugehörige
-Teilekompatibilität bleiben bewusst intern im Admin und werden nach einer
-Anfrage geprüft.
 
 ## Lokale Entwicklung
 
@@ -227,10 +272,15 @@ yarn start
 Prüfungen:
 
 ```bash
-cd backend && python -m pytest tests -q
+cd backend && python -m pytest tests/test_unit_runtime.py tests/test_inquiry_dolibarr.py -q
 cd frontend && CI=true yarn build
 bash -n start.sh stop.sh update.sh
 ```
+
+Die mutierenden API-Integrationstests sind absichtlich gesperrt. Sie laufen nur
+mit `IT_TABELANDER_RUN_INTEGRATION=1`, einer lokalen URL und einer `DB_NAME`, die
+`test` enthält. Dabei wird ein eigener temporärer Test-Admin verwendet; echte
+Admin-Zugangsdaten und Produktionsdaten werden nicht benutzt.
 
 ## Dateien und Laufzeitdaten
 
@@ -238,6 +288,7 @@ bash -n start.sh stop.sh update.sh
 backend/             FastAPI, MongoDB-Zugriff und Tests
 frontend/            React-App und festes Yarn-Lockfile
 deploy.config        interner Host/Port und Startparameter
+deploy.config.local  optionale serverlokale Overrides (ignoriert)
 start.sh             Bootstrap, Build, Start und Healthchecks
 stop.sh              sicherer Prozess-Stopp per PID/Prozessgruppe
 update.sh            Fast-Forward-Update mit vorbereitetem Build
@@ -245,5 +296,5 @@ run/                 PID, Lock und temporäre Deployment-Artefakte (ignoriert)
 logs/                Backend-Log (ignoriert)
 ```
 
-Secrets, `backend/.env`, venv, `node_modules`, Builds, Logs und PID-Dateien werden
-nicht committed.
+Secrets, `backend/.env`, `deploy.config.local`, venv, `node_modules`, Builds,
+Logs und PID-Dateien werden nicht committed.

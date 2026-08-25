@@ -11,15 +11,18 @@ BACKEND_WORKERS="1"
 PYTHON_BIN="python3"
 HEALTHCHECK_HOST="127.0.0.1"
 STARTUP_TIMEOUT_SECONDS="30"
+FORWARDED_ALLOW_IPS="127.0.0.1"
 [[ -f "$SCRIPT_DIR/deploy.config" ]] && source "$SCRIPT_DIR/deploy.config"
+[[ -f "$SCRIPT_DIR/deploy.config.local" ]] && source "$SCRIPT_DIR/deploy.config.local"
 
 RUN_DIR="$SCRIPT_DIR/run"
 LOG_DIR="$SCRIPT_DIR/logs"
 BACKEND_DIR="$SCRIPT_DIR/backend"
 FRONTEND_DIR="$SCRIPT_DIR/frontend"
-VENV_DIR="$BACKEND_DIR/venv"
+VENV_DIR="${IT_TABELANDER_VENV_DIR:-$BACKEND_DIR/venv}"
 BUILD_DIR="$FRONTEND_DIR/build"
 STAGED_BUILD_DIR="$RUN_DIR/frontend-build.next"
+PREVIOUS_BUILD_DIR="$RUN_DIR/frontend-build.previous"
 mkdir -p "$RUN_DIR" "$LOG_DIR"
 
 PREPARE_ONLY=0
@@ -153,14 +156,32 @@ bootstrap_lock_dependencies() {
   fi
 }
 
-[[ "$BACKEND_PORT" =~ ^[0-9]+$ ]] || die "BACKEND_PORT muss eine Zahl sein."
+[[ "$BACKEND_PORT" =~ ^[0-9]+$ ]] && (( BACKEND_PORT >= 1 && BACKEND_PORT <= 65535 )) \
+  || die "BACKEND_PORT muss zwischen 1 und 65535 liegen."
 [[ "$BACKEND_WORKERS" =~ ^[1-9][0-9]*$ ]] || die "BACKEND_WORKERS muss mindestens 1 sein."
 [[ -n "$BACKEND_HOST" ]] || die "BACKEND_HOST darf nicht leer sein."
+[[ -n "$FORWARDED_ALLOW_IPS" ]] || die "FORWARDED_ALLOW_IPS darf nicht leer sein."
 [[ "$STARTUP_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || die "STARTUP_TIMEOUT_SECONDS muss mindestens 1 sein."
+
+case "$BACKEND_HOST" in
+  0.0.0.0) HEALTHCHECK_HOST="127.0.0.1" ;;
+  ::) HEALTHCHECK_HOST="::1" ;;
+  *) HEALTHCHECK_HOST="$BACKEND_HOST" ;;
+esac
+
+healthcheck_url() {
+  local path="$1" host="$HEALTHCHECK_HOST"
+  [[ "$host" == *:* && "$host" != \[*\] ]] && host="[$host]"
+  printf 'http://%s:%s%s' "$host" "$BACKEND_PORT" "$path"
+}
 
 bootstrap_lock_dependencies
 require_command flock
 require_command readlink
+case "$(readlink -m -- "$VENV_DIR")" in
+  "$(readlink -m -- "$BACKEND_DIR/venv")"|"$(readlink -m -- "$RUN_DIR")"/*) ;;
+  *) die "Unsicherer Python-venv-Pfad: $VENV_DIR" ;;
+esac
 lock_is_inherited() {
   [[ "${IT_TABELANDER_DEPLOY_LOCK_HELD:-0}" == "1" ]] || return 1
   [[ -e "/proc/$$/fd/9" ]] || return 1
@@ -235,16 +256,22 @@ process_matches_current_config() {
 running_pid() {
   local service="$1" pidfile="$2" pid
   pid="$(read_pid "$pidfile")" || return 1
-  kill -0 "$pid" 2>/dev/null || return 1
+  process_exists "$pid" || return 1
   process_matches_current_config "$service" "$pid" || return 1
   printf '%s' "$pid"
+}
+
+process_exists() {
+  local pid="$1"
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 1
+  [[ -d "/proc/$pid" ]] || ps -p "$pid" -o pid= >/dev/null 2>&1
 }
 
 clear_stale_pidfile() {
   local service="$1" pidfile="$2" pid=""
   [[ -e "$pidfile" ]] || return 0
   pid="$(read_pid "$pidfile" 2>/dev/null || true)"
-  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+  if [[ -n "$pid" ]] && process_exists "$pid"; then
     if process_belongs_to_project "${service,,}" "$pid"; then
       die "$service läuft mit einer anderen Port-Konfiguration (PID $pid). Bitte zuerst ./stop.sh ausführen."
     fi
@@ -277,14 +304,20 @@ process_target() {
 }
 
 target_is_alive() {
-  kill -0 -- "$1" 2>/dev/null
+  local target="$1" group
+  if [[ "$target" == -* ]]; then
+    group="${target#-}"
+    ps -eo pgid= 2>/dev/null | awk -v wanted="$group" '$1 == wanted { found=1 } END { exit !found }'
+  else
+    process_exists "$target"
+  fi
 }
 
 terminate_process_tree() {
   local pid="$1" target attempt
   if target_is_alive "-$pid"; then
     target="-$pid"
-  elif kill -0 "$pid" 2>/dev/null; then
+  elif process_exists "$pid"; then
     target="$(process_target "$pid")"
   else
     return 0
@@ -333,6 +366,18 @@ cleanup_on_exit() {
         fi
       fi
       [[ -n "$BUILD_TMP" ]] && rm -rf -- "$BUILD_TMP"
+    fi
+    if [[ -d "$PREVIOUS_BUILD_DIR" ]]; then
+      if [[ -d "$BUILD_DIR" ]]; then
+        failed_build="$RUN_DIR/frontend-build.failed.$$"
+        mv -- "$BUILD_DIR" "$failed_build" 2>/dev/null || true
+      fi
+      if mv -- "$PREVIOUS_BUILD_DIR" "$BUILD_DIR"; then
+        [[ -n "${failed_build:-}" && -d "$failed_build" ]] && rm -rf -- "$failed_build"
+        yellow "↶ Vorheriger Frontend-Build wurde wiederhergestellt."
+      else
+        red "Vorheriger Frontend-Build konnte nicht wiederhergestellt werden: $PREVIOUS_BUILD_DIR"
+      fi
     fi
     if [[ "$LAUNCHED_BACKEND_PID" =~ ^[1-9][0-9]*$ ]]; then
       if terminate_process_tree "$LAUNCHED_BACKEND_PID"; then
@@ -648,22 +693,17 @@ prepare_frontend() {
 }
 
 activate_staged_frontend() {
-  local previous_build
   [[ -f "$STAGED_BUILD_DIR/index.html" ]] || return 0
-
-  BUILD_TMP="$(mktemp -d "$RUN_DIR/.frontend-activate.XXXXXX")"
-  previous_build="$BUILD_TMP/previous"
+  [[ ! -e "$PREVIOUS_BUILD_DIR" ]] || die "Rollback-Build liegt bereits unter $PREVIOUS_BUILD_DIR; bitte zuerst prüfen."
   if [[ -d "$BUILD_DIR" ]]; then
-    mv -- "$BUILD_DIR" "$previous_build"
+    mv -- "$BUILD_DIR" "$PREVIOUS_BUILD_DIR"
   elif [[ -e "$BUILD_DIR" ]]; then
     die "$BUILD_DIR ist kein Verzeichnis."
   fi
   if ! mv -- "$STAGED_BUILD_DIR" "$BUILD_DIR"; then
-    [[ -d "$previous_build" ]] && mv -- "$previous_build" "$BUILD_DIR"
+    [[ -d "$PREVIOUS_BUILD_DIR" ]] && mv -- "$PREVIOUS_BUILD_DIR" "$BUILD_DIR"
     die "Bereitgestellter Frontend-Build konnte nicht aktiviert werden."
   fi
-  rm -rf -- "$BUILD_TMP"
-  BUILD_TMP=""
   green "✓ Neuer Frontend-Build aktiviert"
 }
 
@@ -714,6 +754,28 @@ validate_backend_runtime() {
   fi
 }
 
+validate_application_startup() {
+  if ! (
+    cd "$BACKEND_DIR"
+    "$VENV_DIR/bin/python" <<'PY'
+import asyncio
+import server
+
+
+async def main() -> None:
+    async with server.app.router.lifespan_context(server.app):
+        if not server.app.state.startup_ready:
+            raise RuntimeError("Application startup did not become ready")
+
+
+asyncio.run(main())
+PY
+  ); then
+    die "Backend-Startupprüfung fehlgeschlagen; laufender Stand bleibt unangetastet."
+  fi
+  green "✓ Backend-Startup und Datenbankmigrationen geprüft"
+}
+
 check_mongodb() {
   if ! (
     cd "$BACKEND_DIR"
@@ -746,6 +808,27 @@ PY
   green "✓ MongoDB erreichbar"
 }
 
+check_backend_port_available() {
+  if ! "$PYTHON_BIN" - "$BACKEND_HOST" "$BACKEND_PORT" <<'PY'
+import socket
+import sys
+
+host, port_text = sys.argv[1:]
+port = int(port_text)
+family = socket.AF_INET6 if ":" in host else socket.AF_INET
+with socket.socket(family, socket.SOCK_STREAM) as sock:
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind((host, port))
+    except OSError as exc:
+        print(f"Portprüfung fehlgeschlagen: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+PY
+  then
+    die "Port $BACKEND_PORT auf $BACKEND_HOST ist durch einen anderen Prozess belegt."
+  fi
+}
+
 start_backend() {
   local pid
   if pid="$(running_pid backend "$RUN_DIR/backend.pid")"; then
@@ -758,7 +841,8 @@ start_backend() {
     cd "$BACKEND_DIR"
     unset IT_TABELANDER_DEPLOY_LOCK_HELD
     exec nohup setsid "$VENV_DIR/bin/python" -m uvicorn server:app \
-      --host "$BACKEND_HOST" --port "$BACKEND_PORT" --workers "$BACKEND_WORKERS"
+      --host "$BACKEND_HOST" --port "$BACKEND_PORT" --workers "$BACKEND_WORKERS" \
+      --forwarded-allow-ips "$FORWARDED_ALLOW_IPS"
   ) > "$LOG_DIR/backend.log" 2>&1 9>&- &
   pid=$!
   LAUNCHED_BACKEND_PID="$pid"
@@ -769,10 +853,11 @@ start_backend() {
 
 wait_for_backend() {
   local pid response verified_pid deadline=$((SECONDS + STARTUP_TIMEOUT_SECONDS))
-  local url="http://$HEALTHCHECK_HOST:$BACKEND_PORT/api/health"
+  local url
+  url="$(healthcheck_url /api/health)"
   while (( SECONDS < deadline )); do
     pid="$(read_pid "$RUN_DIR/backend.pid" 2>/dev/null || true)"
-    if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+    if [[ -z "$pid" ]] || ! process_exists "$pid"; then
       red "Backend-Prozess wurde vorzeitig beendet. Letzte Logzeilen:"
       tail -n 30 "$LOG_DIR/backend.log" >&2 || true
       return 1
@@ -797,10 +882,11 @@ wait_for_backend() {
 
 wait_for_frontend() {
   local pid verified_pid deadline=$((SECONDS + STARTUP_TIMEOUT_SECONDS))
-  local url="http://$HEALTHCHECK_HOST:$BACKEND_PORT/"
+  local url
+  url="$(healthcheck_url /)"
   while (( SECONDS < deadline )); do
     pid="$(read_pid "$RUN_DIR/backend.pid" 2>/dev/null || true)"
-    if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+    if [[ -z "$pid" ]] || ! process_exists "$pid"; then
       red "Webdienst wurde vorzeitig beendet. Letzte Logzeilen:"
       tail -n 30 "$LOG_DIR/backend.log" >&2 || true
       return 1
@@ -833,6 +919,7 @@ validate_backend_runtime
 check_mongodb
 
 if (( PREPARE_ONLY == 1 )); then
+  validate_application_startup
   green "✓ Vorbereitung abgeschlossen; neuer Frontend-Build wurde nur bereitgestellt."
   exit 0
 fi
@@ -842,11 +929,16 @@ if [[ -e "$RUN_DIR/backend.pid" || -e "$RUN_DIR/frontend.pid" ]]; then
   bash "$SCRIPT_DIR/stop.sh"
 fi
 
+check_backend_port_available
 activate_staged_frontend
 
 start_backend
 wait_for_backend
 wait_for_frontend
+
+if [[ -d "$PREVIOUS_BUILD_DIR" ]]; then
+  rm -rf -- "$PREVIOUS_BUILD_DIR"
+fi
 
 ADMIN_EMAIL_DISPLAY=""
 ADMIN_PASSWORD_DISPLAY=""
@@ -861,7 +953,7 @@ green "════════════════════════�
 green " IT-Tabelander läuft und ist bereit"
 PROXY_TARGET_HOST="$(reverse_proxy_host)"
 echo  " Reverse Proxy (LAN)       : http://$PROXY_TARGET_HOST:$BACKEND_PORT"
-echo  " Lokaler Healthcheck       : http://$HEALTHCHECK_HOST:$BACKEND_PORT/api/health"
+echo  " Lokaler Healthcheck       : $(healthcheck_url /api/health)"
 echo  " Admin                     : /admin"
 echo  " Log                       : $LOG_DIR/backend.log"
 if [[ -n "$ADMIN_PASSWORD_DISPLAY" ]]; then

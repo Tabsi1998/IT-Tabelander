@@ -1,5 +1,6 @@
-"""Iteration-2 regression tests: lockout 429 + clear, admin id guards, PC per-category images, auth playbook checks."""
+"""Iteration-2 regression tests for lockout, admin ID guards, and authentication."""
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -24,21 +25,24 @@ BAD_OID = "not-an-objectid"
 
 # ---------------- REGRESSION FIX 2: lockout returns 429, never 500 ----------------
 class TestLockout:
-    def test_real_admin_lockout_then_recovery(self, test_credentials):
+    def test_isolated_test_admin_lockout_then_recovery(self, test_credentials):
         """5 wrong passwords -> 401s, 6th -> 429 (not 500). Then clear attempts and login works."""
         import asyncio
         from pymongo import AsyncMongoClient
+
+        email = test_credentials["email"]
 
         async def _clear():
             env = dotenv_values(BACKEND_ENV_PATH)
             cli = AsyncMongoClient(env["MONGO_URL"])
             try:
-                res = await cli[env["DB_NAME"]].login_attempts.delete_many({})
+                res = await cli[env["DB_NAME"]].login_attempts.delete_many({
+                    "identifier": {"$regex": re.escape(email)}
+                })
                 return res.deleted_count
             finally:
                 await cli.close()
 
-        email = test_credentials["email"]
         codes = []
         cleared = 0
         try:
@@ -68,7 +72,7 @@ class TestLockout:
 
 # ---------------- Auth playbook checks ----------------
 class TestAuthPlaybook:
-    def test_bcrypt_hash_format(self):
+    def test_bcrypt_hash_format(self, test_credentials):
         import asyncio
         from pymongo import AsyncMongoClient
 
@@ -77,7 +81,7 @@ class TestAuthPlaybook:
             cli = AsyncMongoClient(env["MONGO_URL"])
             try:
                 return await cli[env["DB_NAME"]].users.find_one(
-                    {"email": env["ADMIN_EMAIL"].lower()}
+                    {"email": test_credentials["email"]}
                 )
             finally:
                 await cli.close()
@@ -132,35 +136,4 @@ class TestAdminIdGuards:
         r = admin_client.delete(f"{BASE_URL}/api/admin/{resource}/{BAD_OID}", timeout=30)
         assert r.status_code in (400, 422), f"{resource} DELETE malformed -> {r.status_code} {r.text[:200]}"
 
-
-# ---------------- Configurator: per-category PC images ----------------
-class TestPcCategoryImages:
-    def test_pc_categories_have_distinct_relevant_images(self, api_client):
-        r = api_client.get(f"{BASE_URL}/api/configurator/pc", timeout=30)
-        assert r.status_code == 200
-        cats = r.json().get("categories", [])
-        assert len(cats) >= 5
-        # images live on the options; each category's options should use a
-        # category-specific image (previously every category shared one photo)
-        per_cat = {}
-        for c in cats:
-            urls = {(o.get("image_url") or "").strip()
-                    for o in c.get("options", []) if (o.get("image_url") or "").strip()}
-            if urls:
-                per_cat[c["key"]] = urls
-        assert len(per_cat) >= 5, f"most categories have no images: {per_cat.keys()}"
-        # a single URL must not be shared across more than one category
-        shared = {}
-        for key, urls in per_cat.items():
-            for u in urls:
-                shared.setdefault(u, []).append(key)
-        offenders = {u: k for u, k in shared.items() if len(k) > 1}
-        assert not offenders, f"image reused across categories: {offenders}"
-
-    def test_ps5_and_pc_configurators_load(self, api_client):
-        for name in ("ps5", "pc"):
-            r = api_client.get(f"{BASE_URL}/api/configurator/{name}", timeout=30)
-            assert r.status_code == 200, name
-            body = r.json()
-            assert body.get("categories"), name
-            assert any(c.get("options") for c in body["categories"]), f"{name} has no options"
+# End of regression tests.
