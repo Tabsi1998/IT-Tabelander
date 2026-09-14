@@ -28,13 +28,22 @@ BASE_URL = (
 INTEGRATION_FILES = {"test_api.py", "test_regression_iter2.py"}
 
 
+def _test_database_env():
+    """Use explicitly selected test services without editing backend/.env."""
+    env = dotenv_values(BACKEND_ENV_PATH)
+    for key in ("MONGO_URL", "DB_NAME"):
+        if key in os.environ:
+            env[key] = os.environ[key]
+    return env
+
+
 def _integration_safety_error() -> str | None:
     if os.environ.get("IT_TABELANDER_RUN_INTEGRATION") != "1":
         return "Integrationstests benötigen IT_TABELANDER_RUN_INTEGRATION=1"
     host = (urlparse(BASE_URL).hostname or "").lower()
     if host not in {"localhost", "127.0.0.1", "::1"}:
         return "Integrationstests sind nur gegen localhost erlaubt"
-    database_name = str(dotenv_values(BACKEND_ENV_PATH).get("DB_NAME") or "")
+    database_name = str(_test_database_env().get("DB_NAME") or "")
     if "test" not in database_name.lower():
         return "Integrationstests benötigen eine DB_NAME mit 'test' im Namen"
     return None
@@ -57,11 +66,11 @@ def base_url():
 
 @pytest.fixture(scope="session")
 def test_credentials():
-    env = dotenv_values(BACKEND_ENV_PATH)
+    env = _test_database_env()
     safety_error = _integration_safety_error()
     if safety_error:
         pytest.skip(safety_error)
-    email = f"integration-{uuid.uuid4().hex}@example.test"
+    email = f"integration-{uuid.uuid4().hex}@example.com"
     password = f"Test-{secrets.token_urlsafe(18)}"
 
     async def create_test_admin():

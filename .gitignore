@@ -38,3 +38,8 @@ test_reports/
 .DS_Store
 Thumbs.db
 *.env
+
+# Local VS Code test environments and generated results
+/.local-testing/
+/*.code-workspace
+.venv/

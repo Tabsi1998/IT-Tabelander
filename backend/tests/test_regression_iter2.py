@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 import requests
 from dotenv import dotenv_values
+from conftest import _test_database_env
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ENV_PATH = REPO_ROOT / "backend" / ".env"
@@ -33,7 +34,7 @@ class TestLockout:
         email = test_credentials["email"]
 
         async def _clear():
-            env = dotenv_values(BACKEND_ENV_PATH)
+            env = _test_database_env()
             cli = AsyncMongoClient(env["MONGO_URL"])
             try:
                 res = await cli[env["DB_NAME"]].login_attempts.delete_many({
@@ -77,7 +78,7 @@ class TestAuthPlaybook:
         from pymongo import AsyncMongoClient
 
         async def _get():
-            env = dotenv_values(BACKEND_ENV_PATH)
+            env = _test_database_env()
             cli = AsyncMongoClient(env["MONGO_URL"])
             try:
                 return await cli[env["DB_NAME"]].users.find_one(
@@ -100,7 +101,7 @@ class TestAuthPlaybook:
     def test_cors_allows_credentials_with_origin(self):
         """Verified against the app itself (ingress intercepts OPTIONS and answers with '*')."""
         origin = frontend_env.get("REACT_APP_BACKEND_URL") or BASE_URL
-        r = requests.options("http://localhost:8001/api/auth/login",
+        r = requests.options(f"{BASE_URL}/api/auth/login",
                              headers={"Origin": origin,
                                       "Access-Control-Request-Method": "POST"}, timeout=30)
         assert r.status_code in (200, 204), r.status_code
