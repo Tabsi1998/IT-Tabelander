@@ -4,9 +4,13 @@ Notes for Claude Code sessions on IT-Tabelander: how the local checks are set
 up and how to extend them. Answer the owner (Tabsi1998) in German. Commits and
 PR titles stay English.
 
-## Local first, GitHub second
+## Local checks are the gate; GitHub only warns
 
-GitHub Actions is the second confirmation. Before every push:
+The repository is private; GitHub Actions would cost minutes and stayed red
+for billing, so there is no workflow at all (removed 2026-09-27 at the
+owner's request). GitHub keeps only what it does for free: Dependabot alerts
+for packages with known vulnerabilities (OSV checks the same here). Before
+every push:
 
 ```bash
 python scripts/local_check.py                  # everything but extra
@@ -19,15 +23,15 @@ Results: `.local-testing/local-check.json`, logs in `.local-testing/logs/`,
 live progress in `.local-testing/local-check.progress.json`. All of it is
 ignored by Git.
 
-| Group | Mirrors | Runs |
-| --- | --- | --- |
-| repository | ci.yml `deployment-scripts` | every `*.sh` parses, no CRLF in the index, `git diff --check` over every tracked line (the CI's check sees no diff on a fresh checkout), Gitleaks over the history and over uncommitted files |
-| backend | ci.yml `backend` matrix | for Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, `tests/test_unit_runtime.py`, `tests/test_inquiry_dolibarr.py`, `tests/test_handover.py` and `tests/test_site_data.py` |
-| integration | ci.yml `integration` (control only) | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
-| dolibarr | - (local only) | Dolibarr 24.0.1 + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link, the website's test mail, queue with one warning while Dolibarr is unreachable, personal data gone after hand-over, migration of old records without mails, contact form without new third party, callback as agenda event, company data and imprint (with a moved address), draft marker on legal texts, FAQ only from released website articles, status steps "Angebot bereit" and "abholbereit" |
-| frontend | ci.yml `frontend` | Node 24, `yarn install --frozen-lockfile`, `yarn build` with `CI=true` (Create React App turns warnings into errors) |
-| extra | - | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
-| deploy | - | `start.sh`, `stop.sh`, `update.sh` on a throwaway Ubuntu 24.04 server with systemd (`scripts/deploy-test/`): autostart, crash restart, reboot (`docker restart`), a broken update rolled back, a good update, `stop.sh --disable`, `USE_SYSTEMD=0`. With `--all` only when a deployment file changed against origin/main (about 15 minutes); `--only deploy` forces it. It tests the committed HEAD |
+| Group | Runs |
+| --- | --- |
+| repository | every `*.sh` parses, no CRLF in the index, `git diff --check` over every tracked line (a check on a fresh checkout would see no diff), Gitleaks over the history and over uncommitted files |
+| backend | for Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, `tests/test_unit_runtime.py`, `tests/test_inquiry_dolibarr.py`, `tests/test_handover.py` and `tests/test_site_data.py` |
+| integration | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
+| dolibarr | Dolibarr 24.0.1 + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link, the website's test mail, queue with one warning while Dolibarr is unreachable, personal data gone after hand-over, migration of old records without mails, contact form without new third party, callback as agenda event, company data and imprint (with a moved address), draft marker on legal texts, FAQ only from released website articles, status steps "Angebot bereit" and "abholbereit" |
+| frontend | Node 24, `yarn install --frozen-lockfile`, `yarn build` with `CI=true` (Create React App turns warnings into errors) |
+| extra | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
+| deploy | `start.sh`, `stop.sh`, `update.sh` on a throwaway Ubuntu 24.04 server with systemd (`scripts/deploy-test/`): autostart, crash restart, reboot (`docker restart`), a broken update rolled back, a good update, `stop.sh --disable`, `USE_SYSTEMD=0`. With `--all` only when a deployment file changed against origin/main (about 15 minutes); `--only deploy` forces it. It tests the committed HEAD |
 
 Tools the checks expect: Docker Desktop (MongoDB, OSV, ShellCheck), Git for
 Windows (bash, openssl), gitleaks, Python 3.10 and 3.14 through the `py`
@@ -63,8 +67,9 @@ German (Warum / Was zu tun ist / Abnahme). Every PR names its issues with
 
 The extra group compares against `scripts/ci-baseline.json`: known findings
 are debt, new ones fail. After paying debt down, run
-`python scripts/local_check.py --all --record` and commit the baseline. Gates
-the CI already enforces are never ratcheted. Debt on 2026-09-15: 29 OSV
+`python scripts/local_check.py --all --record` and commit the baseline. The
+hard gates (repository, backend, integration, dolibarr, frontend) are never
+ratcheted. Debt on 2026-09-15: 29 OSV
 findings in `frontend/yarn.lock`, 4 ShellCheck findings.
 
 ## Extending the checks
@@ -84,7 +89,7 @@ cannot run on this machine. Register it with
 `Step(group, name, describe, action, needs)`; `needs` names steps of the same
 group, or `group/name` across groups. A gate that counts findings goes through
 `ratchet(context, key, found, what)`. A new test file must be added to
-`CI_TEST_FILES`, `INTEGRATION_TEST_FILES` or `DOLIBARR_TEST_FILES`, or the test
+`UNIT_TEST_FILES`, `INTEGRATION_TEST_FILES` or `DOLIBARR_TEST_FILES`, or the test
 inventory fails.
 
 Dolibarr facts the scenarios proved (24.0.1): the API user needs
