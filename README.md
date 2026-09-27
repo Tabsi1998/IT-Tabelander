@@ -144,15 +144,18 @@ Wer Systempakete bewusst selbst verwaltet, kann verwenden:
 
 ### Online unter `/admin/einstellungen`
 
-- Unternehmensname, Adresse, Land, E-Mail, Telefon, Servicegebiet und Öffnungszeiten
+- Servicegebiet
 - SEO-Titel, Beschreibung und öffentliche Website-URL
 - Google Analytics Measurement-ID
 - Dolibarr aktiv/inaktiv, Basis-URL, API-Key, Timeout und Ländercode
 - E-Mail-Versand der Website (Mailserver, Absender, wohin Warnungen gehen) mit
   Knopf **Test-Mail senden**
-- Light-/Dark-Logos und Social-Media-Links
-- Impressum und Datenschutz
+- Light-/Dark-Logos
 - Admin-Login-E-Mail und Admin-Passwort
+
+Firmendaten, Öffnungszeiten, Social-Media-Links, Impressum, Datenschutz,
+Nutzungsbedingungen und FAQ stehen **nicht** mehr hier, sondern in Dolibarr
+(siehe „Firmendaten, Rechtstexte und FAQ aus Dolibarr“).
 
 Gespeicherte API-Keys werden vom Backend niemals wieder an den Browser
 ausgegeben. Der Admin zeigt nur an, ob ein Key vorhanden ist. Ein neuer Wert
@@ -208,8 +211,17 @@ automatisch Folgendes:
 Kunden sehen den Stand ihrer Anfrage über die Anfragenummer und ihre E-Mail
 oder über den Link in der Bestätigung (Schnittstelle `/api/inquiries/status`,
 die Seite dazu kommt mit der neuen Website). Angezeigt werden nur Anfrageart und
-Schritt (eingegangen, in Arbeit, wartet auf dich, pausiert, abgeschlossen,
-abgebrochen), keine persönlichen Daten.
+Schritt, keine persönlichen Daten. Die Schritte kommen aus dem Ticket:
+
+| Schritt | Woher in Dolibarr |
+|---|---|
+| eingegangen | Ticket neu, gelesen oder zugewiesen |
+| Angebot bereit | ein **freigegebenes** Angebot ist mit dem Ticket verknüpft (Angebot aus dem Ticket heraus anlegen oder im Ticket unter „Verknüpfte Objekte“ verknüpfen); nach der Annahme zählt wieder das Ticket |
+| in Arbeit | Ticket „In Bearbeitung“ |
+| wartet auf dich | Ticket „Benötigt weitere Informationen“ |
+| pausiert | Ticket „Wartend“ |
+| abholbereit | Häkchen **Gerät abholbereit** im Ticket (Zusatzfeld, siehe unten) |
+| abgeschlossen / abgebrochen | Ticket geschlossen / abgebrochen |
 
 Ein Dolibarr-Fehler verliert deshalb keine Kundenanfrage. Klappt die Übergabe
 nicht (Dolibarr aus, Netz weg, Recht fehlt), versucht es die Website
@@ -268,8 +280,12 @@ werden ausdrücklich nicht in Git aufgenommen.
      dieses Recht findet die Website Stammkunden nicht und legt sie doppelt an,
    - Tickets: **lesen** und **anlegen/ändern**,
    - Kalender: **eigene Termine einsehen** und **eigene Termine anlegen**
-     (für Rückruf-Wünsche).
-   Im Benutzer einen API-Schlüssel erzeugen.
+     (für Rückruf-Wünsche),
+   - Wissensdatenbank: **lesen**, Kategorien: **lesen** (Rechtstexte, FAQ),
+   - Angebote: **lesen** (für den Schritt „Angebot bereit“).
+   Im Benutzer einen API-Schlüssel erzeugen. **Keine** Admin-Rechte.
+   Nur für den einmaligen Umzug der alten FAQ vorübergehend zusätzlich
+   „Wissensdatenbank: anlegen/ändern“ – danach wieder wegnehmen.
 3. Unter **Tickets → Einstellungen** bei **Benachrichtigungs-E-Mail an** die
    Werkstatt-Adresse eintragen und bei **Benachrichtigungs-E-Mail von** die
    Absender-Adresse. Der E-Mail-Versand von Dolibarr selbst muss eingerichtet
@@ -303,9 +319,54 @@ hat oder der Sync fehlschlägt, bleibt die Danke-Seite bewusst bei der lokalen
 `ANF-…`-Referenz. Dieser Schalter führt noch zu Dolibarr selbst und entfällt
 mit der Statusseite der neuen Website (Meilenstein 3).
 
+Zusätzlich in Dolibarr:
+
+- Module **Wissensdatenbank** und **Kategorien** aktivieren.
+- Unter **Start → Einstellungen → Sonstige Einstellungen** zwei Konstanten
+  anlegen, jeweils mit dem Login des Website-Benutzers als Wert:
+  `API_LOGINS_ALLOWED_FOR_GET_COMPANY` (Firmendaten) und
+  `API_LOGINS_ALLOWED_FOR_CONST_READ` (Öffnungszeiten). So braucht der
+  Website-Benutzer keine Admin-Rechte.
+- Unter **Tickets → Einstellungen → Ergänzende Attribute** ein neues Attribut:
+  Bezeichnung „Gerät abholbereit“, Code `abholbereit`, Typ „Ja/Nein
+  (Boolean)“.
+
 Die genaue Bezeichnung der Rechte kann je nach Dolibarr-Version/Sprache leicht
-abweichen. Entscheidend ist, dass der API-Benutzer Dritte suchen und anlegen
-sowie Tickets lesen und anlegen darf.
+abweichen.
+
+### Firmendaten, Rechtstexte und FAQ aus Dolibarr
+
+Alles, was die Website über die Firma sagt, pflegst du in Dolibarr:
+
+- **Firmendaten** unter **Start → Einstellungen → Firma/Organisation**: Name,
+  Adresse, Telefon, E-Mail, Website, Inhaber/Geschäftsführung,
+  Unternehmensgegenstand, UID, Steuernummer (Kennung 1), Firmenbuchgericht
+  (Kennung 2), Firmenbuchnummer (Kennung 3) und die sozialen Netzwerke. Daraus
+  baut die Website das Impressum.
+- **Öffnungszeiten** im Reiter **Öffnungszeiten** derselben Seite.
+- **Rechtstexte und FAQ** als Artikel der **Wissensdatenbank**:
+  1. Unter **Kategorien** eine Kategorie für die Wissensdatenbank anlegen,
+     z. B. „Website“.
+  2. Artikel schreiben: „Datenschutzerklärung“, „Nutzungsbedingungen“,
+     optional „Impressum-Ergänzung“ (was das Firmenformular nicht kennt, z. B.
+     Aufsichtsbehörde und Kammer) und je eine Frage pro FAQ-Eintrag.
+  3. Jedem Artikel für die Website die Kategorie „Website“ geben und ihn
+     **freigeben**. Artikel ohne diese Kategorie bleiben intern – interne
+     Notizen in der Wissensdatenbank sieht nie jemand auf der Website.
+  4. Auf der Website unter `/admin/dolibarr` im Block **Inhalte aus
+     Dolibarr** die Kategorie und die drei Rechtstext-Artikel auswählen,
+     **Auswahl speichern**.
+
+Ein Rechtstext im Entwurf erscheint mit dem Hinweis „Entwurf“. In den FAQ
+erscheinen nur freigegebene Artikel der Kategorie, die kein Rechtstext sind.
+Bis der erste FAQ-Artikel freigegeben ist, zeigt die Website ihre bisherigen
+FAQ weiter. Die Website fragt Dolibarr höchstens alle 10 Minuten; **Neu laden**
+im Admin holt sofort. Ist Dolibarr nicht erreichbar, zeigt sie den letzten
+bekannten Stand. Was fehlt oder nicht erlaubt ist, steht im Block in Worten.
+
+Bankdaten zeigt die Website bewusst nicht: Das Dolibarr-Recht dafür würde auch
+Kontobewegungen lesbar machen. Die IBAN steht auf den Rechnungen aus Dolibarr,
+die im Kundenportal (Meilenstein 5) abrufbar werden.
 
 ### Automatisch in `backend/.env`
 
@@ -367,6 +428,8 @@ Ein gesunder Healthcheck liefert:
 | MongoDB startet nicht | `systemctl status mongod` und `/var/log/mongodb/mongod.log` prüfen |
 | Dolibarr meldet HTTP 403 | API-Benutzerrechte für **Geschäftspartner** und **Tickets** prüfen; die genaue fehlgeschlagene Stufe steht unter `/admin/anfragen` |
 | Stammkunde wird in Dolibarr doppelt angelegt | dem API-Benutzer das Recht **Geschäftspartner: alle einsehen, nicht nur die verknüpften** geben |
+| Firmendaten oder Öffnungszeiten fehlen auf der Website | `/admin/dolibarr` → **Inhalte aus Dolibarr** zeigt den Grund; meist fehlt die Konstante `API_LOGINS_ALLOWED_FOR_GET_COMPANY` bzw. `API_LOGINS_ALLOWED_FOR_CONST_READ` |
+| Ein FAQ-Artikel erscheint nicht | Kategorie „Website“ gesetzt? Freigegeben? Nicht als Rechtstext ausgewählt? Dann **Neu laden** |
 | Kunde bekommt keine Eingangsbestätigung | Dolibarr unter **Einstellungen → E-Mails** eine Test-Mail senden lassen; die Website verschickt diese Mail nicht selbst |
 | Keine Warn-Mail, obwohl Anfragen warten | unter `/admin/einstellungen` **Test-Mail senden**; unter `/admin/dolibarr` steht bei der Warteschlange, warum die Warnung nicht rausging |
 | Rückruf-Termin fehlt, Anfrage wartet mit „Anlegen des Rückruf-Termins“ | Modul **Kalender** aktivieren und dem API-Benutzer **eigene Termine anlegen** geben, dann **Jetzt erneut versuchen** |
@@ -401,7 +464,7 @@ yarn start
 Prüfungen:
 
 ```bash
-cd backend && python -m pytest tests/test_unit_runtime.py tests/test_inquiry_dolibarr.py tests/test_handover.py -q
+cd backend && python -m pytest tests/test_unit_runtime.py tests/test_inquiry_dolibarr.py tests/test_handover.py tests/test_site_data.py -q
 cd frontend && CI=true yarn build
 bash -n start.sh stop.sh update.sh
 ```

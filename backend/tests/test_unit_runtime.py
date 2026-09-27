@@ -81,8 +81,15 @@ def test_only_super_admin_can_change_dolibarr_endpoint_or_key(monkeypatch):
             for field in update.get("$unset", {}):
                 self.doc.pop(field, None)
 
+    class SiteCache:
+        dropped = 0
+
+        async def delete_one(self, _query):
+            SiteCache.dropped += 1
+
     class Database:
         settings = SettingsCollection()
+        site_cache = SiteCache()
 
     database = Database()
     monkeypatch.setattr(settings_router, "get_db", lambda: database)

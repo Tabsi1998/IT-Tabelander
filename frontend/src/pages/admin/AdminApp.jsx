@@ -7,7 +7,6 @@ import AdminLayout from "./AdminLayout";
 import Dashboard from "./Dashboard";
 import AdminRepairs from "./AdminRepairs";
 import AdminServices from "./AdminServices";
-import AdminFaqs from "./AdminFaqs";
 import AdminReviews from "./AdminReviews";
 import AdminMedia from "./AdminMedia";
 import AdminDolibarr from "./AdminDolibarr";
@@ -36,7 +35,6 @@ export default function AdminApp() {
         <Route path="controller-builder" element={<Navigate to="/admin/anfragen" replace />} />
         <Route path="kontakt" element={<Navigate to="/admin" replace />} />
         <Route path="leistungen" element={<AdminServices />} />
-        <Route path="faqs" element={<AdminFaqs />} />
         <Route path="bewertungen" element={<AdminReviews />} />
         <Route path="medien" element={<AdminMedia />} />
         <Route path="dolibarr" element={<AdminDolibarr />} />

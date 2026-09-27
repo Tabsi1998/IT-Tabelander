@@ -7,10 +7,12 @@ results in Dolibarr itself, through an administrator's API key.
 """
 import hashlib
 import io
+import json
 import os
 import re
 import secrets
 import string
+import subprocess
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -32,6 +34,9 @@ PUBLIC_URL = os.environ.get("DOLIBARR_TEST_PUBLIC_URL", "")
 MAILPIT = os.environ.get("MAILPIT_URL", "").rstrip("/")
 MAILPIT_SMTP_PORT = int(os.environ.get("MAILPIT_SMTP_PORT") or 0)
 WARNINGS_TO = "werkstatt-warnung@example.com"
+WEB_USER = os.environ.get("DOLIBARR_TEST_WEB_USER", "")
+CONTENT = json.loads(os.environ.get("DOLIBARR_TEST_CONTENT") or "{}")
+FIXTURE_COMMAND = json.loads(os.environ.get("DOLIBARR_TEST_FIXTURE_COMMAND") or "[]")
 
 
 def website_db():
@@ -46,6 +51,16 @@ def dolibarr_get(path: str, **params):
         params=params or None, timeout=30,
     )
     response.raise_for_status()
+    return response.json()
+
+
+def dolibarr_post(path: str, body: dict):
+    response = requests.post(
+        f"{DOLIBARR}/api/index.php/{path}",
+        headers={"DOLAPIKEY": ADMIN_KEY, "Accept": "application/json"},
+        json=body, timeout=30,
+    )
+    assert response.status_code == 200, response.text
     return response.json()
 
 
@@ -336,8 +351,15 @@ class TestMigration:
         assert ref in refs and message_ref in refs, plan
         assert db.repair_requests.find_one({"ref": ref})["contact"]["email"] == old_email, "the dry run changed data"
 
+        assert plan["faqs"] >= 1 and any(item["request_type"] == "faq" for item in plan["items"]), plan
+
         result = admin_client.post(f"{BASE_URL}/api/admin/dolibarr/migration", timeout=300).json()
         assert result["sent"] >= 1 and result["contact_messages"] >= 1 and not result["failed"], result
+        # The website's own FAQ arrived as drafts in the knowledge base (#81).
+        assert result["faqs"] >= 1, result
+        records = dolibarr_get("knowledgemanagement/knowledgerecords", limit=200)
+        copied = [record for record in records if record.get("question") == "Wie lange dauert eine Reparatur?"]
+        assert copied and all(int(record["status"]) == 0 for record in copied), records
 
         party = dolibarr_get(f"thirdparties/email/{old_email}")
         ticket_for(ref, party["id"])
@@ -406,3 +428,94 @@ class TestCallback:
         wish = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
         response = send_contact(f"ohne-telefon-{uuid.uuid4().hex[:8]}@example.com", callback_at=wish)
         assert response.status_code == 422, response.text
+
+
+def run_fixture(stage: str) -> dict:
+    completed = subprocess.run([*FIXTURE_COMMAND, stage], capture_output=True, text=True, timeout=120)
+    assert completed.returncode == 0, completed.stderr
+    return json.loads(completed.stdout[completed.stdout.index("{"):])
+
+
+@pytest.fixture(scope="module")
+def website_content(admin_client):
+    """The owner picks the website category and the legal articles (#74, #81)."""
+    response = admin_client.put(f"{BASE_URL}/api/admin/settings", json={
+        "dolibarr_content_category_id": CONTENT["category"],
+        "dolibarr_imprint_article_id": CONTENT["imprint"],
+        "dolibarr_privacy_article_id": CONTENT["privacy"],
+        "dolibarr_terms_article_id": CONTENT["terms"],
+    }, timeout=30)
+    assert response.status_code == 200, response.text
+    return CONTENT
+
+
+class TestSiteDataFromDolibarr:
+    def test_company_data_and_opening_hours(self, website_content):
+        info = requests.get(f"{BASE_URL}/api/site-info", timeout=60).json()
+        company = info["company"]
+        assert company["name"] == "IT-Tabelander Test" and company["managers"] == "Test Inhaber"
+        assert company["zip"] == "6020" and company["tva_intra"] == "ATU22222222"
+        assert "note_private" not in company and "Interne Firmennotiz" not in json.dumps(info)
+        assert {"day": "Montag", "hours": "09:00–17:00"} in info["opening_hours"]
+        assert {"day": "Freitag", "hours": "09:00–12:00"} in info["opening_hours"]
+        # The current website reads the same through /api/settings.
+        settings = requests.get(f"{BASE_URL}/api/settings", timeout=60).json()
+        assert settings["company_name"] == "IT-Tabelander Test" and settings["postal_code"] == "6020"
+
+    def test_a_new_address_in_dolibarr_shows_in_the_imprint(self, admin_client, website_content):
+        before = requests.get(f"{BASE_URL}/api/legal/impressum", timeout=60).json()
+        assert "Werkstattweg 1" in before["html"] and "Aufsichtsbehörde: Test-BH" in before["html"]
+        assert "Firmenbuchnummer: FN 222222a" in before["html"] and before["draft"] is False
+        run_fixture("move")
+        overview = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/content", timeout=60).json()
+        assert overview["errors"] == {}, overview["errors"]
+        after = requests.get(f"{BASE_URL}/api/legal/impressum", timeout=60).json()
+        assert "Neue Gasse 7" in after["html"] and "Werkstattweg 1" not in after["html"]
+        assert "Neue Gasse 7" in requests.get(f"{BASE_URL}/api/settings", timeout=60).json()["impressum_html"]
+
+    def test_a_draft_says_so_a_released_text_does_not(self, website_content):
+        privacy = requests.get(f"{BASE_URL}/api/legal/datenschutz", timeout=60).json()
+        assert privacy["draft"] is False and "Test-Datenschutztext" in privacy["html"]
+        terms = requests.get(f"{BASE_URL}/api/legal/nutzungsbedingungen", timeout=60).json()
+        assert terms["draft"] is True and "Test-Nutzungsbedingungen" in terms["html"]
+
+    def test_faq_shows_only_released_website_articles(self, website_content):
+        faqs = requests.get(f"{BASE_URL}/api/faqs", timeout=60).json()
+        assert [faq["question"] for faq in faqs] == ["Holt ihr Geräte auch ab?"], faqs
+        assert "<script" not in faqs[0]["answer_html"] and faqs[0]["answer"] == "Ja, im Raum Innsbruck."
+
+    def test_the_website_user_has_no_admin_rights(self, admin_client, website_content):
+        assert int(dolibarr_get(f"users/{WEB_USER}")["admin"]) == 0
+        overview = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/content", timeout=60).json()
+        assert {"id": CONTENT["category"], "label": "Website"} in overview["categories"]
+        by_id = {article["id"]: article for article in overview["articles"]}
+        assert by_id[CONTENT["terms"]]["status"] == 0 and CONTENT["internal"] not in by_id
+        assert overview["faq_count"] == 1
+
+
+class TestStatusSteps:
+    def test_an_offer_waits_then_the_device_is_ready_for_pickup(self):
+        """#78."""
+        email = f"abholen-{uuid.uuid4().hex[:10]}@example.com"
+        created = send_inquiry(email)
+        party = dolibarr_get(f"thirdparties/email/{email}")
+        ticket = ticket_for(created["ref"], party["id"])
+
+        def step():
+            response = requests.post(f"{BASE_URL}/api/inquiries/status",
+                                     json={"ref": created["ref"], "email": email}, timeout=30)
+            assert response.status_code == 200, response.text
+            return response.json()["step"]
+
+        proposal = dolibarr_post("proposals", {
+            "socid": int(party["id"]), "date": int(time.time()),
+            "linkedObjectsIds": {"ticket": [int(ticket["id"])]},
+        })
+        dolibarr_post(f"proposals/{proposal}/lines", {"desc": "Reparatur laut Diagnose", "qty": 1,
+                                                      "subprice": 80, "tva_tx": 20, "product_type": 1})
+        assert step() == "eingegangen", "a draft offer is not ready yet"
+        dolibarr_post(f"proposals/{proposal}/validate", {"notrigger": 0})
+        assert step() == "angebot_bereit"
+
+        dolibarr_put(f"tickets/{ticket['id']}", {"array_options": {"options_abholbereit": 1}})
+        assert step() == "abholbereit"

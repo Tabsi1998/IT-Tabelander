@@ -89,7 +89,8 @@ NODE_MAJOR = 24
 # The two test files the CI's backend job runs. The other two need a live
 # server and a database; the integration group (and ci.yml's integration job)
 # provides both.
-CI_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py", "tests/test_handover.py")
+CI_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py", "tests/test_handover.py",
+                 "tests/test_site_data.py")
 INTEGRATION_TEST_FILES = ("tests/test_api.py", "tests/test_regression_iter2.py")
 DOLIBARR_TEST_FILES = ("tests/test_dolibarr_runtime.py",)
 
@@ -1233,9 +1234,10 @@ def dolibarr_fixture(context: Context, stage: str) -> dict:
 def dolibarr_fixtures(context: Context) -> str:
     base = dolibarr_fixture(context, "base")
     customer = dolibarr_fixture(context, "customer")
-    context.cache["dolibarr"] = {**base, **customer}
-    return (f"modules, mail through Mailpit, API user #{base['web_user']} with societe, ticket and "
-            f"agenda rights, existing customer #{customer['customer']}")
+    content = dolibarr_fixture(context, "content")
+    context.cache["dolibarr"] = {**base, **customer, "content": content}
+    return (f"modules, mail through Mailpit, API user #{base['web_user']} without admin rights, "
+            f"existing customer #{customer['customer']}, {len(content) - 1} knowledge articles")
 
 
 def dolibarr_site(context: Context) -> str:
@@ -1273,6 +1275,12 @@ def dolibarr_scenarios(context: Context) -> str:
         "DOLIBARR_TEST_PUBLIC_URL": fixtures["public_url"],
         "MAILPIT_URL": f"http://127.0.0.1:{DOLIBARR_MAIL_PORT}",
         "MAILPIT_SMTP_PORT": str(DOLIBARR_SMTP_PORT),
+        "DOLIBARR_TEST_WEB_USER": str(fixtures["web_user"]),
+        "DOLIBARR_TEST_CONTENT": json.dumps(fixtures["content"]),
+        # The scenarios move the company through the fixture script (#74).
+        "DOLIBARR_TEST_FIXTURE_COMMAND": json.dumps([docker(context), "exec", "-u", "www-data",
+                                                     f"{DOLIBARR_PREFIX}-web", "php",
+                                                     f"{DOLIBARR_FIXTURES}/fixtures.php"]),
     })
     completed = context.run(backend_python(INTEGRATION_PYTHON), "-m", "pytest", *DOLIBARR_TEST_FILES,
                             "-q", "-rfEs", "-p", "no:cacheprovider", cwd=SNAPSHOT_BACKEND, env=env,

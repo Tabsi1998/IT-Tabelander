@@ -41,7 +41,7 @@ jobs:
           python -m compileall -q backend
           cd backend
           python -c "import server; print(server.app.title)"
-          python -m pytest tests/test_unit_runtime.py tests/test_inquiry_dolibarr.py tests/test_handover.py -q -p no:cacheprovider
+          python -m pytest tests/test_unit_runtime.py tests/test_inquiry_dolibarr.py tests/test_handover.py tests/test_site_data.py -q -p no:cacheprovider
 
   integration:
     # The local check runs the same suites first; this job is the control on

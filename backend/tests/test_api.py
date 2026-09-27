@@ -164,19 +164,11 @@ class TestFaqs:
         assert r.status_code == 200
         assert all(f["category"] == "reparatur" for f in r.json())
 
-    def test_faq_crud(self, admin_client, api_client):
+    def test_faq_is_no_longer_edited_on_the_website(self, admin_client):
+        """#81: the FAQ is kept in Dolibarr's knowledge base."""
         p = {"question": "TEST_Frage?", "answer": "TEST_Antwort", "category": "test", "sort": 50}
-        r = admin_client.post(f"{BASE_URL}/api/admin/faqs", json=p, timeout=30)
-        assert r.status_code == 200
-        fid = r.json()["id"]
-        got = api_client.get(f"{BASE_URL}/api/faqs?category=test", timeout=30).json()
-        assert any(f["id"] == fid for f in got)
-        p["answer"] = "TEST_Antwort2"
-        u = admin_client.put(f"{BASE_URL}/api/admin/faqs/{fid}", json=p, timeout=30)
-        assert u.status_code == 200 and u.json()["answer"] == "TEST_Antwort2"
-        assert admin_client.delete(f"{BASE_URL}/api/admin/faqs/{fid}", timeout=30).status_code == 200
-        got2 = api_client.get(f"{BASE_URL}/api/faqs?category=test", timeout=30).json()
-        assert not any(f["id"] == fid for f in got2)
+        assert admin_client.post(f"{BASE_URL}/api/admin/faqs", json=p, timeout=30).status_code == 404
+        assert admin_client.delete(f"{BASE_URL}/api/admin/faqs/{uuid.uuid4().hex[:24]}", timeout=30).status_code == 404
 
 
 # ---------------- Reviews ----------------
