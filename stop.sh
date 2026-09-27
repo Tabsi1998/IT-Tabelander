@@ -5,6 +5,24 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+SERVICE_NAME="it-tabelander"
+[[ -f "$SCRIPT_DIR/deploy.config" ]] && source "$SCRIPT_DIR/deploy.config"
+[[ -f "$SCRIPT_DIR/deploy.config.local" ]] && source "$SCRIPT_DIR/deploy.config.local"
+
+DISABLE_AUTOSTART=0
+for argument in "$@"; do
+  case "$argument" in
+    --disable) DISABLE_AUTOSTART=1 ;;
+    -h|--help)
+      echo "Verwendung: ./stop.sh [--disable]"
+      echo "  --disable  zusätzlich den Autostart nach einem Server-Neustart abschalten"
+      echo "             (./start.sh schaltet ihn wieder ein)"
+      exit 0
+      ;;
+    *) echo "Unbekannte Option: $argument" >&2; exit 2 ;;
+  esac
+done
+
 RUN_DIR="$SCRIPT_DIR/run"
 BACKEND_DIR="$SCRIPT_DIR/backend"
 FRONTEND_DIR="$SCRIPT_DIR/frontend"
@@ -16,6 +34,7 @@ yellow() { printf "\033[0;33m%s\033[0m\n" "$1"; }
 red()    { printf "\033[0;31m%s\033[0m\n" "$1" >&2; }
 die()    { red "✗ $1"; exit 1; }
 
+[[ "$SERVICE_NAME" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || die "SERVICE_NAME darf nur a-z, 0-9 und - enthalten."
 command -v flock >/dev/null 2>&1 || die "Benötigtes Programm fehlt: flock"
 command -v ps >/dev/null 2>&1 || die "Benötigtes Programm fehlt: ps"
 command -v readlink >/dev/null 2>&1 || die "Benötigtes Programm fehlt: readlink"
@@ -85,7 +104,37 @@ process_exists() {
   [[ -d "/proc/$pid" ]] || ps -p "$pid" -o pid= >/dev/null 2>&1
 }
 
+run_as_root() {
+  if (( EUID == 0 )); then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    die "Zum Stoppen des Systemdienstes werden root-Rechte oder sudo benötigt."
+  fi
+}
+
 STOP_FAILURES=0
+stop_service() {
+  local unit="$SERVICE_NAME.service"
+  command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]] || return 0
+  [[ -f "/etc/systemd/system/$unit" ]] || return 0
+  if systemctl is-active --quiet "$unit"; then
+    if run_as_root systemctl stop "$unit" && ! systemctl is-active --quiet "$unit"; then
+      green "✓ Dienst $SERVICE_NAME gestoppt"
+    else
+      red "✗ Dienst $SERVICE_NAME ließ sich nicht stoppen: sudo systemctl status $SERVICE_NAME"
+      STOP_FAILURES=1
+    fi
+  else
+    yellow "· Dienst $SERVICE_NAME lief nicht"
+  fi
+  if (( DISABLE_AUTOSTART == 1 )); then
+    run_as_root systemctl disable --quiet "$unit"
+    yellow "· Autostart abgeschaltet; ./start.sh schaltet ihn wieder ein."
+  fi
+}
+
 stop_one() {
   local label="$1" service="$2" pidfile="$3"
   local pid pgid="" target attempt forced=0
@@ -155,11 +204,15 @@ stop_one() {
   fi
 }
 
+stop_service
+
 # Räumt beim ersten Update noch den früheren separaten `serve`-Prozess auf.
 if [[ -e "$RUN_DIR/frontend.pid" ]]; then
   stop_one "Altes Frontend" frontend "$RUN_DIR/frontend.pid"
 fi
-stop_one "Backend" backend "$RUN_DIR/backend.pid"
+if [[ -e "$RUN_DIR/backend.pid" ]]; then
+  stop_one "Backend" backend "$RUN_DIR/backend.pid"
+fi
 
 if (( STOP_FAILURES != 0 )); then
   die "Mindestens ein Prozess konnte nicht sicher gestoppt werden."

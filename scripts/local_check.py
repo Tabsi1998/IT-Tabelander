@@ -19,6 +19,12 @@ Groups:
     frontend     a frozen Yarn install and the production build with CI=true
     extra        what GitHub does not run: OSV over the lockfiles, ShellCheck,
                  and proof that every test file is run by some gate
+    deploy       start.sh, stop.sh and update.sh on a throwaway Ubuntu server
+                 with systemd: autostart, restart after a crash, reboot, a
+                 broken update rolled back, a good update, stop --disable and
+                 USE_SYSTEMD=0. Runs with --all when a deployment file changed
+                 against origin/main (about 15 minutes), always with
+                 --only deploy
 
 Usage:
     python scripts/local_check.py                    everything but extra
@@ -33,6 +39,7 @@ Results go to .local-testing/, which Git ignores.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -57,7 +64,7 @@ LOGS = STATE / "logs"
 BASELINE = ROOT / "scripts" / "ci-baseline.json"
 WINDOWS = platform.system() == "Windows"
 
-GROUPS = ("repository", "backend", "integration", "frontend", "extra")
+GROUPS = ("repository", "backend", "integration", "frontend", "extra", "deploy")
 DEFAULT_GROUPS = ("repository", "backend", "integration", "frontend")
 
 BACKEND = ROOT / "backend"
@@ -820,7 +827,8 @@ def main(argv: list | None = None) -> int:
             pass
     parser = argparse.ArgumentParser(description=f"Run every check for {ROOT.name} on this computer.")
     parser.add_argument("--only", help="comma-separated groups: " + ", ".join(GROUPS))
-    parser.add_argument("--all", action="store_true", help="include the extra group, which GitHub does not run")
+    parser.add_argument("--all", action="store_true",
+                        help="include the extra and deploy groups, which GitHub does not run")
     parser.add_argument("--list", action="store_true", help="show the steps without running them")
     parser.add_argument("--record", action="store_true", help="accept today's findings into the ratchet baseline")
     parser.add_argument("--keep-services", action="store_true", help="leave containers and servers running")
@@ -843,6 +851,7 @@ def main(argv: list | None = None) -> int:
         return 0
 
     context = build_context(record=arguments.record)
+    context.cache["deploy-forced"] = bool(arguments.only and "deploy" in groups)
     print(f"{ROOT.name}: {', '.join(group for group in GROUPS if group in groups)}", flush=True)
     if context.dropped:
         print("Withheld from every step (names only): " + ", ".join(context.dropped), flush=True)
@@ -1154,11 +1163,154 @@ def extra_steps() -> list:
     ]
 
 
+# -------------------------------------------------------------------- deploy
+
+DEPLOY_CONTAINER = "it-tabelander-local-check-deploy"
+DEPLOY_SOURCES = ROOT / "scripts" / "deploy-test"
+DEPLOY_STATE = STATE / "deploy"
+DEPLOY_WATCHED = ("start.sh", "stop.sh", "update.sh", "deploy.config", ".env.example",
+                  "scripts/deploy-test/")
+
+
+def lf_copy(source: Path, target: Path) -> Path:
+    """A copy with LF line endings: the Windows working copy may carry CRLF."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(source.read_bytes().replace(b"\r\n", b"\n"))
+    return target
+
+
+def deploy_needed(context: Context) -> str:
+    """The server scenario runs when a deployment file changed.
+
+    It takes about fifteen minutes, so a change that touches none of the
+    deployment files skips it. It tests the committed HEAD: uncommitted
+    deployment changes would silently not be part of it, so they fail.
+    """
+    binary = git(context)
+    pending = [line[3:] for line in context.run(binary, "status", "--porcelain").stdout.splitlines()]
+    uncommitted = sorted(name for name in pending if name.startswith(DEPLOY_WATCHED))
+    if uncommitted:
+        raise StepFailed("commit the deployment changes first; the scenario tests HEAD:\n  "
+                         + "\n  ".join(uncommitted))
+    if context.cache.get("deploy-forced"):
+        return "requested with --only deploy"
+    base = context.run(binary, "merge-base", "HEAD", "origin/main", check=False)
+    if base.returncode != 0:
+        return "no origin/main to compare with, so the scenario runs"
+    changed = context.run(binary, "diff", "--name-only", base.stdout.strip(), "HEAD").stdout.splitlines()
+    relevant = sorted(name for name in changed if name.startswith(DEPLOY_WATCHED))
+    if not relevant:
+        raise StepSkipped("no deployment file changed against origin/main; --only deploy runs it anyway")
+    return "changed: " + ", ".join(relevant[:6])
+
+
+def deploy_image(context: Context) -> str:
+    """The throwaway server image; rebuilt only when its Dockerfile changes."""
+    binary = docker(context)
+    build_dir = DEPLOY_STATE / "image"
+    dockerfile = lf_copy(DEPLOY_SOURCES / "Dockerfile", build_dir / "Dockerfile")
+    tag = "local-ci/it-tabelander-deploy:" + hashlib.sha256(dockerfile.read_bytes()).hexdigest()[:12]
+    context.cache["deploy-image"] = tag
+    if context.run(binary, "image", "inspect", tag, check=False, timeout=60).returncode == 0:
+        return f"{tag} (cached)"
+    completed = context.run(binary, "build", "--tag", tag, build_dir, check=False, timeout=3600)
+    path = context.log("deploy-image", completed.stdout + completed.stderr)
+    if completed.returncode != 0:
+        raise StepFailed(f"the server image did not build. Full output: {path}\n" + tail(completed, 20))
+    return f"{tag} (built)"
+
+
+def deploy_exec(context: Context, phase: str, timeout: int = 1800) -> str:
+    """Run one scenario phase inside the server and return its last line."""
+    completed = context.run(docker(context), "exec", DEPLOY_CONTAINER, "bash", "/opt/scenario.sh", phase,
+                            check=False, timeout=timeout)
+    text = completed.stdout + completed.stderr
+    path = context.log(f"deploy-{phase}", text)
+    if completed.returncode != 0:
+        details = context.run(docker(context), "exec", DEPLOY_CONTAINER, "bash", "-c",
+                              "tail -n 40 /tmp/update.log /tmp/start.log /srv/it-tabelander/logs/backend.log "
+                              "2>/dev/null", check=False, timeout=60)
+        raise StepFailed(f"{tail(completed, 5)}\nFull output: {path}\n{details.stdout[-3000:]}")
+    lines = [line for line in completed.stdout.splitlines() if line.strip()]
+    return lines[-1] if lines else "done"
+
+
+def wait_for_boot(context: Context, seconds: int = 180) -> None:
+    binary = docker(context)
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        state = context.run(binary, "exec", DEPLOY_CONTAINER, "systemctl", "is-system-running",
+                            check=False, timeout=30).stdout.strip()
+        if state in ("running", "degraded"):
+            return
+        time.sleep(2)
+    raise StepFailed(f"the server did not finish booting within {seconds} s")
+
+
+def deploy_server(context: Context) -> str:
+    """Boot the server and give it the committed HEAD as its Git origin."""
+    binary = docker(context)
+    context.run(binary, "rm", "--force", DEPLOY_CONTAINER, check=False, timeout=120)
+    context.run(binary, "run", "--detach", "--name", DEPLOY_CONTAINER, "--privileged", "--cgroupns=host",
+                "--volume", "/sys/fs/cgroup:/sys/fs/cgroup:rw", "--tmpfs", "/run", "--tmpfs", "/run/lock",
+                context.cache["deploy-image"], timeout=300)
+    context.containers.append(DEPLOY_CONTAINER)
+    wait_for_boot(context)
+    bundle = DEPLOY_STATE / "repo.bundle"
+    bundle.parent.mkdir(parents=True, exist_ok=True)
+    context.run(git(context), "bundle", "create", bundle, "HEAD", timeout=300)
+    scenario = lf_copy(DEPLOY_SOURCES / "scenario.sh", DEPLOY_STATE / "scenario.sh")
+    context.run(binary, "cp", bundle, f"{DEPLOY_CONTAINER}:/tmp/repo.bundle", timeout=300)
+    context.run(binary, "cp", scenario, f"{DEPLOY_CONTAINER}:/opt/scenario.sh", timeout=120)
+    return deploy_exec(context, "setup", timeout=300)
+
+
+def deploy_phase(phase: str, timeout: int = 1800) -> Callable:
+    def action(context: Context) -> str:
+        return deploy_exec(context, phase, timeout)
+    return action
+
+
+def deploy_reboot(context: Context) -> str:
+    """docker restart is a reboot: systemd boots again and nobody runs a script."""
+    context.run(docker(context), "restart", "--time", "30", DEPLOY_CONTAINER, timeout=300)
+    wait_for_boot(context)
+    return deploy_exec(context, "wait-healthy", timeout=300)
+
+
+def deploy_steps() -> list:
+    return [
+        Step("deploy", "needed", "A deployment file changed", deploy_needed),
+        Step("deploy", "image", "An Ubuntu 24.04 server image with systemd", deploy_image, ("needed",)),
+        Step("deploy", "server", "The server boots with the committed HEAD as origin", deploy_server,
+             ("image",)),
+        Step("deploy", "first-start", "./start.sh sets up the service with autostart",
+             deploy_phase("first-start"), ("server",)),
+        Step("deploy", "crash", "systemd restarts the app after a crash", deploy_phase("crash", 120),
+             ("first-start",)),
+        Step("deploy", "reboot", "After a reboot the website comes back by itself", deploy_reboot,
+             ("crash",)),
+        Step("deploy", "update-broken-prepare", "A broken update leaves the running app alone",
+             deploy_phase("update-broken-prepare"), ("reboot",)),
+        Step("deploy", "update-broken-start", "A failed start rolls code, packages and build back",
+             deploy_phase("update-broken-start"), ("update-broken-prepare",)),
+        Step("deploy", "reboot-after-rollback", "The rolled-back version survives a reboot", deploy_reboot,
+             ("update-broken-start",)),
+        Step("deploy", "update-good", "A good update runs the new commit", deploy_phase("update-good"),
+             ("reboot-after-rollback",)),
+        Step("deploy", "stop-disable", "./stop.sh --disable and ./start.sh switch autostart",
+             deploy_phase("stop-disable"), ("update-good",)),
+        Step("deploy", "process-mode", "USE_SYSTEMD=0 runs without the service and back",
+             deploy_phase("process-mode"), ("stop-disable",)),
+    ]
+
+
 # -------------------------------------------------------------------- wiring
 
 def plan(groups: set) -> list:
     builders = {"repository": repository_steps, "backend": backend_steps,
-                "integration": integration_steps, "frontend": frontend_steps, "extra": extra_steps}
+                "integration": integration_steps, "frontend": frontend_steps, "extra": extra_steps,
+                "deploy": deploy_steps}
     steps: list = []
     if "integration" in groups and "backend" not in groups:
         # The server runs from the snapshot in the newest environment.

@@ -11,9 +11,11 @@ BACKEND_DIR="$SCRIPT_DIR/backend"
 CURRENT_VENV="$BACKEND_DIR/venv"
 NEXT_VENV="$RUN_DIR/backend-venv.next"
 PREVIOUS_VENV="$RUN_DIR/backend-venv.previous"
+STAGED_BUILD_DIR="$RUN_DIR/frontend-build.next"
 mkdir -p "$RUN_DIR"
 
 green() { printf "\033[0;32m%s\033[0m\n" "$1"; }
+yellow() { printf "\033[0;33m%s\033[0m\n" "$1"; }
 red()   { printf "\033[0;31m%s\033[0m\n" "$1" >&2; }
 die()   { red "✗ $1"; exit 1; }
 
@@ -40,35 +42,64 @@ for target in "$NEXT_VENV" "$PREVIOUS_VENV"; do
 done
 rm -rf -- "$NEXT_VENV" "$PREVIOUS_VENV"
 
+describe_commit() {
+  git log -1 --format='%h (%s)' "$1" 2>/dev/null || printf '%s' "$1"
+}
+
+# The running state is remembered before anything changes. A failure at any
+# later point returns code, Python packages and frontend build to it, so the
+# next restart or reboot never picks up a half-updated version (issue #29).
+OLD_COMMIT="$(git rev-parse HEAD)"
+CODE_UPDATED=0
+APP_STOPPED=0
 VENV_SWITCHED=0
-rollback_venv() {
+rollback() {
   local status=$?
   trap - EXIT INT TERM
-  if (( status != 0 && VENV_SWITCHED == 1 )); then
-    red "↶ Update fehlgeschlagen; vorheriges Python-venv wird wiederhergestellt."
-    bash "$SCRIPT_DIR/stop.sh" || true
-    rm -rf -- "$CURRENT_VENV"
-    if [[ -d "$PREVIOUS_VENV" ]]; then
-      mv -- "$PREVIOUS_VENV" "$CURRENT_VENV"
+  if (( status != 0 && (CODE_UPDATED == 1 || APP_STOPPED == 1) )); then
+    red "↶ Update fehlgeschlagen; Stand $(describe_commit "$OLD_COMMIT") wird wiederhergestellt."
+    if (( APP_STOPPED == 1 )); then
+      bash "$SCRIPT_DIR/stop.sh" || true
     fi
-    if ! bash "$SCRIPT_DIR/start.sh"; then
-      red "Automatischer Neustart mit dem vorherigen venv ist ebenfalls fehlgeschlagen. Prüfe logs/backend.log."
+    if (( CODE_UPDATED == 1 )); then
+      git reset --hard --quiet "$OLD_COMMIT"
+    fi
+    # A build of the failed version must never be activated by a later start.
+    rm -rf -- "$STAGED_BUILD_DIR"
+    if (( VENV_SWITCHED == 1 )); then
+      rm -rf -- "$CURRENT_VENV"
+      if [[ -d "$PREVIOUS_VENV" ]]; then
+        mv -- "$PREVIOUS_VENV" "$CURRENT_VENV"
+      fi
+    fi
+    if (( APP_STOPPED == 1 )); then
+      if bash "$SCRIPT_DIR/start.sh"; then
+        yellow "↶ Es läuft wieder $(describe_commit "$OLD_COMMIT")."
+      else
+        red "Neustart mit dem vorherigen Stand ist ebenfalls fehlgeschlagen. Prüfe logs/backend.log."
+      fi
+    else
+      yellow "↶ Die laufende Website war nicht betroffen; auf der Platte liegt wieder $(describe_commit "$OLD_COMMIT")."
     fi
   fi
   [[ -d "$NEXT_VENV" ]] && rm -rf -- "$NEXT_VENV"
   exit "$status"
 }
-trap rollback_venv EXIT
+trap rollback EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-green "→ 1/4  Änderungen laden ..."
+green "→ 1/4  Änderungen laden (laufender Stand: $(describe_commit "$OLD_COMMIT")) ..."
 git pull --ff-only
+if [[ "$(git rev-parse HEAD)" != "$OLD_COMMIT" ]]; then
+  CODE_UPDATED=1
+fi
 
 green "→ 2/4  Abhängigkeiten und neuen Build getrennt vorbereiten ..."
 IT_TABELANDER_VENV_DIR="$NEXT_VENV" bash "$SCRIPT_DIR/start.sh" --prepare --refresh
 
 green "→ 3/4  Bisherige Dienste sauber stoppen ..."
+APP_STOPPED=1
 bash "$SCRIPT_DIR/stop.sh"
 
 if [[ -d "$CURRENT_VENV" ]]; then
@@ -82,5 +113,6 @@ bash "$SCRIPT_DIR/start.sh"
 
 rm -rf -- "$PREVIOUS_VENV"
 VENV_SWITCHED=0
+CODE_UPDATED=0
 
-green "✓ Update vollständig abgeschlossen."
+green "✓ Update abgeschlossen. Es läuft $(describe_commit HEAD)."

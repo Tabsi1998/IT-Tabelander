@@ -12,6 +12,8 @@ PYTHON_BIN="python3"
 HEALTHCHECK_HOST="127.0.0.1"
 STARTUP_TIMEOUT_SECONDS="30"
 FORWARDED_ALLOW_IPS="127.0.0.1"
+USE_SYSTEMD="1"
+SERVICE_NAME="it-tabelander"
 [[ -f "$SCRIPT_DIR/deploy.config" ]] && source "$SCRIPT_DIR/deploy.config"
 [[ -f "$SCRIPT_DIR/deploy.config.local" ]] && source "$SCRIPT_DIR/deploy.config.local"
 
@@ -162,6 +164,24 @@ bootstrap_lock_dependencies() {
 [[ -n "$BACKEND_HOST" ]] || die "BACKEND_HOST darf nicht leer sein."
 [[ -n "$FORWARDED_ALLOW_IPS" ]] || die "FORWARDED_ALLOW_IPS darf nicht leer sein."
 [[ "$STARTUP_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || die "STARTUP_TIMEOUT_SECONDS muss mindestens 1 sein."
+[[ "$USE_SYSTEMD" == "0" || "$USE_SYSTEMD" == "1" ]] || die "USE_SYSTEMD muss 0 oder 1 sein."
+[[ "$SERVICE_NAME" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || die "SERVICE_NAME darf nur a-z, 0-9 und - enthalten."
+
+# On a server with systemd the app runs as a service: it comes back after a
+# reboot and restarts after a crash (issue #28). Without systemd, or with
+# USE_SYSTEMD="0", it stays the background process it always was.
+SERVICE_UNIT_PATH="/etc/systemd/system/$SERVICE_NAME.service"
+SERVICE_MODE="process"
+if [[ "$USE_SYSTEMD" == "1" ]] && command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+  if (( EUID == 0 )) || command -v sudo >/dev/null 2>&1; then
+    SERVICE_MODE="systemd"
+  else
+    yellow "⚠ Für den Autostart als Systemdienst werden root-Rechte oder sudo benötigt; die App läuft ohne Autostart."
+  fi
+fi
+if [[ "$SERVICE_MODE" == "systemd" && "$SCRIPT_DIR" =~ [[:space:]] ]]; then
+  die "Für den Systemdienst darf der Projektpfad keine Leerzeichen enthalten: $SCRIPT_DIR"
+fi
 
 case "$BACKEND_HOST" in
   0.0.0.0) HEALTHCHECK_HOST="127.0.0.1" ;;
@@ -344,6 +364,7 @@ remove_pidfile_if_matching() {
 }
 
 LAUNCHED_BACKEND_PID=""
+SERVICE_STARTED=0
 BUILD_TMP=""
 cleanup_on_exit() {
   local status=$?
@@ -378,6 +399,10 @@ cleanup_on_exit() {
       else
         red "Vorheriger Frontend-Build konnte nicht wiederhergestellt werden: $PREVIOUS_BUILD_DIR"
       fi
+    fi
+    if (( SERVICE_STARTED == 1 )); then
+      run_as_root systemctl stop "$SERVICE_NAME.service" \
+        || red "Dienst $SERVICE_NAME konnte nicht gestoppt werden: sudo systemctl stop $SERVICE_NAME"
     fi
     if [[ "$LAUNCHED_BACKEND_PID" =~ ^[1-9][0-9]*$ ]]; then
       if terminate_process_tree "$LAUNCHED_BACKEND_PID"; then
@@ -829,8 +854,112 @@ PY
   fi
 }
 
+service_is_active() {
+  [[ "$SERVICE_MODE" == "systemd" ]] && systemctl is-active --quiet "$SERVICE_NAME.service"
+}
+
+service_unit_content() {
+  local user group
+  user="$(stat -c %U "$SCRIPT_DIR")"
+  group="$(stat -c %G "$SCRIPT_DIR")"
+  cat <<UNIT
+# Erzeugt von start.sh; Änderungen hier überschreibt der nächste Start.
+[Unit]
+Description=IT-Tabelander Website und API
+Wants=network-online.target
+After=network-online.target mongod.service
+
+[Service]
+Type=exec
+User=$user
+Group=$group
+WorkingDirectory=$BACKEND_DIR
+EnvironmentFile=-$RUN_DIR/service.env
+ExecStart=$BACKEND_DIR/venv/bin/python -m uvicorn server:app --host $BACKEND_HOST --port $BACKEND_PORT --workers $BACKEND_WORKERS --forwarded-allow-ips $FORWARDED_ALLOW_IPS
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillMode=mixed
+StandardOutput=append:$LOG_DIR/backend.log
+StandardError=append:$LOG_DIR/backend.log
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+}
+
+install_service_unit() {
+  local unit_tmp
+  unit_tmp="$(mktemp "$RUN_DIR/.service-unit.XXXXXX")"
+  service_unit_content > "$unit_tmp"
+  if ! cmp -s "$unit_tmp" "$SERVICE_UNIT_PATH"; then
+    run_as_root install -m 0644 "$unit_tmp" "$SERVICE_UNIT_PATH"
+    run_as_root systemctl daemon-reload
+    green "✓ Systemdienst $SERVICE_NAME eingerichtet"
+  fi
+  rm -f -- "$unit_tmp"
+  if ! systemctl is-enabled --quiet "$SERVICE_NAME.service" 2>/dev/null; then
+    run_as_root systemctl enable --quiet "$SERVICE_NAME.service" \
+      || die "Autostart für $SERVICE_NAME konnte nicht aktiviert werden."
+    green "✓ Autostart nach einem Server-Neustart aktiviert"
+  fi
+}
+
+retire_service_unit() {
+  [[ "$SERVICE_MODE" == "process" && -f "$SERVICE_UNIT_PATH" ]] || return 0
+  command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]] || return 0
+  yellow "→ USE_SYSTEMD=0: Systemdienst $SERVICE_NAME wird gestoppt und deaktiviert."
+  run_as_root systemctl disable --now --quiet "$SERVICE_NAME.service"
+}
+
+rotate_backend_log() {
+  local log="$LOG_DIR/backend.log" size
+  [[ -f "$log" ]] || return 0
+  size="$(stat -c %s "$log" 2>/dev/null || printf '0')"
+  if (( size > 10 * 1024 * 1024 )); then
+    mv -f -- "$log" "$log.1"
+  fi
+  return 0
+}
+
+start_service() {
+  install_service_unit
+  # The service does not inherit this shell's environment: a pending admin
+  # reset reaches it through a one-shot environment file.
+  if [[ -f "$RUN_DIR/reset-admin.pending" ]]; then
+    printf 'IT_TABELANDER_RESET_ADMIN=1\n' > "$RUN_DIR/service.env"
+    chmod 600 "$RUN_DIR/service.env"
+  else
+    rm -f -- "$RUN_DIR/service.env"
+  fi
+  # systemd would create a missing log file as root; the project user must
+  # keep writing to it, for example after switching to USE_SYSTEMD="0".
+  touch -- "$LOG_DIR/backend.log"
+  green "→ Dienst $SERVICE_NAME starten (Port $BACKEND_PORT) ..."
+  SERVICE_STARTED=1
+  run_as_root systemctl restart "$SERVICE_NAME.service" \
+    || die "Dienst $SERVICE_NAME konnte nicht gestartet werden. Details: journalctl -u $SERVICE_NAME -n 50"
+}
+
+current_backend_pid() {
+  local pid
+  if [[ "$SERVICE_MODE" == "systemd" ]]; then
+    pid="$(systemctl show -p MainPID --value "$SERVICE_NAME.service" 2>/dev/null || true)"
+    [[ "$pid" =~ ^[1-9][0-9]*$ ]] && process_exists "$pid" || return 1
+    printf '%s' "$pid"
+    return 0
+  fi
+  running_pid backend "$RUN_DIR/backend.pid"
+}
+
 start_backend() {
   local pid
+  rotate_backend_log
+  if [[ "$SERVICE_MODE" == "systemd" ]]; then
+    start_service
+    return
+  fi
   if pid="$(running_pid backend "$RUN_DIR/backend.pid")"; then
     yellow "Backend läuft bereits (PID $pid)"
     return
@@ -843,7 +972,7 @@ start_backend() {
     exec nohup setsid "$VENV_DIR/bin/python" -m uvicorn server:app \
       --host "$BACKEND_HOST" --port "$BACKEND_PORT" --workers "$BACKEND_WORKERS" \
       --forwarded-allow-ips "$FORWARDED_ALLOW_IPS"
-  ) > "$LOG_DIR/backend.log" 2>&1 9>&- &
+  ) >> "$LOG_DIR/backend.log" 2>&1 9>&- &
   pid=$!
   LAUNCHED_BACKEND_PID="$pid"
   if ! write_pid "$RUN_DIR/backend.pid" "$pid"; then
@@ -856,8 +985,8 @@ wait_for_backend() {
   local url
   url="$(healthcheck_url /api/health)"
   while (( SECONDS < deadline )); do
-    pid="$(read_pid "$RUN_DIR/backend.pid" 2>/dev/null || true)"
-    if [[ -z "$pid" ]] || ! process_exists "$pid"; then
+    pid="$(current_backend_pid 2>/dev/null || true)"
+    if [[ -z "$pid" ]]; then
       red "Backend-Prozess wurde vorzeitig beendet. Letzte Logzeilen:"
       tail -n 30 "$LOG_DIR/backend.log" >&2 || true
       return 1
@@ -865,7 +994,7 @@ wait_for_backend() {
     if response="$(curl -fsS --max-time 2 "$url" 2>/dev/null)" \
       && [[ "$response" == *'"status":"ok"'* && "$response" == *'"db":true'* ]]; then
       sleep 1
-      verified_pid="$(running_pid backend "$RUN_DIR/backend.pid" 2>/dev/null || true)"
+      verified_pid="$(current_backend_pid 2>/dev/null || true)"
       if [[ "$verified_pid" == "$pid" ]] \
         && response="$(curl -fsS --max-time 2 "$url" 2>/dev/null)" \
         && [[ "$response" == *'"status":"ok"'* && "$response" == *'"db":true'* ]]; then
@@ -885,15 +1014,15 @@ wait_for_frontend() {
   local url
   url="$(healthcheck_url /)"
   while (( SECONDS < deadline )); do
-    pid="$(read_pid "$RUN_DIR/backend.pid" 2>/dev/null || true)"
-    if [[ -z "$pid" ]] || ! process_exists "$pid"; then
+    pid="$(current_backend_pid 2>/dev/null || true)"
+    if [[ -z "$pid" ]]; then
       red "Webdienst wurde vorzeitig beendet. Letzte Logzeilen:"
       tail -n 30 "$LOG_DIR/backend.log" >&2 || true
       return 1
     fi
     if curl -fsS --max-time 2 "$url" >/dev/null 2>&1; then
       sleep 1
-      verified_pid="$(running_pid backend "$RUN_DIR/backend.pid" 2>/dev/null || true)"
+      verified_pid="$(current_backend_pid 2>/dev/null || true)"
       if [[ "$verified_pid" == "$pid" ]] \
         && curl -fsS --max-time 2 "$url" >/dev/null 2>&1; then
         green "✓ Website ist bereit"
@@ -924,8 +1053,9 @@ if (( PREPARE_ONLY == 1 )); then
   exit 0
 fi
 
-if [[ -e "$RUN_DIR/backend.pid" || -e "$RUN_DIR/frontend.pid" ]]; then
-  green "→ Vorhandenen App-Prozess für einen sauberen Neustart stoppen ..."
+retire_service_unit
+if [[ -e "$RUN_DIR/backend.pid" || -e "$RUN_DIR/frontend.pid" ]] || service_is_active; then
+  green "→ Laufende App für einen sauberen Neustart stoppen ..."
   bash "$SCRIPT_DIR/stop.sh"
 fi
 
@@ -935,6 +1065,7 @@ activate_staged_frontend
 start_backend
 wait_for_backend
 wait_for_frontend
+rm -f -- "$RUN_DIR/service.env"
 
 if [[ -d "$PREVIOUS_BUILD_DIR" ]]; then
   rm -rf -- "$PREVIOUS_BUILD_DIR"
@@ -956,6 +1087,11 @@ echo  " Reverse Proxy (LAN)       : http://$PROXY_TARGET_HOST:$BACKEND_PORT"
 echo  " Lokaler Healthcheck       : $(healthcheck_url /api/health)"
 echo  " Admin                     : /admin"
 echo  " Log                       : $LOG_DIR/backend.log"
+if [[ "$SERVICE_MODE" == "systemd" ]]; then
+  echo  " Autostart                 : Systemdienst $SERVICE_NAME (sudo systemctl status $SERVICE_NAME)"
+else
+  echo  " Autostart                 : aus (kein systemd oder USE_SYSTEMD=0)"
+fi
 if [[ -n "$ADMIN_PASSWORD_DISPLAY" ]]; then
   yellow " Einmalige Admin-Zugangsdaten (jetzt anmelden und im Admin-Menü ändern):"
   echo  " E-Mail   : $ADMIN_EMAIL_DISPLAY"

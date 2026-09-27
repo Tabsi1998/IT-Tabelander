@@ -26,6 +26,7 @@ ignored by Git.
 | integration | ci.yml `integration` (control only) | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
 | frontend | ci.yml `frontend` | Node 24, `yarn install --frozen-lockfile`, `yarn build` with `CI=true` (Create React App turns warnings into errors) |
 | extra | - | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
+| deploy | - | `start.sh`, `stop.sh`, `update.sh` on a throwaway Ubuntu 24.04 server with systemd (`scripts/deploy-test/`): autostart, crash restart, reboot (`docker restart`), a broken update rolled back, a good update, `stop.sh --disable`, `USE_SYSTEMD=0`. With `--all` only when a deployment file changed against origin/main (about 15 minutes); `--only deploy` forces it. It tests the committed HEAD |
 
 Tools the checks expect: Docker Desktop (MongoDB, OSV, ShellCheck), Git for
 Windows (bash, openssl), gitleaks, Python 3.10 and 3.14 through the `py`
@@ -85,7 +86,8 @@ group, or `group/name` across groups. A gate that counts findings goes through
 `CI_TEST_FILES` or `INTEGRATION_TEST_FILES`, or the test inventory fails.
 
 Keep the ports unique, so repositories can be checked side by side: API 18011,
-MongoDB 27018 (container `it-tabelander-local-check-mongo`).
+MongoDB 27018 (container `it-tabelander-local-check-mongo`). The deploy group
+publishes no port; its container is `it-tabelander-local-check-deploy`.
 
 ## Windows notes
 

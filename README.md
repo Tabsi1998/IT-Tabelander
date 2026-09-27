@@ -106,15 +106,33 @@ nur sicher über HTTPS übertragen werden.
 ```bash
 ./start.sh                 # installieren/bauen und aktuellen Stand starten
 ./stop.sh                  # nur IT-Tabelander stoppen; MongoDB bleibt aktiv
+./stop.sh --disable        # stoppen und Autostart abschalten (Wartung)
 ./update.sh                # git pull, vorbereiten, sauber neu starten
 ./start.sh --refresh       # Dependencies und Build vollständig erneuern
 ./start.sh --reset-admin   # neues Admin-Passwort erzeugen
 ```
 
-`update.sh` lädt ausschließlich Fast-Forward-Updates. Dependencies und ein neuer
-Frontend-Build werden vor dem Stoppen vorbereitet. Schlägt die Vorbereitung
-fehl, bleibt die bisherige Website aktiv. Nach erfolgreicher Vorbereitung wird
-automatisch gestoppt, der neue Build aktiviert und wieder gestartet.
+Auf einem Server mit systemd richtet `start.sh` beim ersten Start den Dienst
+`it-tabelander` ein. Die Website startet dann nach einem Server-Neustart von
+selbst und nach einem Absturz nach drei Sekunden neu. `./stop.sh` stoppt sie
+bis zum nächsten `./start.sh` oder Neustart des Servers; `./stop.sh --disable`
+schaltet zusätzlich den Autostart ab. Zustand und Meldungen:
+
+```bash
+sudo systemctl status it-tabelander
+tail -f logs/backend.log
+```
+
+Wer keinen Dienst möchte, setzt `USE_SYSTEMD="0"` in `deploy.config.local`;
+dann läuft die App wie früher als Hintergrundprozess ohne Autostart.
+
+`update.sh` lädt ausschließlich Fast-Forward-Updates und merkt sich vorher den
+laufenden Stand. Dependencies und ein neuer Frontend-Build werden vor dem
+Stoppen vorbereitet; schlägt das fehl, bleibt die Website unangetastet und der
+Code auf der Platte geht auf den laufenden Stand zurück. Scheitert der Start
+des neuen Stands, gehen Code, Python-Pakete und Frontend-Build komplett zurück
+und der vorherige Stand wird wieder gestartet. Am Ende steht immer, welcher
+Stand läuft.
 
 Wer Systempakete bewusst selbst verwaltet, kann verwenden:
 
@@ -244,7 +262,7 @@ Kunden-IP statt alle Besucher unter der Proxy-IP zusammenzufassen.
 ## Logs und Diagnose
 
 ```bash
-cat run/backend.pid
+sudo systemctl status it-tabelander
 tail -f logs/backend.log
 curl http://127.0.0.1:8001/api/health
 systemctl status mongod
