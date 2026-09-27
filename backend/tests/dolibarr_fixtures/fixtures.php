@@ -4,12 +4,15 @@
  *
  *   php fixtures.php base      company, mail through Mailpit, modules, API users
  *   php fixtures.php customer  an existing customer the website must never change
+ *   php fixtures.php content   knowledge articles: FAQ, legal texts, internal notes
+ *   php fixtures.php move      the company moves (new address in the setup)
  *
  * Every stage prints one JSON object; scripts/local_check.py passes it to the
  * scenarios in backend/tests/test_dolibarr_runtime.py.
  */
 
 require __DIR__.'/bootstrap.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 
 $stage = $argv[1] ?? '';
 $admin = rt_admin($db);
@@ -54,7 +57,30 @@ if ($stage === 'base') {
     rt_const($db, 'MAIN_MAIL_EMAIL_STARTTLS', '0');
     rt_const($db, 'MAIN_DISABLE_ALL_MAILS', '0');
 
-    rt_modules(array('modSociete', 'modTicket', 'modApi', 'modPropale', 'modFacture', 'modAgenda'));
+    rt_modules(array('modSociete', 'modTicket', 'modApi', 'modPropale', 'modFacture', 'modAgenda',
+        'modCategorie', 'modKnowledgeManagement'));
+    // Company data and opening hours as the owner keeps them in the setup (#74).
+    rt_const($db, 'MAIN_INFO_SOCIETE_ADDRESS', 'Werkstattweg 1');
+    rt_const($db, 'MAIN_INFO_SOCIETE_ZIP', '6020');
+    rt_const($db, 'MAIN_INFO_SOCIETE_TOWN', 'Innsbruck');
+    rt_const($db, 'MAIN_INFO_SOCIETE_TEL', '+43 512 111111');
+    rt_const($db, 'MAIN_INFO_SOCIETE_MANAGERS', 'Test Inhaber');
+    rt_const($db, 'MAIN_INFO_SOCIETE_OBJECT', 'IT-Reparatur und PC-Bau');
+    rt_const($db, 'MAIN_INFO_SOCIETE_NOTE', 'Interne Firmennotiz, nie öffentlich');
+    rt_const($db, 'MAIN_INFO_TVAINTRA', 'ATU22222222');
+    rt_const($db, 'MAIN_INFO_SIRET', 'LG Innsbruck');
+    rt_const($db, 'MAIN_INFO_APE', 'FN 222222a');
+    rt_const($db, 'MAIN_INFO_OPENINGHOURS_MONDAY', '09:00–17:00');
+    rt_const($db, 'MAIN_INFO_OPENINGHOURS_FRIDAY', '09:00–12:00');
+    // Instead of admin rights: name the website user for these two readings.
+    rt_const($db, 'API_LOGINS_ALLOWED_FOR_GET_COMPANY', 'itweb');
+    rt_const($db, 'API_LOGINS_ALLOWED_FOR_CONST_READ', 'itweb');
+    // The owner's yes/no field on tickets (#78).
+    $extrafields = new ExtraFields($db);
+    if ($extrafields->addExtraField('abholbereit', 'Gerät abholbereit', 'boolean', 100, '', 'ticket',
+        0, 0, '', '', 1, '', '1') <= 0) {
+        rt_fail('extra field abholbereit: '.$extrafields->error);
+    }
     rt_const($db, 'API_PRODUCTION_MODE', '0');
     // What the owner sets in Dolibarr (README, "Dolibarr einmalig vorbereiten"):
     // new tickets reach the workshop, and the link in the customer's
@@ -75,6 +101,11 @@ if ($stage === 'base') {
         array('ticket', 'read'), array('ticket', 'write'),
         // Callback wishes become phone calls in the agenda (#73).
         array('agenda', 'myactions', 'read'), array('agenda', 'myactions', 'create'),
+        // Website content and "Angebot bereit" (#74, #78, #81); "write" only
+        // for the one-time copy of the website FAQ.
+        array('knowledgemanagement', 'knowledgerecord', 'read'),
+        array('knowledgemanagement', 'knowledgerecord', 'write'),
+        array('categorie', 'lire'), array('propale', 'lire'),
     ));
     // The scenarios read what the website created through an administrator.
     $adminKey = bin2hex(random_bytes(20));
@@ -109,6 +140,50 @@ if ($stage === 'customer') {
         rt_fail('customer: '.$customer->error.' '.implode(' | ', (array) $customer->errors));
     }
     print json_encode(array('customer' => (int) $customer->id, 'email' => $customer->email), JSON_PRETTY_PRINT)."\n";
+    exit(0);
+}
+
+if ($stage === 'content') {
+    require_once DOL_DOCUMENT_ROOT.'/knowledgemanagement/class/knowledgerecord.class.php';
+    require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
+    $category = new Categorie($db);
+    $category->label = 'Website';
+    $category->type = Categorie::TYPE_KNOWLEDGEMANAGEMENT;
+    if ($category->create($admin) <= 0) {
+        rt_fail('category: '.$category->error);
+    }
+    $articles = array(
+        'faq' => array('Holt ihr Geräte auch ab?', '<p>Ja, im Raum Innsbruck.</p><script>alert(1)</script>', true, true),
+        'faq_draft' => array('Eine Frage im Entwurf?', '<p>Noch nicht fertig.</p>', false, true),
+        'internal' => array('Interne Notiz: Lieferant', '<p>Nur für die Werkstatt.</p>', true, false),
+        'privacy' => array('Datenschutzerklärung', '<h2>Datenschutz</h2><p>Test-Datenschutztext.</p>', true, true),
+        'terms' => array('Nutzungsbedingungen', '<p>Test-Nutzungsbedingungen.</p>', false, true),
+        'imprint' => array('Impressum-Ergänzung', '<p>Aufsichtsbehörde: Test-BH</p>', true, true),
+    );
+    $ids = array('category' => (int) $category->id);
+    foreach ($articles as $key => $spec) {
+        $record = new KnowledgeRecord($db);
+        $record->question = $spec[0];
+        $record->answer = $spec[1];
+        $record->lang = 'de_DE';
+        if ($record->create($admin) <= 0) {
+            rt_fail('article '.$key.': '.$record->error);
+        }
+        if ($spec[2] && $record->validate($admin) <= 0) {
+            rt_fail('validate '.$key.': '.$record->error);
+        }
+        if ($spec[3] && $category->add_type($record, Categorie::TYPE_KNOWLEDGEMANAGEMENT) < 0) {
+            rt_fail('tag '.$key.': '.$category->error);
+        }
+        $ids[$key] = (int) $record->id;
+    }
+    print json_encode($ids, JSON_PRETTY_PRINT)."\n";
+    exit(0);
+}
+
+if ($stage === 'move') {
+    rt_const($db, 'MAIN_INFO_SOCIETE_ADDRESS', 'Neue Gasse 7');
+    print json_encode(array('address' => 'Neue Gasse 7'))."\n";
     exit(0);
 }
 

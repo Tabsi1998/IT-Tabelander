@@ -329,6 +329,7 @@ def contact_message_as_inquiry(message: dict) -> dict:
 async def migration_plan() -> dict:
     """The dry run: what the migration would do, changing nothing."""
     db = get_db()
+    faqs = await db.faqs.find({"active": True, "dolibarr_article_id": {"$exists": False}}).sort("sort", 1).to_list(200)
     unsent = await db.repair_requests.find(OLD_UNSENT).sort("created_at", 1).to_list(200)
     sent = await db.repair_requests.find(OLD_SENT_WITH_DATA).sort("created_at", 1).to_list(200)
     messages = await db.contact_messages.find().sort("created_at", 1).to_list(200)
@@ -342,6 +343,7 @@ async def migration_plan() -> dict:
         "inquiries_to_send": await db.repair_requests.count_documents(OLD_UNSENT),
         "inquiries_to_finish": await db.repair_requests.count_documents(OLD_SENT_WITH_DATA),
         "contact_messages": await db.contact_messages.count_documents({}),
+        "faqs": len(faqs),
         "items": [
             *(row(doc, "wird als Ticket an Dolibarr übergeben, ohne Mail an den Kunden") for doc in unsent),
             *(row(doc, "Ticket gibt es schon; Fotos kommen ans Ticket, dann werden die Daten hier gelöscht")
@@ -350,6 +352,10 @@ async def migration_plan() -> dict:
                "created_at": serialize({"at": msg.get("created_at")})["at"],
                "request_type": "contact", "photos": 0,
                "what": "alte Kontaktnachricht wird ein Ticket, ohne Mail an den Absender"} for msg in messages),
+            *({"ref": "FAQ", "created_at": serialize({"at": faq.get("created_at")})["at"], "request_type": "faq",
+               "photos": 0, "question": faq.get("question"),
+               "what": f"FAQ „{faq.get('question')}“ kommt als Entwurf in die Dolibarr-Wissensdatenbank"}
+              for faq in faqs),
         ],
     }
 
@@ -388,11 +394,18 @@ async def run_migration(*, limit: int = 25) -> dict:
         else:
             result["failed"].append({"id": message["_id"], "ref": inquiry["ref"],
                                      "reason": _reason({"dolibarr": sync_result})})
-    failed_ids = [item["id"] for item in result["failed"]]
+    # The website's own FAQ goes to the knowledge base as drafts (#81).
+    from . import site_data
+    copy = await site_data.copy_website_faq()
+    result["faqs"] = copy["copied"]
+    result["failed"].extend({"id": None, "ref": f"FAQ „{item['question']}“", "reason": item["reason"]}
+                            for item in copy["failed"])
+    failed_ids = [item["id"] for item in result["failed"] if item["id"] is not None]
     result["remaining"] = (
         await db.repair_requests.count_documents({**OLD_UNSENT, "_id": {"$nin": failed_ids}})
         + await db.repair_requests.count_documents({**OLD_SENT_WITH_DATA, "_id": {"$nin": failed_ids}})
         + await db.contact_messages.count_documents({"_id": {"$nin": failed_ids}})
+        + copy["remaining"]
     )
     result["failed"] = [{"ref": item["ref"], "reason": item["reason"]} for item in result["failed"]]
     return result

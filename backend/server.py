@@ -19,7 +19,7 @@ from app import handover  # noqa: E402
 from app.db import close_client, get_db, now_utc  # noqa: E402
 from app.seed import run_all_seeds  # noqa: E402
 from app.routers import (auth, dashboard, dolibarr_router,  # noqa: E402
-                         faqs, media, repairs, reviews, services, settings)
+                         faqs, media, repairs, reviews, services, settings, site)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("it-tabelander")
@@ -300,7 +300,7 @@ app.add_middleware(
 app.add_middleware(SecurityHeadersMiddleware)
 
 for r in (auth, services, faqs, reviews, settings, repairs,
-          media, dolibarr_router, dashboard):
+          media, dolibarr_router, dashboard, site):
     app.include_router(r.router)
 
 READ_METHODS = ["GET", "HEAD"]

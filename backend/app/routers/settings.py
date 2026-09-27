@@ -2,12 +2,17 @@ import nh3
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 
-from .. import mailer
+import logging
+
+from .. import mailer, site_data
 from ..db import get_db, now_utc, serialize
 from ..models import SettingsInput
 from ..security import require_admin
 
 router = APIRouter(prefix="/api", tags=["settings"])
+logger = logging.getLogger("it-tabelander.settings")
+CONTENT_FIELDS = ("dolibarr_content_category_id", "dolibarr_imprint_article_id",
+                  "dolibarr_privacy_article_id", "dolibarr_terms_article_id")
 
 # fields safe to expose publicly (no secrets / API keys)
 PUBLIC_FIELDS = [
@@ -40,6 +45,11 @@ def _admin_response(doc: dict) -> dict:
 async def public_settings():
     doc = await get_db().settings.find_one({"_id": "site"}) or {}
     result = {k: doc.get(k) for k in PUBLIC_FIELDS}
+    try:
+        # Company data, hours and legal texts live in Dolibarr (#74).
+        result.update(await site_data.public_overlay())
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Dolibarr site data unavailable: %s", type(exc).__name__)
     for field in HTML_FIELDS:
         if result.get(field):
             result[field] = nh3.clean(str(result[field]))
@@ -107,6 +117,8 @@ async def update_settings(payload: SettingsInput, admin: dict = Depends(require_
     if unset:
         update["$unset"] = unset
     await db.settings.update_one({"_id": "site"}, update, upsert=True)
+    if any(field in data for field in CONTENT_FIELDS) or "dolibarr_base_url" in data or "dolibarr_api_key" in data:
+        await site_data.forget(db)
     doc = await db.settings.find_one({"_id": "site"})
     return _admin_response(doc)
 

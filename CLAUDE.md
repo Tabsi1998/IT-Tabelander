@@ -22,9 +22,9 @@ ignored by Git.
 | Group | Mirrors | Runs |
 | --- | --- | --- |
 | repository | ci.yml `deployment-scripts` | every `*.sh` parses, no CRLF in the index, `git diff --check` over every tracked line (the CI's check sees no diff on a fresh checkout), Gitleaks over the history and over uncommitted files |
-| backend | ci.yml `backend` matrix | for Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, `tests/test_unit_runtime.py`, `tests/test_inquiry_dolibarr.py` and `tests/test_handover.py` |
+| backend | ci.yml `backend` matrix | for Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, `tests/test_unit_runtime.py`, `tests/test_inquiry_dolibarr.py`, `tests/test_handover.py` and `tests/test_site_data.py` |
 | integration | ci.yml `integration` (control only) | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
-| dolibarr | - (local only) | Dolibarr 24.0.1 + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link, the website's test mail, queue with one warning while Dolibarr is unreachable, personal data gone after hand-over, migration of old records without mails, contact form without new third party, callback as agenda event |
+| dolibarr | - (local only) | Dolibarr 24.0.1 + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link, the website's test mail, queue with one warning while Dolibarr is unreachable, personal data gone after hand-over, migration of old records without mails, contact form without new third party, callback as agenda event, company data and imprint (with a moved address), draft marker on legal texts, FAQ only from released website articles, status steps "Angebot bereit" and "abholbereit" |
 | frontend | ci.yml `frontend` | Node 24, `yarn install --frozen-lockfile`, `yarn build` with `CI=true` (Create React App turns warnings into errors) |
 | extra | - | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
 | deploy | - | `start.sh`, `stop.sh`, `update.sh` on a throwaway Ubuntu 24.04 server with systemd (`scripts/deploy-test/`): autostart, crash restart, reboot (`docker restart`), a broken update rolled back, a good update, `stop.sh --disable`, `USE_SYSTEMD=0`. With `--all` only when a deployment file changed against origin/main (about 15 minutes); `--only deploy` forces it. It tests the committed HEAD |
@@ -95,7 +95,11 @@ carries the status link only with `TICKET_ENABLE_PUBLIC_INTERFACE`, and the
 ticket number only in the workshop mail's subject; `users/info` needs
 "modify own user" (the website takes the ticket's `fk_user_create` as event
 owner instead); an agenda event links to its ticket through `elementid`
-(`fk_element` is refused in API requests).
+(`fk_element` is refused in API requests); `setup/company` answers with the
+private company note too, so the website keeps a whitelist; the
+`API_LOGINS_ALLOWED_FOR_*` constants hold one login, not a list; creating a
+knowledge article needs `status` in the request; the category API cannot tag
+knowledge articles; the rights class of proposals is `propale`.
 
 Keep the ports unique, so repositories can be checked side by side: API 18011,
 MongoDB 27018 (container `it-tabelander-local-check-mongo`). The deploy group

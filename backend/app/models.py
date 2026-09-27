@@ -58,15 +58,6 @@ class ServiceInput(BaseModel):
     active: bool = True
 
 
-# ---------- FAQ ----------
-class FAQInput(BaseModel):
-    question: str
-    answer: str
-    category: str = "allgemein"
-    sort: int = 0
-    active: bool = True
-
-
 # ---------- Reviews ----------
 class ReviewInput(BaseModel):
     author: str
@@ -267,6 +258,12 @@ class SettingsInput(BaseModel):
     smtp_from_name: Optional[str] = Field(default=None, max_length=120)
     # Who hears about inquiries stuck on their way to Dolibarr (#39).
     warning_email: Optional[str] = Field(default=None, max_length=255)
+    # Website content from Dolibarr's knowledge base (#74, #81): the public
+    # category and which article is which legal page. 0 = none.
+    dolibarr_content_category_id: Optional[int] = Field(default=None, ge=0)
+    dolibarr_imprint_article_id: Optional[int] = Field(default=None, ge=0)
+    dolibarr_privacy_article_id: Optional[int] = Field(default=None, ge=0)
+    dolibarr_terms_article_id: Optional[int] = Field(default=None, ge=0)
     logo_light_url: Optional[str] = None
     logo_dark_url: Optional[str] = None
     seo_default_title: Optional[str] = None

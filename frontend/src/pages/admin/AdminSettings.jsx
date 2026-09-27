@@ -8,7 +8,6 @@ import { Button } from "../../components/ui/button";
 import { Input, Select, Textarea } from "../../components/ui/input";
 import { useAuth } from "../../context/AuthContext";
 
-const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 const DOLIBARR_CATEGORIES = [
   ["repair", "Reparatur"], ["pc_build", "PC-Neubau"], ["pc_upgrade", "PC-Upgrade"],
   ["controller_custom", "Controller-Umbau"], ["consulting", "Beratung"], ["other", "Sonstiges"],
@@ -28,10 +27,8 @@ export default function AdminSettings() {
   useEffect(() => {
     api.get("/admin/settings").then(({ data }) => setS({
       ...data,
-      social_links: data.social_links || {},
       dolibarr_ticket_categories: data.dolibarr_ticket_categories || {},
-      opening_hours: WEEKDAYS.map((day) => data.opening_hours?.find((item) => item.day === day) || { day, hours: "" }),
-    })).catch(() => setS({ opening_hours: WEEKDAYS.map((day) => ({ day, hours: "" })), social_links: {}, dolibarr_ticket_categories: {} }));
+    })).catch(() => setS({ dolibarr_ticket_categories: {} }));
   }, []);
 
   useEffect(() => {
@@ -39,20 +36,12 @@ export default function AdminSettings() {
   }, [user]);
 
   const set = (k) => (e) => setS((x) => ({ ...x, [k]: e.target.value }));
-  const setSocial = (k) => (e) => setS((x) => ({ ...x, social_links: { ...x.social_links, [k]: e.target.value } }));
-  const setHours = (day) => (e) => setS((x) => ({ ...x, opening_hours: x.opening_hours.map((item) => item.day === day ? { ...item, hours: e.target.value } : item) }));
 
   const save = async () => {
     setSaving(true);
     try {
-      const payload = { ...s, opening_hours: s.opening_hours.filter((item) => item.hours.trim()) };
-      const { data } = await api.put("/admin/settings", payload);
-      setS({
-        ...data,
-        social_links: data.social_links || {},
-        dolibarr_ticket_categories: data.dolibarr_ticket_categories || {},
-        opening_hours: WEEKDAYS.map((day) => data.opening_hours?.find((item) => item.day === day) || { day, hours: "" }),
-      });
+      const { data } = await api.put("/admin/settings", s);
+      setS({ ...data, dolibarr_ticket_categories: data.dolibarr_ticket_categories || {} });
       toast.success("Einstellungen gespeichert");
     } catch { toast.error("Fehler beim Speichern"); } finally { setSaving(false); }
   };
@@ -91,30 +80,10 @@ export default function AdminSettings() {
 
   return (
     <>
-      <AdminHeader title="Einstellungen" desc="Unternehmensdaten, SEO, Analytics & rechtliche Texte"
+      <AdminHeader title="Einstellungen" desc="SEO, Analytics, Dolibarr-Zugang, E-Mail-Versand und Logos. Firmendaten, Öffnungszeiten, Social Media, Rechtstexte und FAQ pflegst du in Dolibarr."
         action={<Button onClick={save} disabled={saving} data-testid="settings-save">{saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} Speichern</Button>} />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel>
-          <h3 className="mb-4 font-semibold text-ink">Unternehmen & Kontakt</h3>
-          <div className="space-y-3">
-            <Field label="Unternehmensname"><Input value={s.company_name || ""} onChange={set("company_name")} data-testid="settings-company" /></Field>
-            <Field label="Tagline"><Input value={s.tagline || ""} onChange={set("tagline")} /></Field>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="E-Mail"><Input value={s.email || ""} onChange={set("email")} data-testid="settings-email" /></Field>
-              <Field label="Telefon"><Input value={s.phone || ""} onChange={set("phone")} /></Field>
-            </div>
-            <Field label="Adresse"><Input value={s.address || ""} onChange={set("address")} /></Field>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="PLZ"><Input value={s.postal_code || ""} onChange={set("postal_code")} /></Field>
-              <Field label="Ort"><Input value={s.city || ""} onChange={set("city")} /></Field>
-              <Field label="Region"><Input value={s.region || ""} onChange={set("region")} /></Field>
-            </div>
-            <Field label="Land"><Input value={s.country || ""} onChange={set("country")} /></Field>
-            <Field label="Servicegebiet"><Input value={s.service_area || ""} onChange={set("service_area")} /></Field>
-          </div>
-        </Panel>
-
         <Panel>
           <h3 className="mb-4 font-semibold text-ink">SEO & Analytics</h3>
           <div className="space-y-3">
@@ -184,15 +153,6 @@ export default function AdminSettings() {
         </Panel>
 
         <Panel>
-          <h3 className="mb-4 font-semibold text-ink">Öffnungszeiten</h3>
-          <div className="space-y-2">
-            {s.opening_hours.map((item) => (
-              <Field key={item.day} label={item.day}><Input value={item.hours || ""} onChange={setHours(item.day)} placeholder="z. B. 09:00–17:00 oder nach Vereinbarung" /></Field>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel>
           <h3 className="mb-4 font-semibold text-ink">Admin-Zugang</h3>
           <p className="mb-3 text-xs text-faint">Hier änderst du die automatisch angelegten Start-Zugangsdaten. Das aktuelle Passwort ist zur Bestätigung erforderlich.</p>
           <div className="space-y-3">
@@ -213,24 +173,6 @@ export default function AdminSettings() {
           </div>
         </Panel>
 
-        <Panel>
-          <h3 className="mb-4 font-semibold text-ink">Social Media</h3>
-          <div className="space-y-3">
-            <Field label="Instagram"><Input value={s.social_links?.instagram || ""} onChange={setSocial("instagram")} /></Field>
-            <Field label="Facebook"><Input value={s.social_links?.facebook || ""} onChange={setSocial("facebook")} /></Field>
-            <Field label="YouTube"><Input value={s.social_links?.youtube || ""} onChange={setSocial("youtube")} /></Field>
-          </div>
-        </Panel>
-
-        <Panel>
-          <h3 className="mb-4 font-semibold text-ink">Rechtliche Texte</h3>
-          <p className="mb-3 text-xs text-amber-300">Diese Texte sind vom Betreiber rechtlich zu prüfen.</p>
-          <div className="space-y-3">
-            <Field label="Impressum (HTML)"><Textarea value={s.impressum_html || ""} onChange={set("impressum_html")} className="min-h-[120px]" /></Field>
-            <Field label="Datenschutz (HTML)"><Textarea value={s.datenschutz_html || ""} onChange={set("datenschutz_html")} className="min-h-[120px]" /></Field>
-            <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={!!s.legal_reviewed} onChange={(e) => setS((x) => ({ ...x, legal_reviewed: e.target.checked }))} className="h-4 w-4 accent-[#F26522]" /> Rechtliche Texte wurden geprüft</label>
-          </div>
-        </Panel>
       </div>
     </>
   );

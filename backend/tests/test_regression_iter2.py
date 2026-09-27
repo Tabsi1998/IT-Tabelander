@@ -111,12 +111,11 @@ class TestAuthPlaybook:
 
 
 # ---------------- Admin id validation: 404 unknown / 400 malformed ----------------
-@pytest.mark.parametrize("resource", ["services", "faqs", "reviews"])
+@pytest.mark.parametrize("resource", ["services", "reviews"])
 class TestAdminIdGuards:
     PAYLOADS = {
         "services": {"title": "TEST_x", "slug": f"test-{uuid.uuid4().hex[:6]}",
                      "short_description": "x", "description": "x", "category": "pc"},
-        "faqs": {"question": "TEST_q", "answer": "a", "category": "allgemein"},
         "reviews": {"author": "TEST_a", "text": "t", "rating": 5},
     }
 

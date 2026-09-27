@@ -570,6 +570,36 @@ TICKET_STATUS_STEPS = {
     3: "in_arbeit", 5: "wartet_auf_dich", 7: "pausiert",
     8: "abgeschlossen", 9: "abgebrochen",
 }
+# The ticket's extra field "Gerät abholbereit" (yes/no), created by the owner
+# under Tickets -> Einstellungen -> Ergänzende Attribute (#78).
+PICKUP_FIELD = "options_abholbereit"
+PROPOSAL_VALIDATED = 1
+
+
+def _is_yes(value) -> bool:
+    return str(value or "").strip().lower() in ("1", "true", "yes", "ja", "on")
+
+
+async def _offer_waiting(client: httpx.AsyncClient, cfg: dict, ticket_id: str, thirdparty_id) -> bool:
+    """A released, not yet accepted proposal linked to this ticket (#78)."""
+    if not thirdparty_id or str(thirdparty_id) in ("0", "-1"):
+        return False
+    response = await client.get(
+        f"{cfg['base']}/api/index.php/proposals", headers=_headers(cfg),
+        params={"thirdparty_ids": str(thirdparty_id), "sqlfilters": f"(t.fk_statut:=:{PROPOSAL_VALIDATED})",
+                "loadlinkedobjects": 1, "limit": 50},
+    )
+    if response.status_code in (403, 404):
+        # 404: no open proposal. 403: the website user may not read
+        # proposals; the status then simply never says "Angebot bereit".
+        return False
+    response.raise_for_status()
+    for proposal in response.json() or []:
+        linked = (proposal.get("linkedObjectsIds") or {}).get("ticket") or {}
+        ids = linked.values() if isinstance(linked, dict) else linked
+        if str(ticket_id) in {str(value) for value in ids}:
+            return True
+    return False
 
 
 async def fetch_ticket_status(ticket_id: str) -> dict | None:
@@ -587,12 +617,20 @@ async def fetch_ticket_status(ticket_id: str) -> dict | None:
             return None
         response.raise_for_status()
         ticket = response.json()
-    try:
-        code = int(ticket.get("status", ticket.get("fk_statut", 0)))
-    except (TypeError, ValueError):
-        code = 0
+        try:
+            code = int(ticket.get("status", ticket.get("fk_statut", 0)))
+        except (TypeError, ValueError):
+            code = 0
+        step = TICKET_STATUS_STEPS.get(code, "eingegangen")
+        if code not in (8, 9):
+            # Ready for pickup beats everything open; an offer waiting for
+            # the customer's answer beats the plain ticket state (#78).
+            if _is_yes((ticket.get("array_options") or {}).get(PICKUP_FIELD)):
+                step = "abholbereit"
+            elif await _offer_waiting(client, cfg, str(ticket_id), ticket.get("fk_soc") or ticket.get("socid")):
+                step = "angebot_bereit"
     return {
-        "step": TICKET_STATUS_STEPS.get(code, "eingegangen"),
+        "step": step,
         "origin_email": str(ticket.get("origin_email") or "").strip().lower(),
         "updated": _iso_time(ticket.get("date_modification") or ticket.get("tms") or ticket.get("datec")),
         "closed": _iso_time(ticket.get("date_close")),
