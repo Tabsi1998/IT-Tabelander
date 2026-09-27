@@ -21,6 +21,9 @@ Groups:
                  status, existing customers left unchanged, company data,
                  legal texts and FAQ from the knowledge base
     frontend     a frozen Yarn install and the production build with CI=true
+    web          the new website (web/, #44): a frozen install, ESLint, Vitest,
+                 the prerendered build, and Playwright on a desktop (1440 px)
+                 and a phone (390 px) with an answered API
     extra        OSV over the lockfiles, ShellCheck, and proof that every
                  test file is run by some gate
     deploy       start.sh, stop.sh and update.sh on a throwaway Ubuntu server
@@ -68,11 +71,12 @@ LOGS = STATE / "logs"
 BASELINE = ROOT / "scripts" / "ci-baseline.json"
 WINDOWS = platform.system() == "Windows"
 
-GROUPS = ("repository", "backend", "integration", "dolibarr", "frontend", "extra", "deploy")
-DEFAULT_GROUPS = ("repository", "backend", "integration", "dolibarr", "frontend")
+GROUPS = ("repository", "backend", "integration", "dolibarr", "frontend", "web", "extra", "deploy")
+DEFAULT_GROUPS = ("repository", "backend", "integration", "dolibarr", "frontend", "web")
 
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
+WEB = ROOT / "web"
 SNAPSHOT = STATE / "snapshot"
 SNAPSHOT_BACKEND = SNAPSHOT / "backend"
 TLS = STATE / "tls"
@@ -109,6 +113,7 @@ DOLIBARR_SITE_URL = f"https://127.0.0.1:{DOLIBARR_SITE_PORT}"
 DOLIBARR_SITE_DB = "it_tabelander_dolibarr_test"
 DOLIBARR_PREFIX = "it-tabelander-dolibarr"
 DOLIBARR_FIXTURES = "/opt/it-tabelander-fixtures"
+WEB_E2E_PORT = 18015  # vite preview of the built new website
 
 # Ports of their own, so this repository can be checked while another one is.
 API_PORT = 18011
@@ -1155,6 +1160,103 @@ def frontend_steps() -> list:
     ]
 
 
+# ----------------------------------------------------------------------- web
+
+def web_yarn(context: Context, name: str, *arguments, timeout: int = 1800, env: dict | None = None):
+    node = node_of(context, NODE_MAJOR)
+    if env:
+        context.env.update(env)
+    try:
+        completed = run_yarn(context, WEB, *arguments, node=node, check=False, timeout=timeout)
+    finally:
+        for key in env or {}:
+            context.env.pop(key, None)
+    path = context.log(f"web-{name}", completed.stdout + completed.stderr)
+    return completed, path
+
+
+def web_install(context: Context) -> str:
+    completed, path = web_yarn(context, "install", "install", "--frozen-lockfile", "--non-interactive")
+    if completed.returncode != 0:
+        raise StepFailed(f"the frozen install of web/ failed. Full output: {path}\n" + tail(completed))
+    return "frozen install on Node " + context.run(node_of(context, NODE_MAJOR), "--version", timeout=60).stdout.strip()
+
+
+def web_lint(context: Context) -> str:
+    completed, path = web_yarn(context, "lint", "lint")
+    if completed.returncode != 0:
+        raise StepFailed(f"ESLint found problems. Full output: {path}\n" + tail(completed, 30))
+    return "ESLint without a warning (React, hooks, accessibility)"
+
+
+def web_unit(context: Context) -> str:
+    completed, path = web_yarn(context, "unit", "test")
+    text = completed.stdout + completed.stderr
+    if completed.returncode != 0:
+        raise StepFailed(f"Vitest failed. Full output: {path}\n" + tail(completed, 30))
+    match = re.search(r"Tests\s+(\d+) passed", text)
+    return f"{match.group(1) if match else '?'} passed"
+
+
+def web_build(context: Context) -> str:
+    """The build writes every page as finished HTML (#44): the check reads it
+    back without JavaScript, and makes sure no font comes from Google (#45)."""
+    completed, path = web_yarn(context, "build", "build")
+    if completed.returncode != 0:
+        raise StepFailed(f"the build failed. Full output: {path}\n" + tail(completed, 30))
+    dist = WEB / "dist"
+    pages = {"index.html": "IT-Technik, die", "404.html": "Diese Seite gibt es nicht.",
+             "rechtliches/impressum/index.html": "Rechtliches"}
+    for name, text in pages.items():
+        page = dist / name
+        if not page.is_file():
+            raise StepFailed(f"the build wrote no {name}")
+        html = page.read_text(encoding="utf-8")
+        if text not in html:
+            raise StepFailed(f"{name} lacks its prerendered text ({text!r})")
+    for item in dist.rglob("*"):
+        if item.suffix in (".html", ".css", ".js") and "fonts.googleapis" in item.read_text(encoding="utf-8", errors="replace"):
+            raise StepFailed(f"{item.relative_to(WEB)} loads fonts from Google")
+    size = sum(item.stat().st_size for item in dist.rglob("*") if item.is_file() and item.suffix in (".js", ".css"))
+    return f"{len(pages)} prerendered pages checked, {size // 1024} KiB JavaScript and CSS"
+
+
+def web_browsers(context: Context) -> str:
+    """Playwright's Chromium, installed once into the user's cache."""
+    node = node_of(context, NODE_MAJOR)
+    completed = context.run(node, WEB / "node_modules" / "@playwright" / "test" / "cli.js", "install", "chromium",
+                            cwd=WEB, env=node_path_env(context, node), check=False, timeout=1800)
+    path = context.log("web-browsers", completed.stdout + completed.stderr)
+    if completed.returncode != 0:
+        raise StepFailed(f"installing Chromium for Playwright failed. Full output: {path}\n" + tail(completed))
+    return "Chromium for Playwright is installed"
+
+
+def web_e2e(context: Context) -> str:
+    completed, path = web_yarn(context, "e2e", "test:e2e", "--reporter=line", timeout=1800,
+                               env={"WEB_E2E_PORT": str(WEB_E2E_PORT)})
+    text = completed.stdout + completed.stderr
+    if completed.returncode != 0:
+        failed = [line for line in text.splitlines() if re.search(r"\) \[(desktop|handy)\]", line)]
+        raise StepFailed(f"the browser tests failed. Report: {WEB / 'playwright-report' / 'index.html'}\n"
+                         f"Full output: {path}\n" + "\n".join(failed[:15] or [tail(completed, 30)]))
+    passed = re.search(r"(\d+) passed", text)
+    skipped = re.search(r"(\d+) skipped", text)
+    return (f"{passed.group(1) if passed else '?'} passed on 1440 px and 390 px"
+            + (f", {skipped.group(1)} only for one screen" if skipped else ""))
+
+
+def web_steps() -> list:
+    return [
+        Step("web", "install", "A frozen install of the new website", web_install),
+        Step("web", "lint", "ESLint with the accessibility rules", web_lint, ("install",)),
+        Step("web", "unit", "Vitest", web_unit, ("install",)),
+        Step("web", "build", "The build, every page prerendered, fonts of its own", web_build, ("install",)),
+        Step("web", "browsers", "Chromium for Playwright", web_browsers, ("install",)),
+        Step("web", "e2e", "Playwright on a desktop and a phone", web_e2e, ("build", "browsers")),
+    ]
+
+
 # ------------------------------------------------------------------ dolibarr
 
 def dolibarr_stack(context: Context) -> str:
@@ -1492,7 +1594,7 @@ def deploy_steps() -> list:
 def plan(groups: set) -> list:
     builders = {"repository": repository_steps, "backend": backend_steps,
                 "integration": integration_steps, "dolibarr": dolibarr_steps, "frontend": frontend_steps,
-                "extra": extra_steps, "deploy": deploy_steps}
+                "web": web_steps, "extra": extra_steps, "deploy": deploy_steps}
     steps: list = []
     if "dolibarr" in groups and "integration" not in groups:
         # The scenarios reuse the integration MongoDB and certificate.

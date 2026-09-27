@@ -21,7 +21,7 @@ PUBLIC_FIELDS = [
     "ga_measurement_id", "seo_default_title", "seo_default_description",
     "canonical_base_url",
     "impressum_html", "datenschutz_html", "legal_reviewed",
-    "logo_light_url", "logo_dark_url",
+    "logo_light_url", "logo_dark_url", "google_review_url",
 ]
 
 SECRET_FIELDS = ("dolibarr_api_key", "smtp_password")

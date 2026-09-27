@@ -30,6 +30,7 @@ ignored by Git.
 | integration | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
 | dolibarr | Dolibarr 24.0.1 + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link, the website's test mail, queue with one warning while Dolibarr is unreachable, personal data gone after hand-over, migration of old records without mails, contact form without new third party, callback as agenda event, company data and imprint (with a moved address), draft marker on legal texts, FAQ only from released website articles, status steps "Angebot bereit" and "abholbereit" |
 | frontend | Node 24, `yarn install --frozen-lockfile`, `yarn build` with `CI=true` (Create React App turns warnings into errors) |
+| web | the new website in `web/` (Vite 8, React 19, Tailwind 3, same toolbox as LION): frozen install, ESLint with jsx-a11y strict, Vitest, `yarn build` (Vite build + SSR build + `scripts/prerender.mjs`, checked for prerendered text and no Google fonts), Playwright on 1440 px and 390 px against `vite preview`; the e2e tests answer `/api` themselves (`web/e2e/fixtures.js`) |
 | extra | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
 | deploy | `start.sh`, `stop.sh`, `update.sh` on a throwaway Ubuntu 24.04 server with systemd (`scripts/deploy-test/`): autostart, crash restart, reboot (`docker restart`), a broken update rolled back, a good update, `stop.sh --disable`, `USE_SYSTEMD=0`. With `--all` only when a deployment file changed against origin/main (about 15 minutes); `--only deploy` forces it. It tests the committed HEAD |
 
@@ -111,7 +112,8 @@ MongoDB 27018 (container `it-tabelander-local-check-mongo`). The deploy group
 publishes no port; its container is `it-tabelander-local-check-deploy`. The
 dolibarr group: Dolibarr 18031, Mailpit 18131 (SMTP 18125), its website server 18013
 (containers `it-tabelander-dolibarr-db/-mail/-web`, network
-`it-tabelander-dolibarr-net`).
+`it-tabelander-dolibarr-net`). The web group: `vite preview` for Playwright on
+18015; `yarn dev` uses 3010.
 
 ## Windows notes
 

@@ -452,7 +452,7 @@ python -m pip install -r requirements-dev.txt
 uvicorn server:app --reload --port 8001
 ```
 
-Frontend-Entwicklungsserver:
+Frontend-Entwicklungsserver (bisherige Website, bis zur Umschaltung):
 
 ```bash
 cd frontend
@@ -460,6 +460,25 @@ yarn install --frozen-lockfile
 echo 'REACT_APP_BACKEND_URL=http://localhost:8001' > .env
 yarn start
 ```
+
+Neue Website (`web/`, Meilenstein 3; geht mit der Umschaltung #54 online):
+
+```bash
+cd web
+yarn install --frozen-lockfile
+yarn dev          # http://127.0.0.1:3010, /api geht an das Backend auf Port 8001
+yarn lint && yarn test
+yarn build        # dist/ mit fertig vorgerenderten Seiten
+yarn test:e2e     # Playwright am PC (1440 px) und Handy (390 px)
+```
+
+Sie ist ein One-Pager nach Design A: Leistungen als Tabs, Ablauf, „Aus der
+Werkstatt“ (nur mit Fotos sichtbar), Bewertungen (nur mit echten Bewertungen
+sichtbar), Über mich und der Kontaktbereich mit den Tabs Nachricht, Anfrage
+und Status. Eigene Seiten gibt es nur für Rechtliches. Schriften liegen im
+Projekt; die Seite lädt nichts von fremden Servern. Hell und dunkel folgen der
+Systemeinstellung. Der Link aus Dolibarrs Bestätigungsmail
+(`/status/view.php?track_id=…`) öffnet direkt den Status.
 
 Prüfungen:
 

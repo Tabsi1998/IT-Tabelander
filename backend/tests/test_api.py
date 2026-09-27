@@ -195,6 +195,16 @@ class TestReviews:
         assert not any(x["id"] == rid for x in pub2["reviews"])
         assert admin_client.delete(f"{BASE_URL}/api/admin/reviews/{rid}", timeout=30).status_code == 200
 
+    def test_demo_reviews_never_reach_the_public(self, admin_client, api_client):
+        """#51: invented reviews are not allowed on the website."""
+        p = {"author": "TEST_Demo", "rating": 5, "text": "TEST_Demo", "visible": True, "is_demo": True}
+        rid = admin_client.post(f"{BASE_URL}/api/admin/reviews", json=p, timeout=30).json()["id"]
+        try:
+            pub = api_client.get(f"{BASE_URL}/api/reviews", timeout=30).json()
+            assert not any(x["id"] == rid for x in pub["reviews"])
+        finally:
+            admin_client.delete(f"{BASE_URL}/api/admin/reviews/{rid}", timeout=30)
+
     def test_review_rating_validation(self, admin_client):
         r = admin_client.post(f"{BASE_URL}/api/admin/reviews",
                               json={"author": "TEST_x", "rating": 9, "text": "t"}, timeout=30)
