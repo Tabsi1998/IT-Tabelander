@@ -990,6 +990,14 @@ start_backend() {
   if ! write_pid "$RUN_DIR/backend.pid" "$pid"; then
     die "Backend-PID konnte nicht gespeichert werden."
   fi
+  # Until its exec the new process still carries this script's command line,
+  # which no check recognises as the backend: a check in that moment took it
+  # for dead and the clean-up stopped the starting server. Wait for the exec.
+  for _ in {1..50}; do
+    [[ "$(process_command "$pid" 2>/dev/null || true)" == *uvicorn* ]] && break
+    process_exists "$pid" || break
+    sleep 0.1
+  done
 }
 
 wait_for_backend() {
