@@ -54,7 +54,7 @@ if ($stage === 'base') {
     rt_const($db, 'MAIN_MAIL_EMAIL_STARTTLS', '0');
     rt_const($db, 'MAIN_DISABLE_ALL_MAILS', '0');
 
-    rt_modules(array('modSociete', 'modTicket', 'modApi'));
+    rt_modules(array('modSociete', 'modTicket', 'modApi', 'modPropale', 'modFacture'));
     rt_const($db, 'API_PRODUCTION_MODE', '0');
     // What the owner sets in Dolibarr (README, "Dolibarr einmalig vorbereiten"):
     // new tickets reach the workshop, and the link in the customer's
