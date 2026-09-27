@@ -26,6 +26,8 @@ BASE_URL = (
 ).rstrip("/")
 
 INTEGRATION_FILES = {"test_api.py", "test_regression_iter2.py"}
+# Scenarios against a real Dolibarr; they also need the integration settings.
+DOLIBARR_FILES = {"test_dolibarr_runtime.py"}
 
 
 def _test_database_env():
@@ -51,12 +53,15 @@ def _integration_safety_error() -> str | None:
 
 def pytest_collection_modifyitems(items):
     safety_error = _integration_safety_error()
-    if not safety_error:
-        return
-    skip = pytest.mark.skip(reason=safety_error)
+    dolibarr_error = safety_error
+    if not dolibarr_error and os.environ.get("IT_TABELANDER_RUN_DOLIBARR") != "1":
+        dolibarr_error = "Dolibarr-Szenarien benötigen IT_TABELANDER_RUN_DOLIBARR=1 und einen Test-Dolibarr"
     for item in items:
-        if Path(str(item.fspath)).name in INTEGRATION_FILES:
-            item.add_marker(skip)
+        name = Path(str(item.fspath)).name
+        if name in INTEGRATION_FILES and safety_error:
+            item.add_marker(pytest.mark.skip(reason=safety_error))
+        if name in DOLIBARR_FILES and dolibarr_error:
+            item.add_marker(pytest.mark.skip(reason=dolibarr_error))
 
 
 @pytest.fixture(scope="session")

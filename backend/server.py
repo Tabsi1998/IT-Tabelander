@@ -43,6 +43,8 @@ class PublicRequestGuardMiddleware:
         ("POST", "/api/uploads/repair-attachment"): (
             30, 60 * 60, 9 * 1024 * 1024,
         ),
+        # Guessing reference numbers and e-mail addresses stays slow (#43).
+        ("POST", "/api/inquiries/status"): (20, 60 * 60, 4 * 1024),
     }
 
     def __init__(self, application):

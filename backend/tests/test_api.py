@@ -339,7 +339,9 @@ class TestMedia:
         r = admin_client.post(f"{BASE_URL}/api/admin/media", files=files, timeout=30)
         assert r.status_code == 400
 
-    def test_public_repair_attachment(self):
+    def test_repair_attachment_only_for_its_own_draft(self, admin_client):
+        """Customer photos are never public (#37): the draft sees its own
+        preview, the admin sees everything, anybody else gets a 404."""
         request_id = "integration-upload-12345678"
         files = {"file": ("attach.png", _png_bytes("blue"), "image/png")}
         r = requests.post(
@@ -351,14 +353,18 @@ class TestMedia:
         assert r.status_code == 200, r.text
         uploaded = r.json()
         assert uploaded["url"].startswith("/api/media/")
-        assert requests.get(f"{BASE_URL}{uploaded['url']}", timeout=30).status_code == 200
+        url = f"{BASE_URL}{uploaded['url']}"
+        assert requests.get(url, params={"request_id": request_id}, timeout=30).status_code == 200
+        assert requests.get(url, timeout=30).status_code == 404
+        assert requests.get(url, params={"request_id": "integration-other-1234"}, timeout=30).status_code == 404
+        assert admin_client.get(url, timeout=30).status_code == 200
         deleted = requests.delete(
             f"{BASE_URL}/api/uploads/repair-attachment/{uploaded['id']}",
             params={"request_id": request_id},
             timeout=30,
         )
         assert deleted.status_code == 200
-        assert requests.get(f"{BASE_URL}{uploaded['url']}", timeout=30).status_code == 404
+        assert requests.get(url, params={"request_id": request_id}, timeout=30).status_code == 404
 
     def test_media_404(self):
         assert requests.get(f"{BASE_URL}/api/media/nonexistent.webp", timeout=30).status_code == 404

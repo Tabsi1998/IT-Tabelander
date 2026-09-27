@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import re
 import secrets
 import string
 from datetime import timedelta
@@ -11,7 +12,7 @@ from pymongo.errors import DuplicateKeyError
 
 from .. import dolibarr
 from ..db import get_db, now_utc, serialize, to_oid
-from ..models import InquiryInput, InquiryStatusUpdate
+from ..models import InquiryInput, InquiryStatusQuery, InquiryStatusUpdate
 from ..security import require_admin
 from .media import (
     delete_repair_attachments,
@@ -41,6 +42,36 @@ REQUEST_TYPES = {"repair", "pc_build", "pc_upgrade", "controller_custom", "consu
 def _inquiry_ref() -> str:
     alphabet = string.ascii_uppercase + string.digits
     return "ANF-" + "".join(secrets.choice(alphabet) for _ in range(8))
+
+
+def _track_id() -> str:
+    """Random Dolibarr tracking id; it also opens the status view from the
+    confirmation mail, so it must not be guessable (#43)."""
+    alphabet = string.ascii_uppercase + string.digits
+    return "IT" + "".join(secrets.choice(alphabet) for _ in range(14))
+
+
+async def _store_sync_result(db, inquiry_id, sync_result: dict, attachments: list) -> dict:
+    """Save a Dolibarr attempt; once the photos sit on the ticket, drop the
+    website's copies - they are no longer served from here (#37)."""
+    update = {"dolibarr": sync_result, "updated_at": now_utc()}
+    uploaded = set(sync_result.get("documents_uploaded") or [])
+    handed_over = [
+        item for item in attachments or []
+        if isinstance(item, dict) and str(item.get("id") or item.get("url") or "") in uploaded
+    ]
+    if sync_result.get("synced") and handed_over:
+        try:
+            await delete_repair_attachments(handed_over)
+        except Exception as exc:  # noqa: BLE001
+            # The photos are safe in Dolibarr; a leftover copy is removed on
+            # the next attempt or by the maintenance loop.
+            logger.exception("Could not remove photos handed to Dolibarr: %s", exc)
+        else:
+            update["attachments"] = []
+            update["photos_in_dolibarr"] = len(handed_over)
+    await db.repair_requests.update_one({"_id": inquiry_id}, {"$set": update})
+    return sync_result
 
 
 def _created_response(doc: dict, duplicate: bool = False) -> dict:
@@ -181,6 +212,7 @@ async def create_inquiry(payload: InquiryInput):
     data.update({
         "payload_hash": payload_hash,
         "ref": _inquiry_ref(),
+        "track_id": _track_id(),
         "status": "eingegangen",
         "dolibarr": {
             "synced": False,
@@ -221,11 +253,63 @@ async def create_inquiry(payload: InquiryInput):
     # A failed ERP call therefore never loses the customer's inquiry.
     sync_result = await dolibarr.create_ticket_for_inquiry(data)
     data["dolibarr"] = sync_result
-    await db.repair_requests.update_one(
-        {"_id": result.inserted_id},
-        {"$set": {"dolibarr": sync_result, "updated_at": now_utc()}},
-    )
+    await _store_sync_result(db, result.inserted_id, sync_result, data.get("attachments") or [])
     return _created_response(data)
+
+
+NOT_FOUND = "Keine Anfrage mit dieser Nummer und E-Mail gefunden."
+STATUS_CREATED = "eingegangen"
+
+
+async def _status_response(doc: dict, email: str | None) -> dict:
+    """What the customer sees about one inquiry; no personal data (#43).
+
+    With an e-mail, it must match the inquiry; the tracking id from the
+    confirmation mail is proof enough on its own.
+    """
+    contact_email = str((doc.get("contact") or {}).get("email") or "").strip().lower()
+    sync = doc.get("dolibarr") or {}
+    ticket = None
+    if sync.get("synced") and sync.get("ticket_id"):
+        try:
+            ticket = await dolibarr.fetch_ticket_status(str(sync["ticket_id"]))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Ticket status unavailable: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Der Status ist gerade nicht abrufbar. Bitte später erneut versuchen.") from None
+    if email is not None:
+        known = {address for address in (contact_email, (ticket or {}).get("origin_email")) if address}
+        if email.strip().lower() not in known:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+    return {
+        "ref": doc.get("ref"),
+        "request_type": doc.get("request_type") or "repair",
+        "request_type_label": dolibarr.REQUEST_TYPE_LABELS.get(doc.get("request_type") or "repair", "Anfrage"),
+        "step": (ticket or {}).get("step") or STATUS_CREATED,
+        "created_at": serialize({"at": doc.get("created_at")})["at"],
+        "updated_at": (ticket or {}).get("updated") or serialize({"at": doc.get("updated_at")})["at"],
+    }
+
+
+@router.post("/inquiries/status")
+async def inquiry_status(payload: InquiryStatusQuery):
+    """Status by reference number and e-mail, as typed on the website."""
+    doc = await get_db().repair_requests.find_one({"ref": payload.ref})
+    if not doc:
+        raise HTTPException(status_code=404, detail=NOT_FOUND)
+    return await _status_response(doc, str(payload.email))
+
+
+@router.get("/inquiries/status/track/{track_id}")
+async def inquiry_status_by_track_id(track_id: str):
+    """Status behind the link in Dolibarr's confirmation mail."""
+    if not re.fullmatch(r"[A-Za-z0-9]{8,64}", track_id):
+        raise HTTPException(status_code=404, detail=NOT_FOUND)
+    doc = await get_db().repair_requests.find_one(
+        {"$or": [{"track_id": track_id}, {"dolibarr.ticket_track_id": track_id}]}
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail=NOT_FOUND)
+    return await _status_response(doc, None)
 
 
 @router.get("/admin/inquiries")
@@ -313,10 +397,7 @@ async def retry_dolibarr(inquiry_id: str, _: dict = Depends(require_admin)):
     sync_result = await dolibarr.create_ticket_for_inquiry(
         claimed, previous=claimed.get("dolibarr") or {},
     )
-    await db.repair_requests.update_one(
-        {"_id": object_id},
-        {"$set": {"dolibarr": sync_result, "updated_at": now_utc()}},
-    )
+    await _store_sync_result(db, object_id, sync_result, claimed.get("attachments") or [])
     return {"ok": bool(sync_result.get("synced")), "dolibarr": serialize(sync_result)}
 
 
@@ -349,10 +430,7 @@ async def recover_stale_dolibarr_syncs(
         sync_result = await dolibarr.create_ticket_for_inquiry(
             claimed, previous=claimed.get("dolibarr") or {},
         )
-        await db.repair_requests.update_one(
-            {"_id": claimed["_id"]},
-            {"$set": {"dolibarr": sync_result, "updated_at": now_utc()}},
-        )
+        await _store_sync_result(db, claimed["_id"], sync_result, claimed.get("attachments") or [])
         recovered += 1
     return recovered
 

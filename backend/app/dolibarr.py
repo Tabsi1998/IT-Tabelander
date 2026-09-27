@@ -4,9 +4,12 @@ Config (base URL, API key, enabled) is read from the admin settings document
 first, then falls back to environment variables. The frontend never talks to
 Dolibarr directly. Demo mode is used when no API key is configured.
 """
+import base64
 import logging
 import os
 import re
+from datetime import datetime, timezone
+from pathlib import Path
 from urllib.parse import quote, urlencode
 
 import httpx
@@ -252,44 +255,6 @@ async def _create_thirdparty(client: httpx.AsyncClient, cfg: dict, contact: dict
     return _remote_id(response.json())
 
 
-async def _enrich_thirdparty(
-    client: httpx.AsyncClient, cfg: dict, thirdparty_id: str, contact: dict,
-) -> None:
-    """Fill customer-supplied details without clearing existing Dolibarr data."""
-    detail_fields = (
-        "company_name", "address", "postal_code", "city", "website", "vat_id",
-        "tax_number", "company_registration", "court", "eori",
-    )
-    if not any(str(contact.get(field) or "").strip() for field in detail_fields):
-        return
-    mapping = {
-        "company_name": "name",
-        "phone": "phone_mobile",
-        "address": "address",
-        "postal_code": "zip",
-        "city": "town",
-        "country_code": "country_code",
-        "website": "url",
-        "vat_id": "tva_intra",
-        "tax_number": "idprof1",
-        "court": "idprof2",
-        "company_registration": "idprof3",
-        "eori": "idprof5",
-    }
-    payload = {
-        remote: str(contact.get(local) or "").strip()
-        for local, remote in mapping.items()
-        if str(contact.get(local) or "").strip()
-    }
-    if not payload:
-        return
-    response = await client.put(
-        f"{cfg['base']}/api/index.php/thirdparties/{quote(str(thirdparty_id), safe='')}",
-        headers=_headers(cfg), json=payload,
-    )
-    response.raise_for_status()
-
-
 async def _create_ticket(client: httpx.AsyncClient, cfg: dict, *, subject: str,
                          message: str, email: str, thirdparty_id: str,
                          track_id: str | None = None,
@@ -298,7 +263,11 @@ async def _create_ticket(client: httpx.AsyncClient, cfg: dict, *, subject: str,
         "subject": subject,
         "message": message,
         "fk_soc": thirdparty_id,
+        "socid": thirdparty_id,
         "origin_email": email,
+        # Dolibarr's ticket module sends the customer its own confirmation
+        # with the tracking link (TICKET_URL_PUBLIC_INTERFACE) (#40).
+        "notify_tiers_at_create": 1,
     }
     if track_id:
         payload["track_id"] = track_id
@@ -328,97 +297,141 @@ async def _lookup_ticket_by_track_id(
     return payload
 
 
+async def _upload_ticket_document(
+    client: httpx.AsyncClient, cfg: dict, ticket_id: str, attachment: dict,
+) -> None:
+    """Attach one inquiry photo to the ticket through Dolibarr's document API (#37)."""
+    from .routers.media import UPLOAD_DIR
+
+    filename = Path(str(attachment.get("url") or "")).name
+    if not filename:
+        raise ValueError("Anhang ohne Dateiname.")
+    content = (Path(UPLOAD_DIR) / filename).read_bytes()
+    response = await client.post(
+        f"{cfg['base']}/api/index.php/documents/upload",
+        headers=_headers(cfg),
+        json={
+            "filename": f"anfrage-foto-{attachment.get('id') or filename}.webp",
+            "modulepart": "ticket",
+            # Tickets are addressed by their numeric id here.
+            "ref": str(ticket_id),
+            "filecontent": base64.b64encode(content).decode("ascii"),
+            "fileencoding": "base64",
+            "overwriteifexists": 1,
+        },
+    )
+    response.raise_for_status()
+
+
+def _ticket_state(previous: dict) -> dict:
+    """The parts of an earlier attempt that a retry must keep."""
+    return {
+        key: previous.get(key)
+        for key in ("thirdparty_id", "existing_customer", "ticket_id", "ticket_ref",
+                    "ticket_track_id", "documents_uploaded")
+        if previous.get(key) not in (None, "", [])
+    }
+
+
 async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
                                    subject: str, message: str, contact: dict,
                                    previous: dict | None = None,
                                    track_id: str | None = None,
-                                   classification: dict | None = None) -> dict:
-    previous = previous or {}
-    if previous.get("synced") or previous.get("ticket_id") or previous.get("ticket_ref"):
-        return {**previous, "created": True, "synced": True, "stage": "complete",
-                "error": None, "http_status": None}
+                                   classification: dict | None = None,
+                                   attachments: list | None = None) -> dict:
+    """Third party, ticket, photos - each stage resumes where an attempt stopped."""
+    state = _ticket_state(previous or {})
 
-    if track_id:
+    def failed(exc: Exception, stage: str, action: str) -> dict:
+        result = _sync_error(exc, cfg, stage, action, state.get("thirdparty_id"))
+        result.update(state)
+        return result
+
+    if not state.get("ticket_id") and track_id:
         try:
             existing_ticket = await _lookup_ticket_by_track_id(client, cfg, track_id)
         except Exception as exc:  # noqa: BLE001
-            return _sync_error(
-                exc, cfg, "ticket_lookup", "Suchen des bestehenden Tickets",
-                previous.get("thirdparty_id"),
-            )
+            return failed(exc, "ticket_lookup", "Suchen des bestehenden Tickets")
         if existing_ticket:
-            ticket_id = _remote_id(existing_ticket)
-            thirdparty_id = existing_ticket.get("fk_soc") or previous.get("thirdparty_id")
-            timestamp = now_utc()
-            return {
-                "created": True,
-                "synced": True,
+            thirdparty_id = existing_ticket.get("fk_soc") or state.get("thirdparty_id")
+            state.update({
                 "recovered": True,
-                "demo": False,
-                "stage": "complete",
-                "error": None,
-                "http_status": None,
                 "thirdparty_id": str(thirdparty_id) if thirdparty_id else None,
-                "ticket_id": ticket_id,
-                "ticket_ref": str(existing_ticket.get("ref") or ticket_id),
+                "ticket_id": _remote_id(existing_ticket),
+                "ticket_ref": str(existing_ticket.get("ref") or _remote_id(existing_ticket)),
                 "ticket_track_id": track_id,
-                "attempted_at": timestamp,
-                "synced_at": timestamp,
-            }
+            })
 
-    email = str(contact.get("email") or "").strip().lower()
-    thirdparty_id = previous.get("thirdparty_id")
-    if not thirdparty_id:
+    if not state.get("ticket_id"):
+        email = str(contact.get("email") or "").strip().lower()
+        if not state.get("thirdparty_id"):
+            try:
+                found = await _lookup_thirdparty(client, cfg, email)
+            except Exception as exc:  # noqa: BLE001
+                return failed(exc, "thirdparty_lookup", "Suchen des Interessenten")
+            if found:
+                # An existing customer is only linked, never changed: an
+                # anonymous form must not rewrite master data (#36).
+                state.update({"thirdparty_id": str(found), "existing_customer": True})
+            else:
+                try:
+                    state["thirdparty_id"] = await _create_thirdparty(client, cfg, contact)
+                except Exception as exc:  # noqa: BLE001
+                    return failed(exc, "thirdparty_create", "Anlegen des Interessenten")
+                state["existing_customer"] = False
+        ticket_message = message
+        if state.get("existing_customer"):
+            ticket_message = (
+                "Hinweis: Der Kunde war in Dolibarr schon vorhanden und wurde nicht geändert. "
+                "Die Kontaktdaten unten stammen aus dem Formular.\n\n" + message
+            )
         try:
-            thirdparty_id = await _lookup_thirdparty(client, cfg, email)
+            ticket_id = await _create_ticket(
+                client, cfg, subject=subject, message=ticket_message,
+                email=email, thirdparty_id=str(state["thirdparty_id"]), track_id=track_id,
+                classification=classification,
+            )
         except Exception as exc:  # noqa: BLE001
-            return _sync_error(exc, cfg, "thirdparty_lookup", "Suchen des Interessenten")
-    if not thirdparty_id:
-        try:
-            thirdparty_id = await _create_thirdparty(client, cfg, contact)
-        except Exception as exc:  # noqa: BLE001
-            return _sync_error(exc, cfg, "thirdparty_create", "Anlegen des Interessenten")
-    else:
-        try:
-            await _enrich_thirdparty(client, cfg, str(thirdparty_id), contact)
-        except Exception as exc:  # noqa: BLE001
-            # The customer and their local inquiry already exist. Optional
-            # profile enrichment must not prevent creating the actual ticket.
-            logger.info("Dolibarr third-party enrichment skipped: %s", type(exc).__name__)
+            return failed(exc, "ticket_create", "Anlegen des Tickets")
+        state.update({"ticket_id": ticket_id, "ticket_ref": ticket_id, "ticket_track_id": track_id})
+        if track_id:
+            try:
+                created_ticket = await _lookup_ticket_by_track_id(client, cfg, track_id)
+                if created_ticket:
+                    state["ticket_ref"] = str(created_ticket.get("ref") or ticket_id)
+            except Exception:  # noqa: BLE001
+                # The ticket exists. A cosmetic reference lookup must never
+                # turn a successful sync into a failed customer inquiry.
+                logger.info("Dolibarr ticket reference lookup failed after creation")
 
-    try:
-        ticket_id = await _create_ticket(
-            client, cfg, subject=subject, message=message,
-            email=email, thirdparty_id=str(thirdparty_id), track_id=track_id,
-            classification=classification,
-        )
-    except Exception as exc:  # noqa: BLE001
-        return _sync_error(exc, cfg, "ticket_create", "Anlegen des Tickets", str(thirdparty_id))
-
-    ticket_ref = ticket_id
-    if track_id:
+    uploaded = list(state.get("documents_uploaded") or [])
+    for attachment in attachments or []:
+        attachment_id = str(attachment.get("id") or attachment.get("url") or "")
+        if attachment_id in uploaded:
+            continue
         try:
-            created_ticket = await _lookup_ticket_by_track_id(client, cfg, track_id)
-            if created_ticket:
-                ticket_ref = str(created_ticket.get("ref") or ticket_id)
-        except Exception:  # noqa: BLE001
-            # The ticket is already created. A cosmetic reference lookup must
-            # never turn a successful sync into a failed customer inquiry.
-            logger.info("Dolibarr ticket reference lookup failed after creation")
+            await _upload_ticket_document(client, cfg, state["ticket_id"], attachment)
+        except Exception as exc:  # noqa: BLE001
+            state["documents_uploaded"] = uploaded
+            return failed(exc, "documents", "Anhängen der Fotos an das Ticket")
+        uploaded.append(attachment_id)
+    state["documents_uploaded"] = uploaded
+
+    timestamp = now_utc()
     return {
+        **state,
         "created": True,
         "synced": True,
         "demo": False,
         "stage": "complete",
         "error": None,
         "http_status": None,
-        "thirdparty_id": str(thirdparty_id),
-        "ticket_id": ticket_id,
+        "thirdparty_id": str(state["thirdparty_id"]) if state.get("thirdparty_id") else None,
+        "ticket_id": str(state["ticket_id"]),
         # Preserve the old response key used by existing admin code.
-        "ticket_ref": ticket_ref,
-        "ticket_track_id": track_id,
-        "attempted_at": now_utc(),
-        "synced_at": now_utc(),
+        "ticket_ref": str(state.get("ticket_ref") or state["ticket_id"]),
+        "attempted_at": timestamp,
+        "synced_at": timestamp,
     }
 
 
@@ -431,7 +444,14 @@ def inquiry_subject(inquiry: dict) -> str:
 
 
 def inquiry_track_id(inquiry: dict) -> str:
-    """Stable Dolibarr tracking id for retry-safe ticket creation."""
+    """Stable Dolibarr tracking id for retry-safe ticket creation.
+
+    New inquiries carry a random one (``track_id``), because it also opens the
+    status view from the customer's confirmation mail (#43). Older records
+    derive it from their reference as before.
+    """
+    if inquiry.get("track_id"):
+        return str(inquiry["track_id"])
     reference = str(inquiry.get("ref") or "")
     cleaned = re.sub(r"[^A-Za-z0-9]", "", reference).upper()
     if not cleaned:
@@ -461,6 +481,52 @@ def _ticket_classification(inquiry: dict, cfg: dict) -> dict:
     return result
 
 
+# Dolibarr ticket states in the words the customer sees (#43).
+TICKET_STATUS_STEPS = {
+    0: "eingegangen", 1: "eingegangen", 2: "eingegangen",
+    3: "in_arbeit", 5: "wartet_auf_dich", 7: "pausiert",
+    8: "abgeschlossen", 9: "abgebrochen",
+}
+
+
+async def fetch_ticket_status(ticket_id: str) -> dict | None:
+    """The customer-visible state of one ticket, or None without Dolibarr."""
+    cfg = await get_config()
+    if not cfg["enabled"]:
+        return None
+    async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
+        response = await client.get(
+            f"{cfg['base']}/api/index.php/tickets/{quote(str(ticket_id), safe='')}",
+            headers=_headers(cfg),
+            params={"contact_list": 0},
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        ticket = response.json()
+    try:
+        code = int(ticket.get("status", ticket.get("fk_statut", 0)))
+    except (TypeError, ValueError):
+        code = 0
+    return {
+        "step": TICKET_STATUS_STEPS.get(code, "eingegangen"),
+        "origin_email": str(ticket.get("origin_email") or "").strip().lower(),
+        "updated": _iso_time(ticket.get("date_modification") or ticket.get("tms") or ticket.get("datec")),
+        "closed": _iso_time(ticket.get("date_close")),
+    }
+
+
+def _iso_time(value) -> str | None:
+    """Dolibarr sends points in time as Unix seconds (as number or text)."""
+    try:
+        seconds = int(value)
+    except (TypeError, ValueError):
+        return None
+    if seconds <= 0:
+        return None
+    return datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat()
+
+
 def _public_ticket_url(cfg: dict, track_id: str, email: str) -> str | None:
     if not cfg.get("public_ticket_enabled") or not cfg.get("base") or not email:
         return None
@@ -472,17 +538,8 @@ def format_inquiry_message(inquiry: dict) -> str:
     """Build the complete, readable plain-text ticket body."""
     contact = inquiry.get("contact") or {}
     type_label = REQUEST_TYPE_LABELS.get(inquiry.get("request_type"), inquiry.get("request_type") or "–")
-    attachment_lines = []
-    site_base = str(inquiry.get("_site_base") or "").rstrip("/")
-    for attachment in inquiry.get("attachments") or []:
-        url = attachment.get("url") if isinstance(attachment, dict) else str(attachment)
-        if url:
-            attachment_lines.append(f"- {site_base + url if site_base and url.startswith('/') else url}")
-    if not attachment_lines:
-        attachment_lines = [
-            f"- Medien-ID {attachment_id}"
-            for attachment_id in inquiry.get("attachment_ids") or []
-        ]
+    photo_count = len(inquiry.get("attachments") or inquiry.get("attachment_ids") or [])
+    attachment_lines = [f"- {photo_count} Foto(s), am Ticket unter „Dokumente“"] if photo_count else []
     lines = [
         f"Anfrage-Referenz: {inquiry.get('ref') or '–'}",
         f"Anfrageart: {type_label}",
@@ -499,7 +556,7 @@ def format_inquiry_message(inquiry: dict) -> str:
         "Beschreibung:",
         str(inquiry.get("description") or "–"),
         "",
-        "Anhänge:",
+        "Fotos:",
         *(attachment_lines or ["–"]),
         "",
         "Kontakt:",
@@ -549,6 +606,7 @@ async def create_ticket_for_inquiry(inquiry: dict, previous: dict | None = None)
                 previous=previous,
                 track_id=track_id or None,
                 classification=_ticket_classification(ticket_inquiry, cfg),
+                attachments=[item for item in inquiry.get("attachments") or [] if isinstance(item, dict)],
             )
             if result.get("synced") and track_id:
                 result["ticket_public_url"] = _public_ticket_url(
