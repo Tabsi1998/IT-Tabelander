@@ -54,7 +54,7 @@ if ($stage === 'base') {
     rt_const($db, 'MAIN_MAIL_EMAIL_STARTTLS', '0');
     rt_const($db, 'MAIN_DISABLE_ALL_MAILS', '0');
 
-    rt_modules(array('modSociete', 'modTicket', 'modApi', 'modPropale', 'modFacture'));
+    rt_modules(array('modSociete', 'modTicket', 'modApi', 'modPropale', 'modFacture', 'modAgenda'));
     rt_const($db, 'API_PRODUCTION_MODE', '0');
     // What the owner sets in Dolibarr (README, "Dolibarr einmalig vorbereiten"):
     // new tickets reach the workshop, and the link in the customer's
@@ -73,6 +73,8 @@ if ($stage === 'base') {
     list($webId, $webKey) = rt_api_user($db, $admin, 'itweb', array(
         array('societe', 'lire'), array('societe', 'creer'), array('societe', 'client', 'voir'),
         array('ticket', 'read'), array('ticket', 'write'),
+        // Callback wishes become phone calls in the agenda (#73).
+        array('agenda', 'myactions', 'read'), array('agenda', 'myactions', 'create'),
     ));
     // The scenarios read what the website created through an administrator.
     $adminKey = bin2hex(random_bytes(20));

@@ -1,10 +1,26 @@
 import re
+from datetime import datetime, timedelta, timezone
 from typing import List, Literal, Optional
 from urllib.parse import urlparse
 
 from pydantic import (
-    BaseModel, EmailStr, Field, ValidationInfo, field_validator, model_validator,
+    AwareDatetime, BaseModel, EmailStr, Field, ValidationInfo, field_validator, model_validator,
 )
+
+REQUEST_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+
+
+def check_callback(moment: Optional[datetime], phone: Optional[str]) -> None:
+    """A callback wish needs a phone number and a time ahead, within 60 days (#73)."""
+    if moment is None:
+        return
+    if not (phone or "").strip():
+        raise ValueError("Für einen Rückruf fehlt die Telefonnummer")
+    now = datetime.now(timezone.utc)
+    if moment < now + timedelta(minutes=10):
+        raise ValueError("Der Rückruf-Wunsch muss mindestens 10 Minuten in der Zukunft liegen")
+    if moment > now + timedelta(days=60):
+        raise ValueError("Der Rückruf-Wunsch darf höchstens 60 Tage in der Zukunft liegen")
 
 
 # ---------- Auth ----------
@@ -130,8 +146,10 @@ class InquiryInput(BaseModel):
     request_id: str = Field(
         min_length=8,
         max_length=128,
-        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+        pattern=REQUEST_ID_PATTERN,
     )
+    # With the browser's UTC offset, so the workshop sees the customer's time.
+    callback_at: Optional[AwareDatetime] = None
 
     @field_validator(
         "source", "device_type", "manufacturer", "model", "budget", "timeframe",
@@ -163,6 +181,29 @@ class InquiryInput(BaseModel):
         if self.request_type == "controller_custom":
             if not self.device_source or not self.manufacturer or not self.model:
                 raise ValueError("Controller, Herkunft, Hersteller und Modell müssen angegeben werden")
+        check_callback(self.callback_at, self.contact.phone)
+        return self
+
+
+class ContactInput(BaseModel):
+    """The contact form: a message that becomes a Dolibarr ticket (#42)."""
+    request_id: str = Field(min_length=8, max_length=128, pattern=REQUEST_ID_PATTERN)
+    name: str = Field(min_length=2, max_length=128)
+    email: EmailStr
+    phone: Optional[str] = Field(default="", max_length=40)
+    message: str = Field(min_length=10, max_length=5000)
+    consent: bool
+    honeypot: Optional[str] = Field(default="", max_length=500)
+    callback_at: Optional[AwareDatetime] = None
+
+    @field_validator("request_id", "name", "phone", "message", "honeypot", mode="before")
+    @classmethod
+    def strip_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def validate_callback(self):
+        check_callback(self.callback_at, self.phone)
         return self
 
 
@@ -215,6 +256,17 @@ class SettingsInput(BaseModel):
     dolibarr_country_code: Optional[str] = Field(default=None, min_length=2, max_length=2)
     dolibarr_public_ticket_enabled: Optional[bool] = None
     dolibarr_ticket_categories: Optional[dict] = None
+    # The website's own mail (#38). The password is write-only.
+    smtp_host: Optional[str] = Field(default=None, max_length=255)
+    smtp_port: Optional[int] = Field(default=None, ge=1, le=65535)
+    smtp_security: Optional[Literal["starttls", "ssl", "none"]] = None
+    smtp_username: Optional[str] = Field(default=None, max_length=255)
+    smtp_password: Optional[str] = Field(default=None, max_length=512)
+    clear_smtp_password: Optional[bool] = None
+    smtp_from: Optional[str] = Field(default=None, max_length=255)
+    smtp_from_name: Optional[str] = Field(default=None, max_length=120)
+    # Who hears about inquiries stuck on their way to Dolibarr (#39).
+    warning_email: Optional[str] = Field(default=None, max_length=255)
     logo_light_url: Optional[str] = None
     logo_dark_url: Optional[str] = None
     seo_default_title: Optional[str] = None
@@ -269,13 +321,41 @@ class SettingsInput(BaseModel):
             cleaned = cleaned[:-len(suffix)].rstrip("/")
         return cleaned
 
+    @field_validator("smtp_host")
+    @classmethod
+    def validate_smtp_host(cls, value):
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if cleaned and not re.fullmatch(r"[A-Za-z0-9.-]{1,253}|\[[0-9A-Fa-f:.]+\]", cleaned):
+            raise ValueError("Mailserver: nur der Hostname, z. B. smtp.example.at")
+        return cleaned
+
+    @field_validator("smtp_from", "warning_email")
+    @classmethod
+    def validate_mail_address(cls, value):
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if cleaned and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", cleaned):
+            raise ValueError("Bitte eine gültige E-Mail-Adresse eingeben")
+        return cleaned
+
+    @field_validator("smtp_username", "smtp_from_name", mode="before")
+    @classmethod
+    def strip_mail_text(cls, value):
+        if isinstance(value, str) and ("\n" in value or "\r" in value):
+            raise ValueError("Zeilenumbrüche sind hier nicht erlaubt")
+        return value.strip() if isinstance(value, str) else value
+
     @field_validator("dolibarr_ticket_categories")
     @classmethod
     def validate_dolibarr_ticket_categories(cls, value):
         if value is None:
             return value
         allowed = {
-            "repair", "pc_build", "pc_upgrade", "controller_custom", "consulting", "other"
+            "repair", "pc_build", "pc_upgrade", "controller_custom", "consulting", "other",
+            "contact",
         }
         cleaned = {}
         for key, code in value.items():

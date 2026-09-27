@@ -5,9 +5,12 @@ tests/dolibarr_fixtures/fixtures.php and runs a website server of its own. These
 tests connect that website to Dolibarr through the admin settings and check the
 results in Dolibarr itself, through an administrator's API key.
 """
+import hashlib
 import io
 import os
 import re
+import secrets
+import string
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -15,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 import requests
 from PIL import Image
+from pymongo import MongoClient
 
 from conftest import BASE_URL
 
@@ -26,6 +30,13 @@ CUSTOMER_EMAIL = os.environ.get("DOLIBARR_TEST_CUSTOMER_EMAIL", "")
 WORKSHOP_EMAIL = os.environ.get("DOLIBARR_TEST_NOTIFICATION_TO", "")
 PUBLIC_URL = os.environ.get("DOLIBARR_TEST_PUBLIC_URL", "")
 MAILPIT = os.environ.get("MAILPIT_URL", "").rstrip("/")
+MAILPIT_SMTP_PORT = int(os.environ.get("MAILPIT_SMTP_PORT") or 0)
+WARNINGS_TO = "werkstatt-warnung@example.com"
+
+
+def website_db():
+    """The website's own test database, to age records and plant old ones."""
+    return MongoClient(os.environ["MONGO_URL"], tz_aware=True)[os.environ["DB_NAME"]]
 
 
 def dolibarr_get(path: str, **params):
@@ -81,7 +92,8 @@ def upload_photo(request_id: str) -> dict:
     return response.json()
 
 
-def send_inquiry(email: str, *, request_id: str | None = None, attachments=(), **contact) -> dict:
+def send_inquiry(email: str, *, request_id: str | None = None, attachments=(), expect_synced=True,
+                 extra=None, **contact) -> dict:
     payload = {
         "request_id": request_id or f"rt-{uuid.uuid4().hex}",
         "request_type": "repair",
@@ -92,17 +104,45 @@ def send_inquiry(email: str, *, request_id: str | None = None, attachments=(), *
         "attachment_ids": list(attachments),
         "consent": True,
         "contact": {"name": "Runtime Kunde", "email": email, "phone": "+43 660 0000000", **contact},
+        **(extra or {}),
     }
     response = requests.post(f"{BASE_URL}/api/inquiries", json=payload, timeout=120)
     assert response.status_code == 200, response.text
     data = response.json()
-    assert data["dolibarr_synced"] is True, data
+    assert data["dolibarr_synced"] is expect_synced, data
     return data
 
 
 def ticket_for(ref: str, thirdparty_id) -> dict:
     tickets = dolibarr_get("tickets", sqlfilters=f"(t.fk_soc:=:{int(thirdparty_id)})", limit=50)
     return next(ticket for ticket in tickets if ref in str(ticket.get("subject")))
+
+
+def ticket_with(ref: str) -> dict:
+    """The newest ticket naming a reference, with or without third party."""
+    tickets = dolibarr_get("tickets", sortfield="t.rowid", sortorder="DESC", limit=100)
+    return next(ticket for ticket in tickets if ref in str(ticket.get("subject")))
+
+
+def no_third_party(ticket: dict) -> bool:
+    return str(ticket.get("fk_soc") or "0") in ("0", "", "-1")
+
+
+def third_party_exists(email: str) -> bool:
+    response = requests.get(f"{DOLIBARR}/api/index.php/thirdparties/email/{email}",
+                            headers={"DOLAPIKEY": ADMIN_KEY, "Accept": "application/json"}, timeout=30)
+    return response.status_code == 200
+
+
+def use_mailpit_for_website_mail(admin_client):
+    response = admin_client.put(f"{BASE_URL}/api/admin/settings", json={
+        "smtp_host": "127.0.0.1", "smtp_port": MAILPIT_SMTP_PORT, "smtp_security": "none",
+        "smtp_username": "", "smtp_password": "geheim-nie-zeigen",
+        "smtp_from": "website@it-tabelander.example.com", "smtp_from_name": "IT-Tabelander Website",
+        "warning_email": WARNINGS_TO,
+    }, timeout=30)
+    assert response.status_code == 200, response.text
+    return response.json()
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -200,3 +240,169 @@ class TestStatusFollowsDolibarr:
         # Dolibarr's Unix seconds arrive as a real point in time, not hours off.
         updated = datetime.fromisoformat(status.json()["updated_at"])
         assert abs(datetime.now(timezone.utc) - updated) < timedelta(minutes=10), status.text
+
+
+class TestWebsiteMail:
+    def test_test_mail_arrives_and_the_password_stays_secret(self, admin_client):
+        """#38: the button proves the SMTP settings; the password never comes back."""
+        shown = use_mailpit_for_website_mail(admin_client)
+        assert "smtp_password" not in shown and shown["smtp_password_configured"] is True
+        assert "geheim-nie-zeigen" not in admin_client.get(f"{BASE_URL}/api/admin/settings", timeout=30).text
+
+        sent = admin_client.post(f"{BASE_URL}/api/admin/settings/test-mail",
+                                 json={"to": "test-empfang@example.com"}, timeout=60)
+        assert sent.status_code == 200, sent.text
+        received = mails_to("test-empfang@example.com")
+        assert len(received) == 1 and received[0]["Subject"] == "Test-Mail der Website"
+        assert "IT-Tabelander-Website" in mail_text(received[0])
+
+
+class TestQueue:
+    def test_an_inquiry_waits_warns_once_and_arrives_when_dolibarr_is_back(self, admin_client):
+        """#39 and #41: Dolibarr unreachable (refused connection, as with a
+        stopped server), the queue retries, one warning, then hand-over and
+        the personal data is gone from the website."""
+        use_mailpit_for_website_mail(admin_client)
+        db = website_db()
+        email = f"warten-{uuid.uuid4().hex[:10]}@example.com"
+        down = admin_client.put(f"{BASE_URL}/api/admin/settings",
+                                json={"dolibarr_base_url": "http://127.0.0.1:9"}, timeout=30)
+        assert down.status_code == 200, down.text
+        try:
+            created = send_inquiry(email, expect_synced=False)
+            # Half an hour later, as far as the website knows.
+            db.repair_requests.update_one(
+                {"ref": created["ref"]},
+                {"$set": {"created_at": datetime.now(timezone.utc) - timedelta(minutes=31)}},
+            )
+            first = admin_client.post(f"{BASE_URL}/api/admin/dolibarr/queue/run", timeout=120).json()
+            assert first["tried"] >= 1 and first["synced"] == 0 and first["warned"] >= 1, first
+            second = admin_client.post(f"{BASE_URL}/api/admin/dolibarr/queue/run", timeout=120).json()
+            assert second["warned"] == 0, second
+
+            overview = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/queue", timeout=30).json()
+            item = next(entry for entry in overview["items"] if entry["ref"] == created["ref"])
+            assert item["attempts"] >= 3 and item["warned_at"], item
+            assert "nicht erreichbar" in item["reason"], item
+            warnings = mails_to(WARNINGS_TO)
+            assert len(warnings) == 1, [message["Subject"] for message in warnings]
+            assert created["ref"] in mail_text(warnings[0])
+        finally:
+            back = admin_client.put(f"{BASE_URL}/api/admin/settings",
+                                    json={"dolibarr_base_url": DOLIBARR}, timeout=30)
+            assert back.status_code == 200, back.text
+
+        done = admin_client.post(f"{BASE_URL}/api/admin/dolibarr/queue/run", timeout=120).json()
+        assert done["synced"] >= 1, done
+        party = dolibarr_get(f"thirdparties/email/{email}")
+        ticket_for(created["ref"], party["id"])
+        assert len(mails_to(WARNINGS_TO, seconds=2)) == 1, "the warning came more than once"
+
+        stored = db.repair_requests.find_one({"ref": created["ref"]})
+        for field in ("contact", "description", "manufacturer", "model", "attachments", "device_type"):
+            assert field not in stored, field
+        assert stored["dolibarr"]["ticket_id"] and stored["personal_data_removed_at"]
+        # The customer still finds the status: Dolibarr knows the e-mail.
+        status = requests.post(f"{BASE_URL}/api/inquiries/status",
+                               json={"ref": created["ref"], "email": email}, timeout=30)
+        assert status.status_code == 200, status.text
+
+
+class TestMigration:
+    def test_old_records_move_after_a_dry_run_and_without_mails(self, admin_client):
+        """#41: old inquiries and old contact messages go to Dolibarr once,
+        without a confirmation to customers who wrote weeks ago."""
+        db = website_db()
+        old_email = f"altkunde-{uuid.uuid4().hex[:10]}@example.com"
+        old_sender = f"altnachricht-{uuid.uuid4().hex[:10]}@example.com"
+        ref = "ANF-" + "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        summer = datetime(2026, 7, 1, 10, 0, tzinfo=timezone.utc)
+        db.repair_requests.insert_one({
+            "ref": ref, "request_id": f"alt-{uuid.uuid4().hex}", "request_type": "repair",
+            "device_type": "notebook", "description": "Alte Anfrage aus dem Sommer.",
+            "contact": {"name": "Alt Kunde", "email": old_email, "phone": "+43 1 000"},
+            "consent": True, "status": "eingegangen", "attachments": [],
+            "dolibarr": {"synced": False, "stage": "ticket_create", "error": {"message": "HTTP 500"}},
+            "created_at": summer, "updated_at": summer,
+        })
+        message_id = db.contact_messages.insert_one({
+            "name": "Alte Nachricht", "email": old_sender, "phone": "", "subject": "Öffnungszeiten",
+            "message": "Habt ihr im August offen?", "consent": True, "status": "neu", "created_at": summer,
+        }).inserted_id
+        message_ref = "ALT-" + hashlib.sha256(str(message_id).encode()).hexdigest()[:8].upper()
+
+        plan = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/migration", timeout=30).json()
+        refs = {item["ref"] for item in plan["items"]}
+        assert ref in refs and message_ref in refs, plan
+        assert db.repair_requests.find_one({"ref": ref})["contact"]["email"] == old_email, "the dry run changed data"
+
+        result = admin_client.post(f"{BASE_URL}/api/admin/dolibarr/migration", timeout=300).json()
+        assert result["sent"] >= 1 and result["contact_messages"] >= 1 and not result["failed"], result
+
+        party = dolibarr_get(f"thirdparties/email/{old_email}")
+        ticket_for(ref, party["id"])
+        old_message = ticket_with(message_ref)
+        assert no_third_party(old_message) and old_message["origin_email"] == old_sender
+        assert "Habt ihr im August offen?" in str(old_message["message"])
+        time.sleep(3)
+        assert mails_to(old_email, seconds=0) == [] and mails_to(old_sender, seconds=0) == []
+
+        assert "contact" not in db.repair_requests.find_one({"ref": ref})
+        assert db.contact_messages.count_documents({"_id": message_id}) == 0
+        again = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/migration", timeout=30).json()
+        assert not {ref, message_ref} & {item["ref"] for item in again["items"]}
+
+
+def send_contact(email: str, **extra) -> requests.Response:
+    return requests.post(f"{BASE_URL}/api/contact", json={
+        "request_id": f"rt-{uuid.uuid4().hex}", "name": "Kontakt Person", "email": email,
+        "message": "Habt ihr am Samstag geöffnet?", "consent": True, **extra,
+    }, timeout=120)
+
+
+class TestContactForm:
+    def test_a_message_becomes_a_ticket_without_a_new_third_party(self):
+        """#42."""
+        email = f"kontakt-{uuid.uuid4().hex[:10]}@example.com"
+        response = send_contact(email)
+        assert response.status_code == 200, response.text
+        created = response.json()
+        assert created["dolibarr_synced"] is True, created
+        ticket = ticket_with(created["ref"])
+        assert no_third_party(ticket) and ticket["origin_email"] == email
+        assert "Habt ihr am Samstag geöffnet?" in str(ticket["message"])
+        assert not third_party_exists(email)
+        assert mails_to(email), "Dolibarr sent the sender no confirmation"
+
+    def test_a_known_customer_is_linked_and_left_unchanged(self):
+        before = dolibarr_get(f"thirdparties/{CUSTOMER_ID}")
+        response = send_contact(CUSTOMER_EMAIL)
+        assert response.status_code == 200, response.text
+        ticket = ticket_for(response.json()["ref"], CUSTOMER_ID)
+        assert "Habt ihr am Samstag geöffnet?" in str(ticket["message"])
+        after = dolibarr_get(f"thirdparties/{CUSTOMER_ID}")
+        assert {key: after.get(key) for key in ("name", "email", "phone", "address")} == \
+            {key: before.get(key) for key in ("name", "email", "phone", "address")}
+
+
+class TestCallback:
+    def test_the_wished_time_is_a_phone_call_in_the_agenda(self):
+        """#73."""
+        vienna = timezone(timedelta(hours=2))
+        wish = (datetime.now(vienna) + timedelta(days=2)).replace(hour=10, minute=30, second=0, microsecond=0)
+        email = f"rueckruf-{uuid.uuid4().hex[:10]}@example.com"
+        created = send_inquiry(email, extra={"callback_at": wish.isoformat()})
+        party = dolibarr_get(f"thirdparties/email/{email}")
+        ticket = ticket_for(created["ref"], party["id"])
+        assert "Rückruf gewünscht" in str(ticket["message"])
+        events = dolibarr_get("agendaevents", sqlfilters=f"(t.fk_element:=:{int(ticket['id'])}) "
+                                                         "and (t.elementtype:=:'ticket')")
+        calls = [event for event in events if event.get("type_code") == "AC_TEL"]
+        assert len(calls) == 1, events
+        assert int(calls[0]["datep"]) == int(wish.timestamp())
+        assert str(calls[0]["socid"]) == str(party["id"]) and created["ref"] in calls[0]["label"]
+
+    def test_a_callback_without_phone_is_refused(self):
+        wish = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+        response = send_contact(f"ohne-telefon-{uuid.uuid4().hex[:8]}@example.com", callback_at=wish)
+        assert response.status_code == 422, response.text

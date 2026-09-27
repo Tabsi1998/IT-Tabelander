@@ -464,7 +464,7 @@ def test_security_headers_and_hidden_api_docs(tmp_path, monkeypatch):
 
 def test_unknown_api_addresses_answer_404_for_every_method():
     for method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
-        response = _call(method, "/api/contact")
+        response = _call(method, "/api/no-such-address")
         assert response.status_code == 404, (method, response.status_code)
         assert "strict-transport-security" in response.headers
 

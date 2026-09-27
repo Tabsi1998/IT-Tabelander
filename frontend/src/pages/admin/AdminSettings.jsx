@@ -1,26 +1,29 @@
 import React, { useEffect, useState } from "react";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
-import api from "../../lib/api";
+import api, { formatApiError } from "../../lib/api";
 import Skeleton from "../../components/ui/skeleton";
 import { AdminHeader, Panel, Field } from "../../components/admin/AdminUI";
 import { Button } from "../../components/ui/button";
-import { Input, Textarea } from "../../components/ui/input";
+import { Input, Select, Textarea } from "../../components/ui/input";
 import { useAuth } from "../../context/AuthContext";
 
 const WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 const DOLIBARR_CATEGORIES = [
   ["repair", "Reparatur"], ["pc_build", "PC-Neubau"], ["pc_upgrade", "PC-Upgrade"],
   ["controller_custom", "Controller-Umbau"], ["consulting", "Beratung"], ["other", "Sonstiges"],
+  ["contact", "Kontaktnachricht"],
 ];
 
 export default function AdminSettings() {
   const { user, refresh } = useAuth();
-  const canManageDolibarrCredentials = user?.role === "super_admin";
+  const isSuperAdmin = user?.role === "super_admin";
   const [s, setS] = useState(null);
   const [saving, setSaving] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
   const [account, setAccount] = useState({ email: "", current_password: "", new_password: "", confirm_password: "" });
+  const [testTo, setTestTo] = useState("");
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     api.get("/admin/settings").then(({ data }) => setS({
@@ -52,6 +55,16 @@ export default function AdminSettings() {
       });
       toast.success("Einstellungen gespeichert");
     } catch { toast.error("Fehler beim Speichern"); } finally { setSaving(false); }
+  };
+
+  const sendTestMail = async () => {
+    setTesting(true);
+    try {
+      const { data } = await api.post("/admin/settings/test-mail", testTo ? { to: testTo } : {});
+      toast.success(data.message || "Test-Mail gesendet");
+    } catch (error) {
+      toast.error(formatApiError(error.response?.data?.detail || "Test-Mail konnte nicht gesendet werden"));
+    } finally { setTesting(false); }
   };
 
   const saveAccount = async () => {
@@ -118,7 +131,7 @@ export default function AdminSettings() {
           <p className="mb-3 text-xs text-faint">API-Keys sind reine Schreibfelder. Gespeicherte Werte werden niemals wieder an den Browser ausgegeben.</p>
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={!!s.dolibarr_enabled} onChange={(e) => setS((x) => ({ ...x, dolibarr_enabled: e.target.checked }))} className="h-4 w-4 accent-[#F26522]" data-testid="settings-dolibarr-enabled" /> Dolibarr aktivieren</label>
-            <Field label="Dolibarr Basis-URL"><Input value={s.dolibarr_base_url || ""} onChange={set("dolibarr_base_url")} placeholder="https://erp.tabelander.co.at" disabled={!canManageDolibarrCredentials} /></Field>
+            <Field label="Dolibarr Basis-URL"><Input value={s.dolibarr_base_url || ""} onChange={set("dolibarr_base_url")} placeholder="https://erp.tabelander.co.at" disabled={!isSuperAdmin} /></Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Timeout in Sekunden"><Input type="number" min="1" max="60" value={s.dolibarr_timeout_seconds || 8} onChange={(e) => setS((x) => ({ ...x, dolibarr_timeout_seconds: Number(e.target.value) }))} /></Field>
               <Field label="Ländercode"><Input maxLength={2} value={s.dolibarr_country_code || "AT"} onChange={(e) => setS((x) => ({ ...x, dolibarr_country_code: e.target.value.toUpperCase() }))} /></Field>
@@ -131,9 +144,42 @@ export default function AdminSettings() {
               </div>
               <p className="mt-3 text-xs text-faint">Leer lassen, wenn nur „Sonstige“ vorhanden ist. Sobald eigene Themengruppen in Dolibarr angelegt sind, hier deren Codes eintragen.</p>
             </div>
-            <Field label={`Dolibarr API-Key (${s.clear_dolibarr_api_key ? "wird entfernt" : s.dolibarr_api_key_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.dolibarr_api_key || ""} onChange={(e) => setS((x) => ({ ...x, dolibarr_api_key: e.target.value, clear_dolibarr_api_key: false }))} placeholder={s.dolibarr_api_key_configured ? "Neuen Key eingeben, um ihn zu ersetzen" : "DOLAPIKEY"} autoComplete="new-password" data-testid="settings-dolibarr-key" disabled={!canManageDolibarrCredentials} /></Field>
-            {!canManageDolibarrCredentials && <p className="text-xs text-amber-300">Dolibarr-URL und API-Key können nur vom Super-Admin geändert werden.</p>}
-            {canManageDolibarrCredentials && s.dolibarr_api_key_configured && <Button type="button" variant="outline" onClick={() => setS((x) => ({ ...x, dolibarr_api_key: "", clear_dolibarr_api_key: true }))}>Dolibarr-Key entfernen</Button>}
+            <Field label={`Dolibarr API-Key (${s.clear_dolibarr_api_key ? "wird entfernt" : s.dolibarr_api_key_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.dolibarr_api_key || ""} onChange={(e) => setS((x) => ({ ...x, dolibarr_api_key: e.target.value, clear_dolibarr_api_key: false }))} placeholder={s.dolibarr_api_key_configured ? "Neuen Key eingeben, um ihn zu ersetzen" : "DOLAPIKEY"} autoComplete="new-password" data-testid="settings-dolibarr-key" disabled={!isSuperAdmin} /></Field>
+            {!isSuperAdmin && <p className="text-xs text-amber-300">Dolibarr-URL und API-Key können nur vom Super-Admin geändert werden.</p>}
+            {isSuperAdmin && s.dolibarr_api_key_configured && <Button type="button" variant="outline" onClick={() => setS((x) => ({ ...x, dolibarr_api_key: "", clear_dolibarr_api_key: true }))}>Dolibarr-Key entfernen</Button>}
+          </div>
+        </Panel>
+
+        <Panel>
+          <h3 className="mb-1 font-semibold text-ink">E-Mail-Versand der Website</h3>
+          <p className="mb-3 text-xs text-faint">Die Website schickt dir Warnungen, wenn Anfragen nicht in Dolibarr ankommen. Bestätigungen an Kunden verschickt Dolibarr selbst. Das Passwort ist ein reines Schreibfeld.</p>
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
+              <Field label="Mailserver (SMTP)"><Input value={s.smtp_host || ""} onChange={set("smtp_host")} placeholder="z. B. smtp.dein-anbieter.at" disabled={!isSuperAdmin} data-testid="settings-smtp-host" /></Field>
+              <Field label="Port"><Input type="number" min="1" max="65535" value={s.smtp_port || ""} onChange={(e) => setS((x) => ({ ...x, smtp_port: e.target.value ? Number(e.target.value) : undefined }))} placeholder="587" disabled={!isSuperAdmin} /></Field>
+            </div>
+            <Field label="Verschlüsselung"><Select value={s.smtp_security || "starttls"} onChange={set("smtp_security")} disabled={!isSuperAdmin}>
+              <option value="starttls">STARTTLS (meist Port 587)</option>
+              <option value="ssl">SSL/TLS (meist Port 465)</option>
+              <option value="none">Keine (nur im eigenen Netz)</option>
+            </Select></Field>
+            <Field label="Benutzername"><Input value={s.smtp_username || ""} onChange={set("smtp_username")} autoComplete="off" disabled={!isSuperAdmin} /></Field>
+            <Field label={`Passwort (${s.clear_smtp_password ? "wird entfernt" : s.smtp_password_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.smtp_password || ""} onChange={(e) => setS((x) => ({ ...x, smtp_password: e.target.value, clear_smtp_password: false }))} placeholder={s.smtp_password_configured ? "Neues Passwort eingeben, um es zu ersetzen" : ""} autoComplete="new-password" disabled={!isSuperAdmin} /></Field>
+            {isSuperAdmin && s.smtp_password_configured && <Button type="button" variant="outline" onClick={() => setS((x) => ({ ...x, smtp_password: "", clear_smtp_password: true }))}>Mail-Passwort entfernen</Button>}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Absender-Adresse"><Input type="email" value={s.smtp_from || ""} onChange={set("smtp_from")} placeholder="office@tabelander.co.at" /></Field>
+              <Field label="Absender-Name"><Input value={s.smtp_from_name || ""} onChange={set("smtp_from_name")} placeholder="IT-Tabelander" /></Field>
+            </div>
+            <Field label="Warnungen gehen an"><Input type="email" value={s.warning_email || ""} onChange={set("warning_email")} placeholder="leer = E-Mail der Super-Admins" /></Field>
+            {!isSuperAdmin && <p className="text-xs text-amber-300">Mailserver, Benutzername und Passwort kann nur der Super-Admin ändern.</p>}
+            <div className="rounded-xl border border-subtle p-3">
+              <p className="mb-2 text-sm font-medium text-ink">Test-Mail</p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder={`Empfänger (leer = ${user?.email || "deine Login-E-Mail"})`} />
+                <Button type="button" variant="outline" onClick={sendTestMail} disabled={testing} data-testid="settings-test-mail">{testing ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />} Senden</Button>
+              </div>
+              <p className="mt-2 text-xs text-faint">Nutzt die gespeicherten Werte: erst oben „Speichern“, dann testen.</p>
+            </div>
           </div>
         </Panel>
 

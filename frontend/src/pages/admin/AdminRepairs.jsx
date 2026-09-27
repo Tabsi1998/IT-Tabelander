@@ -19,7 +19,7 @@ const STATUS_LABELS = {
 };
 const REQUEST_LABELS = {
   repair: "Reparatur", pc_build: "PC-Neubau", pc_upgrade: "PC-/Notebook-Upgrade",
-  controller_custom: "Controller-Umbau", consulting: "Beratung", other: "Sonstiges",
+  controller_custom: "Controller-Umbau", consulting: "Beratung", other: "Sonstiges", contact: "Kontaktnachricht",
 };
 const DEVICE_LABELS = {
   pc: "Desktop-PC", notebook: "Notebook", playstation: "PlayStation", xbox: "Xbox",
@@ -145,7 +145,7 @@ export default function AdminRepairs() {
                 <div className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
                   <button type="button" onClick={() => setExpanded(isExpanded ? null : id)} className="flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-brand" aria-expanded={isExpanded} data-testid={`inquiry-row-${ref}`}>
                     <ChevronDown size={17} className={`mt-1 shrink-0 text-faint transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                    <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><span className="font-medium text-ink">{ref}</span><Badge tone="brand">{REQUEST_LABELS[item.request_type] || item.request_type || "Anfrage"}</Badge>{dolibarr.error ? <Badge tone="warning">Dolibarr-Fehler</Badge> : hasDolibarrIds ? <Badge tone="success">Dolibarr verknüpft</Badge> : <Badge tone="neutral">Dolibarr offen</Badge>}</span><span className="mt-1 block truncate text-xs text-faint">{item.contact?.name || "Ohne Namen"} · {item.contact?.email || "Keine E-Mail"} · {displayDate(item.created_at)}</span></span>
+                    <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><span className="font-medium text-ink">{ref}</span><Badge tone="brand">{REQUEST_LABELS[item.request_type] || item.request_type || "Anfrage"}</Badge>{dolibarr.error ? <Badge tone="warning">Dolibarr-Fehler</Badge> : hasDolibarrIds ? <Badge tone="success">Dolibarr verknüpft</Badge> : <Badge tone="neutral">Dolibarr offen</Badge>}</span><span className="mt-1 block truncate text-xs text-faint">{item.personal_data_removed_at ? `Kundendaten nur in Dolibarr (Ticket ${dolibarr.ticketRef || dolibarr.ticketId || "–"})` : `${item.contact?.name || "Ohne Namen"} · ${item.contact?.email || "Keine E-Mail"}`} · {displayDate(item.created_at)}</span></span>
                   </button>
                   <div className="flex items-center gap-2 pl-7 lg:pl-0">
                     <Select value={item.status || "eingegangen"} onChange={(event) => setStatus(id, event.target.value)} className="min-w-0 flex-1 py-2 text-sm sm:w-44 sm:flex-none" data-testid={`inquiry-status-${ref}`} aria-label={`Status von ${ref}`}>{statusOptions.map((status) => <option key={status} value={status}>{STATUS_LABELS[status] || status}</option>)}</Select>
@@ -156,6 +156,7 @@ export default function AdminRepairs() {
                 {isExpanded && <div className="border-t border-subtle bg-black/20 p-4 text-sm sm:p-5">
                   <div className="grid gap-6 xl:grid-cols-[1.25fr_1fr]">
                     <div className="space-y-5">
+                      {item.personal_data_removed_at && <p className="rounded-lg border border-subtle bg-elevated/30 p-3 text-muted">Diese Anfrage ist in Dolibarr. Die Website hat Beschreibung, Fotos und Kontaktdaten danach gelöscht – alles Weitere im Ticket {dolibarr.ticketRef || dolibarr.ticketId}.</p>}
                       <section><h3 className="font-semibold text-ink">Anfrage</h3><dl className="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-2">
                         <div><dt className="text-faint">Art</dt><dd className="text-ink">{REQUEST_LABELS[item.request_type] || item.request_type || "–"}</dd></div>
                         <div><dt className="text-faint">Gerät</dt><dd className="text-ink">{[DEVICE_LABELS[item.device_type] || item.device_type, item.manufacturer, item.model].filter(Boolean).join(" · ") || "–"}</dd></div>

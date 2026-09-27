@@ -77,7 +77,7 @@ export default function Dashboard() {
                 <div key={r.id} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-ink">{r.ref} · {REQUEST_TYPE_LABEL[r.request_type] || r.request_type || "Anfrage"} {r.device_type && `– ${DEVICE_TYPE_LABEL[r.device_type] || r.device_type}`} {r.model && `· ${r.model}`}</p>
-                    <p className="truncate text-xs text-faint">{r.contact?.name} · {r.contact?.email}</p>
+                    <p className="truncate text-xs text-faint">{r.personal_data_removed_at ? "Kundendaten in Dolibarr" : `${r.contact?.name || "–"} · ${r.contact?.email || "–"}`}</p>
                   </div>
                   <Badge tone={r.status === "eingegangen" ? "brand" : "neutral"}>{STATUS_LABEL[r.status] || r.status}</Badge>
                 </div>

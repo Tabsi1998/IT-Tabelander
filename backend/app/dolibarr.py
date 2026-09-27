@@ -147,6 +147,7 @@ REQUEST_TYPE_LABELS = {
     "controller_custom": "Controller-Umbau",
     "consulting": "Beratung",
     "other": "Sonstige Anfrage",
+    "contact": "Kontaktnachricht",
 }
 
 DEVICE_SOURCE_LABELS = {
@@ -256,19 +257,20 @@ async def _create_thirdparty(client: httpx.AsyncClient, cfg: dict, contact: dict
 
 
 async def _create_ticket(client: httpx.AsyncClient, cfg: dict, *, subject: str,
-                         message: str, email: str, thirdparty_id: str,
+                         message: str, email: str, thirdparty_id: str | None,
                          track_id: str | None = None,
-                         classification: dict | None = None) -> str:
-    payload = {
-        "subject": subject,
-        "message": message,
-        "fk_soc": thirdparty_id,
-        "socid": thirdparty_id,
+                         classification: dict | None = None,
+                         notify: bool = True) -> str:
+    payload = {"subject": subject, "message": message}
+    if thirdparty_id:
+        payload.update({"fk_soc": thirdparty_id, "socid": thirdparty_id})
+    payload.update({
         "origin_email": email,
         # Dolibarr's ticket module sends the customer its own confirmation
-        # with the tracking link (TICKET_URL_PUBLIC_INTERFACE) (#40).
-        "notify_tiers_at_create": 1,
-    }
+        # with the tracking link (TICKET_URL_PUBLIC_INTERFACE) (#40). It goes
+        # to the third party's address, or to origin_email without one.
+        "notify_tiers_at_create": 1 if notify else 0,
+    })
     if track_id:
         payload["track_id"] = track_id
     payload.update(classification or {})
@@ -323,12 +325,75 @@ async def _upload_ticket_document(
     response.raise_for_status()
 
 
+def attachments_of(doc: dict) -> list[dict]:
+    """Photos of a record; early versions stored bare URLs."""
+    result = []
+    for item in doc.get("attachments") or []:
+        if isinstance(item, dict) and (item.get("id") or item.get("url")):
+            result.append(item)
+        elif isinstance(item, str) and item:
+            result.append({"id": item, "url": item})
+    return result
+
+
+async def _find_callback_event(client: httpx.AsyncClient, cfg: dict, ticket_id: str) -> str | None:
+    """A callback created by an attempt whose answer got lost."""
+    response = await client.get(
+        f"{cfg['base']}/api/index.php/agendaevents",
+        headers=_headers(cfg),
+        params={"sqlfilters": f"(t.fk_element:=:{int(ticket_id)}) and (t.elementtype:=:'ticket') "
+                              "and (t.code:=:'AC_TEL')", "limit": 1},
+    )
+    if response.status_code == 404:
+        return None
+    response.raise_for_status()
+    found = response.json()
+    return _remote_id(found) if found else None
+
+
+async def _create_callback_event(client: httpx.AsyncClient, cfg: dict, *, ticket_id: str,
+                                 thirdparty_id: str | None, callback: dict) -> str:
+    """The customer's callback wish as a phone call in Dolibarr's agenda (#73)."""
+    existing = await _find_callback_event(client, cfg, ticket_id)
+    if existing:
+        return existing
+    # The event belongs to the user who created the ticket: the website's
+    # own API user. That needs only "create own events" (users/info would
+    # need "modify own user"), and an admin's agenda shows every event.
+    ticket = await client.get(f"{cfg['base']}/api/index.php/tickets/{int(ticket_id)}",
+                              headers=_headers(cfg), params={"contact_list": 0})
+    ticket.raise_for_status()
+    owner = (ticket.json() or {}).get("fk_user_create")
+    if not owner:
+        raise ValueError("Das Ticket nennt keinen anlegenden Benutzer.")
+    start = int(datetime.fromisoformat(str(callback["at"])).timestamp())
+    payload = {
+        "userownerid": str(owner),
+        "type_code": "AC_TEL",
+        "label": callback["label"],
+        "datep": start,
+        "datef": start + 15 * 60,
+        "fulldayevent": 0,
+        "percentage": 0,
+        "note_private": callback["note"],
+        "elementtype": "ticket",
+        # "fk_element" is locked in the API; "elementid" fills it.
+        "elementid": int(ticket_id),
+    }
+    if thirdparty_id:
+        payload["socid"] = int(thirdparty_id)
+    response = await client.post(f"{cfg['base']}/api/index.php/agendaevents",
+                                 headers=_headers(cfg), json=payload)
+    response.raise_for_status()
+    return _remote_id(response.json())
+
+
 def _ticket_state(previous: dict) -> dict:
     """The parts of an earlier attempt that a retry must keep."""
     return {
         key: previous.get(key)
         for key in ("thirdparty_id", "existing_customer", "ticket_id", "ticket_ref",
-                    "ticket_track_id", "documents_uploaded")
+                    "ticket_track_id", "documents_uploaded", "callback_event_id")
         if previous.get(key) not in (None, "", [])
     }
 
@@ -338,8 +403,13 @@ async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
                                    previous: dict | None = None,
                                    track_id: str | None = None,
                                    classification: dict | None = None,
-                                   attachments: list | None = None) -> dict:
-    """Third party, ticket, photos - each stage resumes where an attempt stopped."""
+                                   attachments: list | None = None,
+                                   create_thirdparty: bool = True,
+                                   notify: bool = True,
+                                   callback: dict | None = None) -> dict:
+    """Third party, ticket, photos, callback - each stage resumes where an
+    attempt stopped. Without create_thirdparty (contact messages) a known
+    customer is linked and a stranger stays without third party (#42)."""
     state = _ticket_state(previous or {})
 
     def failed(exc: Exception, stage: str, action: str) -> dict:
@@ -373,6 +443,8 @@ async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
                 # An existing customer is only linked, never changed: an
                 # anonymous form must not rewrite master data (#36).
                 state.update({"thirdparty_id": str(found), "existing_customer": True})
+            elif not create_thirdparty:
+                state["existing_customer"] = False
             else:
                 try:
                     state["thirdparty_id"] = await _create_thirdparty(client, cfg, contact)
@@ -388,8 +460,9 @@ async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
         try:
             ticket_id = await _create_ticket(
                 client, cfg, subject=subject, message=ticket_message,
-                email=email, thirdparty_id=str(state["thirdparty_id"]), track_id=track_id,
-                classification=classification,
+                email=email,
+                thirdparty_id=str(state["thirdparty_id"]) if state.get("thirdparty_id") else None,
+                track_id=track_id, classification=classification, notify=notify,
             )
         except Exception as exc:  # noqa: BLE001
             return failed(exc, "ticket_create", "Anlegen des Tickets")
@@ -416,6 +489,15 @@ async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
             return failed(exc, "documents", "Anhängen der Fotos an das Ticket")
         uploaded.append(attachment_id)
     state["documents_uploaded"] = uploaded
+
+    if callback and not state.get("callback_event_id"):
+        try:
+            state["callback_event_id"] = await _create_callback_event(
+                client, cfg, ticket_id=str(state["ticket_id"]),
+                thirdparty_id=state.get("thirdparty_id"), callback=callback,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return failed(exc, "callback", "Anlegen des Rückruf-Termins")
 
     timestamp = now_utc()
     return {
@@ -466,6 +548,7 @@ TICKET_TYPE_CODES = {
     "controller_custom": "REQUEST",
     "consulting": "COM",
     "other": "OTHER",
+    "contact": "COM",
 }
 
 
@@ -534,8 +617,33 @@ def _public_ticket_url(cfg: dict, track_id: str, email: str) -> str | None:
     return f"{cfg['base']}/public/ticket/view.php?{query}"
 
 
+def callback_text(value) -> str:
+    """The wished time as the customer's browser sent it (own UTC offset)."""
+    return datetime.fromisoformat(str(value)).strftime("%d.%m.%Y um %H:%M Uhr")
+
+
+def format_contact_message(inquiry: dict) -> str:
+    """A contact message as ticket body: the text, then who wrote it (#42)."""
+    contact = inquiry.get("contact") or {}
+    lines = [
+        f"Kontaktnachricht über die Website ({inquiry.get('ref') or '–'})",
+        "",
+        str(inquiry.get("description") or "–"),
+        "",
+        "Kontakt:",
+        f"Name: {contact.get('name') or '–'}",
+        f"E-Mail: {contact.get('email') or '–'}",
+        f"Telefon: {contact.get('phone') or '–'}",
+    ]
+    if inquiry.get("callback_at"):
+        lines.append(f"Rückruf gewünscht: {callback_text(inquiry['callback_at'])} (Termin im Kalender)")
+    return "\n".join(lines)
+
+
 def format_inquiry_message(inquiry: dict) -> str:
     """Build the complete, readable plain-text ticket body."""
+    if inquiry.get("request_type") == "contact":
+        return format_contact_message(inquiry)
     contact = inquiry.get("contact") or {}
     type_label = REQUEST_TYPE_LABELS.get(inquiry.get("request_type"), inquiry.get("request_type") or "–")
     photo_count = len(inquiry.get("attachments") or inquiry.get("attachment_ids") or [])
@@ -579,13 +687,36 @@ def format_inquiry_message(inquiry: dict) -> str:
         ("EORI", contact.get("eori")),
     ]
     lines.extend(f"{label}: {value}" for label, value in optional_contact if value)
+    if inquiry.get("callback_at"):
+        lines.append(f"Rückruf gewünscht: {callback_text(inquiry['callback_at'])} (Termin im Kalender)")
     if inquiry.get("request_id"):
         lines.extend(["", f"Request-ID: {inquiry['request_id']}"])
     return "\n".join(lines)
 
 
-async def create_ticket_for_inquiry(inquiry: dict, previous: dict | None = None) -> dict:
-    """Best-effort Dolibarr sync. The local inquiry must already be persisted."""
+def _callback(inquiry: dict) -> dict | None:
+    if not inquiry.get("callback_at"):
+        return None
+    contact = inquiry.get("contact") or {}
+    name = contact.get("name") or contact.get("email") or "Kunde"
+    return {
+        "at": inquiry["callback_at"],
+        "label": f"Rückruf: {name} ({inquiry.get('ref') or '–'})",
+        "note": "\n".join([
+            f"Telefon: {contact.get('phone') or '–'}",
+            f"Wunschzeit: {callback_text(inquiry['callback_at'])}",
+            f"Anfrage: {inquiry.get('ref') or '–'}",
+        ]),
+    }
+
+
+async def create_ticket_for_inquiry(inquiry: dict, previous: dict | None = None, *,
+                                    notify: bool = True) -> dict:
+    """Best-effort Dolibarr sync. The local inquiry must already be persisted.
+
+    notify=False hands old records over without a confirmation mail to the
+    customer (migration, #41).
+    """
     cfg = {"api_key": "", "timeout": 8.0}
     stage = "configuration"
     action = "Laden der Dolibarr-Konfiguration"
@@ -606,7 +737,10 @@ async def create_ticket_for_inquiry(inquiry: dict, previous: dict | None = None)
                 previous=previous,
                 track_id=track_id or None,
                 classification=_ticket_classification(ticket_inquiry, cfg),
-                attachments=[item for item in inquiry.get("attachments") or [] if isinstance(item, dict)],
+                attachments=attachments_of(inquiry),
+                create_thirdparty=inquiry.get("request_type") != "contact",
+                notify=notify,
+                callback=_callback(inquiry),
             )
             if result.get("synced") and track_id:
                 result["ticket_public_url"] = _public_ticket_url(

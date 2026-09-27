@@ -89,7 +89,7 @@ NODE_MAJOR = 24
 # The two test files the CI's backend job runs. The other two need a live
 # server and a database; the integration group (and ci.yml's integration job)
 # provides both.
-CI_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py")
+CI_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py", "tests/test_handover.py")
 INTEGRATION_TEST_FILES = ("tests/test_api.py", "tests/test_regression_iter2.py")
 DOLIBARR_TEST_FILES = ("tests/test_dolibarr_runtime.py",)
 
@@ -103,6 +103,7 @@ DOLIBARR_MARIADB_IMAGE = "mariadb:11.4.13"
 DOLIBARR_MAILPIT_IMAGE = "axllent/mailpit:v1.31.1"
 DOLIBARR_WEB_PORT = 18031
 DOLIBARR_MAIL_PORT = 18131
+DOLIBARR_SMTP_PORT = 18125  # Mailpit's SMTP, for the website's own mail (#38)
 DOLIBARR_SITE_PORT = 18013
 DOLIBARR_SITE_URL = f"https://127.0.0.1:{DOLIBARR_SITE_PORT}"
 DOLIBARR_SITE_DB = "it_tabelander_dolibarr_test"
@@ -1174,7 +1175,7 @@ def dolibarr_stack(context: Context) -> str:
     for name in names.values():
         context.run(binary, "rm", "--force", "--volumes", name, check=False, timeout=120)
     context.run(binary, "network", "rm", network, check=False, timeout=60)
-    for port in (DOLIBARR_WEB_PORT, DOLIBARR_MAIL_PORT):
+    for port in (DOLIBARR_WEB_PORT, DOLIBARR_MAIL_PORT, DOLIBARR_SMTP_PORT):
         if port_open(port):
             raise StepSkipped(f"port {port} is taken by something else; stop it and run again")
     db_password = secrets.token_urlsafe(18)
@@ -1191,6 +1192,7 @@ def dolibarr_stack(context: Context) -> str:
                 DOLIBARR_MARIADB_IMAGE, timeout=900)
     context.run(binary, "run", "--detach", "--name", names["mail"], "--network", network,
                 "--network-alias", "mail", "--publish", f"127.0.0.1:{DOLIBARR_MAIL_PORT}:8025",
+                "--publish", f"127.0.0.1:{DOLIBARR_SMTP_PORT}:1025",
                 DOLIBARR_MAILPIT_IMAGE, timeout=900)
     context.run(binary, "run", "--detach", "--name", names["web"], "--network", network,
                 "--publish", f"127.0.0.1:{DOLIBARR_WEB_PORT}:80", "--tmpfs", "/var/www/documents",
@@ -1232,8 +1234,8 @@ def dolibarr_fixtures(context: Context) -> str:
     base = dolibarr_fixture(context, "base")
     customer = dolibarr_fixture(context, "customer")
     context.cache["dolibarr"] = {**base, **customer}
-    return (f"modules, mail through Mailpit, API user #{base['web_user']} with societe and ticket "
-            f"rights, existing customer #{customer['customer']}")
+    return (f"modules, mail through Mailpit, API user #{base['web_user']} with societe, ticket and "
+            f"agenda rights, existing customer #{customer['customer']}")
 
 
 def dolibarr_site(context: Context) -> str:
@@ -1270,6 +1272,7 @@ def dolibarr_scenarios(context: Context) -> str:
         "DOLIBARR_TEST_NOTIFICATION_TO": fixtures["notification_to"],
         "DOLIBARR_TEST_PUBLIC_URL": fixtures["public_url"],
         "MAILPIT_URL": f"http://127.0.0.1:{DOLIBARR_MAIL_PORT}",
+        "MAILPIT_SMTP_PORT": str(DOLIBARR_SMTP_PORT),
     })
     completed = context.run(backend_python(INTEGRATION_PYTHON), "-m", "pytest", *DOLIBARR_TEST_FILES,
                             "-q", "-rfEs", "-p", "no:cacheprovider", cwd=SNAPSHOT_BACKEND, env=env,
