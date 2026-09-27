@@ -23,6 +23,10 @@ async def ensure_indexes():
     )
     await db.repair_requests.create_index("ref", name="inquiry_ref")
     await db.repair_requests.create_index(
+        [("auto_handover", 1), ("dolibarr.synced", 1), ("queue.next_attempt_at", 1)],
+        name="inquiry_queue",
+    )
+    await db.repair_requests.create_index(
         "track_id",
         name="inquiry_track_id",
         partialFilterExpression={"track_id": {"$type": "string"}},

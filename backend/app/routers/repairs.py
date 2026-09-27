@@ -10,9 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
-from .. import dolibarr
+from .. import dolibarr, handover
 from ..db import get_db, now_utc, serialize, to_oid
-from ..models import InquiryInput, InquiryStatusQuery, InquiryStatusUpdate
+from ..models import ContactInput, InquiryInput, InquiryStatusQuery, InquiryStatusUpdate
 from ..security import require_admin
 from .media import (
     delete_repair_attachments,
@@ -36,7 +36,7 @@ STATUSES = [
 ]
 LEGACY_STATUSES = ["in_diagnose", "warten_auf_teile", "in_reparatur", "fertig"]
 VALID_STATUSES = set(STATUSES + LEGACY_STATUSES)
-REQUEST_TYPES = {"repair", "pc_build", "pc_upgrade", "controller_custom", "consulting", "other"}
+REQUEST_TYPES = {"repair", "pc_build", "pc_upgrade", "controller_custom", "consulting", "other", "contact"}
 
 
 def _inquiry_ref() -> str:
@@ -49,29 +49,6 @@ def _track_id() -> str:
     confirmation mail, so it must not be guessable (#43)."""
     alphabet = string.ascii_uppercase + string.digits
     return "IT" + "".join(secrets.choice(alphabet) for _ in range(14))
-
-
-async def _store_sync_result(db, inquiry_id, sync_result: dict, attachments: list) -> dict:
-    """Save a Dolibarr attempt; once the photos sit on the ticket, drop the
-    website's copies - they are no longer served from here (#37)."""
-    update = {"dolibarr": sync_result, "updated_at": now_utc()}
-    uploaded = set(sync_result.get("documents_uploaded") or [])
-    handed_over = [
-        item for item in attachments or []
-        if isinstance(item, dict) and str(item.get("id") or item.get("url") or "") in uploaded
-    ]
-    if sync_result.get("synced") and handed_over:
-        try:
-            await delete_repair_attachments(handed_over)
-        except Exception as exc:  # noqa: BLE001
-            # The photos are safe in Dolibarr; a leftover copy is removed on
-            # the next attempt or by the maintenance loop.
-            logger.exception("Could not remove photos handed to Dolibarr: %s", exc)
-        else:
-            update["attachments"] = []
-            update["photos_in_dolibarr"] = len(handed_over)
-    await db.repair_requests.update_one({"_id": inquiry_id}, {"$set": update})
-    return sync_result
 
 
 def _created_response(doc: dict, duplicate: bool = False) -> dict:
@@ -91,10 +68,10 @@ def _created_response(doc: dict, duplicate: bool = False) -> dict:
     }
 
 
-def _payload_hash(data: dict) -> str:
+def _payload_hash(data: dict, model=InquiryInput) -> str:
     normalized = {
         field: data[field]
-        for field in InquiryInput.model_fields
+        for field in model.model_fields
         if field != "honeypot" and field in data
     }
     encoded = json.dumps(
@@ -209,22 +186,7 @@ async def create_inquiry(payload: InquiryInput):
     )
 
     timestamp = now_utc()
-    data.update({
-        "payload_hash": payload_hash,
-        "ref": _inquiry_ref(),
-        "track_id": _track_id(),
-        "status": "eingegangen",
-        "dolibarr": {
-            "synced": False,
-            "stage": "pending",
-            "error": None,
-            "http_status": None,
-            "sync_in_progress": True,
-            "sync_started_at": timestamp,
-        },
-        "created_at": timestamp,
-        "updated_at": timestamp,
-    })
+    data.update(_new_record(payload_hash, timestamp))
     try:
         result = await db.repair_requests.insert_one(data)
     except DuplicateKeyError:
@@ -249,12 +211,83 @@ async def create_inquiry(payload: InquiryInput):
             # customer submission into a 500 response because attachment
             # metadata could not be finalized in the same moment.
             logger.exception("Could not link inquiry attachments: %s", exc)
+    return await _hand_over(db, data)
+
+
+def _new_record(payload_hash: str, timestamp) -> dict:
+    """What every new inquiry and contact message starts with."""
+    return {
+        "payload_hash": payload_hash,
+        "ref": _inquiry_ref(),
+        "track_id": _track_id(),
+        "status": "eingegangen",
+        "dolibarr": {
+            "synced": False,
+            "stage": "pending",
+            "error": None,
+            "http_status": None,
+            "sync_in_progress": True,
+            "sync_started_at": timestamp,
+        },
+        # The queue retries and warns for these; older records wait for the
+        # one-time migration (#39, #41).
+        "auto_handover": True,
+        "queue": handover.new_queue(timestamp),
+        "created_at": timestamp,
+        "updated_at": timestamp,
+    }
+
+
+async def _hand_over(db, data: dict) -> dict:
     # Dolibarr is deliberately best-effort and runs only after persistence.
-    # A failed ERP call therefore never loses the customer's inquiry.
+    # A failed ERP call therefore never loses the customer's inquiry; the
+    # queue tries again (#39).
     sync_result = await dolibarr.create_ticket_for_inquiry(data)
     data["dolibarr"] = sync_result
-    await _store_sync_result(db, result.inserted_id, sync_result, data.get("attachments") or [])
+    await handover.store_sync_result(db, data, sync_result)
     return _created_response(data)
+
+
+@router.post("/contact")
+async def create_contact_message(payload: ContactInput):
+    """The contact form: stored, then a Dolibarr ticket without a new third
+    party (#42). A known sender is linked to its customer."""
+    if payload.honeypot:
+        raise HTTPException(status_code=400, detail="Ungültige Anfrage")
+    if not payload.consent:
+        raise HTTPException(status_code=400, detail="Zustimmung zum Datenschutz erforderlich")
+    db = get_db()
+    form = payload.model_dump(mode="json", exclude_none=True)
+    form.pop("honeypot", None)
+    payload_hash = _payload_hash(form, ContactInput)
+    existing = await db.repair_requests.find_one({"request_id": payload.request_id})
+    if existing:
+        return _duplicate_or_conflict(existing, payload_hash)
+    data = {
+        "request_type": "contact",
+        "source": "website",
+        "request_id": payload.request_id,
+        "description": payload.message,
+        "contact": {
+            "name": payload.name,
+            "email": str(payload.email).lower(),
+            "phone": payload.phone or "",
+            "preferred_contact": "phone" if payload.callback_at else "email",
+        },
+        "consent": True,
+        "attachments": [],
+        **({"callback_at": form["callback_at"]} if payload.callback_at else {}),
+        **_new_record(payload_hash, now_utc()),
+    }
+    try:
+        result = await db.repair_requests.insert_one(data)
+    except DuplicateKeyError:
+        existing = await db.repair_requests.find_one({"request_id": payload.request_id})
+        if not existing:
+            raise
+        return _duplicate_or_conflict(existing, payload_hash)
+    data["_id"] = result.inserted_id
+    return await _hand_over(db, data)
 
 
 NOT_FOUND = "Keine Anfrage mit dieser Nummer und E-Mail gefunden."
@@ -396,8 +429,10 @@ async def retry_dolibarr(inquiry_id: str, _: dict = Depends(require_admin)):
 
     sync_result = await dolibarr.create_ticket_for_inquiry(
         claimed, previous=claimed.get("dolibarr") or {},
+        # An old record handed over by hand gets no confirmation mail either.
+        notify=bool(claimed.get("auto_handover")),
     )
-    await _store_sync_result(db, object_id, sync_result, claimed.get("attachments") or [])
+    await handover.store_sync_result(db, claimed, sync_result, manual=True)
     return {"ok": bool(sync_result.get("synced")), "dolibarr": serialize(sync_result)}
 
 
@@ -429,8 +464,9 @@ async def recover_stale_dolibarr_syncs(
             break
         sync_result = await dolibarr.create_ticket_for_inquiry(
             claimed, previous=claimed.get("dolibarr") or {},
+            notify=bool(claimed.get("auto_handover")),
         )
-        await _store_sync_result(db, claimed["_id"], sync_result, claimed.get("attachments") or [])
+        await handover.store_sync_result(db, claimed, sync_result)
         recovered += 1
     return recovered
 
@@ -444,7 +480,7 @@ async def delete_inquiry(inquiry_id: str, _: dict = Depends(require_admin)):
     if not inquiry:
         raise HTTPException(status_code=404, detail="Anfrage nicht gefunden")
     try:
-        await delete_repair_attachments(inquiry.get("attachments") or [])
+        await delete_repair_attachments(handover.attachments_of(inquiry))
     except Exception as exc:  # noqa: BLE001
         logger.exception("Could not delete inquiry attachments: %s", exc)
         raise HTTPException(

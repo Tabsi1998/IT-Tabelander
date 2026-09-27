@@ -1,6 +1,8 @@
 import nh3
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, EmailStr
 
+from .. import mailer
 from ..db import get_db, now_utc, serialize
 from ..models import SettingsInput
 from ..security import require_admin
@@ -17,7 +19,10 @@ PUBLIC_FIELDS = [
     "logo_light_url", "logo_dark_url",
 ]
 
-SECRET_FIELDS = ("dolibarr_api_key",)
+SECRET_FIELDS = ("dolibarr_api_key", "smtp_password")
+# Where mail goes out and with which account: super admins only, like the
+# Dolibarr key (#38).
+SMTP_PROTECTED = ("smtp_host", "smtp_port", "smtp_security", "smtp_username")
 # Rendered as HTML by the website; nh3 drops scripts, event handlers and
 # javascript: links before they reach a browser (#32).
 HTML_FIELDS = ("impressum_html", "datenschutz_html")
@@ -75,9 +80,20 @@ async def update_settings(payload: SettingsInput, admin: dict = Depends(require_
         data.pop("dolibarr_base_url", None)
         data.pop("dolibarr_api_key", None)
         data.pop("clear_dolibarr_api_key", None)
+        changes_smtp = any(
+            field in data and data[field] != existing.get(field) for field in SMTP_PROTECTED
+        ) or bool(str(data.get("smtp_password") or "").strip()) or data.get("clear_smtp_password") is True
+        if changes_smtp:
+            raise HTTPException(
+                status_code=403,
+                detail="Nur Super-Admins dürfen den Mail-Zugang ändern.",
+            )
+        for field in (*SMTP_PROTECTED, "smtp_password", "clear_smtp_password"):
+            data.pop(field, None)
     unset = {}
     clear_flags = {
         "clear_dolibarr_api_key": "dolibarr_api_key",
+        "clear_smtp_password": "smtp_password",
     }
     for flag, field in clear_flags.items():
         if data.pop(flag, False):
@@ -93,3 +109,26 @@ async def update_settings(payload: SettingsInput, admin: dict = Depends(require_
     await db.settings.update_one({"_id": "site"}, update, upsert=True)
     doc = await db.settings.find_one({"_id": "site"})
     return _admin_response(doc)
+
+
+class TestMailInput(BaseModel):
+    to: EmailStr | None = None
+
+
+@router.post("/admin/settings/test-mail")
+async def send_test_mail(payload: TestMailInput, admin: dict = Depends(require_admin)):
+    """The "Test-Mail senden" button: proves the SMTP settings (#38)."""
+    recipient = str(payload.to or admin.get("email") or "")
+    if not recipient:
+        raise HTTPException(status_code=400, detail="Bitte eine Empfänger-Adresse angeben.")
+    try:
+        await mailer.send_mail(
+            recipient,
+            "Test-Mail der Website",
+            "Diese Test-Mail kommt von der IT-Tabelander-Website.\n\n"
+            "Wenn du sie liest, funktioniert der E-Mail-Versand: Warnungen zu Anfragen, "
+            "die nicht in Dolibarr ankommen, erreichen dich.\n",
+        )
+    except (mailer.MailNotConfigured, mailer.MailError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return {"ok": True, "to": recipient, "message": f"Test-Mail an {recipient} gesendet."}

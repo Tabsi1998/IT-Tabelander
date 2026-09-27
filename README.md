@@ -148,6 +148,8 @@ Wer Systempakete bewusst selbst verwaltet, kann verwenden:
 - SEO-Titel, Beschreibung und öffentliche Website-URL
 - Google Analytics Measurement-ID
 - Dolibarr aktiv/inaktiv, Basis-URL, API-Key, Timeout und Ländercode
+- E-Mail-Versand der Website (Mailserver, Absender, wohin Warnungen gehen) mit
+  Knopf **Test-Mail senden**
 - Light-/Dark-Logos und Social-Media-Links
 - Impressum und Datenschutz
 - Admin-Login-E-Mail und Admin-Passwort
@@ -156,7 +158,22 @@ Gespeicherte API-Keys werden vom Backend niemals wieder an den Browser
 ausgegeben. Der Admin zeigt nur an, ob ein Key vorhanden ist. Ein neuer Wert
 ersetzt den bisherigen Key; vorhandene Keys können dort auch entfernt werden.
 Dolibarr-Basis-URL und -API-Key dürfen aus Sicherheitsgründen nur vom
-`super_admin` geändert werden.
+`super_admin` geändert werden, ebenso Mailserver, Benutzername und Passwort
+des E-Mail-Versands. Das Mail-Passwort ist wie die API-Keys ein reines
+Schreibfeld.
+
+### E-Mail-Versand der Website einrichten
+
+Die Website schickt selbst nur eine Art Mail: die Warnung an dich, wenn eine
+Anfrage nicht in Dolibarr ankommt. Bestätigungen an Kunden verschickt Dolibarr.
+
+1. `/admin/einstellungen` öffnen, Block **E-Mail-Versand der Website**.
+2. Mailserver, Port und Verschlüsselung deines Mail-Anbieters eintragen (meist
+   Port 587 mit STARTTLS), dazu Benutzername und Passwort des Postfachs.
+3. Absender-Adresse (z. B. `office@tabelander.co.at`) und bei **Warnungen gehen
+   an** die Adresse, die du täglich liest. Leer = die E-Mail der Super-Admins.
+4. **Speichern**, dann **Test-Mail senden**. Kommt sie an, passt alles; sonst
+   steht dort in Worten, was nicht stimmt (z. B. Passwort abgelehnt).
 
 ## Anfrageformular und Dolibarr
 
@@ -194,24 +211,64 @@ die Seite dazu kommt mit der neuen Website). Angezeigt werden nur Anfrageart und
 Schritt (eingegangen, in Arbeit, wartet auf dich, pausiert, abgeschlossen,
 abgebrochen), keine persönlichen Daten.
 
-Ein Dolibarr-Fehler verliert deshalb keine Kundenanfrage. Unter
-`/admin/anfragen` bleiben Fehlermeldung und Zwischenstand sichtbar und die
-Übertragung kann per Klick erneut gestartet werden. Die vom Browser erzeugte
+Ein Dolibarr-Fehler verliert deshalb keine Kundenanfrage. Klappt die Übergabe
+nicht (Dolibarr aus, Netz weg, Recht fehlt), versucht es die Website
+automatisch weiter: nach 5, 10, 20, 40 Minuten, dann stündlich, etwa drei Tage
+lang. Wartet eine Anfrage länger als 30 Minuten, bekommst du **eine** Warn-Mail
+mit Anfragenummer und Grund – pro Anfrage nur einmal. Unter `/admin/dolibarr`
+siehst du im Block **Warteschlange**, was wartet und warum, und kannst mit
+**Jetzt erneut versuchen** sofort nachschieben. Die vom Browser erzeugte
 Anfrage-ID verhindert Doppelanlagen bei einem Netzwerk-Retry.
+
+Sobald das Ticket in Dolibarr vollständig ist (mit Fotos und Rückruf-Termin),
+löscht die Website Beschreibung, Fotos und Kontaktdaten. Übrig bleiben nur
+Anfragenummer, Ticket-Bezug und Zeitpunkte – damit dieselbe Anfrage nicht
+zweimal übergeben wird. Kundendaten stehen danach nur noch in Dolibarr.
+
+**Kontaktformular** (`/api/contact`, die Seite dazu kommt mit der neuen
+Website): Name, E-Mail, optional Telefon und Nachricht werden ein Ticket in
+Dolibarr. Ein neuer Absender wird dabei **kein** Interessent; schreibt ein
+bekannter Kunde, hängt das Ticket an ihm (ohne ihn zu ändern). Für eine eigene
+Themengruppe „Kontakt“ in Dolibarr deren Code (z. B. `KONTAKT`) unter
+`/admin/einstellungen` bei **Kontaktnachricht** eintragen.
+
+**Rückruf-Wunsch**: Wer im Formular eine Wunschzeit angibt (Telefonnummer
+Pflicht, frühestens in 10 Minuten, höchstens 60 Tage voraus), bekommt in
+Dolibarr einen Termin „Rückruf“ (Art: Telefonat, 15 Minuten) im Kalender,
+verknüpft mit Ticket und Kunde. Du findest ihn in der Kalenderansicht; der
+Termin gehört dem Website-Benutzer, als Administrator siehst du ihn trotzdem.
+
+### Altdaten einmalig umziehen
+
+Anfragen und Kontaktnachrichten von vor dieser Version liegen noch auf der
+Website. So kommen sie nach Dolibarr:
+
+1. `/admin/dolibarr` öffnen, Block **Altdaten umziehen (einmalig)**.
+2. **Probelauf** klicken. Die Liste zeigt jede Anfrage und was mit ihr
+   passieren würde. Der Probelauf ändert nichts.
+3. Passt die Liste, **Jetzt übergeben** klicken (nur Super-Admin). Die Kunden
+   bekommen dabei **keine** Mail. Pro Klick werden bis zu 25 Einträge
+   übergeben; steht danach „noch übrig“, einfach nochmal klicken.
+4. Zum Schluss nochmal **Probelauf**: „Keine Altdaten mehr“.
+
+Schon früher übergebene Anfragen bekommen dabei ihre Fotos ans Ticket, danach
+werden auch ihre Daten auf der Website gelöscht.
 Nicht abgesendete Foto-Entwürfe laufen nach 24 Stunden ab und werden samt Datei
 automatisch bereinigt. Kunden-Uploads liegen nur unter `backend/uploads/` und
 werden ausdrücklich nicht in Git aufgenommen.
 
 ### Dolibarr einmalig vorbereiten
 
-1. In Dolibarr die Module **Geschäftspartner**, **Tickets** und **REST-API**
-   aktivieren (**Start → Einstellungen → Module/Anwendungen**).
+1. In Dolibarr die Module **Geschäftspartner**, **Tickets**, **Kalender** und
+   **REST-API** aktivieren (**Start → Einstellungen → Module/Anwendungen**).
 2. Einen eigenen Benutzer für die Website anlegen (kein Administrator) und ihm
    unter **Benutzer → Berechtigungen** genau diese Rechte geben:
    - Geschäftspartner: **einsehen** und **anlegen/bearbeiten**,
    - Geschäftspartner: **alle einsehen, nicht nur die verknüpften** – ohne
      dieses Recht findet die Website Stammkunden nicht und legt sie doppelt an,
-   - Tickets: **lesen** und **anlegen/ändern**.
+   - Tickets: **lesen** und **anlegen/ändern**,
+   - Kalender: **eigene Termine einsehen** und **eigene Termine anlegen**
+     (für Rückruf-Wünsche).
    Im Benutzer einen API-Schlüssel erzeugen.
 3. Unter **Tickets → Einstellungen** bei **Benachrichtigungs-E-Mail an** die
    Werkstatt-Adresse eintragen und bei **Benachrichtigungs-E-Mail von** die
@@ -311,6 +368,8 @@ Ein gesunder Healthcheck liefert:
 | Dolibarr meldet HTTP 403 | API-Benutzerrechte für **Geschäftspartner** und **Tickets** prüfen; die genaue fehlgeschlagene Stufe steht unter `/admin/anfragen` |
 | Stammkunde wird in Dolibarr doppelt angelegt | dem API-Benutzer das Recht **Geschäftspartner: alle einsehen, nicht nur die verknüpften** geben |
 | Kunde bekommt keine Eingangsbestätigung | Dolibarr unter **Einstellungen → E-Mails** eine Test-Mail senden lassen; die Website verschickt diese Mail nicht selbst |
+| Keine Warn-Mail, obwohl Anfragen warten | unter `/admin/einstellungen` **Test-Mail senden**; unter `/admin/dolibarr` steht bei der Warteschlange, warum die Warnung nicht rausging |
+| Rückruf-Termin fehlt, Anfrage wartet mit „Anlegen des Rückruf-Termins“ | Modul **Kalender** aktivieren und dem API-Benutzer **eigene Termine anlegen** geben, dann **Jetzt erneut versuchen** |
 | Dolibarr meldet HTTP 404 | Als Basis-URL nur die Dolibarr-Installation eintragen, z. B. `https://erp.example.at/dolibarr`, nicht `/api/index.php` anhängen |
 | Port 8001 ist belegt | fremden Dienst stoppen oder `BACKEND_PORT` in `deploy.config.local` und im Reverse Proxy gemeinsam ändern |
 | Admin-Passwort vergessen | `./start.sh --reset-admin` ausführen |
@@ -342,7 +401,7 @@ yarn start
 Prüfungen:
 
 ```bash
-cd backend && python -m pytest tests/test_unit_runtime.py tests/test_inquiry_dolibarr.py -q
+cd backend && python -m pytest tests/test_unit_runtime.py tests/test_inquiry_dolibarr.py tests/test_handover.py -q
 cd frontend && CI=true yarn build
 bash -n start.sh stop.sh update.sh
 ```

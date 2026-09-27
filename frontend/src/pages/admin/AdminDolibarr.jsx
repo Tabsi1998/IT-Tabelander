@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  RefreshCw, CheckCircle2, XCircle, Loader2, Users, TicketCheck, CircleAlert,
+  RefreshCw, CheckCircle2, XCircle, Loader2, Users, TicketCheck, CircleAlert, Clock, DatabaseZap, Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiError } from "../../lib/api";
@@ -9,8 +9,182 @@ import Skeleton from "../../components/ui/skeleton";
 import { AdminHeader, Panel } from "../../components/admin/AdminUI";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
+import { useAuth } from "../../context/AuthContext";
+
+const TYPE_LABELS = {
+  repair: "Reparatur", pc_build: "PC-Neubau", pc_upgrade: "PC-/Notebook-Upgrade",
+  controller_custom: "Controller-Umbau", consulting: "Beratung", other: "Sonstiges", contact: "Kontaktnachricht",
+};
+
+function when(value) {
+  if (!value) return "–";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "–" : date.toLocaleString("de-AT", { dateStyle: "short", timeStyle: "short" });
+}
+
+function QueuePanel() {
+  const [queue, setQueue] = useState(null);
+  const [running, setRunning] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const { data } = await api.get("/admin/dolibarr/queue");
+      setQueue(data);
+    } catch (error) {
+      setQueue({ error: formatApiError(error.response?.data?.detail || "Warteschlange konnte nicht geladen werden.") });
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const run = async () => {
+    setRunning(true);
+    try {
+      const { data } = await api.post("/admin/dolibarr/queue/run");
+      if (!data.dolibarr_enabled) toast.error("Dolibarr ist nicht aktiviert.");
+      else if (data.failed) toast.error(`${data.synced} übergeben, ${data.failed} weiterhin offen.`);
+      else toast.success(data.tried ? `${data.synced} Anfrage(n) an Dolibarr übergeben.` : "Nichts zu tun.");
+      await load();
+    } catch (error) {
+      toast.error(formatApiError(error.response?.data?.detail || "Erneuter Versuch fehlgeschlagen."));
+    } finally { setRunning(false); }
+  };
+
+  if (!queue) return <Skeleton className="mt-6 h-40" />;
+  const waiting = queue.waiting || 0;
+  return (
+    <Panel className="mt-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Clock size={18} className={waiting ? "text-amber-400" : "text-emerald-400"} />
+            <h3 className="font-semibold text-ink">Warteschlange</h3>
+          </div>
+          <p className="mt-1 text-sm text-muted">
+            {queue.error || (waiting === 0
+              ? "Alle Anfragen sind in Dolibarr angekommen."
+              : `${waiting} ${waiting === 1 ? "Anfrage wartet" : "Anfragen warten"} auf Dolibarr. Die Website versucht es automatisch alle 5 bis 60 Minuten; nach 30 Minuten bekommst du einmal eine Warn-Mail.`)}
+          </p>
+        </div>
+        <Button onClick={run} disabled={running || waiting === 0} variant="outline" data-testid="dolibarr-queue-run">
+          {running ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+          Jetzt erneut versuchen
+        </Button>
+      </div>
+      {queue.warning_mail?.last_error && (
+        <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
+          Warn-Mail konnte nicht gesendet werden: {queue.warning_mail.last_error}{" "}
+          <Link to="/admin/einstellungen" className="underline">E-Mail-Versand einrichten</Link>
+        </p>
+      )}
+      {queue.items?.length > 0 && (
+        <ul className="mt-4 divide-y divide-subtle text-sm">
+          {queue.items.map((item) => (
+            <li key={item.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-ink">{item.ref}</span>
+                  <Badge tone="brand">{TYPE_LABELS[item.request_type] || "Anfrage"}</Badge>
+                  {item.gave_up && <Badge tone="warning">Automatik angehalten</Badge>}
+                  {item.warned_at && <Badge tone="neutral">Warnung gesendet</Badge>}
+                </p>
+                <p className="mt-1 break-words text-xs text-amber-300">{item.reason}</p>
+              </div>
+              <p className="shrink-0 text-xs text-faint sm:text-right">
+                seit {when(item.created_at)} · {item.attempts} Versuch(e)
+                {!item.gave_up && <span className="block">nächster: {when(item.next_attempt_at)}</span>}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+function MigrationPanel({ isSuperAdmin }) {
+  const [plan, setPlan] = useState(null);
+  const [result, setResult] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const dryRun = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.get("/admin/dolibarr/migration");
+      setPlan(data);
+    } catch (error) {
+      toast.error(formatApiError(error.response?.data?.detail || "Probelauf fehlgeschlagen."));
+    } finally { setBusy(false); }
+  };
+
+  const apply = async () => {
+    if (!window.confirm("Alte Anfragen und Nachrichten jetzt an Dolibarr übergeben? Kunden bekommen dabei keine Mail. Danach stehen die Daten nur noch in Dolibarr.")) return;
+    setBusy(true);
+    try {
+      const { data } = await api.post("/admin/dolibarr/migration");
+      setResult(data);
+      toast[data.failed?.length ? "error" : "success"](`${data.sent + data.finished + data.contact_messages} erledigt, ${data.remaining} übrig.`);
+      const { data: next } = await api.get("/admin/dolibarr/migration");
+      setPlan(next);
+    } catch (error) {
+      toast.error(formatApiError(error.response?.data?.detail || "Übergabe fehlgeschlagen."));
+    } finally { setBusy(false); }
+  };
+
+  const total = plan ? plan.inquiries_to_send + plan.inquiries_to_finish + plan.contact_messages : 0;
+  return (
+    <Panel className="mt-6">
+      <div className="flex items-center gap-2">
+        <DatabaseZap size={18} className="text-brand" />
+        <h3 className="font-semibold text-ink">Altdaten umziehen (einmalig)</h3>
+      </div>
+      <p className="mt-2 text-sm text-muted">
+        Anfragen und Kontaktnachrichten von vor dieser Version liegen noch auf der Website. Der Umzug übergibt sie an
+        Dolibarr – ohne Mail an die Kunden – und löscht sie danach hier. Der Probelauf zeigt vorher, was passieren würde, und ändert nichts.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button variant="outline" onClick={dryRun} disabled={busy} data-testid="dolibarr-migration-dry-run">
+          {busy ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />} Probelauf
+        </Button>
+        {plan && total > 0 && isSuperAdmin && (
+          <Button onClick={apply} disabled={busy} data-testid="dolibarr-migration-run">
+            {busy ? <Loader2 className="animate-spin" size={16} /> : <TicketCheck size={16} />} Jetzt übergeben
+          </Button>
+        )}
+      </div>
+      {plan && total > 0 && !isSuperAdmin && <p className="mt-3 text-xs text-amber-300">Übergeben kann nur der Super-Admin.</p>}
+      {plan && (
+        <div className="mt-4 text-sm">
+          {total === 0 ? <p className="text-emerald-400">Keine Altdaten mehr – der Umzug ist erledigt.</p> : (
+            <>
+              <p className="text-muted">
+                {plan.inquiries_to_send} Anfrage(n) neu an Dolibarr · {plan.inquiries_to_finish} schon übergeben, Fotos und Daten noch hier · {plan.contact_messages} alte Kontaktnachricht(en)
+              </p>
+              <ul className="mt-3 max-h-72 divide-y divide-subtle overflow-y-auto">
+                {plan.items.map((item) => (
+                  <li key={`${item.ref}-${item.created_at}`} className="py-2">
+                    <span className="font-mono text-ink">{item.ref}</span>
+                    <span className="ml-2 text-xs text-faint">{TYPE_LABELS[item.request_type] || "Anfrage"} · {when(item.created_at)}{item.photos ? ` · ${item.photos} Foto(s)` : ""}</span>
+                    <span className="block text-xs text-muted">{item.what}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+      {result && (
+        <div className="mt-4 rounded-lg border border-subtle p-3 text-xs text-muted">
+          Übergeben: {result.sent} · abgeschlossen: {result.finished} · Kontaktnachrichten: {result.contact_messages} · noch übrig: {result.remaining}
+          {result.failed?.map((item) => <p key={item.ref} className="mt-1 text-amber-300">{item.ref}: {item.reason}</p>)}
+          {result.remaining > 0 && <p className="mt-1">Noch einmal „Jetzt übergeben“ klicken für den nächsten Schwung.</p>}
+        </div>
+      )}
+    </Panel>
+  );
+}
 
 export default function AdminDolibarr() {
+  const { user } = useAuth();
   const [status, setStatus] = useState(null);
   const [checking, setChecking] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -128,19 +302,20 @@ export default function AdminDolibarr() {
             <h3 className="font-semibold text-ink">So funktioniert die Übergabe</h3>
           </div>
           <ol className="mt-4 space-y-3 text-sm text-muted">
-            <li>1. Die Anfrage wird zuerst sicher lokal gespeichert.</li>
-            <li>2. Ein vorhandener Interessent wird anhand der E-Mail wiederverwendet, sonst neu angelegt.</li>
-            <li>3. Danach wird ein Ticket mit allen Angaben erstellt und mit dem Interessenten verknüpft.</li>
-            <li>4. Fehlerhafte Übertragungen können unter „Anfragen“ erneut gestartet werden.</li>
+            <li>1. Die Anfrage wird zuerst sicher auf der Website gespeichert.</li>
+            <li>2. Ein vorhandener Kunde wird anhand der E-Mail verknüpft und nie verändert; sonst entsteht ein neuer Interessent. Kontaktnachrichten legen keinen neuen Interessenten an.</li>
+            <li>3. Ein Ticket mit allen Angaben entsteht; Fotos hängen am Ticket, ein Rückruf-Wunsch steht als Termin im Kalender. Dolibarr schickt dem Kunden die Bestätigung.</li>
+            <li>4. Danach löscht die Website ihre Kopie: Kundendaten stehen nur noch in Dolibarr.</li>
+            <li>5. Klappt die Übergabe nicht, versucht es die Warteschlange unten automatisch weiter.</li>
           </ol>
         </Panel>
 
         <Panel>
           <h3 className="font-semibold text-ink">Benötigte Dolibarr-Rechte</h3>
           <p className="mt-3 text-sm leading-relaxed text-muted">
-            Der API-Benutzer benötigt Lese- und Schreibrechte für Dritte/Firmen sowie Tickets.
-            Das Ticket-Modul und die REST-API müssen in Dolibarr aktiviert sein. Produktrechte
-            sind für diesen Anfrage-Ablauf nicht erforderlich.
+            Der API-Benutzer braucht: Geschäftspartner einsehen, anlegen und <strong>alle einsehen</strong>
+            (sonst werden Stammkunden doppelt angelegt), Tickets lesen und anlegen/ändern sowie im Kalender
+            eigene Termine einsehen und anlegen. Module: Geschäftspartner, Tickets, Kalender und REST-API.
           </p>
           <p className="mt-2 text-xs leading-relaxed text-faint">
             Die Verbindungsprüfung bestätigt Erreichbarkeit und Leserechte. Schreibrechte werden
@@ -160,6 +335,9 @@ export default function AdminDolibarr() {
           )}
         </Panel>
       </div>
+
+      <QueuePanel />
+      <MigrationPanel isSuperAdmin={user?.role === "super_admin"} />
 
       {latest && (
         <Panel className="mt-6">

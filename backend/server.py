@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response  # noqa: E402
 
+from app import handover  # noqa: E402
 from app.db import close_client, get_db, now_utc  # noqa: E402
 from app.seed import run_all_seeds  # noqa: E402
 from app.routers import (auth, dashboard, dolibarr_router,  # noqa: E402
@@ -45,6 +46,7 @@ class PublicRequestGuardMiddleware:
         ),
         # Guessing reference numbers and e-mail addresses stays slow (#43).
         ("POST", "/api/inquiries/status"): (20, 60 * 60, 4 * 1024),
+        ("POST", "/api/contact"): (10, 60 * 60, 32 * 1024),
     }
 
     def __init__(self, application):
@@ -179,6 +181,10 @@ async def maintenance_loop(startup_cutoff) -> None:
                     break
             if dolibarr_total:
                 logger.info("Recovered %s interrupted Dolibarr syncs", dolibarr_total)
+            # Retry failed hand-overs, finish clean-ups, warn after 30 minutes (#39).
+            cycle = await handover.run_cycle()
+            if cycle["tried"] or cycle["cleaned"] or cycle["warned"]:
+                logger.info("Dolibarr queue: %s", cycle)
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
