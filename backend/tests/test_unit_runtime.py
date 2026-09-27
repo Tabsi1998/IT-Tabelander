@@ -573,3 +573,35 @@ def test_login_response_never_contains_the_token():
     login_body = source.split("async def login", 1)[1].split("@router", 1)[0]
     assert '"access_token"' not in login_body
     assert "update_backend_env" not in source
+
+
+def test_customer_photos_are_only_served_to_their_draft_or_the_admin(tmp_path, monkeypatch):
+    (tmp_path / "draft.webp").write_bytes(b"x")
+    (tmp_path / "linked.webp").write_bytes(b"y")
+    docs = {
+        "draft.webp": {"filename": "draft.webp", "kind": "repair_attachment",
+                       "draft_request_id": "browser-1234"},
+        "linked.webp": {"filename": "linked.webp", "kind": "repair_attachment",
+                        "linked_at": "2026-09-27"},
+    }
+
+    class Media:
+        async def find_one(self, query):
+            return docs.get(query["filename"])
+
+    class Database:
+        media = Media()
+
+    async def not_admin(_request):
+        return False
+
+    monkeypatch.setattr(media_router, "UPLOAD_DIR", str(tmp_path))
+    monkeypatch.setattr(media_router, "get_db", lambda: Database())
+    monkeypatch.setattr(media_router, "_is_admin", not_admin)
+
+    own = asyncio.run(media_router.serve_media("draft.webp", None, request_id="browser-1234"))
+    assert isinstance(own, FileResponse)
+    for name, request_id in (("draft.webp", None), ("draft.webp", "someone-else"), ("linked.webp", None)):
+        with pytest.raises(HTTPException) as denied:
+            asyncio.run(media_router.serve_media(name, None, request_id=request_id))
+        assert denied.value.status_code == 404

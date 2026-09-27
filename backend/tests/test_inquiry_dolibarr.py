@@ -26,7 +26,7 @@ CONTACT = {
 }
 
 
-def _run_sync(handler, previous=None, track_id=None):
+def _run_sync(handler, previous=None, track_id=None, contact=None, attachments=None):
     async def run():
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
             return await dolibarr._sync_ticket_with_client(
@@ -34,9 +34,10 @@ def _run_sync(handler, previous=None, track_id=None):
                 CFG,
                 subject="Reparatur: PC (ANF-12345678)",
                 message="Vollständige Anfrage",
-                contact=CONTACT,
+                contact=contact or CONTACT,
                 previous=previous,
                 track_id=track_id,
+                attachments=attachments,
             )
 
     return asyncio.run(run())
@@ -62,10 +63,14 @@ def test_dolibarr_reuses_prospect_found_by_official_email_endpoint():
     ticket = json.loads(requests[-1].content)
     assert ticket == {
         "subject": "Reparatur: PC (ANF-12345678)",
-        "message": "Vollständige Anfrage",
+        "message": ticket["message"],
         "fk_soc": "42",
+        "socid": "42",
         "origin_email": "max@example.com",
+        "notify_tiers_at_create": 1,
     }
+    assert ticket["message"].endswith("Vollständige Anfrage")
+    assert result["existing_customer"] is True
 
 
 def test_dolibarr_creates_prospect_after_404_then_creates_ticket():
@@ -324,10 +329,12 @@ def test_inquiry_ticket_message_contains_all_customer_choices():
     for expected in (
         "ANF-ABCDEFGH", "Controller-Umbau", "PS5 DualSense Edge", "Sony",
         "CFI-ZCP1", "Stick-Drift", "Hall-Effect-Sticks", "Neue Tasten",
-        "bis 200 €", "2–3 Wochen", "Bitte vorher anrufen.", "media-1",
+        "bis 200 €", "2–3 Wochen", "Bitte vorher anrufen.", "1 Foto(s)",
         "Max Muster", "browser:12345678",
     ):
         assert expected in message
+    # Photos travel as ticket documents, never as public links (#37).
+    assert "/api/media/" not in message
 
 
 def test_inquiry_model_limits_attachments_and_request_types():
@@ -430,3 +437,142 @@ def test_repeated_request_id_returns_same_local_inquiry_without_second_sync(monk
     assert len(database.repair_requests.docs) == 1
     assert sync_calls == [first["ref"]]
     assert conflict.value.status_code == 409
+
+
+# ---------------- milestone 2, part A ----------------
+def test_existing_customer_is_never_changed_by_the_form():
+    """Analysis S2: an anonymous inquiry must not rewrite master data (#36)."""
+    calls = []
+
+    def handler(request: httpx.Request):
+        calls.append((request.method, request.url.path))
+        if request.method == "GET":
+            return httpx.Response(200, json={"id": "42", "name": "Echte Stammkunde GmbH"})
+        return httpx.Response(200, json=501)
+
+    business = {**CONTACT, "contact_type": "business", "company_name": "Irgendwas Anderes",
+                "address": "Falsche Gasse 1", "vat_id": "ATU00000000"}
+    result = _run_sync(handler, contact=business)
+
+    assert result["synced"] is True
+    assert not any(method in ("PUT", "PATCH") for method, _path in calls)
+    assert not any(method == "POST" and path.endswith("/thirdparties") for method, path in calls)
+
+
+def test_photos_go_to_the_ticket_and_a_retry_uploads_only_the_missing(tmp_path, monkeypatch):
+    from app.routers import media
+    monkeypatch.setattr(media, "UPLOAD_DIR", str(tmp_path))
+    for name in ("a.webp", "b.webp"):
+        (tmp_path / name).write_bytes(b"webp-" + name.encode())
+    attachments = [{"id": "m1", "url": "/api/media/a.webp"}, {"id": "m2", "url": "/api/media/b.webp"}]
+    uploads, tickets = [], []
+    broken = {"m2": True}
+
+    def handler(request: httpx.Request):
+        if request.method == "GET":
+            return httpx.Response(404, json={"error": {"message": "not found"}})
+        body = json.loads(request.content)
+        if request.url.path.endswith("/documents/upload"):
+            photo = "m1" if "m1" in body["filename"] else "m2"
+            if broken.get(photo):
+                return httpx.Response(500, json={"error": {"message": "disk full"}})
+            assert body["modulepart"] == "ticket" and body["ref"] == "501"
+            uploads.append(photo)
+            return httpx.Response(200, json="ok")
+        if request.url.path.endswith("/thirdparties"):
+            return httpx.Response(200, json=77)
+        tickets.append(body)
+        return httpx.Response(200, json=501)
+
+    first = _run_sync(handler, attachments=attachments)
+    assert first["synced"] is False and first["stage"] == "documents"
+    assert first["ticket_id"] == "501" and first["documents_uploaded"] == ["m1"]
+
+    broken["m2"] = False
+    second = _run_sync(handler, previous=first, attachments=attachments)
+    assert second["synced"] is True
+    assert second["documents_uploaded"] == ["m1", "m2"]
+    assert uploads == ["m1", "m2"]
+    assert len(tickets) == 1  # the retry never creates a second ticket
+
+
+class _StatusCollection:
+    def __init__(self, doc):
+        self.doc = doc
+
+    async def find_one(self, query):
+        if "ref" in query:
+            return self.doc if query["ref"] == self.doc["ref"] else None
+        track = query["$or"][0]["track_id"]
+        return self.doc if track == self.doc.get("track_id") else None
+
+
+def _status_db(monkeypatch, doc, ticket=None):
+    class Database:
+        repair_requests = _StatusCollection(doc)
+
+    async def fake_status(_ticket_id):
+        return ticket
+
+    monkeypatch.setattr(repairs, "get_db", lambda: Database())
+    monkeypatch.setattr(dolibarr, "fetch_ticket_status", fake_status)
+
+
+def test_status_needs_the_matching_email_and_shows_no_personal_data(monkeypatch):
+    from app.models import InquiryStatusQuery
+    doc = {"ref": "ANF-ABCD1234", "track_id": "ITABCDEFGHIJKLMN", "request_type": "repair",
+           "contact": {"email": "kunde@example.com", "name": "Max"},
+           "dolibarr": {"synced": True, "ticket_id": "501"}}
+    _status_db(monkeypatch, doc, {"step": "in_arbeit", "origin_email": "kunde@example.com", "updated": None})
+
+    shown = asyncio.run(repairs.inquiry_status(InquiryStatusQuery(ref="anf-abcd1234", email="KUNDE@example.com")))
+    assert shown["step"] == "in_arbeit" and shown["ref"] == "ANF-ABCD1234"
+    assert "Max" not in json.dumps(shown, default=str) and "kunde@" not in json.dumps(shown, default=str)
+
+    with pytest.raises(HTTPException) as wrong:
+        asyncio.run(repairs.inquiry_status(InquiryStatusQuery(ref="ANF-ABCD1234", email="fremd@example.com")))
+    assert wrong.value.status_code == 404
+
+    by_link = asyncio.run(repairs.inquiry_status_by_track_id("ITABCDEFGHIJKLMN"))
+    assert by_link["step"] == "in_arbeit"
+    with pytest.raises(HTTPException):
+        asyncio.run(repairs.inquiry_status_by_track_id("ITWRONGWRONGWRON"))
+
+
+def test_status_of_an_inquiry_still_waiting_for_dolibarr(monkeypatch):
+    from app.models import InquiryStatusQuery
+    doc = {"ref": "ANF-WAIT0001", "request_type": "pc_build",
+           "contact": {"email": "kunde@example.com"}, "dolibarr": {"synced": False}}
+    _status_db(monkeypatch, doc)
+    shown = asyncio.run(repairs.inquiry_status(InquiryStatusQuery(ref="ANF-WAIT0001", email="kunde@example.com")))
+    assert shown["step"] == "eingegangen" and shown["request_type_label"] == "PC-Neubau"
+
+
+def test_ticket_status_reads_dolibarr_24_fields():
+    ticket = {"status": "3", "fk_statut": "3", "origin_email": " Kunde@Example.com ",
+              "date_modification": 1790518795, "date_close": ""}
+
+    def handler(request: httpx.Request):
+        assert request.url.path.endswith("/tickets/501")
+        return httpx.Response(200, json=ticket)
+
+    async def config():
+        return {**CFG, "enabled": True}
+
+    real_client = httpx.AsyncClient
+
+    def client(**kwargs):
+        return real_client(transport=httpx.MockTransport(handler), **kwargs)
+
+    import unittest.mock
+    with unittest.mock.patch.object(dolibarr, "get_config", config),             unittest.mock.patch.object(dolibarr.httpx, "AsyncClient", client):
+        shown = asyncio.run(dolibarr.fetch_ticket_status("501"))
+    assert shown == {"step": "in_arbeit", "origin_email": "kunde@example.com",
+                     "updated": "2026-09-27T14:19:55+00:00", "closed": None}
+
+
+def test_new_inquiries_get_a_random_track_id():
+    first, second = repairs._track_id(), repairs._track_id()
+    assert first != second and len(first) == 16 and first.startswith("IT")
+    assert dolibarr.inquiry_track_id({"track_id": first, "ref": "ANF-12345678"}) == first
+    assert dolibarr.inquiry_track_id({"ref": "ANF-12345678"}) == "ITANF12345678"

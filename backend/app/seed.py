@@ -21,6 +21,12 @@ async def ensure_indexes():
         name="unique_inquiry_request_id",
         partialFilterExpression={"request_id": {"$type": "string", "$gt": ""}},
     )
+    await db.repair_requests.create_index("ref", name="inquiry_ref")
+    await db.repair_requests.create_index(
+        "track_id",
+        name="inquiry_track_id",
+        partialFilterExpression={"track_id": {"$type": "string"}},
+    )
     await db.media.create_index(
         "expires_at",
         name="inquiry_attachment_expiry",

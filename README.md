@@ -174,12 +174,25 @@ Eine abgesendete Anfrage wird immer zuerst lokal in MongoDB gespeichert und
 erhält eine Referenz `ANF-XXXXXXXX`. Wenn Dolibarr aktiv ist, passiert danach
 automatisch Folgendes:
 
-1. vorhandenen Interessenten anhand der E-Mail-Adresse suchen und wiederverwenden;
+1. Geschäftspartner anhand der E-Mail-Adresse suchen. Einen vorhandenen Kunden
+   oder Interessenten ändert die Website **nie** – Name, Adresse, UID und
+   Telefon in Dolibarr bleiben, wie sie sind. Weichen die Angaben im Formular
+   ab, stehen sie nur im Ticket, mit einem Hinweis für die Werkstatt;
 2. andernfalls einen neuen Interessenten mit den freiwillig angegebenen Firmen-,
    Adress-, Telefon-, UID-, Firmenbuch-, Gerichtsstand-, EORI- und Steuerdaten
    anlegen;
 3. ein Ticket mit allen Angaben erstellen, klassifizieren und mit dem
-   Interessenten verknüpfen.
+   Geschäftspartner verknüpfen;
+4. die Fotos als Dokumente an das Ticket hängen. Danach löscht die Website ihre
+   eigene Kopie; Kundenfotos sind nie öffentlich abrufbar;
+5. Dolibarr schickt dem Kunden die Eingangsbestätigung und der Werkstatt eine
+   Benachrichtigung – beides aus Dolibarr, nicht von der Website.
+
+Kunden sehen den Stand ihrer Anfrage über die Anfragenummer und ihre E-Mail
+oder über den Link in der Bestätigung (Schnittstelle `/api/inquiries/status`,
+die Seite dazu kommt mit der neuen Website). Angezeigt werden nur Anfrageart und
+Schritt (eingegangen, in Arbeit, wartet auf dich, pausiert, abgeschlossen,
+abgebrochen), keine persönlichen Daten.
 
 Ein Dolibarr-Fehler verliert deshalb keine Kundenanfrage. Unter
 `/admin/anfragen` bleiben Fehlermeldung und Zwischenstand sichtbar und die
@@ -191,12 +204,29 @@ werden ausdrücklich nicht in Git aufgenommen.
 
 ### Dolibarr einmalig vorbereiten
 
-1. In Dolibarr die REST-API und das Ticket-Modul aktivieren.
-2. Dem API-Benutzer Lese- und Schreibrechte für **Dritte/Firmen** sowie
-   **Tickets** geben. Produktrechte werden für den Anfrageablauf nicht benötigt.
-3. Unter `/admin/einstellungen` Dolibarr aktivieren, die Basis-URL der
+1. In Dolibarr die Module **Geschäftspartner**, **Tickets** und **REST-API**
+   aktivieren (**Start → Einstellungen → Module/Anwendungen**).
+2. Einen eigenen Benutzer für die Website anlegen (kein Administrator) und ihm
+   unter **Benutzer → Berechtigungen** genau diese Rechte geben:
+   - Geschäftspartner: **einsehen** und **anlegen/bearbeiten**,
+   - Geschäftspartner: **alle einsehen, nicht nur die verknüpften** – ohne
+     dieses Recht findet die Website Stammkunden nicht und legt sie doppelt an,
+   - Tickets: **lesen** und **anlegen/ändern**.
+   Im Benutzer einen API-Schlüssel erzeugen.
+3. Unter **Tickets → Einstellungen** bei **Benachrichtigungs-E-Mail an** die
+   Werkstatt-Adresse eintragen und bei **Benachrichtigungs-E-Mail von** die
+   Absender-Adresse. Der E-Mail-Versand von Dolibarr selbst muss eingerichtet
+   sein (**Einstellungen → E-Mails**).
+4. Unter `/admin/einstellungen` Dolibarr aktivieren, die Basis-URL der
    Installation (ohne `/api/index.php`) und den API-Key eintragen.
-4. Unter `/admin/dolibarr` auf **Verbindung prüfen** klicken.
+5. Unter `/admin/dolibarr` auf **Verbindung prüfen** klicken.
+
+Erst wenn die neue Website mit Statusseite online ist (Meilenstein 3): unter
+**Tickets → Einstellungen** die **öffentliche Oberfläche** einschalten und als
+**URL der öffentlichen Oberfläche** `https://it.tabelander.co.at/status/`
+eintragen. Dolibarr schreibt den Status-Link nur mit eingeschalteter
+Oberfläche in die Bestätigung; der Link führt dann auf die Website, nicht zu
+Dolibarr.
 
 Die Anfrageart wird ohne weitere Einrichtung passend gesetzt: Reparaturen als
 `ISSUE`, Neubau/Beratung als `COM`, Umbau/Upgrade als `REQUEST` und Sonstiges als
@@ -213,7 +243,8 @@ einschalten. Die Website erzeugt ausschließlich den öffentlichen Link mit
 Tracking-ID und Kunden-E-Mail; interne Karten-URLs oder Admin-Token werden nie
 an Kunden ausgegeben. Wenn Dolibarr das öffentliche Interface nicht aktiviert
 hat oder der Sync fehlschlägt, bleibt die Danke-Seite bewusst bei der lokalen
-`ANF-…`-Referenz.
+`ANF-…`-Referenz. Dieser Schalter führt noch zu Dolibarr selbst und entfällt
+mit der Statusseite der neuen Website (Meilenstein 3).
 
 Die genaue Bezeichnung der Rechte kann je nach Dolibarr-Version/Sprache leicht
 abweichen. Entscheidend ist, dass der API-Benutzer Dritte suchen und anlegen
@@ -277,7 +308,9 @@ Ein gesunder Healthcheck liefert:
 | Problem | Lösung |
 |---|---|
 | MongoDB startet nicht | `systemctl status mongod` und `/var/log/mongodb/mongod.log` prüfen |
-| Dolibarr meldet HTTP 403 | API-Benutzerrechte für **Dritte/Firmen** und **Tickets** prüfen; die genaue fehlgeschlagene Stufe steht unter `/admin/anfragen` |
+| Dolibarr meldet HTTP 403 | API-Benutzerrechte für **Geschäftspartner** und **Tickets** prüfen; die genaue fehlgeschlagene Stufe steht unter `/admin/anfragen` |
+| Stammkunde wird in Dolibarr doppelt angelegt | dem API-Benutzer das Recht **Geschäftspartner: alle einsehen, nicht nur die verknüpften** geben |
+| Kunde bekommt keine Eingangsbestätigung | Dolibarr unter **Einstellungen → E-Mails** eine Test-Mail senden lassen; die Website verschickt diese Mail nicht selbst |
 | Dolibarr meldet HTTP 404 | Als Basis-URL nur die Dolibarr-Installation eintragen, z. B. `https://erp.example.at/dolibarr`, nicht `/api/index.php` anhängen |
 | Port 8001 ist belegt | fremden Dienst stoppen oder `BACKEND_PORT` in `deploy.config.local` und im Reverse Proxy gemeinsam ändern |
 | Admin-Passwort vergessen | `./start.sh --reset-admin` ausführen |
@@ -313,6 +346,9 @@ cd backend && python -m pytest tests/test_unit_runtime.py tests/test_inquiry_dol
 cd frontend && CI=true yarn build
 bash -n start.sh stop.sh update.sh
 ```
+
+Der Ablauf gegen einen echten Dolibarr 24.0.1 (mit MariaDB und Mailpit, alles
+in Docker) läuft mit `python scripts/local_check.py --only dolibarr`.
 
 Die mutierenden API-Integrationstests sind absichtlich gesperrt. Sie laufen nur
 mit `IT_TABELANDER_RUN_INTEGRATION=1`, einer lokalen URL und einer `DB_NAME`, die

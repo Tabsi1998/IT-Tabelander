@@ -6,7 +6,7 @@ import uuid
 from datetime import timedelta
 
 from bson import ObjectId
-from fastapi import (APIRouter, Depends, File, Form, HTTPException, UploadFile)
+from fastapi import (APIRouter, Depends, File, Form, HTTPException, Request, UploadFile)
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps
@@ -14,7 +14,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from ..db import get_db, now_utc, serialize, to_oid
-from ..security import require_admin
+from ..security import get_current_user, require_admin
 
 router = APIRouter(prefix="/api", tags=["media"])
 logger = logging.getLogger("it-tabelander.media")
@@ -424,8 +424,16 @@ async def delete_repair_attachment(media_id: str, request_id: str):
     return {"ok": True}
 
 
+async def _is_admin(request: Request) -> bool:
+    try:
+        await require_admin(await get_current_user(request))
+    except HTTPException:
+        return False
+    return True
+
+
 @router.get("/media/{filename}")
-async def serve_media(filename: str):
+async def serve_media(filename: str, request: Request, request_id: str | None = None):
     # prevent path traversal
     safe = os.path.basename(filename)
     if safe != filename:
@@ -434,6 +442,15 @@ async def serve_media(filename: str):
     doc = await db.media.find_one({"filename": safe})
     if not doc or doc.get("attachment_deleting"):
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+    if doc.get("kind") == "repair_attachment":
+        # Customer photos are not public (#37): a draft only for the form that
+        # uploaded it, a submitted photo only for the admin until it moves to
+        # the Dolibarr ticket.
+        own_draft = (not doc.get("linked_at")
+                     and request_id is not None
+                     and request_id == doc.get("draft_request_id"))
+        if not own_draft and not await _is_admin(request):
+            raise HTTPException(status_code=404, detail="Datei nicht gefunden")
     expires_at = doc.get("expires_at")
     if (
         doc.get("kind") == "repair_attachment"

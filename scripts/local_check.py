@@ -16,6 +16,10 @@ Groups:
     integration  the API and regression suites: a MongoDB of its own, the live
                  FastAPI server over HTTPS as in production, and both suites
                  against it (ci.yml's integration job repeats them as a control)
+    dolibarr     the website against a real Dolibarr 24.0.1 with MariaDB and
+                 Mailpit: inquiries, photos on the ticket, confirmation mails,
+                 status, existing customers left unchanged. GitHub has no
+                 Dolibarr, so this group runs here only
     frontend     a frozen Yarn install and the production build with CI=true
     extra        what GitHub does not run: OSV over the lockfiles, ShellCheck,
                  and proof that every test file is run by some gate
@@ -64,8 +68,8 @@ LOGS = STATE / "logs"
 BASELINE = ROOT / "scripts" / "ci-baseline.json"
 WINDOWS = platform.system() == "Windows"
 
-GROUPS = ("repository", "backend", "integration", "frontend", "extra", "deploy")
-DEFAULT_GROUPS = ("repository", "backend", "integration", "frontend")
+GROUPS = ("repository", "backend", "integration", "dolibarr", "frontend", "extra", "deploy")
+DEFAULT_GROUPS = ("repository", "backend", "integration", "dolibarr", "frontend")
 
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
@@ -87,6 +91,23 @@ NODE_MAJOR = 24
 # provides both.
 CI_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py")
 INTEGRATION_TEST_FILES = ("tests/test_api.py", "tests/test_regression_iter2.py")
+DOLIBARR_TEST_FILES = ("tests/test_dolibarr_runtime.py",)
+
+# The disposable Dolibarr of the "dolibarr" group: the release the owner runs,
+# built from Dolibarr's own docker repository at a pinned commit (as in
+# dolibarr-mahnwesen), with MariaDB and Mailpit. Ports stay unique per repository.
+DOLIBARR_IMAGE = "local-ci/dolibarr:24.0.1"
+DOLIBARR_BUILD = ("https://github.com/Dolibarr/dolibarr-docker.git"
+                  "#ec6b10487e52244b64142b6d8806eb26409ac406:images/24.0.1-php8.2")
+DOLIBARR_MARIADB_IMAGE = "mariadb:11.4.13"
+DOLIBARR_MAILPIT_IMAGE = "axllent/mailpit:v1.31.1"
+DOLIBARR_WEB_PORT = 18031
+DOLIBARR_MAIL_PORT = 18131
+DOLIBARR_SITE_PORT = 18013
+DOLIBARR_SITE_URL = f"https://127.0.0.1:{DOLIBARR_SITE_PORT}"
+DOLIBARR_SITE_DB = "it_tabelander_dolibarr_test"
+DOLIBARR_PREFIX = "it-tabelander-dolibarr"
+DOLIBARR_FIXTURES = "/opt/it-tabelander-fixtures"
 
 # Ports of their own, so this repository can be checked while another one is.
 API_PORT = 18011
@@ -1133,6 +1154,156 @@ def frontend_steps() -> list:
     ]
 
 
+# ------------------------------------------------------------------ dolibarr
+
+def dolibarr_stack(context: Context) -> str:
+    """Dolibarr 24.0.1 with MariaDB and Mailpit, installed on first start.
+
+    Databases and documents live in tmpfs, so every run starts from an empty
+    Dolibarr. Passwords are new for every run and never written to a log.
+    """
+    import secrets
+    binary = docker(context)
+    if context.run(binary, "image", "inspect", DOLIBARR_IMAGE, check=False, timeout=60).returncode != 0:
+        built = context.run(binary, "build", "--tag", DOLIBARR_IMAGE, DOLIBARR_BUILD, check=False, timeout=2400)
+        context.log("dolibarr-image", built.stdout + built.stderr)
+        if built.returncode != 0:
+            raise StepFailed(f"building {DOLIBARR_IMAGE} failed:\n" + tail(built))
+    network = f"{DOLIBARR_PREFIX}-net"
+    names = {part: f"{DOLIBARR_PREFIX}-{part}" for part in ("db", "mail", "web")}
+    for name in names.values():
+        context.run(binary, "rm", "--force", "--volumes", name, check=False, timeout=120)
+    context.run(binary, "network", "rm", network, check=False, timeout=60)
+    for port in (DOLIBARR_WEB_PORT, DOLIBARR_MAIL_PORT):
+        if port_open(port):
+            raise StepSkipped(f"port {port} is taken by something else; stop it and run again")
+    db_password = secrets.token_urlsafe(18)
+    context.run(binary, "network", "create", network, timeout=60)
+    context.cache.setdefault("docker-networks", []).append(network)
+    context.containers.extend([names["db"], names["mail"], names["web"]])
+    context.run(binary, "run", "--detach", "--name", names["db"], "--network", network,
+                "--network-alias", "db", "--tmpfs", "/var/lib/mysql",
+                "--env", f"MARIADB_ROOT_PASSWORD={db_password}", "--env", "MARIADB_DATABASE=dolibarr",
+                "--env", "MARIADB_USER=dolibarr", "--env", f"MARIADB_PASSWORD={db_password}",
+                # One time zone for database and PHP, as on a real server; with the
+                # database in UTC, Dolibarr's own timestamps come out two hours off.
+                "--env", "TZ=Europe/Vienna",
+                DOLIBARR_MARIADB_IMAGE, timeout=900)
+    context.run(binary, "run", "--detach", "--name", names["mail"], "--network", network,
+                "--network-alias", "mail", "--publish", f"127.0.0.1:{DOLIBARR_MAIL_PORT}:8025",
+                DOLIBARR_MAILPIT_IMAGE, timeout=900)
+    context.run(binary, "run", "--detach", "--name", names["web"], "--network", network,
+                "--publish", f"127.0.0.1:{DOLIBARR_WEB_PORT}:80", "--tmpfs", "/var/www/documents",
+                "--mount", f"type=bind,source={SNAPSHOT_BACKEND / 'tests' / 'dolibarr_fixtures'},"
+                           f"target={DOLIBARR_FIXTURES},readonly",
+                "--env", "DOLI_DB_HOST=db", "--env", "DOLI_DB_NAME=dolibarr", "--env", "DOLI_DB_USER=dolibarr",
+                "--env", f"DOLI_DB_PASSWORD={db_password}", "--env", "DOLI_ADMIN_LOGIN=admin",
+                "--env", f"DOLI_ADMIN_PASSWORD={secrets.token_urlsafe(18)}", "--env", "DOLI_INSTALL_AUTO=1",
+                "--env", f"DOLI_URL_ROOT=http://127.0.0.1:{DOLIBARR_WEB_PORT}",
+                "--env", "DOLI_COMPANY_COUNTRYCODE=AT", "--env", "DOLI_COMPANY_NAME=IT-Tabelander Test",
+                "--env", "DOLI_PROD=0", "--env", "PHP_INI_DATE_TIMEZONE=Europe/Vienna",
+                DOLIBARR_IMAGE, timeout=900)
+    deadline = time.time() + 420
+    last = ""
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{DOLIBARR_WEB_PORT}/index.php", timeout=5) as answer:
+                if answer.status == 200:
+                    return f"{DOLIBARR_IMAGE} on port {DOLIBARR_WEB_PORT}, Mailpit on {DOLIBARR_MAIL_PORT}"
+        except urllib.error.HTTPError as error:
+            last = f"HTTP {error.code}"
+        except OSError as error:
+            last = str(error)
+        time.sleep(3)
+    raise StepFailed(f"Dolibarr did not answer within 420 s ({last})")
+
+
+def dolibarr_fixture(context: Context, stage: str) -> dict:
+    completed = context.run(docker(context), "exec", "-u", "www-data", f"{DOLIBARR_PREFIX}-web", "php",
+                            f"{DOLIBARR_FIXTURES}/fixtures.php", stage, check=False, timeout=600)
+    text = completed.stdout + completed.stderr
+    context.log(f"dolibarr-fixtures-{stage}", text if completed.returncode else completed.stderr)
+    if completed.returncode != 0 or "{" not in completed.stdout:
+        raise StepFailed(f"fixtures.php {stage} failed:\n{text[-1500:]}")
+    return json.loads(completed.stdout[completed.stdout.index("{"):])
+
+
+def dolibarr_fixtures(context: Context) -> str:
+    base = dolibarr_fixture(context, "base")
+    customer = dolibarr_fixture(context, "customer")
+    context.cache["dolibarr"] = {**base, **customer}
+    return (f"modules, mail through Mailpit, API user #{base['web_user']} with societe and ticket "
+            f"rights, existing customer #{customer['customer']}")
+
+
+def dolibarr_site(context: Context) -> str:
+    """A website server of its own, with its own database, for the scenarios."""
+    if port_open(DOLIBARR_SITE_PORT):
+        raise StepSkipped(f"port {DOLIBARR_SITE_PORT} is taken; stop what uses it and run again")
+    env = integration_env(context.cache["integration-url"])
+    env.update({"DB_NAME": DOLIBARR_SITE_DB, "CANONICAL_BASE_URL": DOLIBARR_SITE_URL,
+                "CORS_ORIGINS": DOLIBARR_SITE_URL})
+    start_process(context, "dolibarr-site",
+                  [backend_python(INTEGRATION_PYTHON), "-m", "uvicorn", "server:app",
+                   "--host", "127.0.0.1", "--port", str(DOLIBARR_SITE_PORT),
+                   "--ssl-keyfile", TLS / "key.pem", "--ssl-certfile", TLS / "cert.pem"],
+                  cwd=SNAPSHOT_BACKEND, env=env,
+                  url=f"{DOLIBARR_SITE_URL}/api/health", seconds=120,
+                  tls=ssl.create_default_context(cafile=str(TLS / "cert.pem")))
+    return f"uvicorn on {DOLIBARR_SITE_URL} with database {DOLIBARR_SITE_DB}"
+
+
+def dolibarr_scenarios(context: Context) -> str:
+    fixtures = context.cache["dolibarr"]
+    env = integration_env(context.cache["integration-url"])
+    env.update({
+        "DB_NAME": DOLIBARR_SITE_DB,
+        "IT_TABELANDER_RUN_INTEGRATION": "1",
+        "IT_TABELANDER_RUN_DOLIBARR": "1",
+        "REACT_APP_BACKEND_URL": DOLIBARR_SITE_URL,
+        "REQUESTS_CA_BUNDLE": str(TLS / "cert.pem"),
+        "DOLIBARR_TEST_URL": f"http://127.0.0.1:{DOLIBARR_WEB_PORT}",
+        "DOLIBARR_TEST_WEB_KEY": fixtures["web_key"],
+        "DOLIBARR_TEST_ADMIN_KEY": fixtures["admin_key"],
+        "DOLIBARR_TEST_CUSTOMER_ID": str(fixtures["customer"]),
+        "DOLIBARR_TEST_CUSTOMER_EMAIL": fixtures["email"],
+        "DOLIBARR_TEST_NOTIFICATION_TO": fixtures["notification_to"],
+        "DOLIBARR_TEST_PUBLIC_URL": fixtures["public_url"],
+        "MAILPIT_URL": f"http://127.0.0.1:{DOLIBARR_MAIL_PORT}",
+    })
+    completed = context.run(backend_python(INTEGRATION_PYTHON), "-m", "pytest", *DOLIBARR_TEST_FILES,
+                            "-q", "-rfEs", "-p", "no:cacheprovider", cwd=SNAPSHOT_BACKEND, env=env,
+                            check=False, timeout=1800)
+    text = completed.stdout + completed.stderr
+    path = context.log("dolibarr-scenarios", text)
+    counts = pytest_counts(text)
+    if completed.returncode != 0:
+        failed = [line for line in text.splitlines() if line.startswith(("FAILED", "ERROR"))]
+        site_log = context.log_dir / "dolibarr-site.log"
+        server_tail = ""
+        if site_log.is_file():
+            server_tail = "\n".join(site_log.read_text(encoding="utf-8", errors="replace").splitlines()[-15:])
+        raise StepFailed(f"the Dolibarr scenarios failed ({describe_counts(counts)}). Full output: {path}\n"
+                         + "\n".join(failed[:15] or [tail(completed, 30)])
+                         + (f"\nWebsite server:\n{server_tail}" if server_tail else ""))
+    if not counts.get("passed") or counts.get("skipped"):
+        raise StepFailed(f"the Dolibarr scenarios did not all run ({describe_counts(counts)}). Full output: {path}")
+    return describe_counts(counts)
+
+
+def dolibarr_steps() -> list:
+    venv = f"backend/venv-{INTEGRATION_PYTHON}"
+    return [
+        Step("dolibarr", "stack", "Dolibarr 24.0.1 with MariaDB and Mailpit", dolibarr_stack),
+        Step("dolibarr", "fixtures", "Modules, mail and a website API user in Dolibarr", dolibarr_fixtures,
+             ("stack", "backend/snapshot")),
+        Step("dolibarr", "site", "A website server of its own for the scenarios", dolibarr_site,
+             ("integration/database", "integration/certificate", venv, "backend/snapshot")),
+        Step("dolibarr", "scenarios", "Inquiries, photos, mails and status against Dolibarr",
+             dolibarr_scenarios, ("fixtures", "site")),
+    ]
+
+
 # --------------------------------------------------------------------- extra
 
 def test_inventory(context: Context) -> str:
@@ -1144,7 +1315,7 @@ def test_inventory(context: Context) -> str:
     """
     present = {name for name in tracked(context, "backend/tests")
                if Path(name).name.startswith("test_") and name.endswith(".py")}
-    covered = {f"backend/{name}" for name in CI_TEST_FILES + INTEGRATION_TEST_FILES}
+    covered = {f"backend/{name}" for name in CI_TEST_FILES + INTEGRATION_TEST_FILES + DOLIBARR_TEST_FILES}
     missing = sorted(present - covered)
     if missing:
         raise StepFailed("these test files are run by no gate:\n  " + "\n  ".join(missing))
@@ -1152,7 +1323,8 @@ def test_inventory(context: Context) -> str:
     if gone:
         raise StepFailed("the gates name test files that no longer exist:\n  " + "\n  ".join(gone))
     return (f"all {len(present)} test files run: {len(CI_TEST_FILES)} in the CI, "
-            f"{len(INTEGRATION_TEST_FILES)} in the integration job")
+            f"{len(INTEGRATION_TEST_FILES)} in the integration job, "
+            f"{len(DOLIBARR_TEST_FILES)} against Dolibarr here")
 
 
 def extra_steps() -> list:
@@ -1309,9 +1481,15 @@ def deploy_steps() -> list:
 
 def plan(groups: set) -> list:
     builders = {"repository": repository_steps, "backend": backend_steps,
-                "integration": integration_steps, "frontend": frontend_steps, "extra": extra_steps,
-                "deploy": deploy_steps}
+                "integration": integration_steps, "dolibarr": dolibarr_steps, "frontend": frontend_steps,
+                "extra": extra_steps, "deploy": deploy_steps}
     steps: list = []
+    if "dolibarr" in groups and "integration" not in groups:
+        # The scenarios reuse the integration MongoDB and certificate.
+        steps += [step for step in integration_steps() if step.name in ("database", "certificate")]
+        if "backend" not in groups:
+            steps += [step for step in backend_steps()
+                      if step.name in ("snapshot", f"venv-{INTEGRATION_PYTHON}")]
     if "integration" in groups and "backend" not in groups:
         # The server runs from the snapshot in the newest environment.
         steps += [step for step in backend_steps()
@@ -1328,6 +1506,10 @@ def build_context(record: bool = False) -> Context:
 
 def tear_down(context: Context) -> None:
     stop_everything(context)
+    binary = shutil.which("docker", path=context.env.get("PATH"))
+    for network in context.cache.pop("docker-networks", []):
+        if binary:
+            subprocess.run([binary, "network", "rm", network], capture_output=True, text=True, timeout=120)
 
 
 if __name__ == "__main__":

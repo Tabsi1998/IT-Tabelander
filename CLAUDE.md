@@ -24,6 +24,7 @@ ignored by Git.
 | repository | ci.yml `deployment-scripts` | every `*.sh` parses, no CRLF in the index, `git diff --check` over every tracked line (the CI's check sees no diff on a fresh checkout), Gitleaks over the history and over uncommitted files |
 | backend | ci.yml `backend` matrix | for Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, `tests/test_unit_runtime.py` and `tests/test_inquiry_dolibarr.py` |
 | integration | ci.yml `integration` (control only) | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
+| dolibarr | - (local only) | Dolibarr 24.0.1 + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link |
 | frontend | ci.yml `frontend` | Node 24, `yarn install --frozen-lockfile`, `yarn build` with `CI=true` (Create React App turns warnings into errors) |
 | extra | - | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
 | deploy | - | `start.sh`, `stop.sh`, `update.sh` on a throwaway Ubuntu 24.04 server with systemd (`scripts/deploy-test/`): autostart, crash restart, reboot (`docker restart`), a broken update rolled back, a good update, `stop.sh --disable`, `USE_SYSTEMD=0`. With `--all` only when a deployment file changed against origin/main (about 15 minutes); `--only deploy` forces it. It tests the committed HEAD |
@@ -83,11 +84,22 @@ cannot run on this machine. Register it with
 `Step(group, name, describe, action, needs)`; `needs` names steps of the same
 group, or `group/name` across groups. A gate that counts findings goes through
 `ratchet(context, key, found, what)`. A new test file must be added to
-`CI_TEST_FILES` or `INTEGRATION_TEST_FILES`, or the test inventory fails.
+`CI_TEST_FILES`, `INTEGRATION_TEST_FILES` or `DOLIBARR_TEST_FILES`, or the test
+inventory fails.
+
+Dolibarr facts the scenarios proved (24.0.1): the API user needs
+`societe client voir`, or it sees only third parties it is sales
+representative of; a ticket's state is written from `status` (`fk_statut` is
+read only); points in time come as Unix seconds; the customer's confirmation
+carries the status link only with `TICKET_ENABLE_PUBLIC_INTERFACE`, and the
+ticket number only in the workshop mail's subject.
 
 Keep the ports unique, so repositories can be checked side by side: API 18011,
 MongoDB 27018 (container `it-tabelander-local-check-mongo`). The deploy group
-publishes no port; its container is `it-tabelander-local-check-deploy`.
+publishes no port; its container is `it-tabelander-local-check-deploy`. The
+dolibarr group: Dolibarr 18031, Mailpit 18131, its website server 18013
+(containers `it-tabelander-dolibarr-db/-mail/-web`, network
+`it-tabelander-dolibarr-net`).
 
 ## Windows notes
 
