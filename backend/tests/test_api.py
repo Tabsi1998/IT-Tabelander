@@ -271,13 +271,24 @@ class TestRepairs:
 
 # ---------------- Legacy contact inbox ----------------
 class TestContact:
-    def test_public_contact_submission_is_replaced_by_central_inquiry(self, api_client):
-        r = api_client.post(
+    def test_contact_message_is_kept_until_dolibarr_takes_it(self, api_client, admin_client):
+        """#42: without Dolibarr (as here) the message is stored and queued."""
+        incomplete = api_client.post(
             f"{BASE_URL}/api/contact",
             json={"name": "TEST_Anna", "email": "test_anna@example.com", "message": "Test"},
             timeout=30,
         )
-        assert r.status_code == 404
+        assert incomplete.status_code == 422
+        r = api_client.post(f"{BASE_URL}/api/contact", json={
+            "request_id": f"integration-contact-{uuid.uuid4().hex}", "name": "TEST_Anna",
+            "email": "test_anna@example.com", "message": "Habt ihr am Samstag offen?", "consent": True,
+        }, timeout=30)
+        assert r.status_code == 200, r.text
+        assert r.json()["ref"].startswith("ANF-") and r.json()["dolibarr_synced"] is False
+        stored = admin_client.get(f"{BASE_URL}/api/admin/inquiries/{r.json()['id']}", timeout=30).json()
+        assert stored["request_type"] == "contact" and stored["auto_handover"] is True
+        assert stored["queue"]["next_attempt_at"], stored
+        assert admin_client.get(f"{BASE_URL}/api/admin/dolibarr/queue", timeout=30).json()["waiting"] >= 1
 
     def test_legacy_admin_inbox_is_removed(self, admin_client):
         assert admin_client.get(f"{BASE_URL}/api/admin/contact", timeout=30).status_code == 404
