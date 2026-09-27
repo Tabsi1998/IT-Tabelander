@@ -1,8 +1,9 @@
 """The website's own e-mail (#38).
 
 Customers get their confirmations from Dolibarr. The website sends only what
-Dolibarr cannot: warnings to the operator (#39) and, with the portal, sign-in
-links. The SMTP password is written by a super admin and never read back.
+Dolibarr cannot: warnings to the operator (#39), the one review request after
+a closed ticket (#71) and, with the portal, sign-in links. The SMTP password is
+written by a super admin and never read back.
 """
 import asyncio
 import logging

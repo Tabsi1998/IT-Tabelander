@@ -20,7 +20,17 @@ export function adminState(overrides = {}) {
     ],
     gallery: [{ id: "g1", image_url: "/assets/img/services/service-overview-640.webp", thumb_url: "/assets/img/services/service-overview-640.webp",
       caption: "Gaming-PC", category: "pc_build", category_label: "PC-Bau", visible: true }],
-    reviews: [{ id: "r1", author: "Eva", rating: 5, text: "Top Arbeit", source: "Google", source_url: "", review_date: "2026-09-01", visible: true }],
+    reviews: [
+      { id: "r2", author: "Max M.", rating: 4, text: "Schnell repariert, fair erklärt.", source: "Website", source_url: "",
+        review_date: "2026-09-27", visible: false, pending: true, inquiry_ref: "ANF-BEWERT01" },
+      { id: "r1", author: "Eva", rating: 5, text: "Top Arbeit", source: "Google", source_url: "", review_date: "2026-09-01", visible: true },
+    ],
+    invites: { waiting: 2, sent: 5, answered: 3, last_error: null },
+    labels: {
+      "ANF-NEU00001": { ref: "ANF-NEU00001", ticket_ref: "TS2609-0001", request_type_label: "Reparatur",
+        title: "Reparatur: Notebook Lenovo ThinkPad T14", created_at: "2026-09-27T09:00:00+00:00",
+        status_url: "https://it.tabelander.co.at/status/view.php?track_id=IT7K3M9Q2XABCD12" },
+    },
     queue: { waiting: 1, gave_up: 0, items: [{ id: "q1", ref: "ANF-WARTE001", request_type: "repair", created_at: "2026-09-27T10:00:00+00:00",
       reason: "Dolibarr ist beim Anlegen des Tickets nicht erreichbar (ConnectError).", attempts: 2, next_attempt_at: "2026-09-27T10:20:00+00:00",
       warned_at: null, gave_up: false }], warning_mail: {} },
@@ -65,9 +75,14 @@ export async function mockAdmin(page, state = adminState()) {
     if (path === "/admin/dashboard") {
       if (state.brokenDashboard) return json(route, { inquiries: null });
       return json(route, {
-        inquiries: { waiting: state.queue.waiting, recent: [{ id: "i1", ref: "ANF-NEU00001", request_type_label: "Reparatur",
-          created_at: "2026-09-27T09:00:00+00:00", in_dolibarr: true, ticket_ref: "TS2609-0001" }] },
-        reviews: { visible: state.reviews.filter((item) => item.visible).length, hidden: 0 },
+        inquiries: { waiting: state.queue.waiting, recent: [
+          { id: "i1", ref: "ANF-NEU00001", request_type: "repair", request_type_label: "Reparatur",
+            created_at: "2026-09-27T09:00:00+00:00", in_dolibarr: true, ticket_ref: "TS2609-0001" },
+          { id: "i2", ref: "ANF-KONTAKT1", request_type: "contact", request_type_label: "Kontaktnachricht",
+            created_at: "2026-09-27T08:00:00+00:00", in_dolibarr: true, ticket_ref: "TS2609-0002" },
+        ] },
+        reviews: { visible: state.reviews.filter((item) => item.visible).length, hidden: 0,
+          pending: state.reviews.filter((item) => item.pending).length },
         gallery: { visible: state.gallery.length, total: state.gallery.length }, services: { active: state.services.length },
         dolibarr_enabled: true, mail_configured: true,
       });
@@ -121,7 +136,21 @@ export async function mockAdmin(page, state = adminState()) {
       return json(route, created);
     }
     const review = path.match(/^\/admin\/reviews\/(\w+)$/);
-    if (review && method === "PUT") return json(route, { ...state.reviews.find((item) => item.id === review[1]), ...body });
+    if (review && method === "PUT") {
+      state.reviews = state.reviews.map((item) => (item.id === review[1]
+        ? { ...item, ...body, ...(body.visible ? { pending: false } : {}) } : item));
+      return json(route, state.reviews.find((item) => item.id === review[1]));
+    }
+    if (path === "/admin/review-invites") return json(route, state.invites);
+    if (path === "/admin/review-invites/run") {
+      state.invites = { ...state.invites, waiting: state.invites.waiting - 1, sent: state.invites.sent + 1 };
+      return json(route, { checked: 2, sent: 1, stopped: 0, failed: 0, problem: null });
+    }
+    const label = path.match(/^\/admin\/labels\/([\w-]+)$/);
+    if (label) {
+      return state.labels[label[1]] ? json(route, state.labels[label[1]])
+        : json(route, { detail: "Keine Anfrage mit dieser Nummer gefunden." }, 404);
+    }
     if (review && method === "DELETE") return json(route, { ok: true });
 
     if (path === "/admin/dolibarr/status") {

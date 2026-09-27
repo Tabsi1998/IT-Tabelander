@@ -1,12 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
 import { mkdirSync } from "node:fs";
-import { expect, expectNoSidewaysScroll, mockApi, test } from "./fixtures.js";
+import { REVIEW_LINK, expect, expectNoSidewaysScroll, mockApi, test } from "./fixtures.js";
 
 const LEGAL = { impressum: { title: "Impressum", html: "<p>IT-Tabelander<br>Teststraße 1<br>6410 Telfs</p>" } };
 const PAGES = [
   ["startseite", "/", "IT-Technik, die"],
   ["rechtliches", "/rechtliches/impressum", "Rechtliches"],
   ["nicht-gefunden", "/gibt-es-nicht", "Diese Seite gibt es nicht."],
+  ["bewertung", `/bewertung#${REVIEW_LINK}`, "Wie war’s?"],
 ];
 
 async function open(page, path, heading) {

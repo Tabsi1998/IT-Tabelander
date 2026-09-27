@@ -6,6 +6,9 @@ from ..security import require_admin
 
 router = APIRouter(prefix="/api", tags=["reviews"])
 
+# What a visitor may see of a review; the rest (order, inquiry, flags) stays here.
+PUBLIC_FIELDS = ("id", "author", "rating", "text", "source", "source_url", "review_date", "created_at")
+
 
 @router.get("/reviews")
 async def list_reviews():
@@ -14,7 +17,7 @@ async def list_reviews():
     db = get_db()
     docs = await db.reviews.find({"visible": True, "is_demo": {"$ne": True}}).sort(
         [("featured", -1), ("sort", 1)]).to_list(100)
-    visible = [serialize(d) for d in docs]
+    visible = [{key: value for key, value in serialize(d).items() if key in PUBLIC_FIELDS} for d in docs]
     avg = round(sum(r["rating"] for r in visible) / len(visible), 1) if visible else None
     return {
         "reviews": visible,
@@ -25,7 +28,8 @@ async def list_reviews():
 
 @router.get("/admin/reviews")
 async def admin_list_reviews(_: dict = Depends(require_admin)):
-    docs = await get_db().reviews.find().sort([("featured", -1), ("sort", 1)]).to_list(200)
+    # Reviews from the link in the mail that wait for a release come first (#71).
+    docs = await get_db().reviews.find().sort([("pending", -1), ("featured", -1), ("sort", 1)]).to_list(200)
     return [serialize(d) for d in docs]
 
 
@@ -42,7 +46,12 @@ async def create_review(payload: ReviewInput, _: dict = Depends(require_admin)):
 async def update_review(review_id: str, payload: ReviewInput, _: dict = Depends(require_admin)):
     db = get_db()
     oid = to_oid(review_id)
-    res = await db.reviews.update_one({"_id": oid}, {"$set": payload.model_dump(exclude_unset=True)})
+    changes = payload.model_dump(exclude_unset=True)
+    update = {"$set": changes}
+    if changes.get("visible") is True:
+        # Switching it on is the release of a review from the link (#71).
+        update["$unset"] = {"pending": ""}
+    res = await db.reviews.update_one({"_id": oid}, update)
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Bewertung nicht gefunden")
     return serialize(await db.reviews.find_one({"_id": oid}))

@@ -1,0 +1,5 @@
+/* The device label on a plain A4 sheet (#72); loaded by the label page only. */
+@page {
+  size: A4;
+  margin: 12mm;
+}

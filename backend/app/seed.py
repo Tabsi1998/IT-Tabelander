@@ -35,6 +35,17 @@ async def ensure_indexes():
         "expires_at",
         name="inquiry_attachment_expiry",
     )
+    # Review requests (#71): due checks, and the links by their hash. A link
+    # record goes a year after it expired; it holds no personal data anyway.
+    await db.repair_requests.create_index(
+        [("review_ok", 1), ("review.next_check_at", 1)],
+        name="inquiry_review_request",
+        partialFilterExpression={"review_ok": True},
+    )
+    await db.review_invites.create_index("token_hash", unique=True, name="review_invite_token")
+    await db.review_invites.create_index(
+        "expires_at", expireAfterSeconds=365 * 24 * 60 * 60, name="review_invite_expiry",
+    )
     await db.media.create_index(
         [("draft_request_id", 1), ("draft_slot", 1)],
         unique=True,

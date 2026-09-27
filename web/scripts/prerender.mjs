@@ -18,6 +18,8 @@ const PAGES = [
     title: "Datenschutzerklärung – IT-Tabelander" },
   { url: "/rechtliches/nutzungsbedingungen", file: "rechtliches/nutzungsbedingungen/index.html",
     title: "Nutzungsbedingungen – IT-Tabelander" },
+  // Behind the personal link after a closed ticket (#71); never in search results.
+  { url: "/bewertung", file: "bewertung/index.html", title: "Bewertung – IT-Tabelander", robots: "noindex" },
   { url: "/seite-nicht-gefunden", file: "404.html", title: "Seite nicht gefunden – IT-Tabelander",
     robots: "noindex" },
 ];

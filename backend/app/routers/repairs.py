@@ -12,6 +12,7 @@ from pymongo.errors import DuplicateKeyError
 
 from .. import dolibarr, handover
 from ..db import get_db, now_utc, serialize, to_oid
+from ..website import seo_data
 from ..models import ContactInput, InquiryInput, InquiryStatusQuery, InquiryStatusUpdate
 from ..security import require_admin
 from .media import (
@@ -367,6 +368,43 @@ async def list_inquiries(
             query["request_type"] = request_type
     docs = await get_db().repair_requests.find(query).sort("created_at", -1).to_list(500)
     return [serialize(doc) for doc in docs]
+
+
+@router.get("/admin/labels/{ref}")
+async def device_label(ref: str, _: dict = Depends(require_admin)):
+    """What the device label shows (#72): number, device, date and the QR
+    link to the status page. No name: the label sits on the device in the shop."""
+    wanted = ref.strip()
+    if not re.fullmatch(r"[A-Za-z0-9-]{4,40}", wanted):
+        raise HTTPException(status_code=404, detail="Keine Anfrage mit dieser Nummer gefunden.")
+    doc = await get_db().repair_requests.find_one(
+        {"$or": [{"ref": wanted.upper()}, {"dolibarr.ticket_ref": wanted}]},
+        sort=[("created_at", -1)],
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Keine Anfrage mit dieser Nummer gefunden.")
+    sync = doc.get("dolibarr") or {}
+    kind = dolibarr.REQUEST_TYPE_LABELS.get(doc.get("request_type") or "repair", "Anfrage")
+    title = ""
+    if doc.get("device_type") or doc.get("manufacturer") or doc.get("model"):
+        title = dolibarr.subject_without_ref(dolibarr.inquiry_subject(doc), doc.get("ref"))
+    elif sync.get("synced") and sync.get("ticket_id"):
+        try:
+            subject = await dolibarr.fetch_ticket_subject(str(sync["ticket_id"]))
+        except Exception as exc:  # noqa: BLE001 - the label works without it
+            logger.warning("Ticket subject for a label unavailable: %s", type(exc).__name__)
+            subject = None
+        title = dolibarr.subject_without_ref(subject or "", doc.get("ref"))
+    track_id = doc.get("track_id") or sync.get("ticket_track_id") or dolibarr.inquiry_track_id(doc)
+    base, _settings, _cache = await seo_data()
+    return {
+        "ref": doc.get("ref"),
+        "ticket_ref": sync.get("ticket_ref") if sync.get("synced") else None,
+        "request_type_label": kind,
+        "title": title or kind,
+        "created_at": serialize({"at": doc.get("created_at")})["at"],
+        "status_url": f"{base}/status/view.php?track_id={track_id}",
+    }
 
 
 @router.get("/admin/inquiries/{inquiry_id}")

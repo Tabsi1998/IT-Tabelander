@@ -168,11 +168,11 @@ Jedes Thema steht an genau einer Stelle:
 
 | Bereich | Was du dort pflegst |
 |---|---|
-| **Übersicht** | was wartet, was neu ist, was noch fehlt (z. B. E-Mail-Versand) |
+| **Übersicht** | was wartet, was neu ist, was noch fehlt (z. B. E-Mail-Versand); bei jeder neuen Anfrage **Etikett** für das Gerät |
 | **Texte** | „Über mich“: Text, Qualifikationen, Foto |
 | **Leistungen** | die Tabs der Website: Name, Überschrift, Text, Stichpunkte, Bild, Reihenfolge, sichtbar; Vorschau je Leistung |
 | **Galerie** | Fotos deiner Arbeiten, auch direkt mit der Handy-Kamera: Titel, Bereich, Reihenfolge, sichtbar |
-| **Bewertungen** | Bewertungen eintragen, wie Kunden sie geschrieben haben (Google mit Link, persönlich, E-Mail) |
+| **Bewertungen** | Bewertungen eintragen, wie Kunden sie geschrieben haben (Google mit Link, persönlich, E-Mail); Bewertungen über den Link nach dem Auftrag **freigeben**; Bewertungsbitten mit **Jetzt prüfen** |
 | **Dolibarr** | Verbindung (mit Test, zeigt die Version), Inhalte aus der Wissensdatenbank, Themengruppen je Anfrageart, Warteschlange, Altdaten-Umzug |
 | **Technik** | öffentliche Adresse, Einzugsgebiet, Titel und Beschreibung der Startseite für Google, Google-Profil, E-Mail-Versand mit **Test-Mail senden**, dein Zugang |
 
@@ -180,6 +180,33 @@ Die Anmeldung verlängert sich im Hintergrund von selbst (bis zu 7 Tage).
 Läuft sie doch ab, sagt der Admin das und öffnet nach dem neuen Anmelden
 wieder dieselbe Seite. Formulare lassen sich erst speichern, wenn ihre Daten
 geladen sind – so überschreibt ein Ladefehler nie etwas.
+
+### Bewertungsbitte nach dem Auftrag
+
+Im Anfrageformular kann der Kunde freiwillig Ja sagen: „Nach Abschluss darf
+ich dich einmal per Mail um eine kurze Bewertung bitten.“ Ohne dieses Ja kommt
+keine Mail – so will es das Gesetz für solche Mails (§ 174 TKG 2021). Das Ja
+steht auch im Ticket in Dolibarr.
+
+Schließt du das Ticket in Dolibarr, schickt die Website innerhalb von 30
+Minuten **eine einzige** Mail an die E-Mail-Adresse im Ticket, mit einem
+persönlichen Link (60 Tage gültig, für eine Bewertung). Wird das Ticket
+abgebrochen, kommt keine Mail. Was der Kunde schreibt, landet unter
+**Bewertungen** oben mit „Wartet auf deine Freigabe“; erst mit **Freigeben**
+erscheint es auf der Website. Die Mail geht über den E-Mail-Versand der Website
+(**Technik**). Unter **Bewertungen → Bewertungsbitten** siehst du, wie viele
+warten, verschickt und beantwortet sind; **Jetzt prüfen** schickt sofort statt
+erst beim nächsten 30-Minuten-Takt.
+
+### Etikett für das Gerät
+
+Unter **Übersicht → Neueste Anfragen** gibt es bei jeder Anfrage **Etikett**
+(oder `/admin/etikett` und die Anfrage- oder Ticket-Nummer eingeben). Das
+Etikett zeigt Nummer, Gerät (so, wie das Ticket in Dolibarr heißt), Datum und
+einen QR-Code zur Status-Seite – der Kunde scannt ihn und sieht den Stand. Ein
+Name steht bewusst nicht drauf, weil das Etikett sichtbar am Gerät klebt.
+Drucken geht auf Etikettendrucker mit 62 × 29 mm (z. B. Brother DK-11209) oder
+auf ein normales A4-Blatt zum Ausschneiden.
 
 Firmendaten, Öffnungszeiten, Social-Media-Links, Impressum, Datenschutz,
 Nutzungsbedingungen und FAQ stehen **nicht** mehr hier, sondern in Dolibarr
@@ -195,8 +222,10 @@ Schreibfeld.
 
 ### E-Mail-Versand der Website einrichten
 
-Die Website schickt selbst nur eine Art Mail: die Warnung an dich, wenn eine
-Anfrage nicht in Dolibarr ankommt. Bestätigungen an Kunden verschickt Dolibarr.
+Die Website schickt selbst nur zwei Arten von Mails: die Warnung an dich, wenn
+eine Anfrage nicht in Dolibarr ankommt, und die eine Bewertungsbitte nach einem
+geschlossenen Ticket (nur mit dem Ja des Kunden). Bestätigungen an Kunden
+verschickt Dolibarr.
 
 1. `/admin/technik` öffnen, Block **E-Mail-Versand der Website**.
 2. Mailserver, Port und Verschlüsselung deines Mail-Anbieters eintragen (meist

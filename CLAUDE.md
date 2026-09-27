@@ -83,6 +83,26 @@ version (`remove_legacy_frontend`), never before, because a failed update
 rolls back to the old version, which serves `frontend/build`. The deploy
 group plants such leftovers and checks they are gone.
 
+Review request (#71, `backend/app/review_invites.py`): only for inquiries
+with `review_ok` (an opt-in in the form, also written into the ticket). The
+maintenance loop claims due records by moving `review.next_check_at` 30
+minutes ahead, asks Dolibarr for the ticket state and, for a closed ticket,
+marks `review.invited_at` before it sends one mail to the ticket's
+`origin_email` - never another address, at most once. The link is
+`/bewertung#<token>` (the fragment keeps the token out of logs and Referer);
+`review_invites` stores its SHA-256 only. `/api/review-invites/check` and
+`/submit` take the token in the body; the review is stored hidden with
+`pending`, and `PUT /admin/reviews/{id}` with `visible: true` releases it. The
+public review list is a field whitelist (`PUBLIC_FIELDS`).
+
+Device label (#72): `GET /api/admin/labels/{ref}` (inquiry or ticket number)
+gives number, title (the local subject before the hand-over, the Dolibarr
+ticket subject after it), date and the status link with the track id. The QR
+code is drawn as SVG from `qrcode-generator` (`src/admin/qr.js`); a Vitest
+test reads it back with jsQR. The paper size comes from
+`public/print/label-roll.css` or `label-sheet.css`, linked only while the
+label page is open; Playwright checks the PDF page size (62 x 29 mm, A4).
+
 The admin (#57): `src/admin/api.js` renews an expired access cookie once via
 `/api/auth/refresh` and retries; if that fails too, `admin-session-expired`
 shows the sign-in form in place, and the same page opens after signing in.

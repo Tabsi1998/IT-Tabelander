@@ -159,6 +159,8 @@ class InquiryInput(BaseModel):
     )
     # With the browser's UTC offset, so the workshop sees the customer's time.
     callback_at: Optional[AwareDatetime] = None
+    # Yes to one mail asking for a review once the ticket is closed (#71).
+    review_ok: bool = False
 
     @field_validator(
         "source", "device_type", "manufacturer", "model", "budget", "timeframe",
@@ -236,6 +238,30 @@ class InquiryStatusQuery(BaseModel):
 
 class InquiryStatusUpdate(BaseModel):
     status: str
+
+
+# ---------- Review requests (#71) ----------
+REVIEW_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{20,100}$"
+
+
+class ReviewInviteCheck(BaseModel):
+    """The personal link from the mail, before the form shows."""
+    token: str = Field(pattern=REVIEW_TOKEN_PATTERN)
+
+
+class ReviewInviteSubmit(BaseModel):
+    """What a customer writes behind the personal link."""
+    token: str = Field(pattern=REVIEW_TOKEN_PATTERN)
+    rating: int = Field(ge=1, le=5)
+    text: str = Field(min_length=2, max_length=2000)
+    author: str = Field(min_length=2, max_length=60)
+    publish_ok: bool
+    honeypot: Optional[str] = Field(default="", max_length=500)
+
+    @field_validator("text", "author", "honeypot", mode="before")
+    @classmethod
+    def strip_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 RepairStatusUpdate = InquiryStatusUpdate

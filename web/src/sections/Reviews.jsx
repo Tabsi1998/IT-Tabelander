@@ -55,7 +55,8 @@ export default function Reviews({ data, googleUrl }) {
                   <span className="text-muted">
                     {review.source_url
                       ? <a href={review.source_url} target="_blank" rel="noopener noreferrer">{review.source || "Google"}</a>
-                      : (review.source && review.source !== "manuell" ? review.source : "persönlich")}
+                      : (review.source === "Website" ? "nach Auftrag"
+                        : review.source && review.source !== "manuell" ? review.source : "persönlich")}
                     {dateText(review.review_date || review.created_at) && ` · ${dateText(review.review_date || review.created_at)}`}
                   </span>
                 </figcaption>
@@ -68,6 +69,11 @@ export default function Reviews({ data, googleUrl }) {
             Alle {reviews.length} Bewertungen anzeigen
           </button>
         )}
+        {/* How reviews are checked: a customer must be told (UWG, reviews). */}
+        <p className="m-0 max-w-[52em] text-sm leading-normal text-muted">
+          Nur echte Bewertungen: Über die Website bewerten kann nur, wer nach einem abgeschlossenen Auftrag einen persönlichen Link bekommen hat.
+          Bewertungen von Google sind mit dem Original verlinkt; persönlich oder per E-Mail erhaltene stehen hier so, wie sie geschrieben wurden.
+        </p>
       </div>
     </section>
   );

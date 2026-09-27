@@ -521,3 +521,72 @@ class TestStatusSteps:
 
         dolibarr_put(f"tickets/{ticket['id']}", {"array_options": {"options_abholbereit": 1}})
         assert step() == "abholbereit"
+
+
+def review_requests_to(address: str, seconds: int = 0) -> list:
+    """The website's review request mails for one address (#71)."""
+    deadline = time.time() + seconds
+    while True:
+        found = [item for item in mails_to(address, seconds=0)
+                 if str(item.get("Subject") or "").startswith("Kurze Bitte zu deiner Anfrage")]
+        if found or time.time() >= deadline:
+            return found
+        time.sleep(1)
+
+
+class TestReviewRequestAndLabel:
+    def test_one_mail_after_the_closed_ticket_and_a_review_that_waits(self, admin_client):
+        use_mailpit_for_website_mail(admin_client)
+        yes = f"bewertung-ja-{uuid.uuid4().hex[:8]}@example.com"
+        no = f"bewertung-nein-{uuid.uuid4().hex[:8]}@example.com"
+        asked = send_inquiry(yes, extra={"review_ok": True})
+        silent = send_inquiry(no)
+        ticket = ticket_with(asked["ref"])
+        other = ticket_with(silent["ref"])
+        # The ticket tells the owner about the yes; the subject names the device.
+        assert "Bewertungsbitte nach Abschluss: ja" in str(dolibarr_get(f"tickets/{ticket['id']}").get("message"))
+        assert ticket["subject"] == f"Reparatur: Notebook Lenovo ThinkPad T14 ({asked['ref']})"
+
+        # The device label (#72): from the ticket in Dolibarr, the website forgot the device.
+        label = admin_client.get(f"{BASE_URL}/api/admin/labels/{asked['ref']}", timeout=60).json()
+        assert label["title"] == "Reparatur: Notebook Lenovo ThinkPad T14" and label["ticket_ref"] == ticket["ref"]
+        track_id = label["status_url"].split("track_id=", 1)[1]
+        by_label = requests.get(f"{BASE_URL}/api/inquiries/status/track/{track_id}", timeout=60)
+        assert by_label.status_code == 200 and by_label.json()["ref"] == asked["ref"]
+        assert yes not in json.dumps(label)
+        # Whatever the owner calls the ticket in Dolibarr is on the label.
+        dolibarr_put(f"tickets/{ticket['id']}", {"subject": f"Akku tauschen ({asked['ref']})"})
+        by_ticket_number = admin_client.get(f"{BASE_URL}/api/admin/labels/{ticket['ref']}", timeout=60).json()
+        assert by_ticket_number["title"] == "Akku tauschen" and by_ticket_number["ref"] == asked["ref"]
+
+        # Still open: nothing goes out.
+        first = admin_client.post(f"{BASE_URL}/api/admin/review-invites/run", timeout=120).json()
+        assert first["problem"] is None, first
+        assert not review_requests_to(yes)
+
+        for closing in (ticket, other):
+            dolibarr_put(f"tickets/{closing['id']}", {"status": 8})
+        done = admin_client.post(f"{BASE_URL}/api/admin/review-invites/run", timeout=120).json()
+        assert done["sent"] >= 1, done
+        [mail] = review_requests_to(yes, seconds=30)
+        text = mail_text(mail)
+        assert asked["ref"] in text and "einzige Mail" in text
+        token = re.search(r"/bewertung#([A-Za-z0-9_-]{40,})", text).group(1)
+        # Without the yes, no mail - and a second round sends no second one.
+        admin_client.post(f"{BASE_URL}/api/admin/review-invites/run", timeout=120)
+        assert not review_requests_to(no)
+        assert len(review_requests_to(yes)) == 1
+
+        check = requests.post(f"{BASE_URL}/api/review-invites/check", json={"token": token}, timeout=30)
+        assert check.status_code == 200 and check.json()["ref"] == asked["ref"], check.text
+        stored = requests.post(f"{BASE_URL}/api/review-invites/submit", json={
+            "token": token, "rating": 5, "text": "Runtime: alles bestens.", "author": "Runtime K.", "publish_ok": True,
+        }, timeout=30)
+        assert stored.status_code == 200, stored.text
+        reviews = admin_client.get(f"{BASE_URL}/api/admin/reviews", timeout=30).json()
+        mine = next(item for item in reviews if item.get("inquiry_ref") == asked["ref"])
+        assert mine["pending"] is True and mine["visible"] is False and mine["rating"] == 5
+        public = requests.get(f"{BASE_URL}/api/reviews", timeout=30).json()["reviews"]
+        assert not any(item["id"] == mine["id"] for item in public)
+        overview = admin_client.get(f"{BASE_URL}/api/admin/review-invites", timeout=30).json()
+        assert overview["sent"] >= 1 and overview["answered"] >= 1

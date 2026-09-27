@@ -498,3 +498,110 @@ class TestAdminMilestone4:
         bad = admin_client.put(f"{BASE_URL}/api/admin/settings", json={"about_photo_url": "https://fremd.example/bild.png"}, timeout=30)
         assert bad.status_code == 422
         admin_client.put(f"{BASE_URL}/api/admin/settings", json={"about_text": "", "about_qualifications": []}, timeout=30)
+
+
+# ---------------- Review request and device label (#71, #72) ----------------
+def _website_db():
+    from pymongo import MongoClient
+
+    from conftest import _test_database_env
+
+    env = _test_database_env()
+    return MongoClient(env["MONGO_URL"], tz_aware=True)[env["DB_NAME"]]
+
+
+def _plant_invite(days_left=60):
+    """A link as the mail after a closed ticket carries it; only its hash is stored."""
+    import hashlib
+    import secrets
+    from datetime import datetime, timedelta, timezone
+
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    invite = {"token_hash": hashlib.sha256(token.encode("utf-8")).hexdigest(), "ref": "ANF-TESTBEW1",
+              "request_type": "repair", "created_at": now, "expires_at": now + timedelta(days=days_left)}
+    _website_db().review_invites.insert_one(invite)
+    return token, invite
+
+
+class TestReviewRequestAndLabel:
+    def test_a_review_through_the_personal_link_waits_for_the_release(self, admin_client, api_client):
+        token, invite = _plant_invite()
+        review_id = None
+        try:
+            check = api_client.post(f"{BASE_URL}/api/review-invites/check", json={"token": token}, timeout=30)
+            assert check.status_code == 200, check.text
+            assert check.json() == {"ref": "ANF-TESTBEW1", "request_type_label": "Reparatur"}
+            body = {"token": token, "rating": 4, "text": "TEST_Schnell und ehrlich", "author": "TEST_Max M.",
+                    "publish_ok": False}
+            assert api_client.post(f"{BASE_URL}/api/review-invites/submit", json=body, timeout=30).status_code == 400
+            stored = api_client.post(f"{BASE_URL}/api/review-invites/submit", json={**body, "publish_ok": True}, timeout=30)
+            assert stored.status_code == 200, stored.text
+            # One review per link.
+            assert api_client.post(f"{BASE_URL}/api/review-invites/submit", json={**body, "publish_ok": True},
+                                   timeout=30).status_code == 404
+            assert api_client.post(f"{BASE_URL}/api/review-invites/check", json={"token": token}, timeout=30).status_code == 404
+
+            listed = admin_client.get(f"{BASE_URL}/api/admin/reviews", timeout=30).json()
+            mine = next(item for item in listed if item["text"] == "TEST_Schnell und ehrlich")
+            review_id = mine["id"]
+            assert listed[0]["id"] == review_id, "a review waiting for the release comes first"
+            assert mine["pending"] is True and mine["visible"] is False
+            assert mine["source"] == "Website" and mine["inquiry_ref"] == "ANF-TESTBEW1"
+            assert not any(item["id"] == review_id for item in api_client.get(f"{BASE_URL}/api/reviews", timeout=30).json()["reviews"])
+            assert admin_client.get(f"{BASE_URL}/api/admin/dashboard", timeout=30).json()["reviews"]["pending"] >= 1
+
+            released = admin_client.put(f"{BASE_URL}/api/admin/reviews/{review_id}", json={
+                "author": mine["author"], "rating": mine["rating"], "text": mine["text"], "visible": True}, timeout=30)
+            assert released.status_code == 200 and "pending" not in released.json()
+            shown = next(item for item in api_client.get(f"{BASE_URL}/api/reviews", timeout=30).json()["reviews"]
+                         if item["id"] == review_id)
+            # A visitor sees the review, not how it is kept (order, inquiry, flags).
+            assert set(shown) <= {"id", "author", "rating", "text", "source", "source_url", "review_date", "created_at"}
+        finally:
+            _website_db().review_invites.delete_one({"token_hash": invite["token_hash"]})
+            if review_id:
+                admin_client.delete(f"{BASE_URL}/api/admin/reviews/{review_id}", timeout=30)
+
+    def test_an_expired_or_unknown_link_is_gone(self, api_client):
+        token, invite = _plant_invite(days_left=-1)
+        try:
+            for known in (token, "x" * 43):
+                check = api_client.post(f"{BASE_URL}/api/review-invites/check", json={"token": known}, timeout=30)
+                assert check.status_code == 404 and "abgelaufen" in check.json()["detail"]
+            submit = api_client.post(f"{BASE_URL}/api/review-invites/submit", json={
+                "token": token, "rating": 5, "text": "TEST_zu spät", "author": "TEST_Eva", "publish_ok": True}, timeout=30)
+            assert submit.status_code == 404
+        finally:
+            _website_db().review_invites.delete_one({"token_hash": invite["token_hash"]})
+
+    def test_review_requests_are_the_admins_business(self, admin_client, api_client):
+        assert api_client.get(f"{BASE_URL}/api/admin/review-invites", timeout=30).status_code == 401
+        assert api_client.post(f"{BASE_URL}/api/admin/review-invites/run", timeout=30).status_code == 401
+        overview = admin_client.get(f"{BASE_URL}/api/admin/review-invites", timeout=30).json()
+        assert {"waiting", "sent", "answered", "last_error"} <= set(overview)
+        run = admin_client.post(f"{BASE_URL}/api/admin/review-invites/run", timeout=60).json()
+        assert {"checked", "sent", "stopped", "failed", "problem"} <= set(run)
+
+    def test_the_device_label_names_the_device_and_links_to_the_status(self, admin_client, api_client):
+        created = api_client.post(f"{BASE_URL}/api/inquiries", json={
+            "request_id": f"integration-{uuid.uuid4().hex}", "request_type": "repair", "device_type": "notebook",
+            "manufacturer": "Lenovo", "model": "ThinkPad T14", "description": "TEST_Startet nicht mehr.",
+            "contact": {"name": "TEST_Eva", "email": "test_eva@example.com"}, "consent": True, "review_ok": True,
+        }, timeout=60).json()
+        try:
+            assert admin_client.get(f"{BASE_URL}/api/admin/inquiries/{created['id']}", timeout=30).json()["review_ok"] is True
+            label = admin_client.get(f"{BASE_URL}/api/admin/labels/{created['ref'].lower()}", timeout=60)
+            assert label.status_code == 200, label.text
+            data = label.json()
+            assert data["ref"] == created["ref"] and data["request_type_label"] == "Reparatur"
+            assert data["title"] == "Reparatur: Notebook Lenovo ThinkPad T14"
+            assert "/status/view.php?track_id=" in data["status_url"]
+            track_id = data["status_url"].split("track_id=", 1)[1]
+            status = api_client.get(f"{BASE_URL}/api/inquiries/status/track/{track_id}", timeout=60)
+            assert status.status_code == 200 and status.json()["ref"] == created["ref"]
+            assert "TEST_Eva" not in label.text and "test_eva@example.com" not in label.text
+            assert admin_client.get(f"{BASE_URL}/api/admin/labels/ANF-GIBTSNIX", timeout=30).status_code == 404
+            assert api_client.get(f"{BASE_URL}/api/admin/labels/{created['ref']}", timeout=30).status_code == 401
+        finally:
+            admin_client.delete(f"{BASE_URL}/api/admin/inquiries/{created['id']}", timeout=30)

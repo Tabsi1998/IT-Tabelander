@@ -42,6 +42,21 @@ export function Honeypot({ value, onChange }) {
   );
 }
 
+/** One to five stars, announced as a choice of one. */
+export function StarInput({ value, onChange, label = "Sterne" }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button key={star} type="button" role="radio" aria-checked={value === star} aria-label={`${star} von 5 Sternen`}
+          onClick={() => onChange(star)}
+          className={`flex h-11 w-11 items-center justify-center rounded-lg text-[26px] leading-none ${star <= value ? "text-accent" : "text-field"}`}>
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function FormError({ message }) {
   if (!message) return null;
   return <p role="alert" className="m-0 rounded-[10px] border border-[#F5B8A5] bg-badge p-3.5 text-[15px] font-semibold text-badge-ink">{message}</p>;
