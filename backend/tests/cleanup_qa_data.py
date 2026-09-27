@@ -20,8 +20,7 @@ env = dotenv_values(BACKEND_ENV_PATH)
 s = requests.Session()
 r = s.post(f"{BASE}/api/auth/login",
            json={"email": env["ADMIN_EMAIL"], "password": env["ADMIN_PASSWORD"]}, timeout=30)
-r.raise_for_status()
-s.headers["Authorization"] = f"Bearer {r.json()['access_token']}"
+r.raise_for_status()  # the session keeps the login cookies
 
 # NOTE: admin routers expose only PUT/DELETE; listing happens through the public endpoints
 for res, field in (("services", "title"), ("reviews", "author"), ("faqs", "question")):

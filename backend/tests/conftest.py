@@ -110,20 +110,12 @@ def api_client():
 
 
 @pytest.fixture(scope="session")
-def auth_token(test_credentials):
+def admin_client(test_credentials):
+    """A logged-in session: the login only sets httpOnly cookies (#32)."""
     s = requests.Session()
     r = s.post(f"{BASE_URL}/api/auth/login", json=test_credentials, timeout=30)
     if r.status_code != 200:
         pytest.fail(f"Admin login failed {r.status_code}: {r.text[:400]}")
-    tok = r.json().get("access_token")
-    if not tok:
-        pytest.fail("No access_token in login response")
-    return tok
-
-
-@pytest.fixture(scope="session")
-def admin_client(auth_token):
-    s = requests.Session()
-    s.headers.update({"Content-Type": "application/json",
-                      "Authorization": f"Bearer {auth_token}"})
+    if "access_token" not in s.cookies:
+        pytest.fail("Login did not set the access_token cookie")
     return s

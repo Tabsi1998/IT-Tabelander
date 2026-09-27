@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Star, MessageSquareQuote, Info } from "lucide-react";
+import { Star, MessageSquareQuote } from "lucide-react";
 import api from "../lib/api";
 import { Card } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -52,9 +52,7 @@ export default function Bewertungen() {
             <MessageSquareQuote size={40} className="mx-auto text-brand" />
             <h2 className="mt-4 font-heading text-xl font-semibold text-ink">Noch keine Bewertungen veröffentlicht</h2>
             <p className="mt-2 text-muted">
-              {data.google_place_configured
-                ? "Google-Bewertungen werden vorbereitet."
-                : "Sobald Bewertungen vorliegen, werden sie hier angezeigt – ohne erfundene Daten."}
+              Sobald Bewertungen vorliegen, werden sie hier angezeigt – ohne erfundene Daten.
             </p>
             <Button as={Link} to="/kontakt" className="mt-6">Kontakt aufnehmen</Button>
           </Card>
@@ -89,11 +87,6 @@ export default function Bewertungen() {
                 </Reveal>
               ))}
             </div>
-            {data.google_place_configured && (
-              <p className="mt-6 flex items-center gap-2 text-xs text-faint">
-                <Info size={13} /> Bewertungen teilweise via Google. Anzeige gemäß Google-Vorgaben.
-              </p>
-            )}
           </>
         )}
       </section>

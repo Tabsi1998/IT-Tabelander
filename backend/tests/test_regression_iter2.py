@@ -97,6 +97,7 @@ class TestAuthPlaybook:
         combined = raw or str(r.raw.headers.getlist("Set-Cookie"))
         assert "access_token" in combined and "refresh_token" in combined, combined[:300]
         assert combined.lower().count("httponly") >= 2, combined[:300]
+        assert combined.lower().count("samesite=lax") >= 2, combined[:300]
 
     def test_cors_allows_credentials_with_origin(self):
         """Verified against the app itself (ingress intercepts OPTIONS and answers with '*')."""

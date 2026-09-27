@@ -17,9 +17,8 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 
 from app.db import close_client, get_db, now_utc  # noqa: E402
 from app.seed import run_all_seeds  # noqa: E402
-from app.routers import (auth, contact, dashboard,  # noqa: E402
-                         dolibarr_router, faqs, media, repairs, reviews,
-                         services, settings)
+from app.routers import (auth, dashboard, dolibarr_router,  # noqa: E402
+                         faqs, media, repairs, reviews, services, settings)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("it-tabelander")
@@ -222,7 +221,57 @@ async def lifespan(application: FastAPI):
         await close_client()
 
 
-app = FastAPI(title="IT-Tabelander API", version="1.0.0", lifespan=lifespan)
+class SecurityHeadersMiddleware:
+    """Adds browser protection headers to every HTTP response (issue #30).
+
+    The Content-Security-Policy is report-only while the old frontend is
+    served; the new frontend (#44) switches it to enforcing with its own tests.
+    """
+
+    HEADERS = (
+        (b"strict-transport-security", b"max-age=31536000"),
+        (b"x-content-type-options", b"nosniff"),
+        (b"referrer-policy", b"strict-origin-when-cross-origin"),
+        (b"x-frame-options", b"DENY"),
+        (b"permissions-policy", b"camera=(), microphone=(), geolocation=(), payment=()"),
+        (b"content-security-policy-report-only", (
+            b"default-src 'self'; script-src 'self' https://www.googletagmanager.com; "
+            b"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            b"font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; "
+            b"connect-src 'self' https://*.google-analytics.com https://www.googletagmanager.com; "
+            b"frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        )),
+    )
+
+    def __init__(self, application):
+        self.application = application
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.application(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message.get("type") == "http.response.start":
+                headers = list(message.get("headers") or [])
+                present = {key.lower() for key, _value in headers}
+                headers.extend(item for item in self.HEADERS if item[0] not in present)
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.application(scope, receive, send_with_headers)
+
+
+# The API is not public documentation: /docs, /redoc and /openapi.json would
+# list every admin endpoint to anyone (issue #30).
+app = FastAPI(
+    title="IT-Tabelander API",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 app.add_middleware(PublicRequestGuardMiddleware)
 
 # Same-origin production traffic does not need CORS. These origins cover local
@@ -240,13 +289,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SecurityHeadersMiddleware)
 
-for r in (auth, services, faqs, reviews, settings, repairs, contact,
+for r in (auth, services, faqs, reviews, settings, repairs,
           media, dolibarr_router, dashboard):
     app.include_router(r.router)
 
+READ_METHODS = ["GET", "HEAD"]
 
-@app.get("/api/health")
+
+@app.api_route("/api/health", methods=READ_METHODS)
 async def health(request: Request):
     try:
         await get_db().command("ping")
@@ -263,8 +315,8 @@ async def health(request: Request):
     return {"status": "ok", "db": True}
 
 
-@app.get("/sitemap.xml")
-@app.get("/api/seo/sitemap.xml")
+@app.api_route("/sitemap.xml", methods=READ_METHODS)
+@app.api_route("/api/seo/sitemap.xml", methods=READ_METHODS)
 async def sitemap():
     settings_doc = await get_db().settings.find_one({"_id": "site"}) or {}
     base = str(settings_doc.get("canonical_base_url") or
@@ -280,8 +332,8 @@ async def sitemap():
     return Response(content=xml, media_type="application/xml")
 
 
-@app.get("/robots.txt", response_class=PlainTextResponse)
-@app.get("/api/seo/robots.txt", response_class=PlainTextResponse)
+@app.api_route("/robots.txt", methods=READ_METHODS, response_class=PlainTextResponse)
+@app.api_route("/api/seo/robots.txt", methods=READ_METHODS, response_class=PlainTextResponse)
 async def robots():
     settings_doc = await get_db().settings.find_one({"_id": "site"}) or {}
     base = str(settings_doc.get("canonical_base_url") or
@@ -289,7 +341,17 @@ async def robots():
     return f"User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: {base}/sitemap.xml\n"
 
 
-@app.get("/{requested_path:path}", include_in_schema=False)
+@app.api_route(
+    "/api/{requested_path:path}",
+    methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
+    include_in_schema=False,
+)
+async def api_not_found(requested_path: str):
+    """Unknown API addresses answer 404 for every method, not 405 (#30)."""
+    raise HTTPException(status_code=404, detail="API-Endpunkt nicht gefunden")
+
+
+@app.api_route("/{requested_path:path}", methods=READ_METHODS, include_in_schema=False)
 async def frontend_app(requested_path: str):
     """Serve the production React build and its client-side routes."""
     if requested_path == "api" or requested_path.startswith("api/"):

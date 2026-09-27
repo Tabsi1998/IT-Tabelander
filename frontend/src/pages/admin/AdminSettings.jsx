@@ -109,7 +109,6 @@ export default function AdminSettings() {
             <Field label="SEO Standard-Beschreibung"><Textarea value={s.seo_default_description || ""} onChange={set("seo_default_description")} /></Field>
             <Field label="Google Analytics 4 Measurement ID"><Input value={s.ga_measurement_id || ""} onChange={set("ga_measurement_id")} placeholder="G-XXXXXXX" data-testid="settings-ga" /></Field>
             <Field label="Öffentliche Website-URL"><Input value={s.canonical_base_url || ""} onChange={set("canonical_base_url")} placeholder="https://it.tabelander.co.at" /></Field>
-            <Field label="Google Place ID (für Reviews)"><Input value={s.google_place_id || ""} onChange={set("google_place_id")} placeholder="ChIJ..." /></Field>
             <p className="text-xs text-faint">Die öffentliche URL wird für Sitemap und robots.txt verwendet.</p>
           </div>
         </Panel>
@@ -135,8 +134,6 @@ export default function AdminSettings() {
             <Field label={`Dolibarr API-Key (${s.clear_dolibarr_api_key ? "wird entfernt" : s.dolibarr_api_key_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.dolibarr_api_key || ""} onChange={(e) => setS((x) => ({ ...x, dolibarr_api_key: e.target.value, clear_dolibarr_api_key: false }))} placeholder={s.dolibarr_api_key_configured ? "Neuen Key eingeben, um ihn zu ersetzen" : "DOLAPIKEY"} autoComplete="new-password" data-testid="settings-dolibarr-key" disabled={!canManageDolibarrCredentials} /></Field>
             {!canManageDolibarrCredentials && <p className="text-xs text-amber-300">Dolibarr-URL und API-Key können nur vom Super-Admin geändert werden.</p>}
             {canManageDolibarrCredentials && s.dolibarr_api_key_configured && <Button type="button" variant="outline" onClick={() => setS((x) => ({ ...x, dolibarr_api_key: "", clear_dolibarr_api_key: true }))}>Dolibarr-Key entfernen</Button>}
-            <Field label={`Google Places API-Key (${s.clear_google_places_api_key ? "wird entfernt" : s.google_places_api_key_configured ? "gespeichert" : "nicht gesetzt"})`}><Input type="password" value={s.google_places_api_key || ""} onChange={(e) => setS((x) => ({ ...x, google_places_api_key: e.target.value, clear_google_places_api_key: false }))} placeholder={s.google_places_api_key_configured ? "Neuen Key eingeben, um ihn zu ersetzen" : "API-Key"} autoComplete="new-password" /></Field>
-            {s.google_places_api_key_configured && <Button type="button" variant="outline" onClick={() => setS((x) => ({ ...x, google_places_api_key: "", clear_google_places_api_key: true }))}>Google-Key entfernen</Button>}
           </div>
         </Panel>
 

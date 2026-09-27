@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Inbox, Mail, Star, Layers, Settings, RefreshCw,
+  LayoutDashboard, Inbox, Star, Layers, Settings, RefreshCw,
   Image as ImageIcon, HelpCircle, LogOut, Menu, X, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -10,7 +10,6 @@ import Logo from "../../components/Logo";
 const NAV = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/anfragen", label: "Anfragen", icon: Inbox },
-  { to: "/admin/kontakt", label: "Alte Nachrichten", icon: Mail },
   { to: "/admin/leistungen", label: "Leistungen", icon: Layers },
   { to: "/admin/faqs", label: "FAQs", icon: HelpCircle },
   { to: "/admin/bewertungen", label: "Bewertungen", icon: Star },

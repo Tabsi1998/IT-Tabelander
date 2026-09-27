@@ -1,3 +1,4 @@
+import nh3
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..db import get_db, now_utc, serialize
@@ -16,7 +17,10 @@ PUBLIC_FIELDS = [
     "logo_light_url", "logo_dark_url",
 ]
 
-SECRET_FIELDS = ("dolibarr_api_key", "google_places_api_key")
+SECRET_FIELDS = ("dolibarr_api_key",)
+# Rendered as HTML by the website; nh3 drops scripts, event handlers and
+# javascript: links before they reach a browser (#32).
+HTML_FIELDS = ("impressum_html", "datenschutz_html")
 
 
 def _admin_response(doc: dict) -> dict:
@@ -30,7 +34,11 @@ def _admin_response(doc: dict) -> dict:
 @router.get("/settings")
 async def public_settings():
     doc = await get_db().settings.find_one({"_id": "site"}) or {}
-    return {k: doc.get(k) for k in PUBLIC_FIELDS}
+    result = {k: doc.get(k) for k in PUBLIC_FIELDS}
+    for field in HTML_FIELDS:
+        if result.get(field):
+            result[field] = nh3.clean(str(result[field]))
+    return result
 
 
 @router.get("/admin/settings")
@@ -70,7 +78,6 @@ async def update_settings(payload: SettingsInput, admin: dict = Depends(require_
     unset = {}
     clear_flags = {
         "clear_dolibarr_api_key": "dolibarr_api_key",
-        "clear_google_places_api_key": "google_places_api_key",
     }
     for flag, field in clear_flags.items():
         if data.pop(flag, False):

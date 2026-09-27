@@ -23,7 +23,7 @@ ignored by Git.
 | --- | --- | --- |
 | repository | ci.yml `deployment-scripts` | every `*.sh` parses, no CRLF in the index, `git diff --check` over every tracked line (the CI's check sees no diff on a fresh checkout), Gitleaks over the history and over uncommitted files |
 | backend | ci.yml `backend` matrix | for Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, `tests/test_unit_runtime.py` and `tests/test_inquiry_dolibarr.py` |
-| integration | - (the CI never runs it) | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
+| integration | ci.yml `integration` (control only) | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
 | frontend | ci.yml `frontend` | Node 24, `yarn install --frozen-lockfile`, `yarn build` with `CI=true` (Create React App turns warnings into errors) |
 | extra | - | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
 
@@ -37,23 +37,25 @@ launcher, Node 24 with Corepack. A missing tool skips its steps with a hint.
   commit. `server.py` loads `backend/.env`; a real `.env` with SMTP or Dolibarr
   credentials must never reach a test.
 - The integration server speaks HTTPS with a throwaway certificate
-  (`.local-testing/tls`). The login sets `Secure; SameSite=None` cookies, which a
+  (`.local-testing/tls`). The login sets `Secure; SameSite=Lax` cookies, which a
   client never returns over plain HTTP; `REQUESTS_CA_BUNDLE` trusts the
   certificate for the test run only.
 - Settings are throwaway values (`integration_env()`); the database name
   contains "test", as `conftest.py` requires.
 
-## Open findings (2026-09-15)
+## Work plan
 
-The integration suite has 57 passing and 2 failing tests; both are app bugs:
+The rework (design, Dolibarr as the single customer system, customer portal)
+is planned as GitHub issues #25 onward with milestones "0 Design" to
+"5 Kundenportal", "Rechtliches" and "Ideen (offen)". Issues are written in
+German (Warum / Was zu tun ist / Abnahme). Every PR names its issues with
+`Closes #N`; a German "Schließt" alone closes nothing.
 
-- `AsyncMongoClient` in `backend/app/db.py` is created without `tz_aware=True`,
-  so stored datetimes come back naive. Comparing them with `now_utc()` raises
-  `TypeError`: `GET /api/media/<file>` answers 500 for an unlinked repair
-  attachment (`routers/media.py`), and `routers/auth.py` compares a reset
-  token's `expires_at` the same way.
-- The unconditional GET catch-all route in `server.py` makes the removed
-  `POST /api/contact` answer 405; the test expects 404.
+- The login lives only in httpOnly cookies (`SameSite=Lax`); the API does not
+  accept `Authorization: Bearer`. Integration tests use a logged-in
+  `requests.Session` (`admin_client` in `conftest.py`).
+- Company data and legal texts come from Dolibarr (issue #74), not from the
+  website admin. Dolibarr 24.0.1 runs at erp.tabelander.co.at.
 
 ## Ratchet
 

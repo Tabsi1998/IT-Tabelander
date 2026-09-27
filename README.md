@@ -128,8 +128,7 @@ Wer Systempakete bewusst selbst verwaltet, kann verwenden:
 
 - Unternehmensname, Adresse, Land, E-Mail, Telefon, Servicegebiet und Öffnungszeiten
 - SEO-Titel, Beschreibung und öffentliche Website-URL
-- Google Analytics Measurement-ID und Google Place-ID
-- Google Places API-Key als geschütztes Schreibfeld
+- Google Analytics Measurement-ID
 - Dolibarr aktiv/inaktiv, Basis-URL, API-Key, Timeout und Ländercode
 - Light-/Dark-Logos und Social-Media-Links
 - Impressum und Datenschutz

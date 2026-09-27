@@ -3,7 +3,7 @@
 
 GitHub is the second, independent confirmation. This is the first: every job of
 .github/workflows/ci.yml, run with the developer's own tools and processor,
-plus the gates the CI never runs.
+plus the gates the CI does not run.
 
 Groups:
     repository   every shell script parses, no CRLF stored, whitespace across
@@ -13,9 +13,9 @@ Groups:
                  environment, pip check, a full compile, the server imports,
                  and the unit tests the CI runs - all against a copy of what
                  Git would commit, so a local .env never reaches a test
-    integration  the API and regression suites the CI never runs: a MongoDB of
-                 its own, the live FastAPI server over HTTPS as in production,
-                 and both suites against it
+    integration  the API and regression suites: a MongoDB of its own, the live
+                 FastAPI server over HTTPS as in production, and both suites
+                 against it (ci.yml's integration job repeats them as a control)
     frontend     a frozen Yarn install and the production build with CI=true
     extra        what GitHub does not run: OSV over the lockfiles, ShellCheck,
                  and proof that every test file is run by some gate
@@ -75,8 +75,9 @@ PYTHON_VERSIONS = ("3.10", "3.14")
 INTEGRATION_PYTHON = "3.14"
 NODE_MAJOR = 24
 
-# The two test files the CI runs. The other two need a live server and a
-# database; the integration group provides both.
+# The two test files the CI's backend job runs. The other two need a live
+# server and a database; the integration group (and ci.yml's integration job)
+# provides both.
 CI_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py")
 INTEGRATION_TEST_FILES = ("tests/test_api.py", "tests/test_regression_iter2.py")
 
@@ -1009,7 +1010,7 @@ def openssl(context: Context) -> str:
 def integration_certificate(context: Context) -> str:
     """A throwaway certificate, so the server speaks HTTPS as in production.
 
-    The login sets its cookies with Secure and SameSite=None. A client returns a
+    The login sets its cookies with Secure and SameSite=Lax. A client returns a
     Secure cookie over HTTPS only, so against plain http://127.0.0.1 every
     request after the login would be anonymous, and the session tests would fail
     for a reason production never has. The certificate is valid for two days
@@ -1043,7 +1044,7 @@ def integration_server(context: Context) -> str:
 def integration_tests(context: Context) -> str:
     """The API and regression suites against the live server.
 
-    The CI never runs them: conftest.py skips both files unless
+    ci.yml's integration job repeats them. conftest.py skips both files unless
     IT_TABELANDER_RUN_INTEGRATION=1, the server is on localhost and the
     database name contains "test". All three hold here. A run in which the
     tests are skipped anyway fails, rather than reading as green.
@@ -1078,7 +1079,7 @@ def integration_steps() -> list:
         Step("integration", "certificate", "A throwaway certificate for HTTPS", integration_certificate),
         Step("integration", "server", f"The FastAPI server over HTTPS on Python {INTEGRATION_PYTHON}",
              integration_server, ("database", "certificate", venv, "backend/snapshot")),
-        Step("integration", "suites", "The API and regression tests the CI never runs",
+        Step("integration", "suites", "The API and regression suites against the live server",
              integration_tests, ("server",)),
     ]
 
@@ -1128,8 +1129,9 @@ def frontend_steps() -> list:
 def test_inventory(context: Context) -> str:
     """Every test file is run by some gate.
 
-    The CI runs two of the four test files. A fifth one added tomorrow would be
-    run by nothing, and nothing would say so.
+    The unit gate runs two of the four test files, the integration gate the
+    other two. A fifth one added tomorrow would be run by nothing, and nothing
+    would say so.
     """
     present = {name for name in tracked(context, "backend/tests")
                if Path(name).name.startswith("test_") and name.endswith(".py")}
@@ -1141,7 +1143,7 @@ def test_inventory(context: Context) -> str:
     if gone:
         raise StepFailed("the gates name test files that no longer exist:\n  " + "\n  ".join(gone))
     return (f"all {len(present)} test files run: {len(CI_TEST_FILES)} in the CI, "
-            f"{len(INTEGRATION_TEST_FILES)} only here")
+            f"{len(INTEGRATION_TEST_FILES)} in the integration job")
 
 
 def extra_steps() -> list:

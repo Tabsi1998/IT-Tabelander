@@ -7,17 +7,11 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// attach bearer token if present (fallback to cookie auth)
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("it_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-export function setToken(token) {
-  if (token) localStorage.setItem("it_token", token);
-  else localStorage.removeItem("it_token");
-}
+// The login lives only in httpOnly cookies. Remove the token that older
+// versions kept in localStorage, where any script could read it (#32).
+try {
+  localStorage.removeItem("it_token");
+} catch {}
 
 export function mediaUrl(path) {
   if (!path) return "";

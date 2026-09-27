@@ -11,12 +11,12 @@ from pydantic import ValidationError
 import server
 from app import dolibarr
 from app.models import SettingsInput
-from app import runtime_env
+from app import db as db_module
+from app.routers import auth as auth_router
 from app.routers import media as media_router
 from app.routers import repairs as repairs_router
 from app.routers import settings as settings_router
 from app.routers.settings import _admin_response
-from dotenv import dotenv_values
 
 
 def test_admin_settings_never_return_secret_values():
@@ -24,13 +24,14 @@ def test_admin_settings_never_return_secret_values():
         "_id": "site",
         "company_name": "IT-Tabelander",
         "dolibarr_api_key": "dolibarr-secret",
-        "google_places_api_key": "google-secret",
+        "google_places_api_key": "retired-secret",
     })
 
     assert "dolibarr_api_key" not in result
-    assert "google_places_api_key" not in result
     assert result["dolibarr_api_key_configured"] is True
-    assert result["google_places_api_key_configured"] is True
+    # The Places key belongs to a removed feature and is never echoed (#33).
+    assert "google_places_api_key" not in result
+    assert "google_places_api_key_configured" not in result
 
 
 def test_canonical_url_requires_http_scheme():
@@ -155,6 +156,9 @@ def test_removed_public_write_routes_are_not_registered():
         for method in (getattr(route, "methods", None) or set())
     }
     assert ("/api/contact", "POST") not in route_methods
+    assert not any(path.startswith("/api/admin/contact") for path, _method in route_methods)
+    for removed in ("/api/auth/forgot-password", "/api/auth/reset-password"):
+        assert (removed, "POST") not in route_methods
     assert not any(
         path.startswith(("/api/builder", "/api/configurator"))
         for path, _method in route_methods
@@ -180,23 +184,6 @@ def test_seed_failure_aborts_application_startup(monkeypatch):
 
     asyncio.run(run())
     assert closed == [True]
-
-
-def test_admin_credentials_are_written_atomically(tmp_path, monkeypatch):
-    env_path = tmp_path / ".env"
-    env_path.write_text("ADMIN_EMAIL=old@example.test\nADMIN_PASSWORD=old\n", encoding="utf-8")
-    monkeypatch.setattr(runtime_env, "BACKEND_ENV_PATH", env_path)
-    monkeypatch.setenv("ADMIN_EMAIL", "old@example.test")
-    monkeypatch.setenv("ADMIN_PASSWORD", "old")
-
-    runtime_env.update_backend_env({
-        "ADMIN_EMAIL": "new@example.test",
-        "ADMIN_PASSWORD": "new password with spaces",
-    })
-
-    values = dotenv_values(env_path)
-    assert values["ADMIN_EMAIL"] == "new@example.test"
-    assert values["ADMIN_PASSWORD"] == "new password with spaces"
 
 
 def test_frontend_spa_and_static_files_are_served(tmp_path, monkeypatch):
@@ -429,3 +416,160 @@ def test_inquiry_claims_every_attachment_before_persistence():
         and update["$set"]["attachment_claim"] == "claim-token"
         for query, update, _return_document in database.media.queries
     )
+
+
+# ---------------- milestone 1 ----------------
+def _call(method, path, tmp_path=None, monkeypatch=None):
+    """Send one request through the ASGI app without running the lifespan."""
+    async def run():
+        transport = httpx.ASGITransport(app=server.app)
+        async with httpx.AsyncClient(transport=transport, base_url="https://testserver") as client:
+            return await client.request(method, path)
+    return asyncio.run(run())
+
+
+def test_mongo_client_returns_timezone_aware_datetimes(monkeypatch):
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, url, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(db_module, "AsyncMongoClient", FakeClient)
+    monkeypatch.setattr(db_module, "_client", None)
+    monkeypatch.setenv("MONGO_URL", "mongodb://example.invalid:27017")
+    db_module.get_client()
+    monkeypatch.setattr(db_module, "_client", None)
+
+    assert captured["tz_aware"] is True
+
+
+def test_security_headers_and_hidden_api_docs(tmp_path, monkeypatch):
+    (tmp_path / "index.html").write_text("SPA", encoding="utf-8")
+    monkeypatch.setattr(server, "FRONTEND_BUILD_DIR", tmp_path)
+
+    page = _call("GET", "/")
+    head = _call("HEAD", "/")
+    docs = _call("GET", "/openapi.json")
+
+    assert page.status_code == 200 and page.text == "SPA"
+    assert head.status_code == 200
+    for name in ("strict-transport-security", "x-content-type-options", "referrer-policy",
+                 "x-frame-options", "permissions-policy", "content-security-policy-report-only"):
+        assert name in page.headers, name
+    assert page.headers["x-frame-options"] == "DENY"
+    assert server.app.openapi_url is None and server.app.docs_url is None
+    assert docs.text == "SPA"  # the SPA shell, never the API schema
+
+
+def test_unknown_api_addresses_answer_404_for_every_method():
+    for method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+        response = _call(method, "/api/contact")
+        assert response.status_code == 404, (method, response.status_code)
+        assert "strict-transport-security" in response.headers
+
+
+def test_public_legal_html_is_sanitized(monkeypatch):
+    class SettingsCollection:
+        async def find_one(self, *_args, **_kwargs):
+            return {
+                "impressum_html": '<p onclick="steal()">Hallo<script>alert(1)</script></p>'
+                                  '<a href="javascript:alert(2)">x</a>',
+                "datenschutz_html": "<h2>Daten</h2>",
+            }
+
+    class Database:
+        settings = SettingsCollection()
+
+    monkeypatch.setattr(settings_router, "get_db", lambda: Database())
+    result = asyncio.run(settings_router.public_settings())
+
+    assert "script" not in result["impressum_html"]
+    assert "onclick" not in result["impressum_html"]
+    assert "javascript:" not in result["impressum_html"]
+    assert "Hallo" in result["impressum_html"]
+    assert result["datenschutz_html"] == "<h2>Daten</h2>"
+
+
+def test_image_conversion_runs_in_a_worker_thread(monkeypatch):
+    used = []
+
+    async def fake_threadpool(function, *args):
+        used.append(function)
+        return {"filename": "x.webp", "size": 1}
+
+    class Upload:
+        content_type = "image/png"
+
+        async def read(self, _size):
+            return b"png-bytes"
+
+    monkeypatch.setattr(media_router, "run_in_threadpool", fake_threadpool)
+    result = asyncio.run(media_router._store_image(Upload()))
+
+    assert used == [media_router._convert_image]
+    assert result["filename"] == "x.webp"
+
+
+class _AttemptStore:
+    """Minimal async stand-in for the login_attempts collection."""
+
+    def __init__(self):
+        self.docs = {}
+
+    async def find_one(self, query):
+        return self.docs.get(query["identifier"])
+
+    async def update_one(self, query, update, upsert=False):
+        doc = dict(self.docs.get(query["identifier"], {"identifier": query["identifier"]}))
+        doc.update(update.get("$set", {}))
+        for key in update.get("$unset", {}):
+            doc.pop(key, None)
+        self.docs[query["identifier"]] = doc
+
+
+def _attempts(monkeypatch):
+    store = _AttemptStore()
+
+    class Database:
+        login_attempts = store
+
+    monkeypatch.setattr(auth_router, "get_db", lambda: Database())
+    return store
+
+
+def test_login_lock_expires_and_counting_starts_fresh(monkeypatch):
+    from datetime import timedelta
+
+    store = _attempts(monkeypatch)
+    for _ in range(auth_router.MAX_ATTEMPTS):
+        asyncio.run(auth_router._register_failure("1.2.3.4:a@b.c", auth_router.MAX_ATTEMPTS))
+    with pytest.raises(HTTPException) as locked:
+        asyncio.run(auth_router._check_lockout("1.2.3.4:a@b.c"))
+    assert locked.value.status_code == 429
+
+    # Fifteen minutes later the lock is over and one more mistake does not
+    # lock again: counting starts from one.
+    past = auth_router.now_utc() - timedelta(minutes=auth_router.LOCK_MINUTES + 1)
+    store.docs["1.2.3.4:a@b.c"].update(locked_until=past, updated_at=past)
+    asyncio.run(auth_router._check_lockout("1.2.3.4:a@b.c"))
+    asyncio.run(auth_router._register_failure("1.2.3.4:a@b.c", auth_router.MAX_ATTEMPTS))
+    assert store.docs["1.2.3.4:a@b.c"]["count"] == 1
+    assert "locked_until" not in store.docs["1.2.3.4:a@b.c"]
+    asyncio.run(auth_router._check_lockout("1.2.3.4:a@b.c"))
+
+
+def test_email_lock_needs_many_more_failures_than_the_address_lock(monkeypatch):
+    store = _attempts(monkeypatch)
+    for _ in range(auth_router.MAX_ATTEMPTS):
+        asyncio.run(auth_router._register_failure("email:owner@b.c", auth_router.MAX_ATTEMPTS_PER_EMAIL))
+    asyncio.run(auth_router._check_lockout("email:owner@b.c"))
+    assert store.docs["email:owner@b.c"]["count"] == auth_router.MAX_ATTEMPTS
+    assert auth_router.MAX_ATTEMPTS_PER_EMAIL >= 4 * auth_router.MAX_ATTEMPTS
+
+
+def test_login_response_never_contains_the_token():
+    source = Path(auth_router.__file__).read_text(encoding="utf-8")
+    login_body = source.split("async def login", 1)[1].split("@router", 1)[0]
+    assert '"access_token"' not in login_body
+    assert "update_backend_env" not in source

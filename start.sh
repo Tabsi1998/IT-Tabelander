@@ -543,7 +543,7 @@ prepare_backend() {
   if (( FORCE_REFRESH == 1 )) || [[ ! -x "$VENV_DIR/bin/uvicorn" || "$installed_hash" != "$requirements_hash" ]]; then
     install_needed=1
   elif ! "$VENV_DIR/bin/python" -m pip check >/dev/null 2>&1 \
-    || ! "$VENV_DIR/bin/python" -c 'import bcrypt, fastapi, httpx, jwt, PIL, pydantic, pymongo, uvicorn; from pymongo import AsyncMongoClient' >/dev/null 2>&1; then
+    || ! "$VENV_DIR/bin/python" -c 'import bcrypt, fastapi, httpx, jwt, nh3, PIL, pydantic, pymongo, uvicorn; from pymongo import AsyncMongoClient' >/dev/null 2>&1; then
     yellow "⚠ Backend-venv ist unvollständig und wird repariert."
     install_needed=1
   fi
@@ -554,7 +554,7 @@ prepare_backend() {
     PIP_DISABLE_PIP_VERSION_CHECK=1 "$VENV_DIR/bin/python" -m pip install \
       --no-input --no-cache-dir --requirement "$requirements"
     "$VENV_DIR/bin/python" -m pip check
-    "$VENV_DIR/bin/python" -c 'import bcrypt, fastapi, httpx, jwt, PIL, pydantic, pymongo, uvicorn; from pymongo import AsyncMongoClient'
+    "$VENV_DIR/bin/python" -c 'import bcrypt, fastapi, httpx, jwt, nh3, PIL, pydantic, pymongo, uvicorn; from pymongo import AsyncMongoClient'
     printf '%s\n' "$requirements_hash" > "$stamp.tmp"
     mv -f -- "$stamp.tmp" "$stamp"
     green "✓ Backend-Abhängigkeiten vollständig"
