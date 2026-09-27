@@ -26,4 +26,3 @@ async def list_faqs(category: str | None = None):
         query["category"] = category
     docs = await get_db().faqs.find(query).sort("sort", 1).to_list(200)
     return [serialize(d) for d in docs]
-
