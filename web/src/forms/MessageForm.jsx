@@ -44,7 +44,7 @@ export default function MessageForm() {
       <Field label="Nachricht" as="textarea" rows={5} required minLength={10} maxLength={5000} value={form.message} onChange={set("message")} />
       <Honeypot value={form.honeypot} onChange={(value) => setForm((current) => ({ ...current, honeypot: value }))} />
       <Consent checked={consent} onChange={setConsent}>
-        Meine Angaben dürfen zur Beantwortung verwendet werden. Details in der <a href="/rechtliches/datenschutz">Datenschutzerklärung</a>.
+        Meine Angaben dürfen zur Beantwortung verwendet werden. Details in der <a href="/rechtliches/datenschutz" className="underline">Datenschutzerklärung</a>.
       </Consent>
       <FormError message={state.error} />
       <button type="submit" disabled={state.sending} className="btn-primary min-h-[52px] self-stretch text-[17px] md:self-start">

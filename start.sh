@@ -21,6 +21,9 @@ RUN_DIR="$SCRIPT_DIR/run"
 LOG_DIR="$SCRIPT_DIR/logs"
 BACKEND_DIR="$SCRIPT_DIR/backend"
 FRONTEND_DIR="$SCRIPT_DIR/frontend"
+# The website (#54). frontend/ only holds the admin until milestone 4 (#57);
+# both are built into BUILD_DIR, which the backend serves.
+WEB_DIR="$SCRIPT_DIR/web"
 VENV_DIR="${IT_TABELANDER_VENV_DIR:-$BACKEND_DIR/venv}"
 BUILD_DIR="$FRONTEND_DIR/build"
 STAGED_BUILD_DIR="$RUN_DIR/frontend-build.next"
@@ -596,8 +599,8 @@ write_frontend_environment() {
   fi
 }
 
-frontend_dependency_hash() {
-  node - "$FRONTEND_DIR" <<'NODE'
+dependency_hash() {
+  node - "$1" <<'NODE'
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -613,66 +616,94 @@ NODE
 }
 
 frontend_build_input_hash() {
-  node - "$FRONTEND_DIR" <<'NODE'
+  node - "$FRONTEND_DIR" "$WEB_DIR" <<'NODE'
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const root = process.argv[2];
+const [admin, web] = process.argv.slice(2);
 const files = [];
 
-function collect(relativeDirectory) {
+function collect(label, root, relativeDirectory) {
   const absoluteDirectory = path.join(root, relativeDirectory);
+  if (!fs.existsSync(absoluteDirectory)) return;
   for (const entry of fs.readdirSync(absoluteDirectory, {withFileTypes: true})) {
     const relative = path.join(relativeDirectory, entry.name);
-    if (entry.isDirectory()) collect(relative);
-    else if (entry.isFile()) files.push(relative);
+    if (entry.isDirectory()) collect(label, root, relative);
+    else if (entry.isFile()) files.push([label, root, relative]);
   }
 }
 
-collect('src');
-collect('public');
-for (const name of ['package.json', 'yarn.lock', '.env.production',
-                    'postcss.config.js', 'tailwind.config.js']) {
-  if (fs.existsSync(path.join(root, name))) files.push(name);
+function add(label, root, names) {
+  for (const name of names) {
+    if (fs.existsSync(path.join(root, name))) files.push([label, root, name]);
+  }
 }
-files.sort();
+
+collect('frontend', admin, 'src');
+collect('frontend', admin, 'public');
+add('frontend', admin, ['package.json', 'yarn.lock', '.env.production', 'postcss.config.js', 'tailwind.config.js']);
+collect('web', web, 'src');
+collect('web', web, 'public');
+collect('web', web, 'scripts');
+add('web', web, ['package.json', 'yarn.lock', 'index.html', 'vite.config.mjs', 'postcss.config.js',
+                 'tailwind.config.js']);
+const key = ([label, , relative]) => label + '/' + relative.split(path.sep).join('/');
+files.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 
 const hash = crypto.createHash('sha256');
-for (const relative of files) {
-  hash.update(relative.split(path.sep).join('/') + '\0');
-  hash.update(fs.readFileSync(path.join(root, relative)));
+for (const file of files) {
+  hash.update(key(file) + '\0');
+  hash.update(fs.readFileSync(path.join(file[1], file[2])));
   hash.update('\0');
 }
 console.log(hash.digest('hex'));
 NODE
 }
 
-prepare_frontend() {
-  local stamp="$FRONTEND_DIR/node_modules/.yarn-install-ok"
-  local install_needed=0 build_needed=0 new_build previous_stage
-  local dependency_hash installed_hash="" build_input_hash baseline_dir="$BUILD_DIR"
-
-  [[ -f "$FRONTEND_DIR/yarn.lock" ]] || die "frontend/yarn.lock fehlt; ein reproduzierbares Install ist nicht möglich."
-  write_frontend_environment
-  dependency_hash="$(frontend_dependency_hash)"
-  [[ -r "$stamp" ]] && installed_hash="$(< "$stamp")"
-
-  if (( FORCE_REFRESH == 1 )) || [[ ! -x "$FRONTEND_DIR/node_modules/.bin/react-scripts" || "$installed_hash" != "$dependency_hash" ]]; then
-    install_needed=1
-  fi
-  if (( install_needed == 1 )); then
-    green "→ Frontend-Abhängigkeiten aus yarn.lock installieren ..."
+# Install one app's packages from its yarn.lock when they changed.
+install_app_dependencies() {
+  local dir="$1" label="$2" probe="$3"
+  local stamp="$dir/node_modules/.yarn-install-ok" wanted installed=""
+  [[ -f "$dir/yarn.lock" ]] || die "${dir#"$SCRIPT_DIR"/}/yarn.lock fehlt; ein reproduzierbares Install ist nicht möglich."
+  wanted="$(dependency_hash "$dir")"
+  [[ -r "$stamp" ]] && installed="$(< "$stamp")"
+  if (( FORCE_REFRESH == 1 )) || [[ ! -x "$dir/node_modules/.bin/$probe" || "$installed" != "$wanted" ]]; then
+    green "→ $label: Abhängigkeiten aus yarn.lock installieren ..."
     rm -f -- "$stamp"
     (
-      cd "$FRONTEND_DIR"
+      cd "$dir"
       yarn install --frozen-lockfile --non-interactive --production=false
     )
-    printf '%s\n' "$dependency_hash" > "$stamp.tmp"
+    printf '%s\n' "$wanted" > "$stamp.tmp"
     mv -f -- "$stamp.tmp" "$stamp"
-    green "✓ Frontend-Abhängigkeiten vollständig"
+    green "✓ $label: Abhängigkeiten vollständig"
   else
-    green "✓ Frontend-Abhängigkeiten unverändert"
+    green "✓ $label: Abhängigkeiten unverändert"
   fi
+}
+
+# One directory for the backend: the website at the top, the admin's page as
+# admin.html and its files next to it. Where both have a file, the website's wins.
+assemble_site() {
+  local admin="$1" site="$2" target="$3" file
+  [[ -f "$site/index.html" ]] || die "Website-Build ist unvollständig (web/dist/index.html fehlt)."
+  [[ -f "$admin/index.html" ]] || die "Verwaltungs-Build ist unvollständig (index.html fehlt)."
+  mkdir -p -- "$target"
+  cp -R -- "$site/." "$target/"
+  mv -- "$admin/index.html" "$target/admin.html"
+  while IFS= read -r -d '' file; do
+    [[ -e "$target/$file" ]] && continue
+    mkdir -p -- "$target/$(dirname -- "$file")"
+    cp -- "$admin/$file" "$target/$file"
+  done < <(cd "$admin" && find . -type f -print0)
+}
+
+prepare_frontend() {
+  local build_needed=0 new_build previous_stage build_input_hash baseline_dir="$BUILD_DIR"
+
+  write_frontend_environment
+  install_app_dependencies "$WEB_DIR" "Website" "vite"
+  install_app_dependencies "$FRONTEND_DIR" "Verwaltung" "react-scripts"
 
   build_input_hash="$(frontend_build_input_hash)"
   [[ -f "$STAGED_BUILD_DIR/index.html" ]] && baseline_dir="$STAGED_BUILD_DIR"
@@ -694,13 +725,21 @@ prepare_frontend() {
   new_build="$BUILD_TMP/build"
   previous_stage="$BUILD_TMP/previous-stage"
   if ! (
-    cd "$FRONTEND_DIR"
-    BUILD_PATH="$new_build" yarn build
+    cd "$WEB_DIR"
+    yarn build
   ); then
-    rm -f -- "$stamp"
-    die "Frontend-Build fehlgeschlagen; beim nächsten Lauf werden auch die Abhängigkeiten geprüft."
+    rm -f -- "$WEB_DIR/node_modules/.yarn-install-ok"
+    die "Website-Build fehlgeschlagen; beim nächsten Lauf werden auch die Abhängigkeiten geprüft."
   fi
-  [[ -f "$new_build/index.html" ]] || die "Frontend-Build ist unvollständig (index.html fehlt)."
+  if ! (
+    cd "$FRONTEND_DIR"
+    BUILD_PATH="$BUILD_TMP/admin" yarn build
+  ); then
+    rm -f -- "$FRONTEND_DIR/node_modules/.yarn-install-ok"
+    die "Verwaltungs-Build fehlgeschlagen; beim nächsten Lauf werden auch die Abhängigkeiten geprüft."
+  fi
+  assemble_site "$BUILD_TMP/admin" "$WEB_DIR/dist" "$new_build"
+  [[ -f "$new_build/index.html" && -f "$new_build/admin.html" ]] || die "Frontend-Build ist unvollständig (index.html oder admin.html fehlt)."
   printf '%s\n' "$build_input_hash" > "$new_build/.build-input.sha256"
 
   if [[ -d "$STAGED_BUILD_DIR" ]]; then

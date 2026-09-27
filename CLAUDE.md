@@ -30,7 +30,7 @@ ignored by Git.
 | integration | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
 | dolibarr | Dolibarr 24.0.1 + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link, the website's test mail, queue with one warning while Dolibarr is unreachable, personal data gone after hand-over, migration of old records without mails, contact form without new third party, callback as agenda event, company data and imprint (with a moved address), draft marker on legal texts, FAQ only from released website articles, status steps "Angebot bereit" and "abholbereit" |
 | frontend | Node 24, `yarn install --frozen-lockfile`, `yarn build` with `CI=true` (Create React App turns warnings into errors) |
-| web | the new website in `web/` (Vite 8, React 19, Tailwind 3, same toolbox as LION): frozen install, ESLint with jsx-a11y strict, Vitest, `yarn build` (Vite build + SSR build + `scripts/prerender.mjs`, checked for prerendered text and no Google fonts), Playwright on 1440 px and 390 px against `vite preview`; the e2e tests answer `/api` themselves (`web/e2e/fixtures.js`) |
+| web | the new website in `web/` (Vite 8, React 19, Tailwind 3, same toolbox as LION): frozen install, ESLint with jsx-a11y strict, Vitest, `yarn build` (Vite build + SSR build + `scripts/prerender.mjs`, checked for prerendered text and no Google fonts), Playwright in 390, 768, 1280 and 1440 px against `vite preview` with the live Content-Security-Policy (a Vitest test keeps it equal to `server.py`), axe WCAG 2.1 AA in light and dark, keyboard, nothing beyond the screen edge, screenshots of every page in `web/screenshots/`; the e2e tests answer `/api` themselves (`web/e2e/fixtures.js`) |
 | extra | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
 | deploy | `start.sh`, `stop.sh`, `update.sh` on a throwaway Ubuntu 24.04 server with systemd (`scripts/deploy-test/`): autostart, crash restart, reboot (`docker restart`), a broken update rolled back, a good update, `stop.sh --disable`, `USE_SYSTEMD=0`. With `--all` only when a deployment file changed against origin/main (about 15 minutes); `--only deploy` forces it. It tests the committed HEAD |
 
@@ -63,6 +63,21 @@ German (Warum / Was zu tun ist / Abnahme). Every PR names its issues with
   `requests.Session` (`admin_client` in `conftest.py`).
 - Company data and legal texts come from Dolibarr (issue #74), not from the
   website admin. Dolibarr 24.0.1 runs at erp.tabelander.co.at.
+
+## Website and admin in production
+
+`start.sh` builds `web/` (the website) and `frontend/` (the old admin, until
+milestone 4 replaces it, #57) into one directory, `frontend/build`: the
+website's prerendered pages at the top, the admin as `admin.html` with its
+files next to it (the website's file wins on a clash). Staging, activation and
+rollback work on that one directory as before. `backend/app/website.py`
+answers every address outside `/api`: `/admin*` gets `admin.html`, old
+addresses redirect (301, `OLD_ADDRESSES`), known pages get the SEO head
+(canonical, absolute og:image, LocalBusiness JSON-LD from the cached Dolibarr
+copy - a page never waits for Dolibarr), everything else `404.html` with 404.
+The Content-Security-Policy is enforced for the website and report-only for
+the old admin (its build inlines a script). The deploy group checks that the
+new site, a redirect, the admin and a 404 are served.
 
 ## Ratchet
 

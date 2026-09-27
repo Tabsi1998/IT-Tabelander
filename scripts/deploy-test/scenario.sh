@@ -27,6 +27,18 @@ healthy() {
   curl -fsS --max-time 3 "$HEALTH" 2>/dev/null | grep -q '"status":"ok"'
 }
 
+# The new website answers, old addresses lead there, the admin stays (#54).
+serves_new_website() {
+  local base=http://127.0.0.1:8001 code
+  curl -fsS --max-time 5 "$base/" | grep -q "IT-Technik, die" || fail "the start page is not the new website"
+  curl -fsS --max-time 5 "$base/rechtliches/impressum" | grep -q "Rechtliches" || fail "the legal page is missing"
+  curl -fsS --max-time 5 "$base/admin" | grep -q "Verwaltung" || fail "the admin is not served"
+  code="$(curl -s -o /dev/null -w '%{http_code}' "$base/impressum")"
+  [[ "$code" == "301" ]] || fail "the old address /impressum answers $code instead of a redirect"
+  code="$(curl -s -o /dev/null -w '%{http_code}' "$base/gibt-es-nicht")"
+  [[ "$code" == "404" ]] || fail "an unknown address answers $code instead of 404"
+}
+
 wait_healthy() {
   local seconds="$1" waited=0
   while (( waited < seconds )); do
@@ -98,7 +110,8 @@ case "${1:-}" in
     [[ "$(systemctl show -p User --value "$SERVICE.service")" == "deploy" ]] \
       || fail "the service does not run as the project user"
     healthy || fail "the health check fails"
-    echo "service active, enabled for boot, runs as deploy, website healthy"
+    serves_new_website
+    echo "service active, enabled for boot, runs as deploy, new website served"
     ;;
 
   crash)
@@ -169,7 +182,8 @@ PY"
     [[ "$(app_commit)" == "$expected" ]] || fail "the server does not run the new commit"
     grep -q "Update abgeschlossen" /tmp/update.log || fail "the update did not report which version runs"
     healthy || fail "the website is down after a good update"
-    echo "good update: runs ${expected:0:7}, website healthy"
+    serves_new_website
+    echo "good update: runs ${expected:0:7}, new website served"
     ;;
 
   stop-disable)

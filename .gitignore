@@ -27,6 +27,7 @@ web/dist/
 web/dist-ssr/
 web/test-results/
 web/playwright-report/
+web/screenshots/
 
 # ── Laufzeit (von start.sh erzeugt) ──────────────────────────────────────
 run/

@@ -71,8 +71,8 @@ export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, 
   return sent;
 }
 
-/** Requests to any server but this site's own (#45). */
 export const test = base.extend({
+  /** Requests to any server but this site's own (#45). */
   foreign: async ({ page, baseURL }, use) => {
     const foreign = [];
     page.on("request", (request) => {
@@ -81,11 +81,31 @@ export const test = base.extend({
     });
     await use(foreign);
   },
+  /** Every test fails on a breach of the security policy (#54). */
+  noPolicyBreach: [async ({ page }, use) => {
+    const breaches = [];
+    page.on("console", (message) => {
+      if (/Content Security Policy/i.test(message.text())) breaches.push(message.text());
+    });
+    await use(breaches);
+    expect(breaches, "the page breaks its Content-Security-Policy").toEqual([]);
+  }, { auto: true }],
 });
 
 export async function expectNoSidewaysScroll(page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow, "the page must not scroll sideways").toBeLessThanOrEqual(0);
+  // Nothing cut off (#55): headings, buttons, links and fields stay inside the
+  // screen, apart from rows that scroll on purpose (service pills on the phone).
+  const outside = await page.evaluate(() => {
+    const width = window.innerWidth;
+    return [...document.querySelectorAll("h1, h2, h3, p, button, a, input, textarea, select, img")]
+      .filter((node) => node.offsetParent !== null && !node.closest("[role=tablist], [role=dialog], [aria-hidden=true]"))
+      .map((node) => ({ node, rect: node.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 && (rect.left < -1 || rect.right > width + 1))
+      .map(({ node }) => `${node.tagName.toLowerCase()} "${(node.textContent || node.getAttribute("alt") || "").trim().slice(0, 40)}"`);
+  });
+  expect(outside, "elements reach beyond the screen edge").toEqual([]);
 }
 
 export { expect };

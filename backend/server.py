@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response  # noqa: E402
 
-from app import handover  # noqa: E402
+from app import handover, website  # noqa: E402
 from app.db import close_client, get_db, now_utc  # noqa: E402
 from app.seed import run_all_seeds  # noqa: E402
 from app.routers import (auth, dashboard, dolibarr_router,  # noqa: E402
@@ -232,8 +232,9 @@ async def lifespan(application: FastAPI):
 class SecurityHeadersMiddleware:
     """Adds browser protection headers to every HTTP response (issue #30).
 
-    The Content-Security-Policy is report-only while the old frontend is
-    served; the new frontend (#44) switches it to enforcing with its own tests.
+    The new website (#44, #54) loads nothing from other servers, so its
+    Content-Security-Policy is enforced. The old admin, served until the new
+    one of milestone 4, keeps a report-only policy: its build inlines a script.
     """
 
     HEADERS = (
@@ -242,14 +243,17 @@ class SecurityHeadersMiddleware:
         (b"referrer-policy", b"strict-origin-when-cross-origin"),
         (b"x-frame-options", b"DENY"),
         (b"permissions-policy", b"camera=(), microphone=(), geolocation=(), payment=()"),
-        (b"content-security-policy-report-only", (
-            b"default-src 'self'; script-src 'self' https://www.googletagmanager.com; "
-            b"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            b"font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; "
-            b"connect-src 'self' https://*.google-analytics.com https://www.googletagmanager.com; "
-            b"frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
-        )),
     )
+    PUBLIC_CSP = (b"content-security-policy", (
+        b"default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; "
+        b"img-src 'self' data: blob:; connect-src 'self'; manifest-src 'self'; "
+        b"frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    ))
+    ADMIN_CSP = (b"content-security-policy-report-only", (
+        b"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+        b"font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; "
+        b"frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    ))
 
     def __init__(self, application):
         self.application = application
@@ -259,11 +263,15 @@ class SecurityHeadersMiddleware:
             await self.application(scope, receive, send)
             return
 
+        path = scope.get("path") or ""
+        admin = path == "/admin" or path.startswith(("/admin/", "/static/"))
+        policy = self.ADMIN_CSP if admin else self.PUBLIC_CSP
+
         async def send_with_headers(message):
             if message.get("type") == "http.response.start":
                 headers = list(message.get("headers") or [])
                 present = {key.lower() for key, _value in headers}
-                headers.extend(item for item in self.HEADERS if item[0] not in present)
+                headers.extend(item for item in (*self.HEADERS, policy) if item[0] not in present)
                 message = {**message, "headers": headers}
             await send(message)
 
@@ -329,11 +337,8 @@ async def sitemap():
     settings_doc = await get_db().settings.find_one({"_id": "site"}) or {}
     base = str(settings_doc.get("canonical_base_url") or
                os.environ.get("CANONICAL_BASE_URL", "https://it.tabelander.co.at")).rstrip("/")
-    static_paths = [
-        "/", "/leistungen", "/pc-reparatur", "/notebook-reparatur", "/pc-aufruestung",
-        "/konsolen-reparatur", "/controller-reparatur", "/gaming-pc",
-        "/anfrage", "/ueber-mich", "/bewertungen", "/kontakt", "/impressum", "/datenschutz",
-    ]
+    # The one-pager and its legal pages (#54); old addresses redirect there.
+    static_paths = ["/", *(f"/rechtliches/{kind}" for kind in website.LEGAL_PAGES)]
     urls = "".join(f"<url><loc>{escape(base + p)}</loc><changefreq>weekly</changefreq></url>" for p in static_paths)
     xml = (f'<?xml version="1.0" encoding="UTF-8"?>'
            f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>')
@@ -361,16 +366,7 @@ async def api_not_found(requested_path: str):
 
 @app.api_route("/{requested_path:path}", methods=READ_METHODS, include_in_schema=False)
 async def frontend_app(requested_path: str):
-    """Serve the production React build and its client-side routes."""
+    """The website's pages and files, the admin under /admin (#54)."""
     if requested_path == "api" or requested_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="API-Endpunkt nicht gefunden")
-    build_root = FRONTEND_BUILD_DIR.resolve()
-    candidate = (build_root / requested_path).resolve()
-    if candidate != build_root and build_root not in candidate.parents:
-        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
-    if requested_path and candidate.is_file():
-        return FileResponse(candidate)
-    index = build_root / "index.html"
-    if not index.is_file():
-        raise HTTPException(status_code=503, detail="Frontend-Build ist noch nicht vorhanden")
-    return FileResponse(index, headers={"Cache-Control": "no-cache"})
+    return await website.respond(requested_path, FRONTEND_BUILD_DIR)
