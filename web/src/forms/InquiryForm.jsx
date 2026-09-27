@@ -279,7 +279,7 @@ export default function InquiryForm({ preset, onShowStatus }) {
           <Honeypot value={honeypot} onChange={setHoneypot} />
           <Consent checked={consent} onChange={setConsent}>
             Meine Angaben und Fotos dürfen zur Bearbeitung dieser Anfrage verwendet werden. Details in der{" "}
-            <a href="/rechtliches/datenschutz">Datenschutzerklärung</a>.
+            <a href="/rechtliches/datenschutz" className="underline">Datenschutzerklärung</a>.
           </Consent>
         </div>
       )}

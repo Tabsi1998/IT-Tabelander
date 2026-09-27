@@ -1,8 +1,9 @@
 # IT-Tabelander
 
-React-Website mit FastAPI-Backend, MongoDB und integriertem Online-Admin. In
-Produktion liefert FastAPI sowohl die Website als auch `/api` über **einen
-einzigen internen Port** aus.
+Website (One-Pager, Design A) mit FastAPI-Backend, MongoDB und Online-Admin;
+Kunden, Anfragen, Firmendaten und Rechtstexte liegen in Dolibarr. In
+Produktion liefert FastAPI die Website, den Admin unter `/admin` und `/api`
+über **einen einzigen internen Port** aus.
 
 ## Schnellstart – ein Befehl
 
@@ -21,7 +22,8 @@ cd /var/www/IT-Tabelander
    MongoDB konfiguriert ist;
 4. `backend/.env` mit sicheren Zufallswerten anlegen;
 5. Python-venv erstellen/reparieren und Runtime-Pakete installieren;
-6. Frontend exakt aus `frontend/yarn.lock` installieren und bauen;
+6. Website (`web/`) und Admin (`frontend/`) exakt aus ihren `yarn.lock`
+   installieren und zu einem Build zusammenbauen;
 7. den bestehenden App-Prozess sauber neu starten;
 8. MongoDB, API und Website per Healthcheck prüfen.
 
@@ -126,9 +128,28 @@ tail -f logs/backend.log
 Wer keinen Dienst möchte, setzt `USE_SYSTEMD="0"` in `deploy.config.local`;
 dann läuft die App wie früher als Hintergrundprozess ohne Autostart.
 
+### Was der Server ausliefert
+
+- `/` die Website: ein One-Pager, fertig vorgerendert. Rechtliches unter
+  `/rechtliches/impressum`, `/datenschutz` und `/nutzungsbedingungen`.
+- `/admin` die Verwaltung. Bis der neue Admin kommt (Meilenstein 4), ist das
+  noch die alte App aus `frontend/`.
+- **Alte Adressen leiten weiter** (dauerhaft, 301): z. B. `/impressum` →
+  `/rechtliches/impressum`, `/pc-reparatur` → `/leistungen/pc-reparatur`
+  (öffnet den passenden Tab), `/kontakt` und `/anfrage` → Kontaktbereich.
+  Alte Links und Google-Einträge führen so an die richtige Stelle.
+- Unbekannte Adressen bekommen eine echte „Seite nicht gefunden“ (404).
+- Für Google und Link-Vorschauen setzt der Server beim Ausliefern die
+  öffentliche Adresse, das Vorschaubild und die Firmendaten samt
+  Öffnungszeiten (aus Dolibarr) ein. Die Sitemap nennt nur die neuen Adressen.
+- Die Website lädt nichts von fremden Servern; eine strenge Sicherheitsregel
+  (Content-Security-Policy) erlaubt nur Dateien vom eigenen Server. Google
+  Analytics gibt es auf der neuen Seite nicht mehr – ohne Tracking braucht sie
+  auch kein Cookie-Banner.
+
 `update.sh` lädt ausschließlich Fast-Forward-Updates und merkt sich vorher den
 laufenden Stand. Dependencies und ein neuer Frontend-Build werden vor dem
-Stoppen vorbereitet; schlägt das fehl, bleibt die Website unangetastet und der
+Stoppen vorbereitet (Website und Admin gemeinsam); schlägt das fehl, bleibt die Website unangetastet und der
 Code auf der Platte geht auf den laufenden Stand zurück. Scheitert der Start
 des neuen Stands, gehen Code, Python-Pakete und Frontend-Build komplett zurück
 und der vorherige Stand wird wieder gestartet. Am Ende steht immer, welcher
@@ -452,7 +473,7 @@ python -m pip install -r requirements-dev.txt
 uvicorn server:app --reload --port 8001
 ```
 
-Frontend-Entwicklungsserver (bisherige Website, bis zur Umschaltung):
+Admin-Entwicklungsserver (`frontend/`, nur noch `/admin`, bis Meilenstein 4):
 
 ```bash
 cd frontend
@@ -461,7 +482,7 @@ echo 'REACT_APP_BACKEND_URL=http://localhost:8001' > .env
 yarn start
 ```
 
-Neue Website (`web/`, Meilenstein 3; geht mit der Umschaltung #54 online):
+Website (`web/`):
 
 ```bash
 cd web
@@ -500,7 +521,8 @@ Admin-Zugangsdaten und Produktionsdaten werden nicht benutzt.
 
 ```text
 backend/             FastAPI, MongoDB-Zugriff und Tests
-frontend/            React-App und festes Yarn-Lockfile
+web/                 die Website (Vite, React 19, Tailwind) mit Tests
+frontend/            der Admin bis Meilenstein 4 (Create React App)
 deploy.config        interner Host/Port und Startparameter
 deploy.config.local  optionale serverlokale Overrides (ignoriert)
 start.sh             Bootstrap, Build, Start und Healthchecks

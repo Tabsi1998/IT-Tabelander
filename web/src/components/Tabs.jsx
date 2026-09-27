@@ -18,7 +18,7 @@ const STYLES = {
  *  tabs; only the selected tab is in the tab order. `variant` picks the look
  *  of Design A. */
 export default function Tabs({ label, items, selected, onSelect, variant = "underline", listClassName = "",
-  listStyle, panelClassName = "", children }) {
+  panelClassName = "", children }) {
   const baseId = useId();
   const refs = useRef([]);
   const panelId = `${baseId}-panel`;
@@ -34,7 +34,7 @@ export default function Tabs({ label, items, selected, onSelect, variant = "unde
 
   return (
     <>
-      <div role="tablist" aria-label={label} className={listClassName} style={listStyle}>
+      <div role="tablist" aria-label={label} className={listClassName}>
         {items.map((item, index) => {
           const active = item.key === selected;
           return (

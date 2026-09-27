@@ -9,7 +9,7 @@ const browser = {
   FormData: "readonly", File: "readonly", URL: "readonly", URLSearchParams: "readonly",
   AbortController: "readonly", crypto: "readonly", console: "readonly", setTimeout: "readonly",
   clearTimeout: "readonly", matchMedia: "readonly", HTMLElement: "readonly", Event: "readonly",
-  requestAnimationFrame: "readonly", IntersectionObserver: "readonly",
+  requestAnimationFrame: "readonly", IntersectionObserver: "readonly", getComputedStyle: "readonly",
 };
 const node = { process: "readonly", console: "readonly", URL: "readonly", Buffer: "readonly" };
 

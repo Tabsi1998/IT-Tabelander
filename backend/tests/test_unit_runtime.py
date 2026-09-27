@@ -137,7 +137,7 @@ def test_only_super_admin_can_change_dolibarr_endpoint_or_key(monkeypatch):
     assert response["dolibarr_api_key_configured"] is True
 
 
-def test_sitemap_lists_inquiry_and_omits_removed_builders(monkeypatch):
+def test_sitemap_lists_the_one_pager_and_its_legal_pages(monkeypatch):
     class SettingsCollection:
         async def find_one(self, *_args, **_kwargs):
             return {
@@ -151,9 +151,10 @@ def test_sitemap_lists_inquiry_and_omits_removed_builders(monkeypatch):
     response = asyncio.run(server.sitemap())
     xml = response.body.decode("utf-8")
 
-    assert "https://example.test/anfrage" in xml
-    assert "gaming-pc-konfigurator" not in xml
-    assert "ps5-controller-konfigurator" not in xml
+    assert "<loc>https://example.test/</loc>" in xml
+    assert "https://example.test/rechtliches/datenschutz" in xml
+    # Old addresses only redirect (#54); the sitemap lists no duplicates.
+    assert "/anfrage" not in xml and "/pc-reparatur" not in xml and "konfigurator" not in xml
 
 
 def test_removed_public_write_routes_are_not_registered():
@@ -195,14 +196,15 @@ def test_seed_failure_aborts_application_startup(monkeypatch):
 
 def test_frontend_spa_and_static_files_are_served(tmp_path, monkeypatch):
     (tmp_path / "index.html").write_text("SPA", encoding="utf-8")
+    (tmp_path / "admin.html").write_text("ADMIN", encoding="utf-8")
     (tmp_path / "asset.txt").write_text("asset", encoding="utf-8")
     monkeypatch.setattr(server, "FRONTEND_BUILD_DIR", tmp_path)
 
-    spa = asyncio.run(server.frontend_app("admin/einstellungen"))
+    admin = asyncio.run(server.frontend_app("admin/einstellungen"))
     asset = asyncio.run(server.frontend_app("asset.txt"))
 
-    assert isinstance(spa, FileResponse)
-    assert Path(spa.path) == tmp_path / "index.html"
+    assert isinstance(admin, FileResponse)
+    assert Path(admin.path) == tmp_path / "admin.html"
     assert Path(asset.path) == tmp_path / "asset.txt"
     with pytest.raises(HTTPException) as exc:
         asyncio.run(server.frontend_app("api/does-not-exist"))
@@ -462,8 +464,9 @@ def test_security_headers_and_hidden_api_docs(tmp_path, monkeypatch):
     assert page.status_code == 200 and page.text == "SPA"
     assert head.status_code == 200
     for name in ("strict-transport-security", "x-content-type-options", "referrer-policy",
-                 "x-frame-options", "permissions-policy", "content-security-policy-report-only"):
+                 "x-frame-options", "permissions-policy", "content-security-policy"):
         assert name in page.headers, name
+    assert "script-src 'self';" in page.headers["content-security-policy"]
     assert page.headers["x-frame-options"] == "DENY"
     assert server.app.openapi_url is None and server.app.docs_url is None
     assert docs.text == "SPA"  # the SPA shell, never the API schema

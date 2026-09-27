@@ -126,13 +126,6 @@
   }
 }
 
-/* One column per service on wider screens; the phone scrolls the pills. */
-@media (min-width: 768px) {
-  .services-tabs {
-    grid-template-columns: repeat(var(--tabs), minmax(0, 1fr));
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

@@ -1,5 +1,6 @@
 """Milestone 2, part C: company data, legal texts, FAQ and status steps from Dolibarr."""
 import asyncio
+import json
 import unittest.mock
 
 import httpx
@@ -181,3 +182,105 @@ def test_review_and_profile_links_must_be_https():
     assert SettingsInput(google_review_url="https://g.page/r/abc/review").google_review_url
     with pytest.raises(ValidationError):
         SettingsInput(google_review_url="https://")
+
+
+# ---------------- serving the new website (#53, #54) ----------------
+def _build(tmp_path):
+    head = ('<head><title>T</title><meta property="og:image" content="/brand/og-image.png" />'
+            "<!--app-head--></head>")
+    (tmp_path / "index.html").write_text(f"<html>{head}<body>START</body></html>", encoding="utf-8")
+    (tmp_path / "404.html").write_text(f"<html>{head}<body>FEHLT</body></html>", encoding="utf-8")
+    (tmp_path / "admin.html").write_text("<html><body>VERWALTUNG</body></html>", encoding="utf-8")
+    legal = tmp_path / "rechtliches" / "impressum"
+    legal.mkdir(parents=True, exist_ok=True)
+    (legal / "index.html").write_text(f"<html>{head}<body>RECHT</body></html>", encoding="utf-8")
+    (tmp_path / "brand").mkdir(exist_ok=True)
+    (tmp_path / "brand" / "og-image.png").write_bytes(b"png")
+    return tmp_path
+
+
+def _serve(monkeypatch, tmp_path, path, cache=None):
+    from app import website
+
+    async def seo():
+        return "https://it.example.at", {"service_area": "Tirol", "google_review_url": "https://g.page/r/x"}, cache or {}
+
+    monkeypatch.setattr(website, "seo_data", seo)
+    return asyncio.run(website.respond(path, _build(tmp_path)))
+
+
+def test_old_addresses_redirect_into_the_one_pager(monkeypatch, tmp_path):
+    for old, new in (("impressum", "/rechtliches/impressum"), ("pc-reparatur", "/leistungen/pc-reparatur"),
+                     ("anfrage", "/?kontakt=anfrage#kontakt"), ("ueber-mich", "/#ueber")):
+        response = _serve(monkeypatch, tmp_path, old)
+        assert response.status_code == 301 and response.headers["location"] == new
+
+
+def test_pages_admin_files_and_unknown_addresses(monkeypatch, tmp_path):
+    import pytest
+    from fastapi import HTTPException
+
+    assert b"VERWALTUNG" in open(_serve(monkeypatch, tmp_path, "admin/anfragen").path, "rb").read()
+    assert str(_serve(monkeypatch, tmp_path, "brand/og-image.png").path).endswith("og-image.png")
+    missing = _serve(monkeypatch, tmp_path, "gibt-es-nicht")
+    assert missing.status_code == 404 and b"FEHLT" in missing.body
+    assert _serve(monkeypatch, tmp_path, "admin.html").status_code == 404
+    legal = _serve(monkeypatch, tmp_path, "rechtliches/impressum/")
+    assert b"RECHT" in legal.body and b'href="https://it.example.at/rechtliches/impressum"' in legal.body
+    service = _serve(monkeypatch, tmp_path, "leistungen/pc-reparatur")
+    assert b"START" in service.body and b'rel="canonical" href="https://it.example.at/"' in service.body
+    assert b'name="robots" content="noindex"' in _serve(monkeypatch, tmp_path, "status/view.php").body
+    with pytest.raises(HTTPException) as outside:
+        _serve(monkeypatch, tmp_path, "../../backend/.env")
+    assert outside.value.status_code == 404
+
+
+def test_start_page_carries_address_preview_and_business_data(monkeypatch, tmp_path):
+    cache = {
+        "company": {"name": "IT-Tabelander", "address": "Gasse 1", "zip": "6410", "town": "Telfs",
+                    "country_code": "AT", "phone": "+43 1", "email": "office@example.at",
+                    "socialnetworks": {"instagram": "https://instagram.com/it"}},
+        "opening_hours": [{"day": "Montag", "hours": "09:00–12:00, 13:00-17:00"},
+                          {"day": "Samstag", "hours": "nach Vereinbarung"}],
+    }
+    body = _serve(monkeypatch, tmp_path, "", cache).body.decode("utf-8")
+    assert '<link rel="canonical" href="https://it.example.at/" />' in body
+    assert 'content="https://it.example.at/brand/og-image.png"' in body
+    data = json.loads(body.split('<script type="application/ld+json">')[1].split("</script>")[0])
+    assert data["@type"] == "LocalBusiness" and data["address"]["addressLocality"] == "Telfs"
+    assert data["areaServed"] == "Tirol" and "https://g.page/r/x" in data["sameAs"]
+    assert data["openingHoursSpecification"] == [
+        {"@type": "OpeningHoursSpecification", "dayOfWeek": "Monday", "opens": "09:00", "closes": "12:00"},
+        {"@type": "OpeningHoursSpecification", "dayOfWeek": "Monday", "opens": "13:00", "closes": "17:00"},
+    ]
+
+
+def test_json_ld_cannot_close_its_script_tag():
+    from app import website
+
+    tag = website.json_ld({"name": "</script><script>alert(1)"})
+    inner = tag[len('<script type="application/ld+json">'):-len("</script>")]
+    assert "</" not in inner and json.loads(inner)["name"].startswith("</script>")
+
+
+def test_public_pages_enforce_the_security_policy_the_admin_only_reports(monkeypatch, tmp_path):
+    import server
+
+    monkeypatch.setattr(server, "FRONTEND_BUILD_DIR", _build(tmp_path))
+
+    async def call(path):
+        transport = httpx.ASGITransport(app=server.app)
+        async with httpx.AsyncClient(transport=transport, base_url="https://testserver") as client:
+            return await client.get(path)
+
+    from app import website
+
+    async def seo():
+        return "https://it.example.at", {}, {}
+
+    monkeypatch.setattr(website, "seo_data", seo)
+    public = asyncio.run(call("/"))
+    admin = asyncio.run(call("/admin"))
+    assert "default-src 'self'" in public.headers["content-security-policy"]
+    assert "content-security-policy" not in admin.headers
+    assert "content-security-policy-report-only" in admin.headers

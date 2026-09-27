@@ -7,38 +7,16 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { useTheme } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
 import { SettingsProvider } from "./context/SettingsContext";
-import { ConsentProvider } from "./context/ConsentContext";
-import Layout from "./components/Layout";
 import Skeleton from "./components/ui/skeleton";
 
-const Home = lazy(() => import("./pages/Home"));
-const Leistungen = lazy(() => import("./pages/Leistungen"));
-const ServiceLanding = lazy(() => import("./pages/ServiceLanding"));
-const GamingPCInfo = lazy(() => import("./pages/GamingPCInfo"));
-const UeberMich = lazy(() => import("./pages/UeberMich"));
-const Bewertungen = lazy(() => import("./pages/Bewertungen"));
-const Kontakt = lazy(() => import("./pages/Kontakt"));
-const Reparatur = lazy(() => import("./pages/Reparatur"));
-const Impressum = lazy(() => import("./pages/Impressum"));
-const Datenschutz = lazy(() => import("./pages/Datenschutz"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+// Only the admin lives here until the new admin of milestone 4 (#57); the
+// public website is the new one in web/ (#54).
 const AdminApp = lazy(() => import("./pages/admin/AdminApp"));
 
 const PageLoader = () => (
   <div className="mx-auto max-w-7xl px-4 pt-28">
     <Skeleton className="h-72 w-full" />
-    <div className="mt-6 grid gap-4 md:grid-cols-3">
-      <Skeleton className="h-40" />
-      <Skeleton className="h-40" />
-      <Skeleton className="h-40" />
-    </div>
   </div>
-);
-
-const Site = ({ children }) => (
-  <Layout>
-    <Suspense fallback={<PageLoader />}>{children}</Suspense>
-  </Layout>
 );
 
 const ThemedToaster = () => {
@@ -51,41 +29,22 @@ function App() {
     <HelmetProvider>
       <ThemeProvider>
         <SettingsProvider>
-          <ConsentProvider>
-            <AuthProvider>
-              <BrowserRouter>
-                <ThemedToaster />
-                <Routes>
-                  <Route path="/" element={<Site><Home /></Site>} />
-                  <Route path="/leistungen" element={<Site><Leistungen /></Site>} />
-                  <Route path="/pc-reparatur" element={<Site><ServiceLanding slug="pc-reparatur" /></Site>} />
-                  <Route path="/notebook-reparatur" element={<Site><ServiceLanding slug="notebook-reparatur" /></Site>} />
-                  <Route path="/pc-aufruestung" element={<Site><ServiceLanding slug="pc-aufruestung" /></Site>} />
-                  <Route path="/konsolen-reparatur" element={<Site><ServiceLanding slug="konsolen-reparatur" /></Site>} />
-                  <Route path="/controller-reparatur" element={<Site><ServiceLanding slug="controller-reparatur" /></Site>} />
-                  <Route path="/gaming-pc" element={<Site><GamingPCInfo /></Site>} />
-                  <Route path="/gaming-pc-konfigurator" element={<Navigate to="/anfrage?type=pc_build" replace />} />
-                  <Route path="/ps5-controller-konfigurator" element={<Navigate to="/anfrage?type=controller_custom" replace />} />
-                  <Route path="/ueber-mich" element={<Site><UeberMich /></Site>} />
-                  <Route path="/bewertungen" element={<Site><Bewertungen /></Site>} />
-                  <Route path="/kontakt" element={<Site><Kontakt /></Site>} />
-                  <Route path="/anfrage" element={<Site><Reparatur /></Site>} />
-                  <Route path="/reparatur" element={<Navigate to="/anfrage?type=repair" replace />} />
-                  <Route path="/impressum" element={<Site><Impressum /></Site>} />
-                  <Route path="/datenschutz" element={<Site><Datenschutz /></Site>} />
-                  <Route
-                    path="/admin/*"
-                    element={
-                      <Suspense fallback={<PageLoader />}>
-                        <AdminApp />
-                      </Suspense>
-                    }
-                  />
-                  <Route path="*" element={<Site><NotFound /></Site>} />
-                </Routes>
-              </BrowserRouter>
-            </AuthProvider>
-          </ConsentProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <ThemedToaster />
+              <Routes>
+                <Route
+                  path="/admin/*"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdminApp />
+                    </Suspense>
+                  }
+                />
+                <Route path="*" element={<Navigate to="/admin" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </AuthProvider>
         </SettingsProvider>
       </ThemeProvider>
     </HelmetProvider>

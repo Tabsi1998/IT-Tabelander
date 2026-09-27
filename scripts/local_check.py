@@ -21,9 +21,10 @@ Groups:
                  status, existing customers left unchanged, company data,
                  legal texts and FAQ from the knowledge base
     frontend     a frozen Yarn install and the production build with CI=true
-    web          the new website (web/, #44): a frozen install, ESLint, Vitest,
-                 the prerendered build, and Playwright on a desktop (1440 px)
-                 and a phone (390 px) with an answered API
+    web          the website (web/, #44): a frozen install, ESLint, Vitest, the
+                 prerendered build, and Playwright in 390, 768, 1280 and 1440 px
+                 with an answered API, the site's security policy, an axe
+                 accessibility check and screenshots of every page (#55)
     extra        OSV over the lockfiles, ShellCheck, and proof that every
                  test file is run by some gate
     deploy       start.sh, stop.sh and update.sh on a throwaway Ubuntu server
@@ -1237,13 +1238,15 @@ def web_e2e(context: Context) -> str:
                                env={"WEB_E2E_PORT": str(WEB_E2E_PORT)})
     text = completed.stdout + completed.stderr
     if completed.returncode != 0:
-        failed = [line for line in text.splitlines() if re.search(r"\) \[(desktop|handy)\]", line)]
+        failed = [line for line in text.splitlines() if re.search(r"\) \[(desktop|laptop|tablet|handy)\]", line)]
         raise StepFailed(f"the browser tests failed. Report: {WEB / 'playwright-report' / 'index.html'}\n"
                          f"Full output: {path}\n" + "\n".join(failed[:15] or [tail(completed, 30)]))
     passed = re.search(r"(\d+) passed", text)
     skipped = re.search(r"(\d+) skipped", text)
-    return (f"{passed.group(1) if passed else '?'} passed on 1440 px and 390 px"
-            + (f", {skipped.group(1)} only for one screen" if skipped else ""))
+    shots = len(list((WEB / "screenshots").glob("*.png")))
+    return (f"{passed.group(1) if passed else '?'} passed on 390, 768, 1280 and 1440 px"
+            + (f" ({skipped.group(1)} only for some widths)" if skipped else "")
+            + f"; {shots} screenshots in web/screenshots, report web/playwright-report/index.html")
 
 
 def web_steps() -> list:
@@ -1253,7 +1256,7 @@ def web_steps() -> list:
         Step("web", "unit", "Vitest", web_unit, ("install",)),
         Step("web", "build", "The build, every page prerendered, fonts of its own", web_build, ("install",)),
         Step("web", "browsers", "Chromium for Playwright", web_browsers, ("install",)),
-        Step("web", "e2e", "Playwright on a desktop and a phone", web_e2e, ("build", "browsers")),
+        Step("web", "e2e", "Playwright in four widths, accessibility, screenshots", web_e2e, ("build", "browsers")),
     ]
 
 

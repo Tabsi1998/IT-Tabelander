@@ -79,8 +79,8 @@ for (const count of [0, 1, 12]) {
   });
 }
 
-test("the phone menu opens, leads to a section and closes with Escape", async ({ page, isMobile }) => {
-  test.skip(!isMobile, "the menu button shows on small screens");
+test("the menu opens, leads to a section and closes with Escape", async ({ page }) => {
+  test.skip(page.viewportSize().width >= 1024, "the menu button shows below 1024 px");
   await mockApi(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Menü öffnen" }).click();

@@ -5,6 +5,11 @@ import { useApi } from "../lib/useApi.js";
 import { Check } from "../components/Icons.jsx";
 import Tabs from "../components/Tabs.jsx";
 
+// One column per service from the tablet on. Whole class names, so Tailwind
+// finds them; no inline style, which the page's security policy forbids.
+const COLUMNS = ["", "md:grid-cols-1", "md:grid-cols-2", "md:grid-cols-3", "md:grid-cols-4", "md:grid-cols-5",
+  "md:grid-cols-6", "md:grid-cols-7", "md:grid-cols-8"];
+
 /** Services as tabs (#46). They come from the admin; until it answers, and
  *  on a fresh installation, the texts of Design A stand in. */
 export default function Services({ initialSlug }) {
@@ -38,8 +43,7 @@ export default function Services({ initialSlug }) {
           selected={current.slug}
           onSelect={setSlug}
           variant="services"
-          listStyle={{ "--tabs": tabs.length }}
-          listClassName="services-tabs mx-5 flex gap-2 overflow-x-auto pb-1 md:mx-0 md:grid md:gap-0 md:overflow-visible md:border-b-2 md:border-line md:pb-0"
+          listClassName={`mx-5 flex gap-2 overflow-x-auto pb-1 md:mx-0 md:grid md:gap-0 md:overflow-visible md:border-b-2 md:border-line md:pb-0 ${COLUMNS[Math.min(tabs.length, 8)]}`}
           panelClassName="card mx-5 flex flex-col overflow-hidden md:mx-0 lg:grid lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:items-start lg:gap-12 lg:p-9"
         >
           <img
