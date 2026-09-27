@@ -109,6 +109,7 @@ async def test_connection() -> dict:
         action = "Prüfen der Dolibarr-API"
         async with httpx.AsyncClient(timeout=cfg["timeout"]) as c:
             checks = {}
+            version = None
             for key, label, path in (
                 ("api", "Dolibarr-API", "status"),
                 ("thirdparties", "Interessenten/Firmen", "thirdparties"),
@@ -131,7 +132,9 @@ async def test_connection() -> dict:
                         continue
                 response.raise_for_status()
                 checks[key] = True
-            return {"connected": True, "demo": False,
+                if key == "api":
+                    version = ((response.json() or {}).get("success") or {}).get("dolibarr_version")
+            return {"connected": True, "demo": False, "version": version or None,
                     "checks": checks,
                     "message": "API, Interessenten/Firmen und Tickets sind erreichbar."}
     except Exception as exc:  # noqa: BLE001

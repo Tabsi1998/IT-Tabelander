@@ -23,7 +23,8 @@ from app.routers import (auth, dashboard, dolibarr_router,  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("it-tabelander")
-FRONTEND_BUILD_DIR = Path(__file__).resolve().parents[1] / "frontend" / "build"
+# The built website and admin (#54, #57); start.sh activates it here.
+FRONTEND_BUILD_DIR = Path(__file__).resolve().parents[1] / "web" / "build"
 
 
 class RequestBodyTooLarge(Exception):
@@ -232,9 +233,8 @@ async def lifespan(application: FastAPI):
 class SecurityHeadersMiddleware:
     """Adds browser protection headers to every HTTP response (issue #30).
 
-    The new website (#44, #54) loads nothing from other servers, so its
-    Content-Security-Policy is enforced. The old admin, served until the new
-    one of milestone 4, keeps a report-only policy: its build inlines a script.
+    The website and its admin (#44, #54, #57) load nothing from other
+    servers, so the Content-Security-Policy is enforced everywhere.
     """
 
     HEADERS = (
@@ -249,11 +249,6 @@ class SecurityHeadersMiddleware:
         b"img-src 'self' data: blob:; connect-src 'self'; manifest-src 'self'; "
         b"frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
     ))
-    ADMIN_CSP = (b"content-security-policy-report-only", (
-        b"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-        b"font-src 'self'; img-src 'self' data: blob:; connect-src 'self'; "
-        b"frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
-    ))
 
     def __init__(self, application):
         self.application = application
@@ -263,9 +258,7 @@ class SecurityHeadersMiddleware:
             await self.application(scope, receive, send)
             return
 
-        path = scope.get("path") or ""
-        admin = path == "/admin" or path.startswith(("/admin/", "/static/"))
-        policy = self.ADMIN_CSP if admin else self.PUBLIC_CSP
+        policy = self.PUBLIC_CSP
 
         async def send_with_headers(message):
             if message.get("type") == "http.response.start":

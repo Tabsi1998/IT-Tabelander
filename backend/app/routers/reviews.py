@@ -42,7 +42,7 @@ async def create_review(payload: ReviewInput, _: dict = Depends(require_admin)):
 async def update_review(review_id: str, payload: ReviewInput, _: dict = Depends(require_admin)):
     db = get_db()
     oid = to_oid(review_id)
-    res = await db.reviews.update_one({"_id": oid}, {"$set": payload.model_dump()})
+    res = await db.reviews.update_one({"_id": oid}, {"$set": payload.model_dump(exclude_unset=True)})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Bewertung nicht gefunden")
     return serialize(await db.reviews.find_one({"_id": oid}))

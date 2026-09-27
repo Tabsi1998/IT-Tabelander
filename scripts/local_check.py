@@ -20,8 +20,7 @@ Groups:
                  Mailpit: inquiries, photos on the ticket, confirmation mails,
                  status, existing customers left unchanged, company data,
                  legal texts and FAQ from the knowledge base
-    frontend     a frozen Yarn install and the production build with CI=true
-    web          the website (web/, #44): a frozen install, ESLint, Vitest, the
+    web          the website and its admin (web/, #44, #57): a frozen install, ESLint, Vitest, the
                  prerendered build, and Playwright in 390, 768, 1280 and 1440 px
                  with an answered API, the site's security policy, an axe
                  accessibility check and screenshots of every page (#55)
@@ -72,11 +71,10 @@ LOGS = STATE / "logs"
 BASELINE = ROOT / "scripts" / "ci-baseline.json"
 WINDOWS = platform.system() == "Windows"
 
-GROUPS = ("repository", "backend", "integration", "dolibarr", "frontend", "web", "extra", "deploy")
-DEFAULT_GROUPS = ("repository", "backend", "integration", "dolibarr", "frontend", "web")
+GROUPS = ("repository", "backend", "integration", "dolibarr", "web", "extra", "deploy")
+DEFAULT_GROUPS = ("repository", "backend", "integration", "dolibarr", "web")
 
 BACKEND = ROOT / "backend"
-FRONTEND = ROOT / "frontend"
 WEB = ROOT / "web"
 SNAPSHOT = STATE / "snapshot"
 SNAPSHOT_BACKEND = SNAPSHOT / "backend"
@@ -1121,46 +1119,6 @@ def integration_steps() -> list:
     ]
 
 
-# ------------------------------------------------------------------ frontend
-
-def frontend_install(context: Context) -> str:
-    node = node_of(context, NODE_MAJOR)
-    completed = run_yarn(context, FRONTEND, "install", "--frozen-lockfile", "--non-interactive",
-                         "--production=false", node=node, check=False, timeout=3600)
-    path = context.log("frontend-install", completed.stdout + completed.stderr)
-    if completed.returncode != 0:
-        raise StepFailed(f"the frozen install failed. Full output: {path}\n" + tail(completed))
-    return "frozen install on Node " + context.run(node, "--version", timeout=60).stdout.strip()
-
-
-def frontend_build(context: Context) -> str:
-    """The production build, with CI=true as on GitHub.
-
-    Create React App turns every lint warning into an error when CI is set, so
-    a build that passes in a developer's shell can still fail in the pipeline.
-    """
-    completed = run_yarn(context, FRONTEND, "build", node=node_of(context, NODE_MAJOR),
-                         check=False, timeout=3600)
-    path = context.log("frontend-build", completed.stdout + completed.stderr)
-    if completed.returncode != 0:
-        raise StepFailed(f"the production build failed. Full output: {path}\n" + tail(completed, 30))
-    out = FRONTEND / "build"
-    if not (out / "index.html").is_file():
-        raise StepFailed("the build produced no build/index.html")
-    bundles = list((out / "static" / "js").glob("*.js")) if (out / "static" / "js").is_dir() else []
-    if not bundles:
-        raise StepFailed("the build produced no JavaScript under build/static/js")
-    size = sum(item.stat().st_size for item in out.rglob("*") if item.is_file())
-    return f"{len(bundles)} bundles, {size // 1024} KiB"
-
-
-def frontend_steps() -> list:
-    return [
-        Step("frontend", "install", "A frozen install from yarn.lock", frontend_install),
-        Step("frontend", "build", "The production build with CI=true", frontend_build, ("install",)),
-    ]
-
-
 # ----------------------------------------------------------------------- web
 
 def web_yarn(context: Context, name: str, *arguments, timeout: int = 1800, env: dict | None = None):
@@ -1596,7 +1554,7 @@ def deploy_steps() -> list:
 
 def plan(groups: set) -> list:
     builders = {"repository": repository_steps, "backend": backend_steps,
-                "integration": integration_steps, "dolibarr": dolibarr_steps, "frontend": frontend_steps,
+                "integration": integration_steps, "dolibarr": dolibarr_steps,
                 "web": web_steps, "extra": extra_steps, "deploy": deploy_steps}
     steps: list = []
     if "dolibarr" in groups and "integration" not in groups:

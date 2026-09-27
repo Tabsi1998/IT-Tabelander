@@ -103,8 +103,12 @@ case "${1:-}" in
     ;;
 
   first-start)
+    # What a server updated from before milestone 4 still has (#57): the old
+    # admin's packages and build under frontend/, ignored by Git.
+    as_deploy "$APP" bash -c 'mkdir -p frontend/build frontend/node_modules/x && echo old > frontend/build/index.html'
     as_deploy "$APP" ./start.sh --no-system-install > /tmp/start.log 2>&1 \
       || { tail -n 40 /tmp/start.log; fail "./start.sh failed"; }
+    [[ ! -e "$APP/frontend" ]] || fail "the old frontend/ directory was not removed after the start"
     systemctl is-active --quiet "$SERVICE" || fail "the service is not active"
     systemctl is-enabled --quiet "$SERVICE" || fail "the service does not start at boot"
     [[ "$(systemctl show -p User --value "$SERVICE.service")" == "deploy" ]] \

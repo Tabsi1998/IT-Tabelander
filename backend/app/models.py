@@ -278,6 +278,10 @@ class SettingsInput(BaseModel):
     warning_email: Optional[str] = Field(default=None, max_length=255)
     # "Auf Google bewerten" on the website (#51).
     google_review_url: Optional[str] = Field(default=None, max_length=2048)
+    # "Über mich" on the website (#58); empty = the built-in text.
+    about_text: Optional[str] = Field(default=None, max_length=4000)
+    about_qualifications: Optional[List[str]] = Field(default=None, max_length=12)
+    about_photo_url: Optional[str] = Field(default=None, max_length=512)
     # Website content from Dolibarr's knowledge base (#74, #81): the public
     # category and which article is which legal page. 0 = none.
     dolibarr_content_category_id: Optional[int] = Field(default=None, ge=0)
@@ -343,6 +347,27 @@ class SettingsInput(BaseModel):
     def validate_google_review_url(cls, value):
         return _https_url(value, "Der Link zum Google-Profil")
 
+    @field_validator("about_qualifications")
+    @classmethod
+    def validate_about_qualifications(cls, values):
+        if values is None:
+            return values
+        cleaned = []
+        for value in values:
+            text = str(value or "").strip()
+            if len(text) > 60:
+                raise ValueError("Eine Qualifikation darf höchstens 60 Zeichen lang sein")
+            if text and text not in cleaned:
+                cleaned.append(text)
+        return cleaned
+
+    @field_validator("about_photo_url")
+    @classmethod
+    def validate_about_photo_url(cls, value):
+        if value and not re.fullmatch(r"/api/media/[A-Za-z0-9._-]+", value.strip()):
+            raise ValueError("Das Foto muss hier hochgeladen werden")
+        return value.strip() if value else value
+
     @field_validator("smtp_host")
     @classmethod
     def validate_smtp_host(cls, value):
@@ -389,3 +414,23 @@ class SettingsInput(BaseModel):
             if code:
                 cleaned[key] = code
         return cleaned
+
+
+# ---------- Admin: order and gallery (#58, #60) ----------
+class OrderInput(BaseModel):
+    """The new order of a list, as the ids from top to bottom."""
+    ids: List[str] = Field(min_length=1, max_length=500)
+
+
+GALLERY_CATEGORIES = ("pc_build", "repair", "upgrade", "console", "controller", "other")
+
+
+class GalleryUpdate(BaseModel):
+    caption: Optional[str] = Field(default=None, max_length=160)
+    category: Optional[Literal["pc_build", "repair", "upgrade", "console", "controller", "other"]] = None
+    visible: Optional[bool] = None
+
+    @field_validator("caption", mode="before")
+    @classmethod
+    def strip_caption(cls, value):
+        return value.strip() if isinstance(value, str) else value

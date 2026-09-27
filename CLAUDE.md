@@ -29,8 +29,7 @@ ignored by Git.
 | backend | for Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, `tests/test_unit_runtime.py`, `tests/test_inquiry_dolibarr.py`, `tests/test_handover.py` and `tests/test_site_data.py` |
 | integration | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
 | dolibarr | Dolibarr 24.0.1 + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link, the website's test mail, queue with one warning while Dolibarr is unreachable, personal data gone after hand-over, migration of old records without mails, contact form without new third party, callback as agenda event, company data and imprint (with a moved address), draft marker on legal texts, FAQ only from released website articles, status steps "Angebot bereit" and "abholbereit" |
-| frontend | Node 24, `yarn install --frozen-lockfile`, `yarn build` with `CI=true` (Create React App turns warnings into errors) |
-| web | the new website in `web/` (Vite 8, React 19, Tailwind 3, same toolbox as LION): frozen install, ESLint with jsx-a11y strict, Vitest, `yarn build` (Vite build + SSR build + `scripts/prerender.mjs`, checked for prerendered text and no Google fonts), Playwright in 390, 768, 1280 and 1440 px against `vite preview` with the live Content-Security-Policy (a Vitest test keeps it equal to `server.py`), axe WCAG 2.1 AA in light and dark, keyboard, nothing beyond the screen edge, screenshots of every page in `web/screenshots/`; the e2e tests answer `/api` themselves (`web/e2e/fixtures.js`) |
+| web | the website and its admin in `web/` (Vite 8, React 19, Tailwind 3, same toolbox as LION): frozen install, ESLint with jsx-a11y strict, Vitest, `yarn build` (Vite build + SSR build + `scripts/prerender.mjs`, checked for prerendered text and no Google fonts), Playwright in 390, 768, 1280 and 1440 px against `vite preview` with the live Content-Security-Policy (a Vitest test keeps it equal to `server.py`), axe WCAG 2.1 AA in light and dark, keyboard, nothing beyond the screen edge, screenshots of every page in `web/screenshots/`; the e2e tests answer `/api` themselves (`web/e2e/fixtures.js`) |
 | extra | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
 | deploy | `start.sh`, `stop.sh`, `update.sh` on a throwaway Ubuntu 24.04 server with systemd (`scripts/deploy-test/`): autostart, crash restart, reboot (`docker restart`), a broken update rolled back, a good update, `stop.sh --disable`, `USE_SYSTEMD=0`. With `--all` only when a deployment file changed against origin/main (about 15 minutes); `--only deploy` forces it. It tests the committed HEAD |
 
@@ -66,27 +65,38 @@ German (Warum / Was zu tun ist / Abnahme). Every PR names its issues with
 
 ## Website and admin in production
 
-`start.sh` builds `web/` (the website) and `frontend/` (the old admin, until
-milestone 4 replaces it, #57) into one directory, `frontend/build`: the
-website's prerendered pages at the top, the admin as `admin.html` with its
-files next to it (the website's file wins on a clash). Staging, activation and
-rollback work on that one directory as before. `backend/app/website.py`
-answers every address outside `/api`: `/admin*` gets `admin.html`, old
-addresses redirect (301, `OLD_ADDRESSES`), known pages get the SEO head
-(canonical, absolute og:image, LocalBusiness JSON-LD from the cached Dolibarr
-copy - a page never waits for Dolibarr), everything else `404.html` with 404.
-The Content-Security-Policy is enforced for the website and report-only for
-the old admin (its build inlines a script). The deploy group checks that the
-new site, a redirect, the admin and a 404 are served.
+`web/` is one Vite app: the website (prerendered) and the admin under
+`/admin` (`src/admin/`, a lazy chunk visitors never download; `admin.html` is
+its empty shell from `scripts/prerender.mjs`). `start.sh` builds it and
+activates `web/dist` as `web/build`; staging, activation and rollback work on
+that one directory. `backend/app/website.py` answers every address outside
+`/api`: `/admin*` gets `admin.html`, old addresses redirect (301,
+`OLD_ADDRESSES`), known pages get the SEO head (canonical, absolute og:image,
+the admin's start page title/description, LocalBusiness JSON-LD from the
+cached Dolibarr copy - a page never waits for Dolibarr), everything else
+`404.html` with 404. The Content-Security-Policy is enforced everywhere.
+
+`frontend/` (the old CRA admin) was removed in milestone 4. A server updated
+from before still has `frontend/build` and `frontend/node_modules` (ignored
+by Git); `start.sh` removes them after the first successful start of the new
+version (`remove_legacy_frontend`), never before, because a failed update
+rolls back to the old version, which serves `frontend/build`. The deploy
+group plants such leftovers and checks they are gone.
+
+The admin (#57): `src/admin/api.js` renews an expired access cookie once via
+`/api/auth/refresh` and retries; if that fails too, `admin-session-expired`
+shows the sign-in form in place, and the same page opens after signing in.
+`LoadState` renders a form only after its data loaded (a failed load can
+never save over data). `ErrorBoundary` per page. Error texts come from the
+backend's `detail` (pydantic lists mapped to field names in German).
 
 ## Ratchet
 
 The extra group compares against `scripts/ci-baseline.json`: known findings
 are debt, new ones fail. After paying debt down, run
-`python scripts/local_check.py --all --record` and commit the baseline. The
-hard gates (repository, backend, integration, dolibarr, frontend) are never
-ratcheted. Debt on 2026-09-15: 29 OSV
-findings in `frontend/yarn.lock`, 4 ShellCheck findings.
+`python scripts/local_check.py --all --record` and commit the baseline. The hard gates (repository, backend, integration, dolibarr, web) are never
+ratcheted. Debt on 2026-09-27: no OSV findings (the 29 of the old CRA admin's
+`frontend/yarn.lock` left with it in milestone 4), 4 ShellCheck findings.
 
 ## Extending the checks
 

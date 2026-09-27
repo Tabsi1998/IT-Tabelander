@@ -22,8 +22,8 @@ cd /var/www/IT-Tabelander
    MongoDB konfiguriert ist;
 4. `backend/.env` mit sicheren Zufallswerten anlegen;
 5. Python-venv erstellen/reparieren und Runtime-Pakete installieren;
-6. Website (`web/`) und Admin (`frontend/`) exakt aus ihren `yarn.lock`
-   installieren und zu einem Build zusammenbauen;
+6. Website samt Admin (`web/`) exakt aus `web/yarn.lock` installieren und
+   bauen;
 7. den bestehenden App-Prozess sauber neu starten;
 8. MongoDB, API und Website per Healthcheck prüfen.
 
@@ -32,8 +32,8 @@ installierte Komponenten werden nicht erneut installiert. Ein mit `Ctrl-C`
 abgebrochener Lauf kann einfach mit `./start.sh` fortgesetzt werden.
 
 Beim ersten Start werden einmalig sichere Admin-Zugangsdaten ausgegeben. Danach
-unter `/admin` anmelden und E-Mail/Passwort unter **Einstellungen →
-Admin-Zugang** ändern.
+unter `/admin` anmelden und E-Mail/Passwort unter **Technik → Dein Zugang**
+ändern.
 
 ## Reverse Proxy
 
@@ -132,8 +132,7 @@ dann läuft die App wie früher als Hintergrundprozess ohne Autostart.
 
 - `/` die Website: ein One-Pager, fertig vorgerendert. Rechtliches unter
   `/rechtliches/impressum`, `/datenschutz` und `/nutzungsbedingungen`.
-- `/admin` die Verwaltung. Bis der neue Admin kommt (Meilenstein 4), ist das
-  noch die alte App aus `frontend/`.
+- `/admin` die Verwaltung (Teil derselben App, nur bei Bedarf geladen).
 - **Alte Adressen leiten weiter** (dauerhaft, 301): z. B. `/impressum` →
   `/rechtliches/impressum`, `/pc-reparatur` → `/leistungen/pc-reparatur`
   (öffnet den passenden Tab), `/kontakt` und `/anfrage` → Kontaktbereich.
@@ -163,16 +162,24 @@ Wer Systempakete bewusst selbst verwaltet, kann verwenden:
 
 ## Was wird wo eingestellt?
 
-### Online unter `/admin/einstellungen`
+### Online im Admin unter `/admin`
 
-- Servicegebiet
-- SEO-Titel, Beschreibung und öffentliche Website-URL
-- Google Analytics Measurement-ID
-- Dolibarr aktiv/inaktiv, Basis-URL, API-Key, Timeout und Ländercode
-- E-Mail-Versand der Website (Mailserver, Absender, wohin Warnungen gehen) mit
-  Knopf **Test-Mail senden**
-- Light-/Dark-Logos
-- Admin-Login-E-Mail und Admin-Passwort
+Jedes Thema steht an genau einer Stelle:
+
+| Bereich | Was du dort pflegst |
+|---|---|
+| **Übersicht** | was wartet, was neu ist, was noch fehlt (z. B. E-Mail-Versand) |
+| **Texte** | „Über mich“: Text, Qualifikationen, Foto |
+| **Leistungen** | die Tabs der Website: Name, Überschrift, Text, Stichpunkte, Bild, Reihenfolge, sichtbar; Vorschau je Leistung |
+| **Galerie** | Fotos deiner Arbeiten, auch direkt mit der Handy-Kamera: Titel, Bereich, Reihenfolge, sichtbar |
+| **Bewertungen** | Bewertungen eintragen, wie Kunden sie geschrieben haben (Google mit Link, persönlich, E-Mail) |
+| **Dolibarr** | Verbindung (mit Test, zeigt die Version), Inhalte aus der Wissensdatenbank, Themengruppen je Anfrageart, Warteschlange, Altdaten-Umzug |
+| **Technik** | öffentliche Adresse, Einzugsgebiet, Titel und Beschreibung der Startseite für Google, Google-Profil, E-Mail-Versand mit **Test-Mail senden**, dein Zugang |
+
+Die Anmeldung verlängert sich im Hintergrund von selbst (bis zu 7 Tage).
+Läuft sie doch ab, sagt der Admin das und öffnet nach dem neuen Anmelden
+wieder dieselbe Seite. Formulare lassen sich erst speichern, wenn ihre Daten
+geladen sind – so überschreibt ein Ladefehler nie etwas.
 
 Firmendaten, Öffnungszeiten, Social-Media-Links, Impressum, Datenschutz,
 Nutzungsbedingungen und FAQ stehen **nicht** mehr hier, sondern in Dolibarr
@@ -191,7 +198,7 @@ Schreibfeld.
 Die Website schickt selbst nur eine Art Mail: die Warnung an dich, wenn eine
 Anfrage nicht in Dolibarr ankommt. Bestätigungen an Kunden verschickt Dolibarr.
 
-1. `/admin/einstellungen` öffnen, Block **E-Mail-Versand der Website**.
+1. `/admin/technik` öffnen, Block **E-Mail-Versand der Website**.
 2. Mailserver, Port und Verschlüsselung deines Mail-Anbieters eintragen (meist
    Port 587 mit STARTTLS), dazu Benutzername und Passwort des Postfachs.
 3. Absender-Adresse (z. B. `office@tabelander.co.at`) und bei **Warnungen gehen
@@ -263,7 +270,7 @@ Website): Name, E-Mail, optional Telefon und Nachricht werden ein Ticket in
 Dolibarr. Ein neuer Absender wird dabei **kein** Interessent; schreibt ein
 bekannter Kunde, hängt das Ticket an ihm (ohne ihn zu ändern). Für eine eigene
 Themengruppe „Kontakt“ in Dolibarr deren Code (z. B. `KONTAKT`) unter
-`/admin/einstellungen` bei **Kontaktnachricht** eintragen.
+`/admin/dolibarr` unter **Themengruppen je Anfrageart** bei **Kontaktnachricht** eintragen.
 
 **Rückruf-Wunsch**: Wer im Formular eine Wunschzeit angibt (Telefonnummer
 Pflicht, frühestens in 10 Minuten, höchstens 60 Tage voraus), bekommt in
@@ -311,7 +318,7 @@ werden ausdrücklich nicht in Git aufgenommen.
    Werkstatt-Adresse eintragen und bei **Benachrichtigungs-E-Mail von** die
    Absender-Adresse. Der E-Mail-Versand von Dolibarr selbst muss eingerichtet
    sein (**Einstellungen → E-Mails**).
-4. Unter `/admin/einstellungen` Dolibarr aktivieren, die Basis-URL der
+4. Unter `/admin/dolibarr` (Block **Verbindung**) Dolibarr aktivieren, die Basis-URL der
    Installation (ohne `/api/index.php`) und den API-Key eintragen.
 5. Unter `/admin/dolibarr` auf **Verbindung prüfen** klicken.
 
@@ -325,7 +332,7 @@ Dolibarr.
 Die Anfrageart wird ohne weitere Einrichtung passend gesetzt: Reparaturen als
 `ISSUE`, Neubau/Beratung als `COM`, Umbau/Upgrade als `REQUEST` und Sonstiges als
 `OTHER`; die Dringlichkeit ist zunächst `NORMAL`. Eigene Themengruppen können in
-Dolibarr angelegt und deren Codes unter `/admin/einstellungen` je Anfrageart
+Dolibarr angelegt und deren Codes unter `/admin/dolibarr` je Anfrageart
 zugeordnet werden. Sinnvolle Codes sind `REPARATUR`, `PC_BAU`, `PC_UPGRADE`,
 `CONTROLLER`, `BERATUNG` und `SONSTIGES`. Leere Zuordnungen werden nicht an
 Dolibarr gesendet und können den Sync daher nicht stören.
@@ -447,12 +454,12 @@ Ein gesunder Healthcheck liefert:
 | Problem | Lösung |
 |---|---|
 | MongoDB startet nicht | `systemctl status mongod` und `/var/log/mongodb/mongod.log` prüfen |
-| Dolibarr meldet HTTP 403 | API-Benutzerrechte für **Geschäftspartner** und **Tickets** prüfen; die genaue fehlgeschlagene Stufe steht unter `/admin/anfragen` |
+| Dolibarr meldet HTTP 403 | API-Benutzerrechte für **Geschäftspartner** und **Tickets** prüfen; die genaue fehlgeschlagene Stufe steht unter `/admin/dolibarr` bei der Warteschlange |
 | Stammkunde wird in Dolibarr doppelt angelegt | dem API-Benutzer das Recht **Geschäftspartner: alle einsehen, nicht nur die verknüpften** geben |
 | Firmendaten oder Öffnungszeiten fehlen auf der Website | `/admin/dolibarr` → **Inhalte aus Dolibarr** zeigt den Grund; meist fehlt die Konstante `API_LOGINS_ALLOWED_FOR_GET_COMPANY` bzw. `API_LOGINS_ALLOWED_FOR_CONST_READ` |
 | Ein FAQ-Artikel erscheint nicht | Kategorie „Website“ gesetzt? Freigegeben? Nicht als Rechtstext ausgewählt? Dann **Neu laden** |
 | Kunde bekommt keine Eingangsbestätigung | Dolibarr unter **Einstellungen → E-Mails** eine Test-Mail senden lassen; die Website verschickt diese Mail nicht selbst |
-| Keine Warn-Mail, obwohl Anfragen warten | unter `/admin/einstellungen` **Test-Mail senden**; unter `/admin/dolibarr` steht bei der Warteschlange, warum die Warnung nicht rausging |
+| Keine Warn-Mail, obwohl Anfragen warten | unter `/admin/technik` **Test-Mail senden**; unter `/admin/dolibarr` steht bei der Warteschlange, warum die Warnung nicht rausging |
 | Rückruf-Termin fehlt, Anfrage wartet mit „Anlegen des Rückruf-Termins“ | Modul **Kalender** aktivieren und dem API-Benutzer **eigene Termine anlegen** geben, dann **Jetzt erneut versuchen** |
 | Dolibarr meldet HTTP 404 | Als Basis-URL nur die Dolibarr-Installation eintragen, z. B. `https://erp.example.at/dolibarr`, nicht `/api/index.php` anhängen |
 | Port 8001 ist belegt | fremden Dienst stoppen oder `BACKEND_PORT` in `deploy.config.local` und im Reverse Proxy gemeinsam ändern |
@@ -473,24 +480,15 @@ python -m pip install -r requirements-dev.txt
 uvicorn server:app --reload --port 8001
 ```
 
-Admin-Entwicklungsserver (`frontend/`, nur noch `/admin`, bis Meilenstein 4):
-
-```bash
-cd frontend
-yarn install --frozen-lockfile
-echo 'REACT_APP_BACKEND_URL=http://localhost:8001' > .env
-yarn start
-```
-
-Website (`web/`):
+Website und Admin (`web/`):
 
 ```bash
 cd web
 yarn install --frozen-lockfile
-yarn dev          # http://127.0.0.1:3010, /api geht an das Backend auf Port 8001
+yarn dev          # http://127.0.0.1:3010 (Admin: /admin), /api geht an das Backend auf Port 8001
 yarn lint && yarn test
 yarn build        # dist/ mit fertig vorgerenderten Seiten
-yarn test:e2e     # Playwright am PC (1440 px) und Handy (390 px)
+yarn test:e2e     # Playwright in 390, 768, 1280 und 1440 px, mit Barrierefreiheits-Check
 ```
 
 Sie ist ein One-Pager nach Design A: Leistungen als Tabs, Ablauf, „Aus der
@@ -505,7 +503,7 @@ Prüfungen:
 
 ```bash
 cd backend && python -m pytest tests/test_unit_runtime.py tests/test_inquiry_dolibarr.py tests/test_handover.py tests/test_site_data.py -q
-cd frontend && CI=true yarn build
+cd web && yarn lint && yarn test && yarn build
 bash -n start.sh stop.sh update.sh
 ```
 
@@ -521,8 +519,7 @@ Admin-Zugangsdaten und Produktionsdaten werden nicht benutzt.
 
 ```text
 backend/             FastAPI, MongoDB-Zugriff und Tests
-web/                 die Website (Vite, React 19, Tailwind) mit Tests
-frontend/            der Admin bis Meilenstein 4 (Create React App)
+web/                 Website und Admin (Vite, React 19, Tailwind) mit Tests
 deploy.config        interner Host/Port und Startparameter
 deploy.config.local  optionale serverlokale Overrides (ignoriert)
 start.sh             Bootstrap, Build, Start und Healthchecks
