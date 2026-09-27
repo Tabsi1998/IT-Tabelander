@@ -58,8 +58,18 @@ revert_last_change() {
   as_deploy "$WORK" git push --quiet
 }
 
+# The whole update output goes to stdout as well, so local_check.py keeps it in
+# .local-testing/logs/deploy-<phase>.log; the summary stays the last line.
 run_update() {
-  as_deploy "$APP" ./update.sh > /tmp/update.log 2>&1
+  local status=0
+  as_deploy "$APP" ./update.sh > /tmp/update.log 2>&1 || status=$?
+  cat /tmp/update.log
+  return "$status"
+}
+
+# A failed update must fail for the planted reason, not for any other one.
+expect_in_update_log() {
+  grep -qF -- "$1" /tmp/update.log || fail "the update failed, but not with: $1"
 }
 
 case "${1:-}" in
@@ -117,6 +127,8 @@ case "${1:-}" in
     if run_update; then
       fail "an update with a broken import succeeded"
     fi
+    expect_in_update_log "deploy test: broken import"
+    expect_in_update_log "Backend-Code oder Runtime-Abhängigkeiten können nicht geladen werden"
     [[ "$(app_commit)" == "$before" ]] || fail "the code on disk was not rolled back"
     [[ "$(main_pid)" == "$pid" ]] || fail "the running app was restarted although the update never reached it"
     [[ ! -e "$APP/run/frontend-build.next" ]] || fail "a build of the failed version was left for the next start"
@@ -138,6 +150,7 @@ PY"
     if run_update; then
       fail "an update whose start fails succeeded"
     fi
+    expect_in_update_log "Backend wurde nicht rechtzeitig bereit"
     grep -q "Es läuft wieder" /tmp/update.log || { tail -n 40 /tmp/update.log; fail "the rollback did not restart the previous version"; }
     [[ "$(app_commit)" == "$before" ]] || fail "the code on disk was not rolled back"
     systemctl is-active --quiet "$SERVICE" || fail "the service is not active after the rollback"
