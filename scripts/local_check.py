@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
-"""Run every check the CI runs, on this computer - and the ones it skips.
+"""Every check of IT-Tabelander, on this computer. This is the gate.
 
-GitHub is the second, independent confirmation. This is the first: every job of
-.github/workflows/ci.yml, run with the developer's own tools and processor,
-plus the gates the CI does not run.
+The repository is private and GitHub Actions would cost minutes, so GitHub runs
+no workflow. It only warns about packages with known vulnerabilities
+(Dependabot alerts), which OSV in the extra group checks here as well.
 
 Groups:
     repository   every shell script parses, no CRLF stored, whitespace across
                  every tracked line, Gitleaks over the history and over
                  uncommitted and new files
-    backend      for Python 3.10 and 3.14, the CI matrix: a pinned
-                 environment, pip check, a full compile, the server imports,
-                 and the unit tests the CI runs - all against a copy of what
+    backend      for Python 3.10 and 3.14 (oldest and newest supported): a
+                 pinned environment, pip check, a full compile, the server
+                 imports, and the unit tests - all against a copy of what
                  Git would commit, so a local .env never reaches a test
     integration  the API and regression suites: a MongoDB of its own, the live
                  FastAPI server over HTTPS as in production, and both suites
-                 against it (ci.yml's integration job repeats them as a control)
+                 against it
     dolibarr     the website against a real Dolibarr 24.0.1 with MariaDB and
                  Mailpit: inquiries, photos on the ticket, confirmation mails,
-                 status, existing customers left unchanged. GitHub has no
-                 Dolibarr, so this group runs here only
+                 status, existing customers left unchanged, company data,
+                 legal texts and FAQ from the knowledge base
     frontend     a frozen Yarn install and the production build with CI=true
-    extra        what GitHub does not run: OSV over the lockfiles, ShellCheck,
-                 and proof that every test file is run by some gate
+    extra        OSV over the lockfiles, ShellCheck, and proof that every
+                 test file is run by some gate
     deploy       start.sh, stop.sh and update.sh on a throwaway Ubuntu server
                  with systemd: autostart, restart after a crash, reboot, a
                  broken update rolled back, a good update, stop --disable and
@@ -81,15 +81,14 @@ TLS = STATE / "tls"
 # read thousands of third-party files as if they were the project's own.
 CACHE = Path.home() / ".local-ci" / ROOT.name
 
-# The CI matrix. Both ends are checked, because a server may run either.
+# Both ends of the supported Python range, because a server may run either.
 PYTHON_VERSIONS = ("3.10", "3.14")
 INTEGRATION_PYTHON = "3.14"
 NODE_MAJOR = 24
 
-# The two test files the CI's backend job runs. The other two need a live
-# server and a database; the integration group (and ci.yml's integration job)
-# provides both.
-CI_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py", "tests/test_handover.py",
+# The unit test files. The integration files need a live server and a
+# database, the Dolibarr file a test Dolibarr; their groups provide both.
+UNIT_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py", "tests/test_handover.py",
                  "tests/test_site_data.py")
 INTEGRATION_TEST_FILES = ("tests/test_api.py", "tests/test_regression_iter2.py")
 DOLIBARR_TEST_FILES = ("tests/test_dolibarr_runtime.py",)
@@ -131,7 +130,7 @@ INTEGRATION_DB = "it_tabelander_local_check_test"
 
 PASS, FAIL, SKIP = "passed", "failed", "skipped"
 
-# The MongoDB the CI workflows run as a service.
+# The MongoDB release the server runs.
 MONGO_IMAGE = "mongo:7.0.39-jammy"
 # OSV-Scanner 2.6.0 and ShellCheck 0.11.0, pinned by digest: a scanner that
 # updates itself between two runs would change the findings on its own.
@@ -983,7 +982,7 @@ def import_step(version: str):
 
 def unit_step(version: str):
     def action(context: Context) -> str:
-        completed = context.run(backend_python(version), "-m", "pytest", *CI_TEST_FILES, "-q",
+        completed = context.run(backend_python(version), "-m", "pytest", *UNIT_TEST_FILES, "-q",
                                 "-p", "no:cacheprovider", cwd=SNAPSHOT_BACKEND, check=False,
                                 timeout=1800)
         text = completed.stdout + completed.stderr
@@ -1008,7 +1007,7 @@ def backend_steps() -> list:
                  compile_step(version), (venv, "snapshot")),
             Step("backend", f"import-{version}", f"Python {version}: the server imports",
                  import_step(version), (venv, "snapshot")),
-            Step("backend", f"unit-{version}", f"Python {version}: the unit tests the CI runs",
+            Step("backend", f"unit-{version}", f"Python {version}: the unit tests",
                  unit_step(version), (venv, "snapshot")),
         ]
     return steps
@@ -1076,7 +1075,7 @@ def integration_server(context: Context) -> str:
 def integration_tests(context: Context) -> str:
     """The API and regression suites against the live server.
 
-    ci.yml's integration job repeats them. conftest.py skips both files unless
+    conftest.py skips both files unless
     IT_TABELANDER_RUN_INTEGRATION=1, the server is on localhost and the
     database name contains "test". All three hold here. A run in which the
     tests are skipped anyway fails, rather than reading as green.
@@ -1326,15 +1325,15 @@ def test_inventory(context: Context) -> str:
     """
     present = {name for name in tracked(context, "backend/tests")
                if Path(name).name.startswith("test_") and name.endswith(".py")}
-    covered = {f"backend/{name}" for name in CI_TEST_FILES + INTEGRATION_TEST_FILES + DOLIBARR_TEST_FILES}
+    covered = {f"backend/{name}" for name in UNIT_TEST_FILES + INTEGRATION_TEST_FILES + DOLIBARR_TEST_FILES}
     missing = sorted(present - covered)
     if missing:
         raise StepFailed("these test files are run by no gate:\n  " + "\n  ".join(missing))
     gone = sorted(covered - present)
     if gone:
         raise StepFailed("the gates name test files that no longer exist:\n  " + "\n  ".join(gone))
-    return (f"all {len(present)} test files run: {len(CI_TEST_FILES)} in the CI, "
-            f"{len(INTEGRATION_TEST_FILES)} in the integration job, "
+    return (f"all {len(present)} test files run: {len(UNIT_TEST_FILES)} unit, "
+            f"{len(INTEGRATION_TEST_FILES)} in the integration group, "
             f"{len(DOLIBARR_TEST_FILES)} against Dolibarr here")
 
 
