@@ -9,8 +9,11 @@ from .security import hash_password
 async def ensure_indexes():
     db = get_db()
     await db.users.create_index("email", unique=True)
-    await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.login_attempts.create_index("identifier")
+    # Failure counters vanish a day after the last wrong password (#32).
+    await db.login_attempts.create_index(
+        "updated_at", expireAfterSeconds=24 * 60 * 60, name="login_attempts_expiry",
+    )
     await db.services.create_index("slug")
     await db.repair_requests.create_index(
         "request_id",
@@ -84,7 +87,6 @@ async def seed_settings():
         "dolibarr_country_code": "AT",
         "dolibarr_public_ticket_enabled": False,
         "dolibarr_ticket_categories": {},
-        "google_place_id": os.environ.get("GOOGLE_PLACE_ID", ""),
         "seo_default_title": (
             "IT-Tabelander – IT-Service, Reparatur & Gaming-Hardware in Tirol"
         ),
@@ -362,8 +364,19 @@ async def seed_faqs():
     )
 
 
+async def remove_retired_settings():
+    """Drop settings of removed features; the Places key was a stored secret (#33)."""
+    await get_db().settings.update_one(
+        {"_id": "site"},
+        {"$unset": {"google_places_api_key": "", "google_place_id": ""}},
+    )
+    # Reset tokens of the removed "forgot password" flow.
+    await get_db().password_reset_tokens.drop()
+
+
 async def run_all_seeds():
     await ensure_indexes()
+    await remove_retired_settings()
     await seed_admin()
     await seed_settings()
     await seed_services()

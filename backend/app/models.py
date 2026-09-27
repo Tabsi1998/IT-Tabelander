@@ -20,15 +20,6 @@ class UserCreate(BaseModel):
     role: str = "staff"
 
 
-class ForgotPasswordInput(BaseModel):
-    email: EmailStr
-
-
-class ResetPasswordInput(BaseModel):
-    token: str
-    password: str = Field(min_length=12, max_length=72)
-
-
 class AccountUpdate(BaseModel):
     current_password: str = Field(min_length=1, max_length=256)
     email: Optional[EmailStr] = None
@@ -202,9 +193,6 @@ class SettingsInput(BaseModel):
     social_links: Optional[dict] = None
     ga_measurement_id: Optional[str] = None
     canonical_base_url: Optional[str] = None
-    google_place_id: Optional[str] = None
-    google_places_api_key: Optional[str] = None
-    clear_google_places_api_key: Optional[bool] = None
     dolibarr_enabled: Optional[bool] = None
     dolibarr_base_url: Optional[str] = Field(default=None, max_length=2048)
     dolibarr_api_key: Optional[str] = None

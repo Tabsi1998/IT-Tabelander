@@ -7,12 +7,13 @@ from datetime import timedelta
 
 from bson import ObjectId
 from fastapi import (APIRouter, Depends, File, Form, HTTPException, UploadFile)
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
-from ..db import get_db, now_utc, serialize
+from ..db import get_db, now_utc, serialize, to_oid
 from ..security import require_admin
 
 router = APIRouter(prefix="/api", tags=["media"])
@@ -269,6 +270,12 @@ async def _store_image(file: UploadFile, optimize: bool = True) -> dict:
         raise HTTPException(status_code=400, detail="Datei zu groß (max. 8 MB)")
     if not raw:
         raise HTTPException(status_code=400, detail="Die Bilddatei ist leer")
+    # Decoding and WebP encoding take up to seconds of CPU. In a worker thread
+    # the single server process keeps answering other visitors (#31).
+    return await run_in_threadpool(_convert_image, raw, optimize)
+
+
+def _convert_image(raw: bytes, optimize: bool) -> dict:
     ext = "webp"
     fid = uuid.uuid4().hex
     fname = f"{fid}.{ext}"
@@ -318,7 +325,7 @@ async def list_media(_: dict = Depends(require_admin)):
 
 @router.put("/admin/media/{media_id}")
 async def update_alt(media_id: str, alt: str = Form(""), _: dict = Depends(require_admin)):
-    await get_db().media.update_one({"_id": ObjectId(media_id)}, {"$set": {"alt": alt}})
+    await get_db().media.update_one({"_id": to_oid(media_id)}, {"$set": {"alt": alt}})
     return {"ok": True}
 
 

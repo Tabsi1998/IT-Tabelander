@@ -20,6 +20,9 @@ def get_client() -> AsyncMongoClient:
     if _client is None:
         _client = AsyncMongoClient(
             os.environ["MONGO_URL"],
+            # Stored datetimes come back with their UTC zone, so they compare
+            # with now_utc() instead of raising TypeError (issue #27).
+            tz_aware=True,
             serverSelectionTimeoutMS=_timeout_ms("MONGO_SERVER_SELECTION_TIMEOUT_MS"),
             connectTimeoutMS=_timeout_ms("MONGO_CONNECT_TIMEOUT_MS"),
             timeoutMS=_timeout_ms("MONGO_OPERATION_TIMEOUT_MS", 5000),

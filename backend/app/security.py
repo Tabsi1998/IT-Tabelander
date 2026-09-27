@@ -50,11 +50,17 @@ def create_refresh_token(user_id: str) -> str:
     return jwt.encode(payload, _secret(), algorithm=JWT_ALGORITHM)
 
 
-def set_auth_cookies(response, access: str, refresh: str):
+# Website and API share one origin, so the cookies stay SameSite=Lax: other
+# sites cannot send them with a POST, and scripts never see the tokens (#32).
+def set_access_cookie(response, access: str):
     response.set_cookie("access_token", access, httponly=True, secure=True,
-                        samesite="none", max_age=ACCESS_MINUTES * 60, path="/")
+                        samesite="lax", max_age=ACCESS_MINUTES * 60, path="/")
+
+
+def set_auth_cookies(response, access: str, refresh: str):
+    set_access_cookie(response, access)
     response.set_cookie("refresh_token", refresh, httponly=True, secure=True,
-                        samesite="none", max_age=REFRESH_DAYS * 86400, path="/")
+                        samesite="lax", max_age=REFRESH_DAYS * 86400, path="/")
 
 
 def clear_auth_cookies(response):
@@ -63,12 +69,7 @@ def clear_auth_cookies(response):
 
 
 def _extract_token(request: Request) -> str | None:
-    token = request.cookies.get("access_token")
-    if not token:
-        header = request.headers.get("Authorization", "")
-        if header.startswith("Bearer "):
-            token = header[7:]
-    return token
+    return request.cookies.get("access_token")
 
 
 async def get_current_user(request: Request) -> dict:

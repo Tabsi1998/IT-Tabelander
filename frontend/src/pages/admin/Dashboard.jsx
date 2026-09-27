@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Inbox, Mail, Layers, Star, RefreshCw, ArrowRight } from "lucide-react";
+import { Inbox, Layers, Star, RefreshCw, ArrowRight } from "lucide-react";
 import api from "../../lib/api";
 import Skeleton from "../../components/ui/skeleton";
 import { AdminHeader, Panel } from "../../components/admin/AdminUI";
@@ -8,7 +8,6 @@ import { Badge } from "../../components/ui/badge";
 
 const STAT_META = [
   { key: "new_repairs", label: "Neue Anfragen", icon: Inbox, to: "/admin/anfragen", tone: "brand" },
-  { key: "contact_new", label: "Neue Nachrichten", icon: Mail, to: "/admin/kontakt" },
   { key: "active_services", label: "Aktive Leistungen", icon: Layers, to: "/admin/leistungen" },
   { key: "reviews_visible", label: "Sichtbare Reviews", icon: Star, to: "/admin/bewertungen" },
 ];

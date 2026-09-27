@@ -6,7 +6,6 @@ import AdminLogin from "./AdminLogin";
 import AdminLayout from "./AdminLayout";
 import Dashboard from "./Dashboard";
 import AdminRepairs from "./AdminRepairs";
-import AdminContact from "./AdminContact";
 import AdminServices from "./AdminServices";
 import AdminFaqs from "./AdminFaqs";
 import AdminReviews from "./AdminReviews";
@@ -35,7 +34,7 @@ export default function AdminApp() {
         <Route path="reparaturen" element={<Navigate to="/admin/anfragen" replace />} />
         <Route path="konfigurator" element={<Navigate to="/admin/anfragen" replace />} />
         <Route path="controller-builder" element={<Navigate to="/admin/anfragen" replace />} />
-        <Route path="kontakt" element={<AdminContact />} />
+        <Route path="kontakt" element={<Navigate to="/admin" replace />} />
         <Route path="leistungen" element={<AdminServices />} />
         <Route path="faqs" element={<AdminFaqs />} />
         <Route path="bewertungen" element={<AdminReviews />} />

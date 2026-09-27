@@ -29,12 +29,13 @@ class TestHealth:
 
 # ---------------- Auth ----------------
 class TestAuth:
-    def test_login_success_sets_cookies_and_token(self, test_credentials):
+    def test_login_success_sets_cookies_only(self, test_credentials):
         s = requests.Session()
         r = s.post(f"{BASE_URL}/api/auth/login", json=test_credentials, timeout=30)
         assert r.status_code == 200, r.text
         data = r.json()
-        assert "access_token" in data and isinstance(data["access_token"], str)
+        # The token must never reach scripts, only the httpOnly cookie (#32).
+        assert "access_token" not in data
         assert data["user"]["email"] == test_credentials["email"]
         assert data["user"]["role"] == "super_admin"
         assert "password_hash" not in data["user"]
@@ -42,12 +43,13 @@ class TestAuth:
         cookie_header = r.headers.get("set-cookie", "")
         assert "access_token" in cookie_header
         assert "HttpOnly" in cookie_header or "httponly" in cookie_header
+        assert "samesite=lax" in cookie_header.lower()
         # /me via cookie session
         me = s.get(f"{BASE_URL}/api/auth/me", timeout=30)
         assert me.status_code == 200
         assert me.json()["user"]["email"] == test_credentials["email"]
 
-    def test_me_with_bearer(self, admin_client, test_credentials):
+    def test_me_with_cookie_session(self, admin_client, test_credentials):
         r = admin_client.get(f"{BASE_URL}/api/auth/me", timeout=30)
         assert r.status_code == 200
         assert r.json()["user"]["email"] == test_credentials["email"]
@@ -58,7 +60,13 @@ class TestAuth:
 
     def test_me_invalid_token(self):
         r = requests.get(f"{BASE_URL}/api/auth/me",
-                         headers={"Authorization": "Bearer garbage.token.here"}, timeout=30)
+                         cookies={"access_token": "garbage.token.here"}, timeout=30)
+        assert r.status_code == 401
+
+    def test_bearer_header_is_not_accepted(self, admin_client):
+        token = admin_client.cookies.get("access_token")
+        r = requests.get(f"{BASE_URL}/api/auth/me",
+                         headers={"Authorization": f"Bearer {token}"}, timeout=30)
         assert r.status_code == 401
 
     def test_wrong_password_401(self, test_credentials):
@@ -84,11 +92,11 @@ class TestAuth:
         r = s.post(f"{BASE_URL}/api/auth/logout", timeout=30)
         assert r.status_code == 200 and r.json().get("ok") is True
 
-    def test_forgot_password_no_enumeration(self):
-        r = requests.post(f"{BASE_URL}/api/auth/forgot-password",
-                          json={"email": "definitely-not-a-user@example.com"}, timeout=30)
-        assert r.status_code == 200
-        assert r.json().get("ok") is True
+    def test_forgot_password_is_removed(self):
+        for path in ("forgot-password", "reset-password"):
+            r = requests.post(f"{BASE_URL}/api/auth/{path}",
+                              json={"email": "definitely-not-a-user@example.com"}, timeout=30)
+            assert r.status_code == 404, (path, r.status_code)
 
 
 # ---------------- Services ----------------
@@ -177,8 +185,7 @@ class TestReviews:
         r = api_client.get(f"{BASE_URL}/api/reviews", timeout=30)
         assert r.status_code == 200
         d = r.json()
-        assert set(["reviews", "average", "count", "google_place_configured"]).issubset(d)
-        assert d["google_place_configured"] is False
+        assert set(d) == {"reviews", "average", "count"}
 
     def test_review_crud_and_public_visibility(self, admin_client, api_client):
         p = {"author": "TEST_Kunde", "rating": 5, "text": "TEST_Sehr gut", "visible": True}
@@ -272,8 +279,8 @@ class TestContact:
         )
         assert r.status_code == 404
 
-    def test_legacy_admin_inbox_requires_auth(self):
-        assert requests.get(f"{BASE_URL}/api/admin/contact", timeout=30).status_code == 401
+    def test_legacy_admin_inbox_is_removed(self, admin_client):
+        assert admin_client.get(f"{BASE_URL}/api/admin/contact", timeout=30).status_code == 404
 
 
 # ---------------- Removed builder APIs ----------------
@@ -310,11 +317,10 @@ def _png_bytes(color="red"):
 
 
 class TestMedia:
-    def test_upload_list_serve_delete(self, auth_token):
-        h = {"Authorization": f"Bearer {auth_token}"}
+    def test_upload_list_serve_delete(self, admin_client):
         files = {"file": ("test.png", _png_bytes(), "image/png")}
-        r = requests.post(f"{BASE_URL}/api/admin/media", headers=h, files=files,
-                          data={"alt": "TEST_alt"}, timeout=60)
+        r = admin_client.post(f"{BASE_URL}/api/admin/media", files=files,
+                              data={"alt": "TEST_alt"}, timeout=60)
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["url"].startswith("/api/media/") and d["alt"] == "TEST_alt"
@@ -322,16 +328,15 @@ class TestMedia:
         serve = requests.get(f"{BASE_URL}{d['url']}", timeout=30)
         assert serve.status_code == 200
         assert serve.headers["content-type"] == "image/webp"
-        lst = requests.get(f"{BASE_URL}/api/admin/media", headers=h, timeout=30)
+        lst = admin_client.get(f"{BASE_URL}/api/admin/media", timeout=30)
         assert lst.status_code == 200 and any(m["id"] == mid for m in lst.json())
-        dele = requests.delete(f"{BASE_URL}/api/admin/media/{mid}", headers=h, timeout=30)
+        dele = admin_client.delete(f"{BASE_URL}/api/admin/media/{mid}", timeout=30)
         assert dele.status_code == 200
         assert requests.get(f"{BASE_URL}{d['url']}", timeout=30).status_code == 404
 
-    def test_reject_non_image(self, auth_token):
-        h = {"Authorization": f"Bearer {auth_token}"}
+    def test_reject_non_image(self, admin_client):
         files = {"file": ("bad.txt", b"hello", "text/plain")}
-        r = requests.post(f"{BASE_URL}/api/admin/media", headers=h, files=files, timeout=30)
+        r = admin_client.post(f"{BASE_URL}/api/admin/media", files=files, timeout=30)
         assert r.status_code == 400
 
     def test_public_repair_attachment(self):
@@ -376,9 +381,9 @@ class TestSettings:
     def test_admin_settings_update(self, admin_client):
         cur = admin_client.get(f"{BASE_URL}/api/admin/settings", timeout=30)
         assert cur.status_code == 200
-        for secret in ("google_places_api_key", "dolibarr_api_key"):
-            assert secret not in cur.json()
-            assert isinstance(cur.json()[f"{secret}_configured"], bool)
+        assert "dolibarr_api_key" not in cur.json()
+        assert isinstance(cur.json()["dolibarr_api_key_configured"], bool)
+        assert "google_places_api_key_configured" not in cur.json()
         original_phone = cur.json().get("phone") or ""
         u = admin_client.put(f"{BASE_URL}/api/admin/settings",
                              json={"phone": "+43 660 TEST"}, timeout=30)
@@ -398,7 +403,7 @@ class TestDashboard:
         r = admin_client.get(f"{BASE_URL}/api/admin/dashboard", timeout=30)
         assert r.status_code == 200
         d = r.json()
-        for k in ("new_repairs", "total_repairs", "contact_new", "active_services",
+        for k in ("new_repairs", "total_repairs", "active_services",
                   "reviews_visible", "dolibarr_enabled"):
             assert k in d
         assert isinstance(d["total_repairs"], int)

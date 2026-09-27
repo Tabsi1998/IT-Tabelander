@@ -13,14 +13,12 @@ async def dashboard(_: dict = Depends(require_admin)):
     new_repairs = await db.repair_requests.count_documents({"status": "eingegangen"})
     total_repairs = await db.repair_requests.count_documents({})
     recent = await db.repair_requests.find().sort("created_at", -1).to_list(5)
-    contact_new = await db.contact_messages.count_documents({"status": "neu"})
     active_services = await db.services.count_documents({"active": True})
     reviews_visible = await db.reviews.count_documents({"visible": True})
     return {
         "new_repairs": new_repairs,
         "total_repairs": total_repairs,
         "recent_repairs": [serialize(r) for r in recent],
-        "contact_new": contact_new,
         "active_services": active_services,
         "reviews_visible": reviews_visible,
         "dolibarr_enabled": await dolibarr.is_enabled(),

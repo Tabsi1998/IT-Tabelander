@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import api, { setToken } from "../lib/api";
+import api from "../lib/api";
 
 const AuthContext = createContext();
 
@@ -8,11 +8,6 @@ export function AuthProvider({ children }) {
   const [ready, setReady] = useState(false);
 
   const check = useCallback(async () => {
-    if (!localStorage.getItem("it_token")) {
-      setUser(false);
-      setReady(true);
-      return;
-    }
     try {
       const { data } = await api.get("/auth/me");
       setUser(data.user);
@@ -29,7 +24,6 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
-    if (data.access_token) setToken(data.access_token);
     setUser(data.user);
     return data.user;
   };
@@ -38,7 +32,6 @@ export function AuthProvider({ children }) {
     try {
       await api.post("/auth/logout");
     } catch {}
-    setToken(null);
     setUser(false);
   };
 
