@@ -110,3 +110,74 @@ def test_ready_for_pickup_and_offer_waiting_are_status_steps():
     assert _status(base, proposal_status=403) == "in_arbeit"
     # A closed ticket stays closed, whatever the extra field says.
     assert _status({**base, "status": "8", "array_options": {"options_abholbereit": "1"}}) == "abgeschlossen"
+
+
+# ---------------- new website (#50, #51) ----------------
+class _Cursor:
+    def __init__(self, docs):
+        self.docs = docs
+
+    def sort(self, *_args, **_kwargs):
+        return self
+
+    async def to_list(self, _limit):
+        return self.docs
+
+
+class _Collection:
+    def __init__(self, docs):
+        self.docs = docs
+        self.queries = []
+
+    def find(self, query=None, *_args):
+        self.queries.append(query)
+        return _Cursor(self.docs)
+
+
+def test_gallery_lists_photos_with_their_area(monkeypatch):
+    from bson import ObjectId
+
+    from app.routers import gallery
+
+    class Database:
+        gallery = _Collection([
+            {"_id": ObjectId(), "image_url": "/api/media/a.webp", "caption": "Gaming-PC", "category": "pc_build"},
+            {"_id": ObjectId(), "image_url": "/api/media/b.webp", "category": "unknown"},
+            {"_id": ObjectId(), "caption": "ohne Bild"},
+        ])
+
+    monkeypatch.setattr(gallery, "get_db", lambda: Database())
+    items = asyncio.run(gallery.public_gallery())["items"]
+    assert [item["category_label"] for item in items] == ["PC-Bau", "Sonstiges"]
+    assert items[0]["thumb_url"] == "/api/media/a.webp" and items[1]["caption"] == ""
+    assert Database.gallery.queries[0] == {"visible": {"$ne": False}}
+
+
+def test_public_reviews_never_contain_demo_entries(monkeypatch):
+    from bson import ObjectId
+
+    from app.routers import reviews
+
+    class Database:
+        reviews = _Collection([{"_id": ObjectId(), "author": "Eva", "rating": 4, "text": "Gut", "visible": True}])
+
+    monkeypatch.setattr(reviews, "get_db", lambda: Database())
+    answer = asyncio.run(reviews.list_reviews())
+    assert Database.reviews.queries[0] == {"visible": True, "is_demo": {"$ne": True}}
+    assert answer["count"] == 1 and answer["average"] == 4.0
+
+
+def test_review_and_profile_links_must_be_https():
+    import pytest
+    from pydantic import ValidationError
+
+    from app.models import ReviewInput, SettingsInput
+
+    assert ReviewInput(author="Eva", rating=5, text="Top", source="Google",
+                       source_url="https://g.page/r/x", review_date="2026-09-01").source_url == "https://g.page/r/x"
+    for bad in ({"source_url": "javascript:alert(1)"}, {"source_url": "http://g.page/r/x"}, {"review_date": "gestern"}):
+        with pytest.raises(ValidationError):
+            ReviewInput(author="Eva", rating=5, text="Top", **bad)
+    assert SettingsInput(google_review_url="https://g.page/r/abc/review").google_review_url
+    with pytest.raises(ValidationError):
+        SettingsInput(google_review_url="https://")

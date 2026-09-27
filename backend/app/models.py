@@ -59,15 +59,33 @@ class ServiceInput(BaseModel):
 
 
 # ---------- Reviews ----------
+def _https_url(value, what: str):
+    if not value:
+        return value
+    cleaned = value.strip()
+    parsed = urlparse(cleaned)
+    if parsed.scheme != "https" or not parsed.netloc or any(character.isspace() for character in cleaned):
+        raise ValueError(f"{what} muss eine vollständige https-Adresse sein")
+    return cleaned
+
+
 class ReviewInput(BaseModel):
     author: str
     rating: int = Field(ge=1, le=5)
     text: str
     source: str = "manuell"
+    # Link to the original review, e.g. on Google (#51), and when it was written.
+    source_url: Optional[str] = Field(default="", max_length=2048)
+    review_date: Optional[str] = Field(default="", max_length=10, pattern=r"^(\d{4}-\d{2}-\d{2})?$")
     is_demo: bool = False
     featured: bool = False
     visible: bool = True
     sort: int = 0
+
+    @field_validator("source_url")
+    @classmethod
+    def validate_source_url(cls, value):
+        return _https_url(value, "Der Link zur Bewertung")
 
 
 # ---------- Website inquiries ----------
@@ -258,6 +276,8 @@ class SettingsInput(BaseModel):
     smtp_from_name: Optional[str] = Field(default=None, max_length=120)
     # Who hears about inquiries stuck on their way to Dolibarr (#39).
     warning_email: Optional[str] = Field(default=None, max_length=255)
+    # "Auf Google bewerten" on the website (#51).
+    google_review_url: Optional[str] = Field(default=None, max_length=2048)
     # Website content from Dolibarr's knowledge base (#74, #81): the public
     # category and which article is which legal page. 0 = none.
     dolibarr_content_category_id: Optional[int] = Field(default=None, ge=0)
@@ -317,6 +337,11 @@ class SettingsInput(BaseModel):
         if cleaned.lower().endswith(suffix):
             cleaned = cleaned[:-len(suffix)].rstrip("/")
         return cleaned
+
+    @field_validator("google_review_url")
+    @classmethod
+    def validate_google_review_url(cls, value):
+        return _https_url(value, "Der Link zum Google-Profil")
 
     @field_validator("smtp_host")
     @classmethod

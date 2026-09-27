@@ -9,14 +9,15 @@ router = APIRouter(prefix="/api", tags=["reviews"])
 
 @router.get("/reviews")
 async def list_reviews():
-    """Public: only visible reviews (admin-curated). No fabricated data."""
+    """Public: only visible, real reviews (admin-curated). A demo entry never
+    leaves the server - invented reviews are not allowed on the site (#51)."""
     db = get_db()
-    docs = await db.reviews.find({"visible": True}).sort([("featured", -1), ("sort", 1)]).to_list(100)
-    reviews = [serialize(d) for d in docs]
-    visible = [r for r in reviews if not r.get("is_demo")]
+    docs = await db.reviews.find({"visible": True, "is_demo": {"$ne": True}}).sort(
+        [("featured", -1), ("sort", 1)]).to_list(100)
+    visible = [serialize(d) for d in docs]
     avg = round(sum(r["rating"] for r in visible) / len(visible), 1) if visible else None
     return {
-        "reviews": reviews,
+        "reviews": visible,
         "average": avg,
         "count": len(visible),
     }
