@@ -6,7 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 SERVICE_NAME="it-tabelander"
+# Plain KEY="value" lines; nothing for ShellCheck to follow.
+# shellcheck source=/dev/null
 [[ -f "$SCRIPT_DIR/deploy.config" ]] && source "$SCRIPT_DIR/deploy.config"
+# deploy.config.local exists only on a server that overrides values.
+# shellcheck source=/dev/null
 [[ -f "$SCRIPT_DIR/deploy.config.local" ]] && source "$SCRIPT_DIR/deploy.config.local"
 
 DISABLE_AUTOSTART=0

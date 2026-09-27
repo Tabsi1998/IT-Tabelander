@@ -18,6 +18,8 @@ fail() {
 as_deploy() {
   local directory="$1"
   shift
+  # The inner script expands its own positional parameters, hence single quotes.
+  # shellcheck disable=SC2016
   runuser -u deploy -- bash -c 'cd "$1" && shift && exec "$@"' bash "$directory" "$@"
 }
 
