@@ -20,6 +20,7 @@ from .media import mark_repair_attachments_linked, release_repair_attachment_cla
 router = APIRouter(prefix="/api", tags=["inquiries"])
 logger = logging.getLogger("it-tabelander.inquiries")
 
+
 def _inquiry_ref() -> str:
     alphabet = string.ascii_uppercase + string.digits
     return "ANF-" + "".join(secrets.choice(alphabet) for _ in range(8))
