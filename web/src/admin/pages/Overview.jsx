@@ -37,6 +37,12 @@ export default function Overview() {
                 {data.reviews.pending} {data.reviews.pending === 1 ? "Bewertung wartet" : "Bewertungen warten"} auf deine Freigabe. <Link to="/admin/bewertungen">Zu den Bewertungen</Link>
               </Notice>
             )}
+            {data.legal_todo?.length > 0 && (
+              <Notice tone="warning">
+                Rechtstexte: {data.legal_todo.slice(0, 3).join(" · ")}{data.legal_todo.length > 3 ? ` · und ${data.legal_todo.length - 3} mehr` : ""}.{" "}
+                <Link to="/admin/dolibarr">Zu den Rechtstexten</Link>
+              </Notice>
+            )}
             {data.inquiries.waiting > 0 && (
               <Notice tone="warning">
                 {data.inquiries.waiting} {data.inquiries.waiting === 1 ? "Anfrage wartet" : "Anfragen warten"} auf Dolibarr. <Link to="/admin/dolibarr">Warteschlange ansehen</Link>

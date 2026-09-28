@@ -11,6 +11,7 @@ export function adminState(overrides = {}) {
       google_review_url: "", about_text: "", about_qualifications: [], about_photo_url: "",
       dolibarr_enabled: true, dolibarr_base_url: "https://erp.example.at", dolibarr_api_key_configured: true,
       dolibarr_timeout_seconds: 8, dolibarr_country_code: "AT", dolibarr_ticket_categories: {},
+      dolibarr_content_category_id: 5, dolibarr_imprint_article_id: 7, dolibarr_privacy_article_id: 0, dolibarr_terms_article_id: 9,
       smtp_host: "smtp.example.at", smtp_port: 587, smtp_security: "starttls", smtp_password_configured: true,
       smtp_from: "office@example.at", smtp_from_name: "IT-Tabelander", warning_email: "",
     },
@@ -34,6 +35,28 @@ export function adminState(overrides = {}) {
     queue: { waiting: 1, gave_up: 0, items: [{ id: "q1", ref: "ANF-WARTE001", request_type: "repair", created_at: "2026-09-27T10:00:00+00:00",
       reason: "Dolibarr ist beim Anlegen des Tickets nicht erreichbar (ConnectError).", attempts: 2, next_attempt_at: "2026-09-27T10:20:00+00:00",
       warned_at: null, gave_up: false }], warning_mail: {} },
+    legal: {
+      imprint: [
+        { label: "Firmenname", ok: true, required: true, where: "Dolibarr: Einstellungen → Unternehmen/Institution → „Firmenname“", note: "" },
+        { label: "Unternehmensgegenstand", ok: false, required: true,
+          where: "Dolibarr: Einstellungen → Unternehmen/Institution → „Gegenstand des Unternehmens“", note: "" },
+        { label: "UID-Nummer", ok: false, required: false, where: "Dolibarr: Einstellungen → Unternehmen/Institution → „Umsatzsteuer-ID“",
+          note: "nur wenn du eine hast" },
+      ],
+      texts: [
+        { kind: "impressum", label: "Ergänzung zum Impressum", setting: "dolibarr_imprint_article_id",
+          article: { id: 7, question: "Impressum – Ergänzung", status: 1 }, gone: false, state: "released", open_points: [] },
+        { kind: "datenschutz", label: "Datenschutzerklärung", setting: "dolibarr_privacy_article_id",
+          article: null, gone: false, state: "missing", open_points: [] },
+        { kind: "nutzungsbedingungen", label: "Nutzungsbedingungen", setting: "dolibarr_terms_article_id",
+          article: { id: 9, question: "Nutzungsbedingungen", status: 0 }, gone: false, state: "draft",
+          open_points: ["[BITTE ERGÄNZEN: z. B. 4 Wochen]", "[BITTE MIT DER WKO KLÄREN: nicht abgeholte Geräte]"] },
+      ],
+      choices: [{ id: 7, question: "Impressum – Ergänzung", status: 1 }, { id: 9, question: "Nutzungsbedingungen", status: 0 }],
+      todo: ["Unternehmensgegenstand fehlt im Impressum", "Datenschutzerklärung fehlt", "Nutzungsbedingungen ist noch ein Entwurf",
+        "Nutzungsbedingungen: 2 Stellen noch zu ergänzen"],
+      error: null,
+    },
     sent: [],
     refreshes: 0,
     ...overrides,
@@ -84,7 +107,7 @@ export async function mockAdmin(page, state = adminState()) {
         reviews: { visible: state.reviews.filter((item) => item.visible).length, hidden: 0,
           pending: state.reviews.filter((item) => item.pending).length },
         gallery: { visible: state.gallery.length, total: state.gallery.length }, services: { active: state.services.length },
-        dolibarr_enabled: true, mail_configured: true,
+        dolibarr_enabled: true, mail_configured: true, legal_todo: state.legal.todo,
       });
     }
     if (path === "/admin/settings" && method === "GET") return json(route, state.settings);
@@ -158,7 +181,18 @@ export async function mockAdmin(page, state = adminState()) {
     }
     if (path === "/admin/dolibarr/content") {
       return json(route, { company: { name: "IT-Tabelander", address: "Gasse 1", zip: "6410", town: "Telfs" }, opening_hours: [{ day: "Montag", hours: "09:00–17:00" }],
-        categories: [{ id: 5, label: "Website" }], articles: [{ id: 7, question: "Datenschutzerklärung", status: 1 }], faq_count: 2, errors: {} });
+        categories: [{ id: 5, label: "Website" }], articles: [{ id: 7, question: "Impressum – Ergänzung", status: 1 }], faq_count: 2,
+        legal: state.legal, errors: {} });
+    }
+    const legalDraft = path.match(/^\/admin\/legal\/(\w+)\/draft$/);
+    if (legalDraft) {
+      state.legal = { ...state.legal,
+        texts: state.legal.texts.map((text) => (text.kind === legalDraft[1]
+          ? { ...text, article: { id: 11, question: "Datenschutzerklärung", status: 0 }, state: "draft", open_points: ["[BITTE ERGÄNZEN: Anbieter]"] }
+          : text)),
+        choices: [...state.legal.choices, { id: 11, question: "Datenschutzerklärung", status: 0 }],
+        todo: state.legal.todo.filter((item) => item !== "Datenschutzerklärung fehlt").concat("Datenschutzerklärung ist noch ein Entwurf") };
+      return json(route, { kind: legalDraft[1], article_id: 11 });
     }
     if (path === "/admin/dolibarr/queue") return json(route, state.queue);
     if (path === "/admin/dolibarr/queue/run") {

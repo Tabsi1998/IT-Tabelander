@@ -887,7 +887,7 @@ User=$user
 Group=$group
 WorkingDirectory=$BACKEND_DIR
 EnvironmentFile=-$RUN_DIR/service.env
-ExecStart=$BACKEND_DIR/venv/bin/python -m uvicorn server:app --host $BACKEND_HOST --port $BACKEND_PORT --workers $BACKEND_WORKERS --forwarded-allow-ips $FORWARDED_ALLOW_IPS
+ExecStart=$BACKEND_DIR/venv/bin/python -m uvicorn server:app --host $BACKEND_HOST --port $BACKEND_PORT --workers $BACKEND_WORKERS --forwarded-allow-ips $FORWARDED_ALLOW_IPS --no-access-log
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=20
@@ -983,7 +983,7 @@ start_backend() {
     unset IT_TABELANDER_DEPLOY_LOCK_HELD
     exec nohup setsid "$VENV_DIR/bin/python" -m uvicorn server:app \
       --host "$BACKEND_HOST" --port "$BACKEND_PORT" --workers "$BACKEND_WORKERS" \
-      --forwarded-allow-ips "$FORWARDED_ALLOW_IPS"
+      --forwarded-allow-ips "$FORWARDED_ALLOW_IPS" --no-access-log
   ) >> "$LOG_DIR/backend.log" 2>&1 9>&- &
   pid=$!
   LAUNCHED_BACKEND_PID="$pid"

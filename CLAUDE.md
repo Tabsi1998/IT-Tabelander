@@ -95,6 +95,19 @@ marks `review.invited_at` before it sends one mail to the ticket's
 `pending`, and `PUT /admin/reviews/{id}` with `visible: true` releases it. The
 public review list is a field whitelist (`PUBLIC_FIELDS`).
 
+Legal texts (#68, #69, #75, `backend/app/legal_texts.py`): the imprint is
+the company data (checklist `IMPRINT_FIELDS`) plus an article; privacy policy
+and terms are articles. A picked legal article is read by its number
+(`site_data.fetch_article`), not through the website category - picking it is
+the decision to publish it. Plain-language drafts live in
+`backend/app/legal_drafts/*.html`; `POST /api/admin/legal/{kind}/draft`
+writes one into the knowledge base as a draft and picks it. Places for the
+owner are marked `[BITTE ERGÄNZEN|PRÜFEN|ENTSCHEIDEN|MIT DER WKO KLÄREN ...]`;
+`open_points` counts them and the dashboard's `legal_todo` lists everything
+open. A unit test keeps the periods in the privacy text equal to the code
+(`ATTACHMENT_TTL`, `LINK_VALID`). Uvicorn runs with `--no-access-log`: the
+website keeps no visitor IPs, the reverse proxy logs requests.
+
 Device label (#72): `GET /api/admin/labels/{ref}` (inquiry or ticket number)
 gives number, title (the local subject before the hand-over, the Dolibarr
 ticket subject after it), date and the status link with the track id. The QR

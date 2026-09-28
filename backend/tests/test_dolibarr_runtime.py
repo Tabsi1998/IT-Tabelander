@@ -495,6 +495,50 @@ class TestSiteDataFromDolibarr:
         assert overview["faq_count"] == 1
 
 
+class TestLegalTexts:
+    def test_the_privacy_draft_goes_to_dolibarr_and_is_released_there(self, admin_client, website_content):
+        """#68, #69: the checklist reads the company data; the button writes the draft into the
+        knowledge base; the owner completes and releases it in Dolibarr."""
+        def legal():
+            overview = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/content", timeout=60).json()
+            return overview["legal"], {text["kind"]: text for text in overview["legal"]["texts"]}
+
+        checklist, _texts = legal()
+        assert all(item["ok"] for item in checklist["imprint"] if item["required"]), checklist["imprint"]
+        try:
+            cleared = admin_client.put(f"{BASE_URL}/api/admin/settings", json={"dolibarr_privacy_article_id": 0}, timeout=30)
+            assert cleared.status_code == 200, cleared.text
+            todo = admin_client.get(f"{BASE_URL}/api/admin/dashboard", timeout=60).json()["legal_todo"]
+            assert "Datenschutzerklärung fehlt" in todo, todo
+            assert requests.get(f"{BASE_URL}/api/legal/datenschutz", timeout=60).status_code == 404
+
+            created = admin_client.post(f"{BASE_URL}/api/admin/legal/datenschutz/draft", timeout=60)
+            assert created.status_code == 200, created.text
+            article_id = created.json()["article_id"]
+            article = dolibarr_get(f"knowledgemanagement/knowledgerecords/{article_id}")
+            assert int(article["status"]) == 0 and article["question"] == "Datenschutzerklärung"
+            assert admin_client.post(f"{BASE_URL}/api/admin/legal/datenschutz/draft", timeout=60).status_code == 409
+
+            # On the website at once, marked as a draft - picked by its number, no category needed.
+            _overview, texts = legal()
+            assert texts["datenschutz"]["state"] == "draft" and texts["datenschutz"]["open_points"], texts
+            page = requests.get(f"{BASE_URL}/api/legal/datenschutz", timeout=60).json()
+            assert page["draft"] is True and "Wer ist verantwortlich?" in page["html"]
+
+            # The owner fills in the marked places and releases the article in Dolibarr.
+            dolibarr_put(f"knowledgemanagement/knowledgerecords/{article_id}", {"answer": "<p>Ausgefüllt und geprüft.</p>"})
+            dolibarr_post(f"knowledgemanagement/{article_id}/validate", {"notrigger": 0})
+            _overview, texts = legal()
+            assert texts["datenschutz"]["state"] == "released" and texts["datenschutz"]["open_points"] == [], texts
+            page = requests.get(f"{BASE_URL}/api/legal/datenschutz", timeout=60).json()
+            assert page["draft"] is False and "Ausgefüllt und geprüft." in page["html"]
+            todo = admin_client.get(f"{BASE_URL}/api/admin/dashboard", timeout=60).json()["legal_todo"]
+            assert not any("Datenschutz" in item for item in todo), todo
+        finally:
+            admin_client.put(f"{BASE_URL}/api/admin/settings", json={"dolibarr_privacy_article_id": CONTENT["privacy"]},
+                             timeout=30)
+
+
 class TestStatusSteps:
     def test_an_offer_waits_then_the_device_is_ready_for_pickup(self):
         """#78."""

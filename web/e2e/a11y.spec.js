@@ -72,6 +72,17 @@ test("the page works with the keyboard alone (#55)", async ({ page, isMobile }) 
   await expect(page.getByRole("tab", { name: "Reparatur anfragen" })).toHaveAttribute("aria-selected", "true");
 });
 
+test("a legal page prints just its text, e.g. as PDF for the offers in Dolibarr (#75)", async ({ page }) => {
+  await open(page, "/rechtliches/impressum", "Rechtliches");
+  await expect(page.getByText("Teststraße 1")).toBeVisible();
+  await page.emulateMedia({ media: "print" });
+  await expect(page.getByRole("banner")).toBeHidden();
+  await expect(page.getByRole("navigation", { name: "Rechtliche Texte" })).toBeHidden();
+  await expect(page.getByRole("contentinfo")).toBeHidden();
+  await expect(page.getByRole("heading", { level: 2, name: "Impressum" })).toBeVisible();
+  await expect(page.getByText("Teststraße 1")).toBeVisible();
+});
+
 // Screenshots of every page in every width, for looking through after a run:
 // web/screenshots/ and the Playwright report (#55).
 for (const [name, path, heading] of PAGES) {

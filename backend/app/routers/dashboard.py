@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from .. import dolibarr, mailer
+from .. import dolibarr, legal_texts, mailer, site_data
 from ..db import get_db, serialize
 from ..security import require_admin
 
@@ -16,6 +16,11 @@ async def dashboard(_: dict = Depends(require_admin)):
         {}, {"ref": 1, "request_type": 1, "created_at": 1, "dolibarr.synced": 1, "dolibarr.ticket_ref": 1},
     ).sort("created_at", -1).to_list(10)
     mail = await mailer.get_mail_config()
+    legal = []
+    if await dolibarr.is_enabled():
+        # The cached copy; the overview never waits longer than one refresh.
+        settings = await db.settings.find_one({"_id": "site"}) or {}
+        legal = legal_texts.overview(await site_data.refresh(), settings)["todo"]
     return {
         "inquiries": {
             "waiting": await db.repair_requests.count_documents(waiting),
@@ -41,4 +46,6 @@ async def dashboard(_: dict = Depends(require_admin)):
         "services": {"active": await db.services.count_documents({"active": True})},
         "dolibarr_enabled": await dolibarr.is_enabled(),
         "mail_configured": bool(mail["host"] and mail["sender"]),
+        # What is still missing for imprint, privacy policy and terms (#68, #69, #75).
+        "legal_todo": legal,
     }
