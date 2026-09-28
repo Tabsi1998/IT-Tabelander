@@ -315,7 +315,7 @@ function Migration() {
   const total = plan ? plan.inquiries_to_send + plan.inquiries_to_finish + plan.contact_messages + (plan.faqs || 0) : 0;
   const dryRun = async () => setPlan(await run(() => adminRequest("GET", "/admin/dolibarr/migration"), ""));
   return (
-    <Section title="Altdaten umziehen (einmalig)" description="Anfragen und Nachrichten von vor der Umstellung kommen nach Dolibarr – ohne Mail an die Kunden – und werden danach hier gelöscht. Die bisherigen FAQ kommen als Entwurf in die Wissensdatenbank. Der Probelauf ändert nichts.">
+    <Section title="Altdaten umziehen (einmalig)" description="Anfragen und Nachrichten von vor der Umstellung kommen nach Dolibarr – ohne Mail an die Kunden – und werden danach hier gelöscht. Die bisherigen FAQ kommen als Entwurf in die Wissensbasis. Der Probelauf ändert nichts.">
       <div className="flex flex-wrap gap-3">
         <button type="button" className="btn-outline" disabled={state.busy} onClick={dryRun}>Probelauf</button>
         {plan && total > 0 && user?.role === "super_admin" && (

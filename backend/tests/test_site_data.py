@@ -78,7 +78,7 @@ def test_hints_name_the_dolibarr_setting():
                                       response=httpx.Response(403))
     assert "API_LOGINS_ALLOWED_FOR_GET_COMPANY" in site_data._hint("company", forbidden)
     assert "API_LOGINS_ALLOWED_FOR_CONST_READ" in site_data._hint("opening_hours", forbidden)
-    assert "Wissensdatenbank" in site_data._hint("articles", forbidden)
+    assert "Wissensmanagement: Artikel lesen" in site_data._hint("articles", forbidden)
 
 
 def _status(ticket, proposals=None, proposal_status=200):

@@ -144,8 +144,9 @@ backend's `detail` (pydantic lists mapped to field names in German).
 The extra group compares against `scripts/ci-baseline.json`: known findings
 are debt, new ones fail. After paying debt down, run
 `python scripts/local_check.py --all --record` and commit the baseline. The hard gates (repository, backend, integration, dolibarr, web) are never
-ratcheted. Debt on 2026-09-27: no OSV findings (the 29 of the old CRA admin's
-`frontend/yarn.lock` left with it in milestone 4), 4 ShellCheck findings.
+ratcheted. Debt on 2026-09-28: none. No OSV findings (the 29 of the old CRA
+admin's `frontend/yarn.lock` left with it in milestone 4) and no ShellCheck
+findings (the last 4 fixed after milestone 5).
 
 ## Extending the checks
 

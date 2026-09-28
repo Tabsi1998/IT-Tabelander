@@ -57,11 +57,11 @@ def _hint(part: str, exc: Exception) -> str:
         return ("Dolibarr gibt die Öffnungszeiten nicht heraus: den Login des Website-Benutzers in der "
                 "Konstante API_LOGINS_ALLOWED_FOR_CONST_READ eintragen.")
     if status == 403 and part == "articles":
-        return "Dem Website-Benutzer das Recht „Wissensdatenbank: lesen“ geben."
+        return "Dem Website-Benutzer das Recht „Wissensmanagement: Artikel lesen“ geben."
     if status == 403 and part == "categories":
         return "Dem Website-Benutzer das Recht „Kategorien: lesen“ geben."
     if status in (404, 501) and part in ("articles", "categories"):
-        return "In Dolibarr die Module „Wissensdatenbank“ und „Kategorien“ aktivieren."
+        return "In Dolibarr die Module „Wissensmanagement-System“ und „Kategorien“ aktivieren."
     if isinstance(exc, (httpx.TimeoutException, httpx.RequestError)):
         return "Dolibarr ist gerade nicht erreichbar; die Website zeigt den letzten bekannten Stand."
     return f"Dolibarr meldet einen Fehler ({type(exc).__name__}{f', HTTP {status}' if status else ''})."
@@ -419,7 +419,7 @@ async def copy_website_faq() -> dict:
                 article_id = dolibarr._remote_id(response.json())
             except Exception as exc:  # noqa: BLE001
                 status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
-                reason = ("Dem Website-Benutzer für die Kopie vorübergehend „Wissensdatenbank: anlegen/ändern“ geben."
+                reason = ("Dem Website-Benutzer für die Kopie vorübergehend „Wissensmanagement: Artikel anlegen/ändern“ geben."
                           if status == 403 else _hint("articles", exc))
                 failed.append({"question": faq.get("question"), "reason": reason})
                 if status == 403:

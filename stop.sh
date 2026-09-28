@@ -141,7 +141,7 @@ stop_service() {
 
 stop_one() {
   local label="$1" service="$2" pidfile="$3"
-  local pid pgid="" target attempt forced=0
+  local pid pgid="" target forced=0
 
   if [[ ! -e "$pidfile" ]]; then
     yellow "· $label: keine PID-Datei"
@@ -178,7 +178,7 @@ stop_one() {
     STOP_FAILURES=1
     return
   fi
-  for attempt in {1..40}; do
+  for _ in {1..40}; do
     target_is_alive "$target" || break
     sleep 0.25
   done
@@ -189,7 +189,7 @@ stop_one() {
       STOP_FAILURES=1
       return
     fi
-    for attempt in {1..8}; do
+    for _ in {1..8}; do
       target_is_alive "$target" || break
       sleep 0.25
     done

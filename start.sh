@@ -14,7 +14,9 @@ STARTUP_TIMEOUT_SECONDS="30"
 FORWARDED_ALLOW_IPS="127.0.0.1"
 USE_SYSTEMD="1"
 SERVICE_NAME="it-tabelander"
+# shellcheck source=/dev/null
 [[ -f "$SCRIPT_DIR/deploy.config" ]] && source "$SCRIPT_DIR/deploy.config"
+# shellcheck source=/dev/null
 [[ -f "$SCRIPT_DIR/deploy.config.local" ]] && source "$SCRIPT_DIR/deploy.config.local"
 
 RUN_DIR="$SCRIPT_DIR/run"
@@ -163,8 +165,9 @@ bootstrap_lock_dependencies() {
   fi
 }
 
-[[ "$BACKEND_PORT" =~ ^[0-9]+$ ]] && (( BACKEND_PORT >= 1 && BACKEND_PORT <= 65535 )) \
-  || die "BACKEND_PORT muss zwischen 1 und 65535 liegen."
+if ! [[ "$BACKEND_PORT" =~ ^[0-9]+$ ]] || (( BACKEND_PORT < 1 || BACKEND_PORT > 65535 )); then
+  die "BACKEND_PORT muss zwischen 1 und 65535 liegen."
+fi
 [[ "$BACKEND_WORKERS" =~ ^[1-9][0-9]*$ ]] || die "BACKEND_WORKERS muss mindestens 1 sein."
 [[ -n "$BACKEND_HOST" ]] || die "BACKEND_HOST darf nicht leer sein."
 [[ -n "$FORWARDED_ALLOW_IPS" ]] || die "FORWARDED_ALLOW_IPS darf nicht leer sein."
@@ -339,7 +342,7 @@ target_is_alive() {
 }
 
 terminate_process_tree() {
-  local pid="$1" target attempt
+  local pid="$1" target
   if target_is_alive "-$pid"; then
     target="-$pid"
   elif process_exists "$pid"; then
@@ -348,12 +351,12 @@ terminate_process_tree() {
     return 0
   fi
   kill -TERM -- "$target" 2>/dev/null || target_is_alive "$target" || return 0
-  for attempt in {1..20}; do
+  for _ in {1..20}; do
     target_is_alive "$target" || return 0
     sleep 0.25
   done
   kill -KILL -- "$target" 2>/dev/null || target_is_alive "$target" || return 0
-  for attempt in {1..8}; do
+  for _ in {1..8}; do
     target_is_alive "$target" || return 0
     sleep 0.25
   done
@@ -509,7 +512,9 @@ install_and_start_mongodb() {
       return 0
     fi
     [[ -r /etc/os-release ]] || die "MongoDB kann automatisch nur auf Ubuntu installiert werden."
+    # shellcheck source=/dev/null
     os_id="$(. /etc/os-release && printf '%s' "${ID:-}")"
+    # shellcheck source=/dev/null
     codename="$(. /etc/os-release && printf '%s' "${VERSION_CODENAME:-}")"
     [[ "$os_id" == "ubuntu" ]] || die "MongoDB-Autoinstallation unterstützt Ubuntu; gefunden: ${os_id:-unbekannt}."
     [[ "$codename" == "focal" || "$codename" == "jammy" || "$codename" == "noble" ]] \
