@@ -211,8 +211,8 @@ class TestReviews:
         assert r.status_code == 422
 
 
-# ---------------- Repairs ----------------
-class TestRepairs:
+# ---------------- Inquiries ----------------
+class TestInquiries:
     def _payload(self, consent=True, honeypot=""):
         return {
             "request_id": f"integration-{uuid.uuid4().hex}",
@@ -223,52 +223,41 @@ class TestRepairs:
             "consent": consent, "honeypot": honeypot,
         }
 
-    def test_create_repair_and_admin_flow(self, api_client, admin_client):
-        r = api_client.post(f"{BASE_URL}/api/repairs", json=self._payload(), timeout=30)
+    def test_an_inquiry_is_stored_and_waits_for_dolibarr(self, api_client):
+        r = api_client.post(f"{BASE_URL}/api/inquiries", json=self._payload(), timeout=30)
         assert r.status_code == 200, r.text
         d = r.json()
-        assert d["ok"] is True
-        assert d["ref"].startswith("ANF-") and len(d["ref"]) == 12
-        rid = d["id"]
-        lst = admin_client.get(f"{BASE_URL}/api/admin/repairs", timeout=30)
-        assert lst.status_code == 200
-        assert any(x["id"] == rid for x in lst.json())
-        one = admin_client.get(f"{BASE_URL}/api/admin/repairs/{rid}", timeout=30)
-        assert one.status_code == 200
-        assert one.json()["status"] == "eingegangen"
-        assert one.json()["contact"]["email"] == "test_max@example.com"
-        # status update
-        up = admin_client.patch(f"{BASE_URL}/api/admin/repairs/{rid}/status",
-                                json={"status": "in_diagnose"}, timeout=30)
-        assert up.status_code == 200
-        assert admin_client.get(f"{BASE_URL}/api/admin/repairs/{rid}", timeout=30).json()["status"] == "in_diagnose"
-        # invalid status
-        bad = admin_client.patch(f"{BASE_URL}/api/admin/repairs/{rid}/status",
-                                 json={"status": "nonsense"}, timeout=30)
-        assert bad.status_code == 400
-        # filter
-        f = admin_client.get(f"{BASE_URL}/api/admin/repairs?status=in_diagnose", timeout=30)
-        assert f.status_code == 200 and any(x["id"] == rid for x in f.json())
-        # cleanup
-        assert admin_client.delete(f"{BASE_URL}/api/admin/repairs/{rid}", timeout=30).status_code == 200
-        assert admin_client.get(f"{BASE_URL}/api/admin/repairs/{rid}", timeout=30).status_code == 404
+        assert d["ok"] is True and d["ref"].startswith("ANF-") and len(d["ref"]) == 12
+        assert set(d) == {"ok", "ref", "id", "duplicate", "dolibarr_synced", "ticket_ref"}
+        stored = _website_db().repair_requests.find_one({"ref": d["ref"]})
+        try:
+            assert stored["contact"]["email"] == "test_max@example.com" and stored["auto_handover"] is True
+        finally:
+            _website_db().repair_requests.delete_one({"_id": stored["_id"]})
 
-    def test_repair_without_consent_400(self, api_client):
-        r = api_client.post(f"{BASE_URL}/api/repairs", json=self._payload(consent=False), timeout=30)
+    def test_inquiry_without_consent_400(self, api_client):
+        r = api_client.post(f"{BASE_URL}/api/inquiries", json=self._payload(consent=False), timeout=30)
         assert r.status_code == 400
 
-    def test_repair_honeypot_400(self, api_client):
-        r = api_client.post(f"{BASE_URL}/api/repairs", json=self._payload(honeypot="bot"), timeout=30)
+    def test_inquiry_honeypot_400(self, api_client):
+        r = api_client.post(f"{BASE_URL}/api/inquiries", json=self._payload(honeypot="bot"), timeout=30)
         assert r.status_code == 400
 
-    def test_repair_invalid_email_422(self, api_client):
+    def test_inquiry_invalid_email_422(self, api_client):
         p = self._payload()
         p["contact"]["email"] = "not-an-email"
-        r = api_client.post(f"{BASE_URL}/api/repairs", json=p, timeout=30)
+        r = api_client.post(f"{BASE_URL}/api/inquiries", json=p, timeout=30)
         assert r.status_code == 422
 
-    def test_admin_repairs_requires_auth(self):
-        assert requests.get(f"{BASE_URL}/api/admin/repairs", timeout=30).status_code == 401
+    def test_what_only_the_old_admin_used_is_gone(self, admin_client):
+        """Inquiries live in Dolibarr, pictures are uploaded where they are
+        used, and there is one owner: no API without a page behind it."""
+        for method, path in (("GET", "/api/admin/inquiries"), ("GET", "/api/admin/repairs"), ("POST", "/api/repairs"),
+                             ("DELETE", "/api/admin/inquiries/000000000000000000000000"), ("GET", "/api/admin/media"),
+                             ("DELETE", "/api/admin/media/000000000000000000000000"), ("GET", "/api/auth/users"),
+                             ("POST", "/api/auth/users")):
+            response = admin_client.request(method, f"{BASE_URL}{path}", timeout=30)
+            assert response.status_code in (404, 405), (method, path, response.status_code)
 
 
 # ---------------- Legacy contact inbox ----------------
@@ -287,7 +276,7 @@ class TestContact:
         }, timeout=30)
         assert r.status_code == 200, r.text
         assert r.json()["ref"].startswith("ANF-") and r.json()["dolibarr_synced"] is False
-        stored = admin_client.get(f"{BASE_URL}/api/admin/inquiries/{r.json()['id']}", timeout=30).json()
+        stored = _website_db().repair_requests.find_one({"ref": r.json()["ref"]})
         assert stored["request_type"] == "contact" and stored["auto_handover"] is True
         assert stored["queue"]["next_attempt_at"], stored
         assert admin_client.get(f"{BASE_URL}/api/admin/dolibarr/queue", timeout=30).json()["waiting"] >= 1
@@ -330,22 +319,17 @@ def _png_bytes(color="red"):
 
 
 class TestMedia:
-    def test_upload_list_serve_delete(self, admin_client):
+    def test_upload_and_serve(self, admin_client):
         files = {"file": ("test.png", _png_bytes(), "image/png")}
         r = admin_client.post(f"{BASE_URL}/api/admin/media", files=files,
                               data={"alt": "TEST_alt"}, timeout=60)
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["url"].startswith("/api/media/") and d["alt"] == "TEST_alt"
-        mid = d["id"]
         serve = requests.get(f"{BASE_URL}{d['url']}", timeout=30)
         assert serve.status_code == 200
         assert serve.headers["content-type"] == "image/webp"
-        lst = admin_client.get(f"{BASE_URL}/api/admin/media", timeout=30)
-        assert lst.status_code == 200 and any(m["id"] == mid for m in lst.json())
-        dele = admin_client.delete(f"{BASE_URL}/api/admin/media/{mid}", timeout=30)
-        assert dele.status_code == 200
-        assert requests.get(f"{BASE_URL}{d['url']}", timeout=30).status_code == 404
+        _website_db().media.delete_one({"url": d["url"]})
 
     def test_reject_non_image(self, admin_client):
         files = {"file": ("bad.txt", b"hello", "text/plain")}
@@ -393,9 +377,8 @@ class TestSettings:
         r = api_client.get(f"{BASE_URL}/api/settings", timeout=30)
         assert r.status_code == 200
         d = r.json()
-        assert d["company_name"] == "IT-Tabelander"
-        for secret in ("google_place_id", "google_places_api_key", "dolibarr_api_key", "jwt_secret"):
-            assert secret not in d
+        # Only what the website reads; company data comes from Dolibarr (#74).
+        assert set(d) == {"google_review_url", "about_text", "about_qualifications", "about_photo_url", "portal_enabled"}
 
     def test_admin_settings_update(self, admin_client):
         cur = admin_client.get(f"{BASE_URL}/api/admin/settings", timeout=30)
@@ -403,14 +386,14 @@ class TestSettings:
         assert "dolibarr_api_key" not in cur.json()
         assert isinstance(cur.json()["dolibarr_api_key_configured"], bool)
         assert "google_places_api_key_configured" not in cur.json()
-        original_phone = cur.json().get("phone") or ""
+        original = cur.json().get("google_review_url") or ""
         u = admin_client.put(f"{BASE_URL}/api/admin/settings",
-                             json={"phone": "+43 660 TEST"}, timeout=30)
-        assert u.status_code == 200 and u.json()["phone"] == "+43 660 TEST"
+                             json={"google_review_url": "https://g.page/r/TEST"}, timeout=30)
+        assert u.status_code == 200 and u.json()["google_review_url"] == "https://g.page/r/TEST"
         pub = requests.get(f"{BASE_URL}/api/settings", timeout=30).json()
-        assert pub["phone"] == "+43 660 TEST"
+        assert pub["google_review_url"] == "https://g.page/r/TEST"
         # restore
-        admin_client.put(f"{BASE_URL}/api/admin/settings", json={"phone": original_phone}, timeout=30)
+        admin_client.put(f"{BASE_URL}/api/admin/settings", json={"google_review_url": original}, timeout=30)
 
     def test_admin_settings_requires_auth(self):
         assert requests.get(f"{BASE_URL}/api/admin/settings", timeout=30).status_code == 401
@@ -590,7 +573,7 @@ class TestReviewRequestAndLabel:
             "contact": {"name": "TEST_Eva", "email": "test_eva@example.com"}, "consent": True, "review_ok": True,
         }, timeout=60).json()
         try:
-            assert admin_client.get(f"{BASE_URL}/api/admin/inquiries/{created['id']}", timeout=30).json()["review_ok"] is True
+            assert _website_db().repair_requests.find_one({"ref": created["ref"]})["review_ok"] is True
             label = admin_client.get(f"{BASE_URL}/api/admin/labels/{created['ref'].lower()}", timeout=60)
             assert label.status_code == 200, label.text
             data = label.json()
@@ -604,4 +587,4 @@ class TestReviewRequestAndLabel:
             assert admin_client.get(f"{BASE_URL}/api/admin/labels/ANF-GIBTSNIX", timeout=30).status_code == 404
             assert api_client.get(f"{BASE_URL}/api/admin/labels/{created['ref']}", timeout=30).status_code == 401
         finally:
-            admin_client.delete(f"{BASE_URL}/api/admin/inquiries/{created['id']}", timeout=30)
+            _website_db().repair_requests.delete_one({"ref": created["ref"]})

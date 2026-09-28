@@ -22,7 +22,7 @@ from app.routers.settings import _admin_response
 def test_admin_settings_never_return_secret_values():
     result = _admin_response({
         "_id": "site",
-        "company_name": "IT-Tabelander",
+        "service_area": "Tirol",
         "dolibarr_api_key": "dolibarr-secret",
         "google_places_api_key": "retired-secret",
     })
@@ -66,7 +66,7 @@ def test_only_super_admin_can_change_dolibarr_endpoint_or_key(monkeypatch):
         def __init__(self):
             self.doc = {
                 "_id": "site",
-                "company_name": "Alt",
+                "service_area": "Alt",
                 "dolibarr_base_url": "http://192.168.2.10/dolibarr/api/index.php/",
                 "dolibarr_api_key": "existing-secret",
             }
@@ -117,12 +117,12 @@ def test_only_super_admin_can_change_dolibarr_endpoint_or_key(monkeypatch):
 
     response = asyncio.run(settings_router.update_settings(
         SettingsInput(
-            company_name="Neu",
+            service_area="Neu",
             dolibarr_base_url="http://192.168.2.10/dolibarr",
         ),
         {"role": "admin"},
     ))
-    assert response["company_name"] == "Neu"
+    assert response["service_area"] == "Neu"
     assert database.settings.doc["dolibarr_api_key"] == "existing-secret"
     assert "dolibarr_base_url" not in database.settings.updates[-1][0]["$set"]
 
@@ -479,26 +479,22 @@ def test_unknown_api_addresses_answer_404_for_every_method():
         assert "strict-transport-security" in response.headers
 
 
-def test_public_legal_html_is_sanitized(monkeypatch):
+def test_public_settings_show_only_what_the_website_reads(monkeypatch):
+    """Company data, hours and legal texts come from Dolibarr (#74); old fields
+    of the first admin and every secret stay inside."""
     class SettingsCollection:
         async def find_one(self, *_args, **_kwargs):
-            return {
-                "impressum_html": '<p onclick="steal()">Hallo<script>alert(1)</script></p>'
-                                  '<a href="javascript:alert(2)">x</a>',
-                "datenschutz_html": "<h2>Daten</h2>",
-            }
+            return {"_id": "site", "google_review_url": "https://g.page/r/x", "portal_enabled": True,
+                    "company_name": "Alt", "impressum_html": "<p>alt</p>", "dolibarr_api_key": "secret",
+                    "smtp_password": "secret", "portal_bank_iban": "AT611904300234573201"}
 
     class Database:
         settings = SettingsCollection()
 
     monkeypatch.setattr(settings_router, "get_db", lambda: Database())
     result = asyncio.run(settings_router.public_settings())
-
-    assert "script" not in result["impressum_html"]
-    assert "onclick" not in result["impressum_html"]
-    assert "javascript:" not in result["impressum_html"]
-    assert "Hallo" in result["impressum_html"]
-    assert result["datenschutz_html"] == "<h2>Daten</h2>"
+    assert set(result) == {"google_review_url", "about_text", "about_qualifications", "about_photo_url", "portal_enabled"}
+    assert result["google_review_url"] == "https://g.page/r/x" and result["portal_enabled"] is True
 
 
 def test_image_conversion_runs_in_a_worker_thread(monkeypatch):

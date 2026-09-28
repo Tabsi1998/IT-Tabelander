@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
-from ..db import get_db, now_utc, serialize, to_oid
+from ..db import get_db, now_utc, serialize
 from ..security import get_current_user, require_admin
 
 router = APIRouter(prefix="/api", tags=["media"])
@@ -317,37 +317,6 @@ async def upload_media(file: UploadFile = File(...), alt: str = Form(""),
     return serialize(doc)
 
 
-@router.get("/admin/media")
-async def list_media(_: dict = Depends(require_admin)):
-    docs = await get_db().media.find().sort("created_at", -1).to_list(500)
-    return [serialize(d) for d in docs]
-
-
-@router.put("/admin/media/{media_id}")
-async def update_alt(media_id: str, alt: str = Form(""), _: dict = Depends(require_admin)):
-    await get_db().media.update_one({"_id": to_oid(media_id)}, {"$set": {"alt": alt}})
-    return {"ok": True}
-
-
-@router.delete("/admin/media/{media_id}")
-async def delete_media(media_id: str, _: dict = Depends(require_admin)):
-    db = get_db()
-    if not ObjectId.is_valid(media_id):
-        raise HTTPException(status_code=400, detail="Ungültige Medien-ID")
-    token, doc = await _claim_media_deletion(db, {"_id": ObjectId(media_id)})
-    if doc:
-        try:
-            await _finish_media_deletion(db, doc, token)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Admin media deletion failed: %s", exc)
-            raise HTTPException(
-                status_code=500,
-                detail="Medium konnte nicht gelöscht werden; bitte erneut versuchen",
-            ) from None
-    return {"ok": True}
-
-
-# ---- repair attachments (public upload, size/type limited) ----
 @router.post("/uploads/repair-attachment")
 async def upload_repair_attachment(
     file: UploadFile = File(...),

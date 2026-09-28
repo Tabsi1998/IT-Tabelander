@@ -1,8 +1,5 @@
-import nh3
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
-
-import logging
 
 from .. import mailer, site_data
 from ..db import get_db, now_utc, serialize
@@ -10,31 +7,17 @@ from ..models import SettingsInput
 from ..security import require_admin
 
 router = APIRouter(prefix="/api", tags=["settings"])
-logger = logging.getLogger("it-tabelander.settings")
 CONTENT_FIELDS = ("dolibarr_content_category_id", "dolibarr_imprint_article_id",
                   "dolibarr_privacy_article_id", "dolibarr_terms_article_id")
 
-# fields safe to expose publicly (no secrets / API keys)
-PUBLIC_FIELDS = [
-    "company_name", "tagline", "email", "phone", "address", "city", "region",
-    "postal_code", "country", "service_area", "opening_hours", "social_links",
-    "ga_measurement_id", "seo_default_title", "seo_default_description",
-    "canonical_base_url",
-    "impressum_html", "datenschutz_html", "legal_reviewed",
-    "logo_light_url", "logo_dark_url", "google_review_url",
-    "about_text", "about_qualifications", "about_photo_url",
-    "portal_enabled",
-]
+# What the website itself reads; company data, hours and legal texts come
+# through /api/site-info and /api/legal from Dolibarr (#74).
+PUBLIC_FIELDS = ["google_review_url", "about_text", "about_qualifications", "about_photo_url", "portal_enabled"]
 
 SECRET_FIELDS = ("dolibarr_api_key", "smtp_password")
 # Where mail goes out and with which account: super admins only, like the
 # Dolibarr key (#38).
 SMTP_PROTECTED = ("smtp_host", "smtp_port", "smtp_security", "smtp_username")
-# Rendered as HTML by the website; nh3 drops scripts, event handlers and
-# javascript: links before they reach a browser (#32).
-HTML_FIELDS = ("impressum_html", "datenschutz_html")
-
-
 def _admin_response(doc: dict) -> dict:
     allowed = set(SettingsInput.model_fields)
     result = {key: value for key, value in doc.items() if key in allowed}
@@ -46,16 +29,7 @@ def _admin_response(doc: dict) -> dict:
 @router.get("/settings")
 async def public_settings():
     doc = await get_db().settings.find_one({"_id": "site"}) or {}
-    result = {k: doc.get(k) for k in PUBLIC_FIELDS}
-    try:
-        # Company data, hours and legal texts live in Dolibarr (#74).
-        result.update(await site_data.public_overlay())
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Dolibarr site data unavailable: %s", type(exc).__name__)
-    for field in HTML_FIELDS:
-        if result.get(field):
-            result[field] = nh3.clean(str(result[field]))
-    return result
+    return {key: doc.get(key) for key in PUBLIC_FIELDS}
 
 
 @router.get("/admin/settings")

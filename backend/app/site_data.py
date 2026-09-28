@@ -313,43 +313,6 @@ async def legal_page(kind: str) -> dict | None:
     }
 
 
-SOCIAL_KEYS = ("facebook", "instagram", "youtube", "tiktok", "linkedin", "twitter", "whatsapp")
-
-
-async def public_overlay() -> dict:
-    """Company fields of GET /api/settings, taken from Dolibarr when known.
-    The current website reads these fields until the new one (#44) exists."""
-    data = await refresh()
-    company = data.get("company") or {}
-    overlay = {}
-    if company:
-        overlay.update({key: value for key, value in {
-            "company_name": company.get("name"), "email": company.get("email"),
-            "phone": company.get("phone") or company.get("phone_mobile"),
-            "address": company.get("address"), "postal_code": company.get("zip"),
-            "city": company.get("town"), "country": company.get("country_code"),
-        }.items() if value})
-        networks = company.get("socialnetworks") or {}
-        if isinstance(networks, dict) and networks:
-            overlay["social_links"] = {key: networks[key] for key in SOCIAL_KEYS if networks.get(key)}
-        imprint = await legal_page("impressum")
-        if imprint:
-            overlay["impressum_html"] = _with_draft_hint(imprint)
-    if data.get("opening_hours"):
-        overlay["opening_hours"] = data["opening_hours"]
-    privacy = await legal_page("datenschutz")
-    if privacy:
-        overlay["datenschutz_html"] = _with_draft_hint(privacy)
-    return overlay
-
-
-DRAFT_HINT = "<p><strong>Entwurf</strong> – dieser Text ist noch nicht freigegeben.</p>"
-
-
-def _with_draft_hint(page: dict) -> str:
-    return DRAFT_HINT + page["html"] if page["draft"] else page["html"]
-
-
 async def site_info() -> dict:
     data = await refresh()
     settings = await _settings()

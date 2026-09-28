@@ -135,10 +135,9 @@ def test_business_details_fill_new_dolibarr_prospect():
     assert posted["client"] == 2
 
 
-def test_ticket_classification_and_public_url_are_safe_and_configurable():
+def test_ticket_classification_is_configurable():
     cfg = {
         **CFG,
-        "public_ticket_enabled": True,
         "ticket_categories": {"controller_custom": "controller"},
     }
     assert dolibarr._ticket_classification({"request_type": "controller_custom"}, cfg) == {
@@ -146,12 +145,6 @@ def test_ticket_classification_and_public_url_are_safe_and_configurable():
         "severity_code": "NORMAL",
         "category_code": "CONTROLLER",
     }
-    url = dolibarr._public_ticket_url(cfg, "ITANF123", "max+portal@example.com")
-    assert url == (
-        "https://erp.example.test/public/ticket/view.php?"
-        "track_id=ITANF123&email=max%2Bportal%40example.com"
-    )
-    assert dolibarr._public_ticket_url({**cfg, "public_ticket_enabled": False}, "x", "a@b.at") is None
 
 
 def test_dolibarr_error_is_structured_and_never_leaks_api_key():

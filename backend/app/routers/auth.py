@@ -4,7 +4,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from ..db import get_db, now_utc, serialize, to_oid
-from ..models import AccountUpdate, LoginInput, UserCreate
+from ..models import AccountUpdate, LoginInput
 from ..security import (clear_auth_cookies, create_access_token,
                         create_refresh_token, get_current_user, hash_password,
                         require_admin, set_access_cookie, set_auth_cookies,
@@ -145,34 +145,3 @@ async def refresh_token(request: Request, response: Response):
         return {"ok": True}
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Ungültiger Token")
-
-
-# ---- admin user management ----
-@router.get("/users")
-async def list_users(_: dict = Depends(require_admin)):
-    docs = await get_db().users.find().to_list(200)
-    return [serialize(d) for d in docs]
-
-
-@router.post("/users")
-async def create_user(payload: UserCreate, admin: dict = Depends(require_admin)):
-    if admin.get("role") != "super_admin":
-        raise HTTPException(status_code=403, detail="Nur Super-Admins dürfen Benutzer anlegen")
-    db = get_db()
-    if await db.users.find_one({"email": payload.email.lower().strip()}):
-        raise HTTPException(status_code=400, detail="E-Mail bereits vergeben")
-    doc = {"email": payload.email.lower().strip(), "password_hash": hash_password(payload.password),
-           "name": payload.name, "role": payload.role, "created_at": now_utc()}
-    res = await db.users.insert_one(doc)
-    doc["_id"] = res.inserted_id
-    return serialize(doc)
-
-
-@router.delete("/users/{user_id}")
-async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
-    if admin.get("role") != "super_admin":
-        raise HTTPException(status_code=403, detail="Nur Super-Admins dürfen Benutzer löschen")
-    if str(admin["_id"]) == user_id:
-        raise HTTPException(status_code=400, detail="Eigenen Account nicht löschen")
-    await get_db().users.delete_one({"_id": to_oid(user_id)})
-    return {"ok": True}

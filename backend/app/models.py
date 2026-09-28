@@ -44,13 +44,6 @@ class LoginInput(BaseModel):
     password: str
 
 
-class UserCreate(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=12, max_length=72)
-    name: str
-    role: str = "staff"
-
-
 class AccountUpdate(BaseModel):
     current_password: str = Field(min_length=1, max_length=256)
     email: Optional[EmailStr] = None
@@ -233,10 +226,6 @@ class ContactInput(BaseModel):
         return self
 
 
-# Backwards-compatible names for old clients using /repairs.
-RepairInput = InquiryInput
-
-
 class InquiryStatusQuery(BaseModel):
     """Status lookup on the website: reference number plus the e-mail (#43)."""
     ref: str = Field(min_length=12, max_length=12)
@@ -249,10 +238,6 @@ class InquiryStatusQuery(BaseModel):
         if not re.fullmatch(r"ANF-[A-Z0-9]{8}", text):
             raise ValueError("Die Anfrage-Nummer hat die Form ANF-XXXXXXXX")
         return text
-
-
-class InquiryStatusUpdate(BaseModel):
-    status: str
 
 
 # ---------- Review requests (#71) ----------
@@ -279,24 +264,9 @@ class ReviewInviteSubmit(BaseModel):
         return value.strip() if isinstance(value, str) else value
 
 
-RepairStatusUpdate = InquiryStatusUpdate
-
-
 # ---------- Settings ----------
 class SettingsInput(BaseModel):
-    company_name: Optional[str] = None
-    tagline: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    address: Optional[str] = None
-    city: Optional[str] = None
-    region: Optional[str] = None
-    postal_code: Optional[str] = None
-    country: Optional[str] = None
     service_area: Optional[str] = None
-    opening_hours: Optional[List[dict]] = None
-    social_links: Optional[dict] = None
-    ga_measurement_id: Optional[str] = None
     canonical_base_url: Optional[str] = None
     dolibarr_enabled: Optional[bool] = None
     dolibarr_base_url: Optional[str] = Field(default=None, max_length=2048)
@@ -304,7 +274,6 @@ class SettingsInput(BaseModel):
     clear_dolibarr_api_key: Optional[bool] = None
     dolibarr_timeout_seconds: Optional[float] = Field(default=None, ge=1, le=60)
     dolibarr_country_code: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    dolibarr_public_ticket_enabled: Optional[bool] = None
     dolibarr_ticket_categories: Optional[dict] = None
     # The website's own mail (#38). The password is write-only.
     smtp_host: Optional[str] = Field(default=None, max_length=255)
@@ -336,13 +305,8 @@ class SettingsInput(BaseModel):
     dolibarr_imprint_article_id: Optional[int] = Field(default=None, ge=0)
     dolibarr_privacy_article_id: Optional[int] = Field(default=None, ge=0)
     dolibarr_terms_article_id: Optional[int] = Field(default=None, ge=0)
-    logo_light_url: Optional[str] = None
-    logo_dark_url: Optional[str] = None
     seo_default_title: Optional[str] = None
     seo_default_description: Optional[str] = None
-    impressum_html: Optional[str] = None
-    datenschutz_html: Optional[str] = None
-    legal_reviewed: Optional[bool] = None
 
     @field_validator("canonical_base_url")
     @classmethod
