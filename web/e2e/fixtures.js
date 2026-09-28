@@ -29,6 +29,9 @@ export function reviews(count) {
   }));
 }
 
+// The personal link from the review request mail (#71): /bewertung#<token>.
+export const REVIEW_LINK = "Beispiel-Link-nur-fuer-Tests-000000000000";
+
 /** Answers every /api request of the page; `sent` records what the page posted. */
 export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, status } = {}) {
   const sent = [];
@@ -63,6 +66,13 @@ export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, 
       return json(route, { ref: body.ref, request_type: "repair", request_type_label: "Reparatur", step: status || "eingegangen",
         created_at: "2026-09-27T10:00:00+00:00", updated_at: "2026-09-27T12:00:00+00:00" });
     }
+    if (path === "/review-invites/check" && method === "POST") {
+      if (request.postDataJSON().token !== REVIEW_LINK) {
+        return json(route, { detail: "Dieser Link ist abgelaufen oder wurde schon verwendet." }, 404);
+      }
+      return json(route, { ref: "ANF-BEWERT01", request_type_label: "Reparatur" });
+    }
+    if (path === "/review-invites/submit" && method === "POST") return json(route, { ok: true });
     if (path.startsWith("/inquiries/status/track/")) {
       return json(route, { ref: "ANF-LINK0001", request_type: "repair", request_type_label: "Reparatur", step: "in_arbeit" });
     }

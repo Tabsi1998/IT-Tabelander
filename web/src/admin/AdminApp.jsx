@@ -3,6 +3,7 @@ import ErrorBoundary from "./ErrorBoundary.jsx";
 import Layout from "./Layout.jsx";
 import Dolibarr from "./pages/Dolibarr.jsx";
 import Gallery from "./pages/Gallery.jsx";
+import Label from "./pages/Label.jsx";
 import Login from "./pages/Login.jsx";
 import Overview from "./pages/Overview.jsx";
 import Reviews from "./pages/Reviews.jsx";
@@ -33,6 +34,8 @@ function Pages() {
           <Route path="bewertungen" element={<Reviews />} />
           <Route path="dolibarr" element={<Dolibarr />} />
           <Route path="technik" element={<Technik />} />
+          <Route path="etikett" element={<Label />} />
+          <Route path="etikett/:ref" element={<Label />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </ErrorBoundary>

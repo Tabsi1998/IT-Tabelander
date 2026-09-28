@@ -1,6 +1,8 @@
 import { useId, useState } from "react";
 import { adminRequest, errorText } from "./api.js";
 
+export { StarInput } from "../forms/fields.jsx";
+
 export function PageHeader({ title, description, actions }) {
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -82,20 +84,6 @@ export function Chips({ label, options, value, onChange }) {
           className={`min-h-[44px] rounded-full border-[1.5px] px-4 text-[15px] font-semibold ${
             value === key ? "border-ink bg-ink text-page" : "border-line bg-surface text-ink"}`}>
           {text}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export function StarInput({ value, onChange }) {
-  return (
-    <div role="radiogroup" aria-label="Sterne" className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button key={star} type="button" role="radio" aria-checked={value === star} aria-label={`${star} von 5 Sternen`}
-          onClick={() => onChange(star)}
-          className={`flex h-11 w-11 items-center justify-center rounded-lg text-[26px] leading-none ${star <= value ? "text-accent" : "text-field"}`}>
-          ★
         </button>
       ))}
     </div>

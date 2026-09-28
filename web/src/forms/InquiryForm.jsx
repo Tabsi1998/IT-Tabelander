@@ -47,6 +47,7 @@ export default function InquiryForm({ preset, onShowStatus }) {
   const [callback, setCallback] = useState({ wanted: false, date: "", time: "10:00" });
   const [photos, setPhotos] = useState([]);
   const [consent, setConsent] = useState(false);
+  const [reviewOk, setReviewOk] = useState(false);
   const [honeypot, setHoneypot] = useState("");
   const [state, setState] = useState({ busy: false, error: "", done: null });
   const headingRef = useRef(null);
@@ -94,7 +95,7 @@ export default function InquiryForm({ preset, onShowStatus }) {
       budget: device.budget, timeframe: device.timeframe,
       attachment_ids: photos.map((photo) => photo.id),
       contact: { ...contact, preferred_contact: callback.wanted ? "phone" : contact.preferred_contact },
-      consent: true, honeypot,
+      consent: true, honeypot, review_ok: reviewOk,
       ...(callback.wanted ? { callback_at: localIso(callback.date, callback.time) } : {}),
     };
     try {
@@ -131,7 +132,7 @@ export default function InquiryForm({ preset, onShowStatus }) {
   const restart = () => {
     photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
     setDraftId(requestId("anfrage"));
-    setStep(0); setType(""); setPhotos([]); setConsent(false);
+    setStep(0); setType(""); setPhotos([]); setConsent(false); setReviewOk(false);
     setDevice({ device_type: "", device_source: "", manufacturer: "", model: "", description: "", budget: "", timeframe: "" });
     setState({ busy: false, error: "", done: null });
   };
@@ -276,6 +277,15 @@ export default function InquiryForm({ preset, onShowStatus }) {
               </Field>
             </div>
           )}
+          {/* Asking for a review by mail needs a yes beforehand; it stays optional (#71). */}
+          <label className="flex items-start gap-3 text-[15px] font-semibold">
+            <input type="checkbox" checked={reviewOk} onChange={(event) => setReviewOk(event.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--c-ink)]" />
+            <span>
+              Nach Abschluss darf ich dich einmal per Mail um eine kurze Bewertung bitten.
+              <span className="block font-normal text-muted">Freiwillig und eine einzige Mail. Du kannst das jederzeit mit einer kurzen Nachricht zurücknehmen.</span>
+            </span>
+          </label>
           <Honeypot value={honeypot} onChange={setHoneypot} />
           <Consent checked={consent} onChange={setConsent}>
             Meine Angaben und Fotos dürfen zur Bearbeitung dieser Anfrage verwendet werden. Details in der{" "}

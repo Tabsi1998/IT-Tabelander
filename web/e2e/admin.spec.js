@@ -9,6 +9,7 @@ const PHOTO = Buffer.from(
 const PAGES = [
   ["/admin", "Übersicht"], ["/admin/texte", "Texte"], ["/admin/leistungen", "Leistungen"], ["/admin/galerie", "Galerie"],
   ["/admin/bewertungen", "Bewertungen"], ["/admin/dolibarr", "Dolibarr"], ["/admin/technik", "Technik"],
+  ["/admin/etikett/ANF-NEU00001", "Etikett drucken"],
 ];
 
 for (const [path, title] of PAGES) {
@@ -167,6 +168,71 @@ test("the admin menu on a phone (#57)", async ({ page }) => {
   await page.getByRole("dialog", { name: "Menü" }).getByRole("link", { name: "Galerie" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Galerie" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Menü" })).toHaveCount(0);
+});
+
+test("a review from the link waits for the release; requests go out on demand (#71)", async ({ page }) => {
+  const state = await mockAdmin(page);
+  await page.goto("/admin");
+  await expect(page.getByText("1 Bewertung wartet auf deine Freigabe.")).toBeVisible();
+  await page.getByRole("link", { name: "Zu den Bewertungen" }).click();
+
+  const pending = page.getByRole("listitem").filter({ hasText: "Schnell repariert, fair erklärt." });
+  await expect(pending.getByText("Wartet auf deine Freigabe")).toBeVisible();
+  await expect(pending.getByText(/über den Link nach dem Auftrag/)).toBeVisible();
+  await pending.getByRole("button", { name: "Freigeben" }).click();
+  await expect(pending.getByText("Wartet auf deine Freigabe")).toHaveCount(0);
+  await expect(pending.getByRole("switch", { name: "Bewertung von Max M. sichtbar" })).toHaveAttribute("aria-checked", "true");
+  const put = state.sent.find((item) => item.method === "PUT" && item.path === "/admin/reviews/r2").body;
+  expect(put).toMatchObject({ visible: true });
+
+  const invites = page.getByRole("region", { name: "Bewertungsbitten" });
+  await expect(invites.getByText("verschickt")).toBeVisible();
+  await invites.getByRole("button", { name: "Jetzt prüfen" }).click();
+  await expect(invites.getByText("1 Mail verschickt.")).toBeVisible();
+});
+
+test("a device label with a QR code to the status page (#72)", async ({ page }) => {
+  await mockAdmin(page);
+  await page.goto("/admin");
+  // A contact message is no device: no label for it.
+  await expect(page.getByRole("link", { name: "Etikett für ANF-KONTAKT1 drucken" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Etikett für ANF-NEU00001 drucken" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Etikett drucken" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "QR-Code zur Status-Seite von ANF-NEU00001" })).toBeVisible();
+  await expect(page.getByText("Reparatur: Notebook Lenovo ThinkPad T14")).toBeVisible();
+  await expect(page.getByText(/TS2609-0001 · 27\.9\.2026/)).toBeVisible();
+  // No customer name on a label that sits on the device in the shop.
+  await expect(page.getByText("Kein Name auf dem Etikett", { exact: false })).toBeVisible();
+  await expectNoSidewaysScroll(page);
+
+  await page.getByRole("link", { name: "Anderes Etikett" }).click();
+  await page.getByLabel("Anfrage- oder Ticket-Nummer").fill("ANF-GIBTSNICHT");
+  await page.getByRole("button", { name: "Etikett zeigen" }).click();
+  await expect(page.getByText("Keine Anfrage mit dieser Nummer gefunden.")).toBeVisible();
+});
+
+test("the label prints on 62 x 29 mm or on A4, and nothing else prints (#72)", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "one PDF is enough; the paper size does not depend on the width");
+  await mockAdmin(page);
+  await page.goto("/admin/etikett/ANF-NEU00001");
+  await expect(page.getByRole("img", { name: /QR-Code/ })).toBeVisible();
+  const sizes = async () => {
+    const pdf = (await page.pdf({ preferCSSPageSize: true, printBackground: true })).toString("latin1");
+    return [...pdf.matchAll(/\/MediaBox\s*\[\s*0 0 ([\d.]+) ([\d.]+)\s*\]/g)].map((match) => [Number(match[1]), Number(match[2])]);
+  };
+  // 62 x 29 mm in PDF points (1 mm = 72 / 25.4 pt), one page only.
+  const roll = await sizes();
+  expect(roll).toHaveLength(1);
+  expect(roll[0][0]).toBeCloseTo(175.7, 0);
+  expect(roll[0][1]).toBeCloseTo(82.2, 0);
+
+  await page.getByRole("button", { name: "Normales Blatt (A4)" }).click();
+  await expect(page.locator('link[href="/print/label-sheet.css"]')).toHaveCount(1);
+  const sheet = await sizes();
+  expect(sheet).toHaveLength(1);
+  expect(sheet[0][0]).toBeCloseTo(595.3, 0);
+  expect(sheet[0][1]).toBeCloseTo(841.9, 0);
+  await expect(page.locator('link[href="/print/label-roll.css"]')).toHaveCount(0);
 });
 
 // Screenshots of every admin page in every width (#55), next to the website's.

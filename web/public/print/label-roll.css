@@ -1,0 +1,5 @@
+/* The device label on a 62 mm label printer (#72); loaded by the label page only. */
+@page {
+  size: 62mm 29mm;
+  margin: 0;
+}

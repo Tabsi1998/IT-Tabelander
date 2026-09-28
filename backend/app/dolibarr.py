@@ -153,6 +153,17 @@ REQUEST_TYPE_LABELS = {
     "contact": "Kontaktnachricht",
 }
 
+# The device choices of the inquiry form, in words (ticket subject, label #72).
+DEVICE_LABELS = {
+    "pc": "Desktop-PC",
+    "notebook": "Notebook",
+    "playstation": "PlayStation",
+    "xbox": "Xbox",
+    "switch": "Switch",
+    "controller": "Controller",
+    "other": "Sonstiges",
+}
+
 DEVICE_SOURCE_LABELS = {
     "new_controller": "Neuen Controller mitbestellen",
     "send_in": "Vorhandenen Controller einsenden",
@@ -520,12 +531,31 @@ async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
     }
 
 
+def device_text(inquiry: dict) -> str:
+    """"Notebook Lenovo ThinkPad T14": the device in words, as far as known."""
+    code = str(inquiry.get("device_type") or "").strip()
+    maker = str(inquiry.get("manufacturer") or "").strip()
+    model = str(inquiry.get("model") or "").strip()
+    device = DEVICE_LABELS.get(code, code)
+    if code == "other" and (maker or model):
+        device = ""
+    return " ".join(part for part in (device, maker, model) if part)[:160]
+
+
 def inquiry_subject(inquiry: dict) -> str:
     kind = REQUEST_TYPE_LABELS.get(inquiry.get("request_type"), "Website-Anfrage")
-    device = str(inquiry.get("device_type") or "").strip()
+    device = device_text(inquiry)
     suffix = f": {device}" if device else ""
     reference = str(inquiry.get("ref") or "").strip()
     return f"{kind}{suffix} ({reference})" if reference else f"{kind}{suffix}"
+
+
+def subject_without_ref(subject: str, ref: str) -> str:
+    """A ticket subject for the label: without the "(ANF-...)" at its end."""
+    text = str(subject or "").strip()
+    if ref and text.endswith(f"({ref})"):
+        text = text[: -len(f"({ref})")].rstrip()
+    return text
 
 
 def inquiry_track_id(inquiry: dict) -> str:
@@ -640,6 +670,23 @@ async def fetch_ticket_status(ticket_id: str) -> dict | None:
     }
 
 
+async def fetch_ticket_subject(ticket_id: str) -> str | None:
+    """The ticket's subject as the owner keeps it in Dolibarr (label #72)."""
+    cfg = await get_config()
+    if not cfg["enabled"]:
+        return None
+    async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
+        response = await client.get(
+            f"{cfg['base']}/api/index.php/tickets/{quote(str(ticket_id), safe='')}",
+            headers=_headers(cfg),
+            params={"contact_list": 0},
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        return str(response.json().get("subject") or "").strip() or None
+
+
 def _iso_time(value) -> str | None:
     """Dolibarr sends points in time as Unix seconds (as number or text)."""
     try:
@@ -693,7 +740,7 @@ def format_inquiry_message(inquiry: dict) -> str:
         f"Anfrage-Referenz: {inquiry.get('ref') or '–'}",
         f"Anfrageart: {type_label}",
         f"Quelle: {inquiry.get('source') or '–'}",
-        f"Gerät / Bereich: {inquiry.get('device_type') or '–'}",
+        f"Gerät / Bereich: {DEVICE_LABELS.get(inquiry.get('device_type'), inquiry.get('device_type')) or '–'}",
         f"Geräteherkunft: {DEVICE_SOURCE_LABELS.get(inquiry.get('device_source'), inquiry.get('device_source')) or '–'}",
         f"Hersteller: {inquiry.get('manufacturer') or '–'}",
         f"Modell: {inquiry.get('model') or '–'}",
@@ -730,6 +777,8 @@ def format_inquiry_message(inquiry: dict) -> str:
     lines.extend(f"{label}: {value}" for label, value in optional_contact if value)
     if inquiry.get("callback_at"):
         lines.append(f"Rückruf gewünscht: {callback_text(inquiry['callback_at'])} (Termin im Kalender)")
+    lines.append("Bewertungsbitte nach Abschluss: "
+                 + ("ja, eine Mail mit Link, sobald das Ticket geschlossen ist" if inquiry.get("review_ok") else "nein"))
     if inquiry.get("request_id"):
         lines.extend(["", f"Request-ID: {inquiry['request_id']}"])
     return "\n".join(lines)

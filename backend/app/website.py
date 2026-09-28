@@ -184,6 +184,10 @@ async def respond(requested_path: str, build_dir: Path):
         page, canonical = root / "index.html", "/"
     elif clean == "status/view.php":
         page, canonical, extra = root / "index.html", "/", '<meta name="robots" content="noindex" />'
+    elif clean == "bewertung":
+        # The page behind the personal link from the mail (#71); the link
+        # itself follows the "#", which never reaches the server.
+        page = root / "bewertung" / "index.html"
     else:
         page, status = root / "404.html", 404
     if not page.is_file():

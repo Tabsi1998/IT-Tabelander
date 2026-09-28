@@ -15,11 +15,12 @@ from fastapi import FastAPI, HTTPException, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response  # noqa: E402
 
-from app import handover, website  # noqa: E402
+from app import handover, review_invites, website  # noqa: E402
 from app.db import close_client, get_db, now_utc  # noqa: E402
 from app.seed import run_all_seeds  # noqa: E402
 from app.routers import (auth, dashboard, dolibarr_router,  # noqa: E402
-                         faqs, gallery, media, repairs, reviews, services, settings, site)
+                         faqs, gallery, media, repairs, review_invites as review_invites_router,
+                         reviews, services, settings, site)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("it-tabelander")
@@ -48,6 +49,9 @@ class PublicRequestGuardMiddleware:
         # Guessing reference numbers and e-mail addresses stays slow (#43).
         ("POST", "/api/inquiries/status"): (20, 60 * 60, 4 * 1024),
         ("POST", "/api/contact"): (10, 60 * 60, 32 * 1024),
+        # The personal review link (#71): guessing stays hopeless and slow.
+        ("POST", "/api/review-invites/check"): (30, 60 * 60, 4 * 1024),
+        ("POST", "/api/review-invites/submit"): (10, 60 * 60, 16 * 1024),
     }
 
     def __init__(self, application):
@@ -186,6 +190,10 @@ async def maintenance_loop(startup_cutoff) -> None:
             cycle = await handover.run_cycle()
             if cycle["tried"] or cycle["cleaned"] or cycle["warned"]:
                 logger.info("Dolibarr queue: %s", cycle)
+            # After a closed ticket, one mail asking for a review (#71).
+            invites = await review_invites.run()
+            if invites["sent"] or invites["failed"]:
+                logger.info("Review requests: %s", invites)
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
@@ -301,7 +309,7 @@ app.add_middleware(
 app.add_middleware(SecurityHeadersMiddleware)
 
 for r in (auth, services, faqs, reviews, settings, repairs,
-          media, dolibarr_router, dashboard, site, gallery):
+          media, dolibarr_router, dashboard, site, gallery, review_invites_router):
     app.include_router(r.router)
 
 READ_METHODS = ["GET", "HEAD"]

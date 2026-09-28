@@ -62,15 +62,15 @@ export default function Layout({ children }) {
   }, [open]);
 
   return (
-    <div className="min-h-screen bg-page lg:grid lg:grid-cols-[250px_minmax(0,1fr)]">
+    <div className="min-h-screen bg-page lg:grid lg:grid-cols-[250px_minmax(0,1fr)] print:block print:min-h-0 print:bg-white">
       <a href="#inhalt" className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[60] focus:rounded focus:bg-surface focus:p-3">
         Zum Inhalt springen
       </a>
-      <aside className="sticky top-0 hidden h-screen flex-col gap-6 bg-navy px-3.5 py-6 lg:flex">
+      <aside className="sticky top-0 hidden h-screen flex-col gap-6 bg-navy px-3.5 py-6 lg:flex print:!hidden">
         <img src="/brand/banner-on-dark.webp" alt="IT-Tabelander" width="651" height="136" className="mx-2.5 h-[26px] w-auto self-start" />
         <Nav waiting={waiting} />
       </aside>
-      <header className="sticky top-0 z-40 flex h-[60px] items-center gap-3 bg-navy px-4 text-on-navy lg:hidden">
+      <header className="sticky top-0 z-40 flex h-[60px] items-center gap-3 bg-navy px-4 text-on-navy lg:hidden print:!hidden">
         <img src="/brand/banner-on-dark.webp" alt="IT-Tabelander" width="651" height="136" className="h-5 w-auto" />
         <span className="truncate font-display text-[17px] font-bold">{current?.label || "Verwaltung"}</span>
         <button type="button" onClick={() => setOpen(true)} aria-label="Menü öffnen" aria-expanded={open}
@@ -90,7 +90,7 @@ export default function Layout({ children }) {
           <Nav waiting={waiting} onNavigate={() => setOpen(false)} />
         </div>
       )}
-      <main id="inhalt" className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 py-6 md:px-8 lg:px-12 lg:py-9">
+      <main id="inhalt" className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 py-6 md:px-8 lg:px-12 lg:py-9 print:!m-0 print:!block print:!max-w-none print:!p-0">
         {children}
       </main>
     </div>
