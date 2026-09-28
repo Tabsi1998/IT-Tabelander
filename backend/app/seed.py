@@ -46,6 +46,12 @@ async def ensure_indexes():
     await db.review_invites.create_index(
         "expires_at", expireAfterSeconds=365 * 24 * 60 * 60, name="review_invite_expiry",
     )
+    # Customer area (#63): sign-in links by their hash, gone a day after they
+    # expired; sessions gone when they expire.
+    await db.portal_links.create_index("token_hash", unique=True, name="portal_link_token")
+    await db.portal_links.create_index([("email", 1), ("created_at", -1)], name="portal_link_email")
+    await db.portal_links.create_index("expires_at", expireAfterSeconds=24 * 60 * 60, name="portal_link_expiry")
+    await db.portal_sessions.create_index("expires_at", expireAfterSeconds=0, name="portal_session_expiry")
     await db.media.create_index(
         [("draft_request_id", 1), ("draft_slot", 1)],
         unique=True,

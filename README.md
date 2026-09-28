@@ -174,7 +174,7 @@ Jedes Thema steht an genau einer Stelle:
 | **Galerie** | Fotos deiner Arbeiten, auch direkt mit der Handy-Kamera: Titel, Bereich, Reihenfolge, sichtbar |
 | **Bewertungen** | Bewertungen eintragen, wie Kunden sie geschrieben haben (Google mit Link, persönlich, E-Mail); Bewertungen über den Link nach dem Auftrag **freigeben**; Bewertungsbitten mit **Jetzt prüfen** |
 | **Dolibarr** | Verbindung (mit Test, zeigt die Version), Inhalte aus der Wissensdatenbank, Themengruppen je Anfrageart, Warteschlange, Altdaten-Umzug |
-| **Technik** | öffentliche Adresse, Einzugsgebiet, Titel und Beschreibung der Startseite für Google, Google-Profil, E-Mail-Versand mit **Test-Mail senden**, dein Zugang |
+| **Technik** | öffentliche Adresse, Einzugsgebiet, Titel und Beschreibung der Startseite für Google, Google-Profil, E-Mail-Versand mit **Test-Mail senden**, **Kundenbereich** ein/aus mit Bankverbindung für den QR-Code, dein Zugang |
 
 Die Anmeldung verlängert sich im Hintergrund von selbst (bis zu 7 Tage).
 Läuft sie doch ab, sagt der Admin das und öffnet nach dem neuen Anmelden
@@ -339,7 +339,9 @@ werden ausdrücklich nicht in Git aufgenommen.
    - Kalender: **eigene Termine einsehen** und **eigene Termine anlegen**
      (für Rückruf-Wünsche),
    - Wissensdatenbank: **lesen**, Kategorien: **lesen** (Rechtstexte, FAQ),
-   - Angebote: **lesen** (für den Schritt „Angebot bereit“).
+   - Angebote: **lesen** (für den Schritt „Angebot bereit“),
+   - für den Kundenbereich zusätzlich: Kontakte **lesen**, Rechnungen
+     **lesen** und Angebote **anlegen/ändern** (zum Annehmen und Ablehnen).
    Im Benutzer einen API-Schlüssel erzeugen. **Keine** Admin-Rechte.
    Nur für den einmaligen Umzug der alten FAQ vorübergehend zusätzlich
    „Wissensdatenbank: anlegen/ändern“ – danach wieder wegnehmen.
@@ -473,6 +475,104 @@ Datei neu hochladen.
 (Apache/Nginx). Wie lange er es behält, steht in `/etc/logrotate.d/apache2`
 bzw. `/etc/logrotate.d/nginx`; diese Frist gehört in die
 Datenschutzerklärung.
+
+### Kundenbereich
+
+Unter `/kundenbereich` sehen Kunden ihre Anfragen und Reparaturen, ihre
+Angebote und Rechnungen. Alles kommt bei jedem Aufruf frisch aus Dolibarr,
+immer nur für diesen einen Kunden; die Website speichert davon nichts.
+
+**Anmelden ohne Passwort:** Der Kunde gibt seine E-Mail-Adresse ein. Gehört sie
+in Dolibarr zu einem aktiven Kunden oder Interessenten oder zu einem aktiven
+Kontakt eines solchen, bekommt genau diese Adresse einen Link, der 15 Minuten
+gilt und einmal funktioniert. Die Seite sagt nie, ob eine Adresse bekannt ist.
+Danach bleibt der Kunde 7 Tage angemeldet. Konten legt niemand an – jede
+E-Mail-Adresse aus Dolibarr funktioniert. Ein Kontakt einer Firma sieht die
+Anfragen, Angebote und Rechnungen der Firma.
+
+**Sperren** geht direkt in Dolibarr am Kunden, und die Website fragt spätestens
+alle 5 Minuten neu:
+
+- Zusatzfeld **Kundenbereich gesperrt** ankreuzen (einmal anlegen unter
+  **Geschäftspartner → Einstellungen → Ergänzende Attribute**: Bezeichnung
+  „Kundenbereich gesperrt“, Attribut-Code `kundenbereich_gesperrt`, Typ
+  „Boolean (Checkbox)“),
+- oder den Kunden auf **geschlossen** stellen,
+- oder einen einzelnen Kontakt **deaktivieren**.
+
+Die „Webzugriffskonten“ in Dolibarr taugen dafür nicht: Ihre Schnittstelle
+gibt nicht heraus, ob ein Konto deaktiviert ist.
+
+**Angebote annehmen:** Der Kunde sieht Positionen, Summe und PDF, liest den
+Hinweis zum Rücktrittsrecht, kann „Bitte sofort beginnen“ ankreuzen und
+bestätigt mit seinem Namen über den Knopf **Angebot kostenpflichtig annehmen**
+(so will es das Gesetz für Verträge im Internet). In Dolibarr wird das Angebot
+als unterschrieben geschlossen; in der internen Notiz stehen Zeitpunkt, Name,
+E-Mail-Adresse, IP-Adresse und ob sofort begonnen werden soll. Steht dort
+„Sofort beginnen verlangt: NEIN“, erst nach 14 Tagen anfangen oder vorher
+nachfragen. Der Kunde bekommt die Bestätigung mit Rücktrittsrecht und
+Muster-Formular per Mail, du eine kurze Nachricht an die Warn-Adresse aus
+**Technik**. Ablehnen geht mit einem freiwilligen Grund, der ebenfalls in der
+Notiz landet. Tipp: In der Dolibarr-Mailvorlage für Angebote einen Satz mit dem
+Link `https://it.tabelander.co.at/kundenbereich` ergänzen.
+
+**Rechnungen:** Offene Rechnungen zeigen Empfänger, IBAN, BIC, offenen Betrag
+und Rechnungsnummer als Verwendungszweck – zum Kopieren und als QR-Code, den
+österreichische Banking-Apps mit „Zahlen mit Code“ lesen. Die Bankverbindung
+dafür trägst du unter **Technik → Kundenbereich** ein (dasselbe Konto wie auf
+den Rechnungen aus Dolibarr): Sie aus Dolibarr zu lesen, bräuchte ein Recht,
+das auch alle Kontobewegungen zeigt. Die IBAN wird beim Speichern geprüft.
+
+**Einschalten:** Rechte und Zusatzfeld in Dolibarr wie oben, E-Mail-Versand der
+Website eingerichtet, dann **Technik → Kundenbereich** einschalten. Erst dann
+zeigt die Website den Link „Kundenbereich“ im Kopf und im Fuß.
+
+### Dolibarr von außen unsichtbar machen
+
+Mit dem Kundenbereich braucht kein Kunde mehr die Dolibarr-Oberfläche. Die
+Anmeldeseite von Dolibarr sollte deshalb von außen nicht mehr erreichbar sein.
+Die Website braucht nur die Schnittstelle unter `/api/`. Drei Wege, vom
+einfachsten zum sichersten:
+
+1. **Nur aus dem Heimnetz oder über VPN** (z. B. WireGuard oder Tailscale auf
+   dem Server): Dolibarr erlaubt nur Adressen aus diesen Netzen.
+2. **Zugriffsliste im Reverse Proxy:** alles außer `/api/` nur für deine
+   Netze, `/api/` nur für den Website-Server.
+3. **Website und Dolibarr auf demselben Server:** Unter `/admin/dolibarr` als
+   Adresse die interne Adresse eintragen (z. B. `http://127.0.0.1:8080`) und
+   den öffentlichen Zugang zu Dolibarr ganz sperren.
+
+Nginx, im `server`-Block von `erp.tabelander.co.at` (Adressen anpassen):
+
+```nginx
+location / {
+    allow 10.8.0.0/24;      # dein VPN-Netz
+    allow 192.168.1.0/24;   # dein Heimnetz, falls Dolibarr dort steht
+    deny all;
+    # ... die bisherigen Zeilen (proxy_pass bzw. fastcgi_pass)
+}
+location /api/ {
+    allow 203.0.113.10;     # öffentliche Adresse des Website-Servers
+    deny all;
+    # ... die bisherigen Zeilen
+}
+```
+
+Apache, im `VirtualHost` von `erp.tabelander.co.at`:
+
+```apache
+<Location "/">
+    Require ip 10.8.0.0/24 192.168.1.0/24
+</Location>
+<Location "/api/">
+    Require ip 203.0.113.10
+</Location>
+```
+
+Danach prüfen: Mit dem Handy **ohne WLAN** `https://erp.tabelander.co.at`
+öffnen – es muss „Forbidden“ kommen. Im Admin unter **Dolibarr → Verbindung
+prüfen** muss es weiter grün sein, und eine Test-Anfrage muss als Ticket
+ankommen.
 
 ### Automatisch in `backend/.env`
 

@@ -156,6 +156,14 @@ async def respond(requested_path: str, build_dir: Path):
     """The answer for one address outside /api."""
     root = build_dir.resolve()
     clean = requested_path.strip("/")
+    if clean == "kundenbereich" or clean.startswith("kundenbereich/"):
+        # The customer area (#63) is drawn in the browser; its page is an empty shell.
+        shell = root / "kundenbereich.html"
+        if not shell.is_file():
+            shell = root / "index.html"
+        if not shell.is_file():
+            raise HTTPException(status_code=503, detail="Frontend-Build ist noch nicht vorhanden")
+        return FileResponse(shell, headers=NO_CACHE)
     if clean == "admin" or clean.startswith("admin/"):
         admin = root / "admin.html"
         if not admin.is_file():

@@ -37,6 +37,12 @@ describe("the QR code on the device label (#72)", () => {
     expect(jsQR(data, size, size)?.data).toBe(URL);
   });
 
+  test("a transfer code for the banking app keeps umlauts (#66)", () => {
+    const epc = ["BCD", "002", "1", "SCT", "", "Jürgen Müller", "AT611904300234573201", "EUR12.30", "", "", "FA2609-0001"].join("\n");
+    const { data, size } = pixels(qrModules(epc));
+    expect(jsQR(data, size, size)?.data).toBe(epc);
+  });
+
   test("the SVG path draws exactly the dark modules", () => {
     const modules = qrModules(URL);
     expect(fromPath(qrPath(modules), modules.length)).toEqual(modules);

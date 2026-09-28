@@ -23,6 +23,21 @@ def check_callback(moment: Optional[datetime], phone: Optional[str]) -> None:
         raise ValueError("Der Rückruf-Wunsch darf höchstens 60 Tage in der Zukunft liegen")
 
 
+def check_iban(value: Optional[str]) -> Optional[str]:
+    """Spaces out, capitals, and the check digits must add up (ISO 13616)."""
+    if value is None:
+        return value
+    iban = re.sub(r"\s+", "", value).upper()
+    if not iban:
+        return ""
+    if not re.fullmatch(r"[A-Z]{2}\d{2}[A-Z0-9]{11,30}", iban):
+        raise ValueError("Die IBAN hat nicht die richtige Form, z. B. AT61 1904 3002 3457 3201")
+    digits = "".join(str(int(character, 36)) for character in iban[4:] + iban[:4])
+    if int(digits) % 97 != 1:
+        raise ValueError("Die IBAN stimmt nicht: Die Prüfziffer passt nicht, bitte vergleichen")
+    return iban
+
+
 # ---------- Auth ----------
 class LoginInput(BaseModel):
     email: EmailStr
@@ -308,6 +323,13 @@ class SettingsInput(BaseModel):
     about_text: Optional[str] = Field(default=None, max_length=4000)
     about_qualifications: Optional[List[str]] = Field(default=None, max_length=12)
     about_photo_url: Optional[str] = Field(default=None, max_length=512)
+    # The customer area on the website (#63); off until the owner is ready.
+    portal_enabled: Optional[bool] = None
+    # The account for the transfer QR code on open invoices (#66); the same as
+    # on the invoices from Dolibarr, which would need a bank right to read it.
+    portal_bank_holder: Optional[str] = Field(default=None, max_length=70)
+    portal_bank_iban: Optional[str] = Field(default=None, max_length=42)
+    portal_bank_bic: Optional[str] = Field(default=None, max_length=11)
     # Website content from Dolibarr's knowledge base (#74, #81): the public
     # category and which article is which legal page. 0 = none.
     dolibarr_content_category_id: Optional[int] = Field(default=None, ge=0)
@@ -367,6 +389,26 @@ class SettingsInput(BaseModel):
         if cleaned.lower().endswith(suffix):
             cleaned = cleaned[:-len(suffix)].rstrip("/")
         return cleaned
+
+    @field_validator("portal_bank_holder", mode="before")
+    @classmethod
+    def clean_bank_holder(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("portal_bank_iban")
+    @classmethod
+    def validate_iban(cls, value):
+        return check_iban(value)
+
+    @field_validator("portal_bank_bic")
+    @classmethod
+    def validate_bic(cls, value):
+        if value is None:
+            return value
+        bic = re.sub(r"\s+", "", value).upper()
+        if bic and not re.fullmatch(r"[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?", bic):
+            raise ValueError("Der BIC hat 8 oder 11 Zeichen, z. B. BKAUATWW")
+        return bic
 
     @field_validator("google_review_url")
     @classmethod

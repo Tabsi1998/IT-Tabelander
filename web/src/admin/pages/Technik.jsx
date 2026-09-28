@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Field } from "../../forms/fields.jsx";
 import { adminRequest, errorText, useAdminData } from "../api.js";
 import { useSession } from "../session.jsx";
-import { LoadState, Notice, PageHeader, Section } from "../ui.jsx";
+import { LoadState, Notice, PageHeader, Section, Toggle } from "../ui.jsx";
 
 function useSaver() {
   const [state, setState] = useState({ busy: false, error: "", done: "" });
@@ -150,6 +150,41 @@ function Account() {
   );
 }
 
+/** The customer area (#63-#66): on or off, and the account for the transfer QR code. */
+function Portal({ settings }) {
+  const [form, setForm] = useState({
+    portal_enabled: Boolean(settings.portal_enabled), portal_bank_holder: settings.portal_bank_holder || "",
+    portal_bank_iban: settings.portal_bank_iban || "", portal_bank_bic: settings.portal_bank_bic || "",
+  });
+  const [state, run] = useSaver();
+  const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+  return (
+    <Section title="Kundenbereich"
+      description="Kunden melden sich mit der E-Mail-Adresse aus Dolibarr an – ohne Passwort, mit einem Link per Mail – und sehen ihre Anfragen, Angebote und Rechnungen. Gesperrt wird in Dolibarr direkt am Kunden.">
+      <Toggle checked={form.portal_enabled} onChange={(portal_enabled) => setForm((current) => ({ ...current, portal_enabled }))}
+        label="Kundenbereich auf der Website" />
+      <p className="m-0 text-[15px] text-body">
+        Vorher in Dolibarr: dem Website-Benutzer die Rechte <b>Kontakte lesen</b>, <b>Rechnungen lesen</b> und <b>Angebote anlegen/ändern</b>
+        (für das Annehmen) geben und am Geschäftspartner das Zusatzfeld <b>Kundenbereich gesperrt</b> anlegen. Der E-Mail-Versand oben muss eingerichtet sein.
+      </p>
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_160px]">
+        <Field label="Kontoinhaber" maxLength={70} value={form.portal_bank_holder} onChange={set("portal_bank_holder")} />
+        <Field label="IBAN" placeholder="AT61 1904 3002 3457 3201" value={form.portal_bank_iban} onChange={set("portal_bank_iban")} />
+        <Field label="BIC" hint="(optional)" maxLength={11} value={form.portal_bank_bic} onChange={set("portal_bank_bic")} />
+      </div>
+      <p className="m-0 text-sm text-muted">Für den QR-Code auf offenen Rechnungen – dasselbe Konto wie auf deinen Rechnungen aus Dolibarr. Ohne Konto zeigt der Kundenbereich keinen QR-Code.</p>
+      <Status state={state} />
+      <button type="button" className="btn-primary self-start" disabled={state.busy}
+        onClick={() => run(() => adminRequest("PUT", "/admin/settings", {
+          portal_enabled: form.portal_enabled, portal_bank_holder: form.portal_bank_holder.trim(),
+          portal_bank_iban: form.portal_bank_iban.trim(), portal_bank_bic: form.portal_bank_bic.trim(),
+        }), "Gespeichert.")}>
+        Speichern
+      </button>
+    </Section>
+  );
+}
+
 /** Settings of the website itself (#61); each topic lives in one place only. */
 export default function Technik() {
   const settings = useAdminData("/admin/settings");
@@ -161,6 +196,7 @@ export default function Technik() {
           <>
             <Website settings={data} />
             <Mail settings={data} />
+            <Portal settings={data} />
           </>
         )}
       </LoadState>

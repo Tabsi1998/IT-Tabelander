@@ -634,3 +634,195 @@ class TestReviewRequestAndLabel:
         assert not any(item["id"] == mine["id"] for item in public)
         overview = admin_client.get(f"{BASE_URL}/api/admin/review-invites", timeout=30).json()
         assert overview["sent"] >= 1 and overview["answered"] >= 1
+
+
+# ---------------------------------------------------------------- customer area (#63-#66)
+
+def link_mails_to(address: str, seconds: int = 0) -> list:
+    """The website's sign-in mails for one address."""
+    deadline = time.time() + seconds
+    while True:
+        found = [item for item in mails_to(address, seconds=0)
+                 if str(item.get("Subject") or "") == "Dein Link zum Kundenbereich"]
+        if found or time.time() >= deadline:
+            return found
+        time.sleep(1)
+
+
+def mail_with(address: str, subject_start: str, seconds: int = 30) -> dict | None:
+    """The newest mail to an address whose subject starts so, waiting for it."""
+    deadline = time.time() + seconds
+    while True:
+        found = [item for item in mails_to(address, seconds=0) if str(item.get("Subject") or "").startswith(subject_start)]
+        if found or time.time() >= deadline:
+            return found[0] if found else None
+        time.sleep(1)
+
+
+def portal_session(email: str) -> requests.Session:
+    """Sign in like a customer: address, mail, link."""
+    before = len(link_mails_to(email))
+    session = requests.Session()
+    asked = session.post(f"{BASE_URL}/api/portal/login", json={"email": email}, timeout=30)
+    assert asked.status_code == 200 and asked.json() == {"ok": True}, asked.text
+    deadline = time.time() + 30
+    while len(link_mails_to(email)) <= before and time.time() < deadline:
+        time.sleep(1)
+    newest = link_mails_to(email)[0]
+    token = re.search(r"/kundenbereich/anmelden#([A-Za-z0-9_-]{40,})", mail_text(newest)).group(1)
+    opened = session.post(f"{BASE_URL}/api/portal/session", json={"token": token}, timeout=60)
+    assert opened.status_code == 200, opened.text
+    return session
+
+
+def new_customer(name: str, email: str, **extra) -> int:
+    return int(dolibarr_post("thirdparties", {"name": name, "email": email, "client": 1, "code_client": "-1",
+                                              "status": 1, **extra}))
+
+
+def new_ticket(socid: int, subject: str) -> dict:
+    ticket_id = dolibarr_post("tickets", {"subject": subject, "message": "Portal-Szenario", "fk_soc": socid,
+                                          "type_code": "ISSUE", "severity_code": "NORMAL"})
+    return dolibarr_get(f"tickets/{int(ticket_id)}")
+
+
+def new_document(kind: str, socid: int, text: str, price: float) -> dict:
+    """A released offer or invoice with one line and its PDF, as the owner makes them."""
+    body = {"socid": socid, "date": int(time.time()),
+            "lines": [{"desc": text, "qty": 1, "subprice": price, "tva_tx": 20, "product_type": 1}]}
+    if kind == "invoices":
+        body["type"] = 0
+    object_id = int(dolibarr_post(kind, body))
+    dolibarr_post(f"{kind}/{object_id}/validate", {"notrigger": 0})
+    item = dolibarr_get(f"{kind}/{object_id}")
+    module = "propal" if kind == "proposals" else "facture"
+    response = requests.put(f"{DOLIBARR}/api/index.php/documents/builddoc",
+                            headers={"DOLAPIKEY": ADMIN_KEY, "Accept": "application/json"}, timeout=60,
+                            json={"modulepart": module, "original_file": f"{item['ref']}/{item['ref']}.pdf",
+                                  "doctemplate": "cyan" if module == "propal" else "sponge", "langcode": "de_DE"})
+    assert response.status_code == 200, response.text
+    return dolibarr_get(f"{kind}/{object_id}")
+
+
+@pytest.fixture(scope="class")
+def portal_world(admin_client):
+    """Two customers with a repair, an offer and an invoice each, a blocked
+    customer and a company reached through its contact's address."""
+    use_mailpit_for_website_mail(admin_client)
+    switched = admin_client.put(f"{BASE_URL}/api/admin/settings", json={
+        "portal_enabled": True, "portal_bank_holder": "IT-Tabelander Test", "portal_bank_iban": "AT61 1904 3002 3457 3201",
+        "portal_bank_bic": "BKAUATWW"}, timeout=30)
+    assert switched.status_code == 200, switched.text
+    tag = uuid.uuid4().hex[:8]
+    world = {"tag": tag, "a": f"portal-a-{tag}@example.com", "b": f"portal-b-{tag}@example.com", "c": f"portal-c-{tag}@example.com",
+             "contact": f"portal-kontakt-{tag}@example.com"}
+    world["a_id"] = new_customer(f"Portal A {tag}", world["a"])
+    world["b_id"] = new_customer(f"Portal B {tag}", world["b"])
+    world["c_id"] = new_customer(f"Portal C {tag}", world["c"], array_options={"options_kundenbereich_gesperrt": 1})
+    world["d_id"] = new_customer(f"Portal Firma D {tag}", f"firma-d-{tag}@example.com")
+    dolibarr_post("contacts", {"socid": world["d_id"], "lastname": "Kontakt", "firstname": "Dora", "email": world["contact"],
+                               "statut": 1})
+    for key in ("a", "b"):
+        world[f"{key}_ticket"] = new_ticket(world[f"{key}_id"], f"Reparatur: Notebook {key.upper()} (ANF-PORTAL0{key.upper()})")
+        world[f"{key}_offer"] = new_document("proposals", world[f"{key}_id"], f"Akku tauschen {key.upper()}", 50)
+        world[f"{key}_invoice"] = new_document("invoices", world[f"{key}_id"], f"Reinigung {key.upper()}", 75)
+    # One sign-in per customer: three links per address and quarter hour is the limit.
+    world["a_session"] = portal_session(world["a"])
+    world["b_session"] = portal_session(world["b"])
+    return world
+
+
+class TestCustomerArea:
+    def test_a_customer_sees_only_their_own(self, portal_world):
+        """#63, #64: customer A never sees inquiries, offers or invoices of customer B."""
+        world = portal_world
+        a = world["a_session"]
+        overview = a.get(f"{BASE_URL}/api/portal/overview", timeout=60).json()
+        assert overview["customers"] == [f"Portal A {world['tag']}"], overview["customers"]
+        assert [item["ref"] for item in overview["tickets"]] == [world["a_ticket"]["ref"]]
+        assert overview["tickets"][0]["inquiry_ref"] == "ANF-PORTAL0A"
+        assert [item["ref"] for item in overview["offers"]] == [world["a_offer"]["ref"]]
+        assert [item["ref"] for item in overview["invoices"]] == [world["a_invoice"]["ref"]]
+        assert overview["counts"] == {"offers_open": 1, "invoices_open": 1, "repairs_running": 1}
+        for path in (f"offers/{world['b_offer']['id']}", f"offers/{world['b_offer']['id']}/pdf",
+                     f"invoices/{world['b_invoice']['id']}", f"invoices/{world['b_invoice']['id']}/pdf"):
+            assert a.get(f"{BASE_URL}/api/portal/{path}", timeout=60).status_code == 404, path
+        foreign = a.post(f"{BASE_URL}/api/portal/offers/{world['b_offer']['id']}/answer",
+                         json={"accept": True, "name": "Fremd"}, timeout=60)
+        assert foreign.status_code == 404
+        assert int(dolibarr_get(f"proposals/{world['b_offer']['id']}")["status"]) == 1
+
+        refs = json.dumps(world["b_session"].get(f"{BASE_URL}/api/portal/overview", timeout=60).json())
+        assert world["b_offer"]["ref"] in refs and world["a_offer"]["ref"] not in refs and world["a_invoice"]["ref"] not in refs
+
+    def test_a_contact_sees_the_company(self, portal_world):
+        overview = portal_session(portal_world["contact"]).get(f"{BASE_URL}/api/portal/overview", timeout=60).json()
+        assert overview["customers"] == [f"Portal Firma D {portal_world['tag']}"]
+
+    def test_a_blocked_customer_gets_no_link_and_an_old_link_opens_nothing(self, portal_world):
+        world = portal_world
+        asked = requests.post(f"{BASE_URL}/api/portal/login", json={"email": world["c"]}, timeout=30)
+        assert asked.status_code == 200 and asked.json() == {"ok": True}, "the answer never tells"
+        assert link_mails_to(world["c"], seconds=6) == []
+
+        before = len(link_mails_to(world["a"]))
+        asked = requests.post(f"{BASE_URL}/api/portal/login", json={"email": world["a"]}, timeout=30)
+        assert asked.status_code == 200
+        deadline = time.time() + 30
+        while len(link_mails_to(world["a"])) <= before and time.time() < deadline:
+            time.sleep(1)
+        token = re.search(r"#([A-Za-z0-9_-]{40,})", mail_text(link_mails_to(world["a"])[0])).group(1)
+        website_db().portal_links.update_many(
+            {"email": world["a"], "used_at": {"$exists": False}},
+            {"$set": {"expires_at": datetime.now(timezone.utc) - timedelta(minutes=1)}})
+        late = requests.post(f"{BASE_URL}/api/portal/session", json={"token": token}, timeout=30)
+        assert late.status_code == 400 and "abgelaufen" in late.json()["detail"], late.text
+
+    def test_an_offer_accepted_online_is_signed_in_dolibarr_with_the_proof(self, portal_world):
+        """#65."""
+        world = portal_world
+        a = world["a_session"]
+        offer_id = world["a_offer"]["id"]
+        detail = a.get(f"{BASE_URL}/api/portal/offers/{offer_id}", timeout=60).json()
+        assert detail["can_answer"] is True and detail["lines"][0]["text"] == "Akku tauschen A"
+        pdf = a.get(f"{BASE_URL}/api/portal/offers/{offer_id}/pdf", timeout=60)
+        assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf" and pdf.content.startswith(b"%PDF")
+
+        answered = a.post(f"{BASE_URL}/api/portal/offers/{offer_id}/answer",
+                          json={"accept": True, "name": "Max Portal", "start_now": True}, timeout=60)
+        assert answered.status_code == 200 and answered.json()["state"] == "angenommen", answered.text
+        signed = dolibarr_get(f"proposals/{offer_id}")
+        assert int(signed["status"]) == 2
+        assert "„Max Portal“" in signed["note_private"] and world["a"] in signed["note_private"]
+        assert "IP " in signed["note_private"] and "Sofort beginnen verlangt: ja" in signed["note_private"]
+        again = a.post(f"{BASE_URL}/api/portal/offers/{offer_id}/answer", json={"accept": True, "name": "Max"}, timeout=60)
+        assert again.status_code == 409
+
+        confirmation = mail_with(world["a"], f"Bestätigung: Angebot {world['a_offer']['ref']}")
+        assert confirmation, "the customer got no confirmation"
+        text = mail_text(confirmation)
+        assert "Muster-Widerrufsformular" in text and "14 Tagen" in text and "„Max Portal“" in text
+        assert mail_with(WARNINGS_TO, f"Angebot {world['a_offer']['ref']} angenommen"), "the owner was not told"
+
+    def test_an_open_invoice_shows_what_to_transfer(self, portal_world):
+        """#66: amount and invoice number in the data and in the code for the banking app."""
+        world = portal_world
+        a = world["a_session"]
+        invoice = a.get(f"{BASE_URL}/api/portal/invoices/{world['a_invoice']['id']}", timeout=60).json()
+        assert invoice["open"] is True and float(invoice["remain"]) == 90.0
+        payment = invoice["payment"]
+        assert payment["iban"] == "AT611904300234573201" and payment["reference"] == world["a_invoice"]["ref"]
+        lines = payment["epc"].split("\n")
+        assert lines[:4] == ["BCD", "002", "1", "SCT"] and lines[5] == "IT-Tabelander Test"
+        assert lines[6] == "AT611904300234573201" and lines[7] == "EUR90.00" and lines[10] == world["a_invoice"]["ref"]
+        pdf = a.get(f"{BASE_URL}/api/portal/invoices/{world['a_invoice']['id']}/pdf", timeout=60)
+        assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+
+    def test_a_block_ends_a_running_session(self, portal_world):
+        world = portal_world
+        b = world["b_session"]
+        assert b.get(f"{BASE_URL}/api/portal/overview", timeout=60).status_code == 200
+        dolibarr_put(f"thirdparties/{world['b_id']}", {"array_options": {"options_kundenbereich_gesperrt": 1}})
+        website_db().portal_sessions.update_many(
+            {"email": world["b"]}, {"$set": {"checked_at": datetime.now(timezone.utc) - timedelta(hours=1)}})
+        assert b.get(f"{BASE_URL}/api/portal/overview", timeout=60).status_code == 401

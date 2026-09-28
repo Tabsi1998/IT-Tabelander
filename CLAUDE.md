@@ -108,6 +108,22 @@ open. A unit test keeps the periods in the privacy text equal to the code
 (`ATTACHMENT_TTL`, `LINK_VALID`). Uvicorn runs with `--no-access-log`: the
 website keeps no visitor IPs, the reverse proxy logs requests.
 
+Customer area (#63-#66, `backend/app/portal.py`, `web/src/portal/`): sign-in
+by a one-time link (15 min, hash in `portal_links`, `/kundenbereich/anmelden#token`,
+3 per address per 15 min) to an address that `customers_for` finds in Dolibarr
+(active customer/prospect or active contact; not closed, not the extra field
+`kundenbereich_gesperrt`); the request always answers the same and sends in
+the background. Session: opaque cookie `portal_session` (path `/api/portal`,
+7 days, hash in `portal_sessions`), access asked again every 5 minutes. Every
+Dolibarr reading is filtered by the session's customer ids and checked again
+(`_owned`: other customer or draft = 404). Accepting closes the proposal via
+`POST proposals/{id}/close` (status 2/3) with the proof in `note_private`, then
+mails the customer the confirmation with the withdrawal right (FAGG) and the
+owner a notice. Open invoices carry an EPC QR payload (`epc_payload`, UTF-8,
+drawn by `src/lib/qr.js`); the bank account is a website setting because
+reading it from Dolibarr needs the bank right. Off (`portal_enabled`) until
+the owner switches it on; `kundenbereich.html` is an empty shell like the admin.
+
 Device label (#72): `GET /api/admin/labels/{ref}` (inquiry or ticket number)
 gives number, title (the local subject before the hand-over, the Dolibarr
 ticket subject after it), date and the status link with the track id. The QR

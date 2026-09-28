@@ -44,4 +44,9 @@ writeFileSync(path.join(dist, "admin.html"), template
   .replace(/<title>[^<]*<\/title>/, "<title>Verwaltung – IT-Tabelander</title>")
   .replace("<!--app-head-->", '<meta name="robots" content="noindex" />\n    <!--app-head-->'));
 console.log("wrote the empty admin page -> dist/admin.html");
+// So does the customer area (#63): it needs a sign-in, search engines stay out.
+writeFileSync(path.join(dist, "kundenbereich.html"), template
+  .replace(/<title>[^<]*<\/title>/, "<title>Kundenbereich – IT-Tabelander</title>")
+  .replace("<!--app-head-->", '<meta name="robots" content="noindex" />\n    <!--app-head-->'));
+console.log("wrote the empty customer area page -> dist/kundenbereich.html");
 rmSync(path.join(root, "dist-ssr"), { recursive: true, force: true });

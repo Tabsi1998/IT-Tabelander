@@ -4,7 +4,7 @@ import { telHref, useSite } from "../lib/site.jsx";
 import Logo from "./Logo.jsx";
 
 export default function Footer({ onHome = true }) {
-  const { company } = useSite();
+  const { company, settings } = useSite();
   const name = company?.name || "IT-Tabelander";
   const place = [company?.town, "Tirol"].filter(Boolean).join(" · ");
   const customerLink = (tab, label) => (onHome
@@ -34,6 +34,9 @@ export default function Footer({ onHome = true }) {
             <b className="mb-1.5 text-on-navy">Für Kunden</b>
             {customerLink("anfrage", "Anfrage starten")}
             {customerLink("status", "Status prüfen")}
+            {settings.portal_enabled && (
+              <Link to="/kundenbereich" className="flex min-h-[44px] items-center text-on-navy-muted no-underline md:min-h-0">Kundenbereich</Link>
+            )}
           </nav>
           <nav aria-label="Rechtliches" className="flex flex-col gap-0 text-base md:gap-2.5 md:text-[15px]">
             <b className="mb-1.5 text-on-navy">Rechtliches</b>

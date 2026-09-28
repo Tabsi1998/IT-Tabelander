@@ -19,8 +19,8 @@ from app import handover, review_invites, website  # noqa: E402
 from app.db import close_client, get_db, now_utc  # noqa: E402
 from app.seed import run_all_seeds  # noqa: E402
 from app.routers import (auth, dashboard, dolibarr_router,  # noqa: E402
-                         faqs, gallery, media, repairs, review_invites as review_invites_router,
-                         reviews, services, settings, site)
+                         faqs, gallery, media, portal as portal_router, repairs,
+                         review_invites as review_invites_router, reviews, services, settings, site)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("it-tabelander")
@@ -52,6 +52,10 @@ class PublicRequestGuardMiddleware:
         # The personal review link (#71): guessing stays hopeless and slow.
         ("POST", "/api/review-invites/check"): (30, 60 * 60, 4 * 1024),
         ("POST", "/api/review-invites/submit"): (10, 60 * 60, 16 * 1024),
+        # The customer area (#63): links are asked for rarely, and a link is
+        # opened once; guessing either stays hopeless and slow.
+        ("POST", "/api/portal/login"): (10, 60 * 60, 4 * 1024),
+        ("POST", "/api/portal/session"): (20, 60 * 60, 4 * 1024),
     }
 
     def __init__(self, application):
@@ -309,7 +313,7 @@ app.add_middleware(
 app.add_middleware(SecurityHeadersMiddleware)
 
 for r in (auth, services, faqs, reviews, settings, repairs,
-          media, dolibarr_router, dashboard, site, gallery, review_invites_router):
+          media, dolibarr_router, dashboard, site, gallery, review_invites_router, portal_router):
     app.include_router(r.router)
 
 READ_METHODS = ["GET", "HEAD"]
