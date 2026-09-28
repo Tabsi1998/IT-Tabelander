@@ -354,7 +354,7 @@ async def migration_plan() -> dict:
                "what": "alte Kontaktnachricht wird ein Ticket, ohne Mail an den Absender"} for msg in messages),
             *({"ref": "FAQ", "created_at": serialize({"at": faq.get("created_at")})["at"], "request_type": "faq",
                "photos": 0, "question": faq.get("question"),
-               "what": f"FAQ „{faq.get('question')}“ kommt als Entwurf in die Dolibarr-Wissensdatenbank"}
+               "what": f"FAQ „{faq.get('question')}“ kommt als Entwurf in die Dolibarr-Wissensbasis"}
               for faq in faqs),
         ],
     }

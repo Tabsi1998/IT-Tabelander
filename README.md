@@ -173,7 +173,7 @@ Jedes Thema steht an genau einer Stelle:
 | **Leistungen** | die Tabs der Website: Name, Überschrift, Text, Stichpunkte, Bild, Reihenfolge, sichtbar; Vorschau je Leistung |
 | **Galerie** | Fotos deiner Arbeiten, auch direkt mit der Handy-Kamera: Titel, Bereich, Reihenfolge, sichtbar |
 | **Bewertungen** | Bewertungen eintragen, wie Kunden sie geschrieben haben (Google mit Link, persönlich, E-Mail); Bewertungen über den Link nach dem Auftrag **freigeben**; Bewertungsbitten mit **Jetzt prüfen** |
-| **Dolibarr** | Verbindung (mit Test, zeigt die Version), Inhalte aus der Wissensdatenbank, Themengruppen je Anfrageart, Warteschlange, Altdaten-Umzug |
+| **Dolibarr** | Verbindung (mit Test, zeigt die Version), Inhalte aus der Wissensbasis, Rechtstexte mit Prüfliste und Entwürfen, Themengruppen je Anfrageart, Warteschlange, Altdaten-Umzug |
 | **Technik** | öffentliche Adresse, Einzugsgebiet, Titel und Beschreibung der Startseite für Google, Google-Profil, E-Mail-Versand mit **Test-Mail senden**, **Kundenbereich** ein/aus mit Bankverbindung für den QR-Code, dein Zugang |
 
 Die Anmeldung verlängert sich im Hintergrund von selbst (bis zu 7 Tage).
@@ -328,37 +328,51 @@ werden ausdrücklich nicht in Git aufgenommen.
 
 ### Dolibarr einmalig vorbereiten
 
-1. In Dolibarr die Module **Geschäftspartner**, **Tickets**, **Kalender** und
-   **REST-API** aktivieren (**Start → Einstellungen → Module/Anwendungen**).
+Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 24.
+
+1. Unter **Einstellungen → Module/Anwendungen** aktivieren: **Geschäftspartner**,
+   **Tickets**, **Agenda (Ereignisse/Termine)**, **Angebote**, **Rechnungen**,
+   **Wissensmanagement-System**, **Kategorien** und **REST-API**.
 2. Einen eigenen Benutzer für die Website anlegen (kein Administrator) und ihm
    unter **Benutzer → Berechtigungen** genau diese Rechte geben:
    - Geschäftspartner: **einsehen** und **anlegen/bearbeiten**,
    - Geschäftspartner: **alle einsehen, nicht nur die verknüpften** – ohne
      dieses Recht findet die Website Stammkunden nicht und legt sie doppelt an,
+   - Kontakte: **einsehen** (Anmeldung im Kundenbereich mit der Adresse eines
+     Kontakts),
    - Tickets: **lesen** und **anlegen/ändern**,
-   - Kalender: **eigene Termine einsehen** und **eigene Termine anlegen**
+   - Agenda: **eigene Termine einsehen** und **eigene Termine anlegen**
      (für Rückruf-Wünsche),
-   - Wissensdatenbank: **lesen**, Kategorien: **lesen** (Rechtstexte, FAQ),
-   - Angebote: **lesen** (für den Schritt „Angebot bereit“),
-   - für den Kundenbereich zusätzlich: Kontakte **lesen**, Rechnungen
-     **lesen** und Angebote **anlegen/ändern** (zum Annehmen und Ablehnen).
+   - Wissensmanagement: Artikel **lesen**, Kategorien: **lesen**
+     (Rechtstexte, FAQ),
+   - Angebote: **lesen** (Schritt „Angebot bereit“) und **anlegen/ändern**
+     (Annehmen und Ablehnen im Kundenbereich),
+   - Rechnungen: **lesen** (Kundenbereich).
    Im Benutzer einen API-Schlüssel erzeugen. **Keine** Admin-Rechte.
-   Nur für den einmaligen Umzug der alten FAQ vorübergehend zusätzlich
-   „Wissensdatenbank: anlegen/ändern“ – danach wieder wegnehmen.
-3. Unter **Tickets → Einstellungen** bei **Benachrichtigungs-E-Mail an** die
-   Werkstatt-Adresse eintragen und bei **Benachrichtigungs-E-Mail von** die
-   Absender-Adresse. Der E-Mail-Versand von Dolibarr selbst muss eingerichtet
-   sein (**Einstellungen → E-Mails**).
-4. Unter `/admin/dolibarr` (Block **Verbindung**) Dolibarr aktivieren, die Basis-URL der
-   Installation (ohne `/api/index.php`) und den API-Key eintragen.
-5. Unter `/admin/dolibarr` auf **Verbindung prüfen** klicken.
-
-Erst wenn die neue Website mit Statusseite online ist (Meilenstein 3): unter
-**Tickets → Einstellungen** die **öffentliche Oberfläche** einschalten und als
-**URL der öffentlichen Oberfläche** `https://it.tabelander.co.at/status/`
-eintragen. Dolibarr schreibt den Status-Link nur mit eingeschalteter
-Oberfläche in die Bestätigung; der Link führt dann auf die Website, nicht zu
-Dolibarr.
+   Nur vorübergehend zusätzlich „Wissensmanagement: Artikel anlegen/ändern“ –
+   für die Entwürfe der Rechtstexte und den einmaligen Umzug der alten FAQ –,
+   danach wieder wegnehmen.
+3. Unter **Einstellungen → Erweiterte Einstellungen** zwei Einträge anlegen,
+   jeweils mit dem Login des Website-Benutzers als Wert:
+   `API_LOGINS_ALLOWED_FOR_GET_COMPANY` (Firmendaten) und
+   `API_LOGINS_ALLOWED_FOR_CONST_READ` (Öffnungszeiten). So braucht der
+   Website-Benutzer keine Admin-Rechte.
+4. Zwei **Ergänzende Attribute**, jeweils Typ **Boolean (ein Kontrollkästchen)**:
+   - in der Einrichtung des Ticketmoduls: Bezeichnung „Gerät abholbereit“,
+     Code `abholbereit`,
+   - in der Einrichtung der Geschäftspartner: Bezeichnung „Kundenbereich
+     gesperrt“, Code `kundenbereich_gesperrt`.
+5. In der **Einrichtung des Ticketmoduls** bei der Benachrichtigung über neue
+   Tickets die Werkstatt-Adresse eintragen und beim Absender die
+   Absender-Adresse; das öffentliche Interface einschalten und als seine URL
+   `https://it.tabelander.co.at/status/` eintragen. Dolibarr schreibt den
+   Status-Link nur mit eingeschaltetem öffentlichen Interface in die
+   Bestätigung – der Link führt dann auf die Status-Seite der Website, nicht zu
+   Dolibarr. Der E-Mail-Versand von Dolibarr selbst muss eingerichtet sein
+   (**Einstellungen → E-Mails**).
+6. Unter `/admin/dolibarr` (Block **Verbindung**) Dolibarr aktivieren, die
+   Basis-URL der Installation (ohne `/api/index.php`) und den API-Key
+   eintragen, dann **Verbindung prüfen**.
 
 Die Anfrageart wird ohne weitere Einrichtung passend gesetzt: Reparaturen als
 `ISSUE`, Neubau/Beratung als `COM`, Umbau/Upgrade als `REQUEST` und Sonstiges als
@@ -368,30 +382,7 @@ zugeordnet werden. Sinnvolle Codes sind `REPARATUR`, `PC_BAU`, `PC_UPGRADE`,
 `CONTROLLER`, `BERATUNG` und `SONSTIGES`. Leere Zuordnungen werden nicht an
 Dolibarr gesendet und können den Sync daher nicht stören.
 
-Für einen Link auf der Danke-Seite zusätzlich in Dolibarr unter **Ticket →
-Einstellungen → Öffentliches Interface** die öffentliche Oberfläche aktivieren
-und danach im Website-Admin **Öffentlichen Dolibarr-Ticketlink anzeigen**
-einschalten. Die Website erzeugt ausschließlich den öffentlichen Link mit
-Tracking-ID und Kunden-E-Mail; interne Karten-URLs oder Admin-Token werden nie
-an Kunden ausgegeben. Wenn Dolibarr das öffentliche Interface nicht aktiviert
-hat oder der Sync fehlschlägt, bleibt die Danke-Seite bewusst bei der lokalen
-`ANF-…`-Referenz. Dieser Schalter führt noch zu Dolibarr selbst und entfällt
-mit der Statusseite der neuen Website (Meilenstein 3).
-
-Zusätzlich in Dolibarr:
-
-- Module **Wissensdatenbank** und **Kategorien** aktivieren.
-- Unter **Start → Einstellungen → Sonstige Einstellungen** zwei Konstanten
-  anlegen, jeweils mit dem Login des Website-Benutzers als Wert:
-  `API_LOGINS_ALLOWED_FOR_GET_COMPANY` (Firmendaten) und
-  `API_LOGINS_ALLOWED_FOR_CONST_READ` (Öffnungszeiten). So braucht der
-  Website-Benutzer keine Admin-Rechte.
-- Unter **Tickets → Einstellungen → Ergänzende Attribute** ein neues Attribut:
-  Bezeichnung „Gerät abholbereit“, Code `abholbereit`, Typ „Ja/Nein
-  (Boolean)“.
-
-Die genaue Bezeichnung der Rechte kann je nach Dolibarr-Version/Sprache leicht
-abweichen.
+Die genaue Bezeichnung einzelner Rechte kann je nach Sprache leicht abweichen.
 
 ### Firmendaten, Rechtstexte und FAQ aus Dolibarr
 
@@ -493,10 +484,8 @@ Anfragen, Angebote und Rechnungen der Firma.
 **Sperren** geht direkt in Dolibarr am Kunden, und die Website fragt spätestens
 alle 5 Minuten neu:
 
-- Zusatzfeld **Kundenbereich gesperrt** ankreuzen (einmal anlegen unter
-  **Geschäftspartner → Einstellungen → Ergänzende Attribute**: Bezeichnung
-  „Kundenbereich gesperrt“, Attribut-Code `kundenbereich_gesperrt`, Typ
-  „Boolean (Checkbox)“),
+- Zusatzfeld **Kundenbereich gesperrt** ankreuzen (einmal anlegen, siehe
+  „Dolibarr einmalig vorbereiten“, Schritt 4),
 - oder den Kunden auf **geschlossen** stellen,
 - oder einen einzelnen Kontakt **deaktivieren**.
 
