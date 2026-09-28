@@ -395,27 +395,25 @@ abweichen.
 
 Alles, was die Website über die Firma sagt, pflegst du in Dolibarr:
 
-- **Firmendaten** unter **Start → Einstellungen → Firma/Organisation**: Name,
-  Adresse, Telefon, E-Mail, Website, Inhaber/Geschäftsführung,
-  Unternehmensgegenstand, UID, Steuernummer (Kennung 1), Firmenbuchgericht
-  (Kennung 2), Firmenbuchnummer (Kennung 3) und die sozialen Netzwerke. Daraus
-  baut die Website das Impressum.
+- **Firmendaten** unter **Einstellungen → Unternehmen/Institution**:
+  Firmenname, Firmenadresse, Postleitzahl, Stadt, Telefon, E-Mail, Internet,
+  „Name(n) des/der Manager“, „Gegenstand des Unternehmens“, Umsatzsteuer-ID,
+  Steuernummer, Gerichtsstand (Firmenbuchgericht), Firmenbuchnummer und die
+  sozialen Netzwerke. Daraus baut die Website das Impressum.
 - **Öffnungszeiten** im Reiter **Öffnungszeiten** derselben Seite.
-- **Rechtstexte und FAQ** als Artikel der **Wissensdatenbank**:
-  1. Unter **Kategorien** eine Kategorie für die Wissensdatenbank anlegen,
+- **FAQ** als Artikel der **Wissensbasis**:
+  1. Unter **Kategorien** eine Kategorie für die Wissensbasis anlegen,
      z. B. „Website“.
-  2. Artikel schreiben: „Datenschutzerklärung“, „Nutzungsbedingungen“,
-     optional „Impressum-Ergänzung“ (was das Firmenformular nicht kennt, z. B.
-     Aufsichtsbehörde und Kammer) und je eine Frage pro FAQ-Eintrag.
-  3. Jedem Artikel für die Website die Kategorie „Website“ geben und ihn
-     **freigeben**. Artikel ohne diese Kategorie bleiben intern – interne
-     Notizen in der Wissensdatenbank sieht nie jemand auf der Website.
-  4. Auf der Website unter `/admin/dolibarr` im Block **Inhalte aus
-     Dolibarr** die Kategorie und die drei Rechtstext-Artikel auswählen,
-     **Auswahl speichern**.
+  2. Je eine Frage pro FAQ-Eintrag als Artikel schreiben, ihm die Kategorie
+     „Website“ geben und ihn **freigeben**. Artikel ohne diese Kategorie
+     bleiben intern – interne Notizen sieht nie jemand auf der Website.
+  3. Auf der Website unter `/admin/dolibarr` im Block **Inhalte aus
+     Dolibarr** die Kategorie auswählen, **Auswahl speichern**.
+- **Rechtstexte** ebenfalls als Artikel der Wissensbasis, siehe nächster
+  Abschnitt.
 
-Ein Rechtstext im Entwurf erscheint mit dem Hinweis „Entwurf“. In den FAQ
-erscheinen nur freigegebene Artikel der Kategorie, die kein Rechtstext sind.
+In den FAQ erscheinen nur freigegebene Artikel der Kategorie, die kein
+Rechtstext sind.
 Bis der erste FAQ-Artikel freigegeben ist, zeigt die Website ihre bisherigen
 FAQ weiter. Die Website fragt Dolibarr höchstens alle 10 Minuten; **Neu laden**
 im Admin holt sofort. Ist Dolibarr nicht erreichbar, zeigt sie den letzten
@@ -424,6 +422,57 @@ bekannten Stand. Was fehlt oder nicht erlaubt ist, steht im Block in Worten.
 Bankdaten zeigt die Website bewusst nicht: Das Dolibarr-Recht dafür würde auch
 Kontobewegungen lesbar machen. Die IBAN steht auf den Rechnungen aus Dolibarr,
 die im Kundenportal (Meilenstein 5) abrufbar werden.
+
+### Rechtstexte: Impressum, Datenschutzerklärung, Nutzungsbedingungen
+
+Unter `/admin/dolibarr` im Block **Rechtstexte** steht alles an einer Stelle:
+
+- **Impressum aus den Firmendaten** als Prüfliste: ✓ ausgefüllt, **!** fehlt
+  (Pflicht), **–** leer, aber nur nötig, wenn es auf dich zutrifft (z. B. UID).
+  Bei jedem fehlenden Punkt steht das Feld in Dolibarr dabei.
+- Drei Texte mit ihrem Stand (fehlt, Entwurf, freigegeben) und den Stellen,
+  die noch zu ergänzen sind:
+  - **Ergänzung zum Impressum**: Rechtsform, Gewerbe, Gewerbebehörde, Kammer,
+    Berufsrecht und Offenlegung nach dem Mediengesetz. Dafür hat Dolibarr kein
+    Feld, das die Website lesen kann (Unternehmensform und „Hinweis“ gibt die
+    Schnittstelle nicht heraus).
+  - **Datenschutzerklärung**
+  - **Nutzungsbedingungen** für Reparaturen, mit dem Rücktrittsrecht und dem
+    Muster-Widerrufsformular für online angenommene Angebote
+
+So kommst du zu fertigen Texten:
+
+1. Dem Website-Benutzer in Dolibarr vorübergehend das Recht
+   **Wissensmanagement: Artikel anlegen/ändern** geben.
+2. Beim Text **Entwurf in Dolibarr anlegen** klicken. Der Entwurf landet als
+   Artikel in der Wissensbasis und ist sofort für die Website gewählt; dort
+   steht er mit dem Hinweis „Entwurf“. Eine Kategorie braucht er nicht.
+3. In Dolibarr **Wissensbasis** → Artikel öffnen → **Ändern** → alle Stellen
+   „[BITTE …]“ ergänzen oder entscheiden → **Speichern** → **Freigeben**.
+4. Im Admin **Neu laden**. Solange etwas fehlt, ein Text Entwurf ist oder eine
+   Stelle offen ist, sagt es auch die **Übersicht**.
+5. Das Recht aus Schritt 1 wieder wegnehmen.
+
+Die Entwürfe beschreiben, was diese Website wirklich tut: keine Cookies für
+Besucher, nichts von fremden Servern, Anfragen gehen nach Dolibarr und die
+Website vergisst sie danach, die Bewertungsbitte nur mit Ja. Sie sind in
+einfacher Sprache geschrieben, ersetzen aber keine Rechtsberatung – vor der
+Freigabe am besten vom Rechtsservice der WKO prüfen lassen. Den früher üblichen
+Link zur EU-Plattform für Online-Streitbeilegung braucht es nicht mehr; die
+Plattform wurde im Juli 2025 eingestellt.
+
+**Nutzungsbedingungen an Angebote hängen:** die Seite
+`/rechtliches/nutzungsbedingungen` im Browser drucken und „Als PDF speichern“
+(gedruckt wird nur der Text). In Dolibarr unter **Einstellungen → PDF →
+Spezifische Parameter** die Datei hochladen und **Ein PDF am Ende eines
+Angebots-PDF hinzufügen** einschalten. Nach jeder Änderung der Bedingungen die
+Datei neu hochladen.
+
+**Protokolle:** Die Website selbst schreibt keine IP-Adressen von Besuchern in
+`logs/backend.log`. Das Zugriffsprotokoll führt nur der Webserver davor
+(Apache/Nginx). Wie lange er es behält, steht in `/etc/logrotate.d/apache2`
+bzw. `/etc/logrotate.d/nginx`; diese Frist gehört in die
+Datenschutzerklärung.
 
 ### Automatisch in `backend/.env`
 
@@ -487,6 +536,7 @@ Ein gesunder Healthcheck liefert:
 | Stammkunde wird in Dolibarr doppelt angelegt | dem API-Benutzer das Recht **Geschäftspartner: alle einsehen, nicht nur die verknüpften** geben |
 | Firmendaten oder Öffnungszeiten fehlen auf der Website | `/admin/dolibarr` → **Inhalte aus Dolibarr** zeigt den Grund; meist fehlt die Konstante `API_LOGINS_ALLOWED_FOR_GET_COMPANY` bzw. `API_LOGINS_ALLOWED_FOR_CONST_READ` |
 | Ein FAQ-Artikel erscheint nicht | Kategorie „Website“ gesetzt? Freigegeben? Nicht als Rechtstext ausgewählt? Dann **Neu laden** |
+| **Entwurf in Dolibarr anlegen** meldet fehlende Rechte | dem Website-Benutzer vorübergehend **Wissensmanagement: Artikel anlegen/ändern** geben |
 | Kunde bekommt keine Eingangsbestätigung | Dolibarr unter **Einstellungen → E-Mails** eine Test-Mail senden lassen; die Website verschickt diese Mail nicht selbst |
 | Keine Warn-Mail, obwohl Anfragen warten | unter `/admin/technik` **Test-Mail senden**; unter `/admin/dolibarr` steht bei der Warteschlange, warum die Warnung nicht rausging |
 | Rückruf-Termin fehlt, Anfrage wartet mit „Anlegen des Rückruf-Termins“ | Modul **Kalender** aktivieren und dem API-Benutzer **eigene Termine anlegen** geben, dann **Jetzt erneut versuchen** |

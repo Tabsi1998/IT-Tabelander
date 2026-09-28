@@ -107,6 +107,23 @@ def plain_text(value: str) -> str:
     return "\n".join(line.strip() for line in text.splitlines() if line.strip())
 
 
+def _article(raw: dict) -> dict | None:
+    try:
+        status = int(raw.get("status"))
+    except (TypeError, ValueError):
+        return None
+    if status not in (ARTICLE_DRAFT, ARTICLE_VALIDATED):
+        return None  # obsolete articles never show
+    return {
+        "id": int(raw.get("id")),
+        "ref": raw.get("ref"),
+        "question": str(raw.get("question") or "").strip(),
+        "answer_html": clean_html(raw.get("answer")),
+        "status": status,
+        "updated_at": dolibarr._iso_time(raw.get("tms") or raw.get("date_modification") or raw.get("date_creation")),
+    }
+
+
 async def fetch_articles(client, cfg, category_id: int) -> list[dict]:
     response = await _get(client, cfg, "knowledgemanagement/knowledgerecords", {
         "category": int(category_id), "limit": 200, "sortfield": "t.rowid", "sortorder": "ASC",
@@ -116,23 +133,17 @@ async def fetch_articles(client, cfg, category_id: int) -> list[dict]:
         if "not found" in detail and "api" not in detail:
             return []  # an empty category
     response.raise_for_status()
-    articles = []
-    for raw in response.json() or []:
-        try:
-            status = int(raw.get("status"))
-        except (TypeError, ValueError):
-            continue
-        if status not in (ARTICLE_DRAFT, ARTICLE_VALIDATED):
-            continue  # obsolete articles never show
-        articles.append({
-            "id": int(raw.get("id")),
-            "ref": raw.get("ref"),
-            "question": str(raw.get("question") or "").strip(),
-            "answer_html": clean_html(raw.get("answer")),
-            "status": status,
-            "updated_at": dolibarr._iso_time(raw.get("tms") or raw.get("date_modification") or raw.get("date_creation")),
-        })
-    return articles
+    return [article for article in (_article(raw) for raw in response.json() or []) if article]
+
+
+async def fetch_article(client, cfg, article_id: int) -> dict | None:
+    """One picked article, whatever its category: picking it for a legal page
+    is the decision to publish it (#68)."""
+    response = await _get(client, cfg, f"knowledgemanagement/knowledgerecords/{int(article_id)}")
+    if response.status_code == 404:
+        return None
+    response.raise_for_status()
+    return _article(response.json() or {})
 
 
 async def fetch_categories(client, cfg) -> list[dict]:
@@ -174,7 +185,7 @@ async def refresh(*, force: bool = False) -> dict:
             return {**cache, "errors": {"dolibarr": "Dolibarr ist in den Website-Einstellungen nicht aktiviert."}}
         category_id = settings.get("dolibarr_content_category_id")
         result = {"company": cache.get("company"), "opening_hours": cache.get("opening_hours"),
-                  "articles": cache.get("articles"), "errors": {}}
+                  "articles": cache.get("articles"), "legal": cache.get("legal") or {}, "errors": {}}
         parts = [("company", fetch_company), ("opening_hours", fetch_opening_hours)]
         async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
             for part, fetch in parts:
@@ -191,9 +202,30 @@ async def refresh(*, force: bool = False) -> dict:
                     logger.warning("Dolibarr knowledge base unavailable: %s", type(exc).__name__)
             else:
                 result["articles"] = []
+            result["legal"] = await _fetch_legal(client, cfg, settings, result)
         result.update({"category_id": category_id, "fetched_at": now_utc()})
         await db.site_cache.replace_one({"_id": CACHE_ID}, {"_id": CACHE_ID, **result}, upsert=True)
         return result
+
+
+async def _fetch_legal(client, cfg, settings: dict, result: dict) -> dict:
+    """The picked legal articles by their number; a failure keeps the last copy."""
+    legal = {}
+    listed = {item["id"]: item for item in result.get("articles") or []}
+    for kind, key in LEGAL_ARTICLES.items():
+        if not settings.get(key):
+            continue
+        article_id = int(settings[key])
+        if article_id in listed:
+            legal[kind] = listed[article_id]
+            continue
+        try:
+            legal[kind] = await fetch_article(client, cfg, article_id)
+        except Exception as exc:  # noqa: BLE001
+            result["errors"]["legal"] = _hint("articles", exc)
+            legal[kind] = (result.get("legal") or {}).get(kind)
+            logger.warning("Dolibarr legal article unavailable: %s", type(exc).__name__)
+    return legal
 
 
 async def forget(db=None) -> None:
@@ -259,9 +291,9 @@ async def legal_page(kind: str) -> dict | None:
         return None
     settings = await _settings()
     data = await refresh()
-    article_id = settings.get(LEGAL_ARTICLES[kind])
-    article = next((item for item in data.get("articles") or []
-                    if article_id and item["id"] == int(article_id)), None)
+    if "legal" not in data:
+        data = await refresh(force=True)  # a copy from before the legal articles were read by number
+    article = (data.get("legal") or {}).get(kind) if settings.get(LEGAL_ARTICLES[kind]) else None
     if kind == "impressum":
         if not data.get("company"):
             return None
@@ -333,6 +365,8 @@ async def site_info() -> dict:
 
 async def admin_overview() -> dict:
     """For the owner: what comes from Dolibarr, and what to fix where."""
+    from . import legal_texts
+
     data = await refresh(force=True)
     settings = await _settings()
     cfg = await dolibarr.get_config()
@@ -353,6 +387,7 @@ async def admin_overview() -> dict:
         "articles": [{key: item[key] for key in ("id", "ref", "question", "status")}
                      for item in data.get("articles") or []],
         "faq_count": len(faq_entries(data, settings)),
+        "legal": legal_texts.overview(data, settings),
         "errors": errors,
         "fetched_at": data.get("fetched_at").isoformat() if isinstance(data.get("fetched_at"), datetime) else None,
     }

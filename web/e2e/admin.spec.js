@@ -235,6 +235,34 @@ test("the label prints on 62 x 29 mm or on A4, and nothing else prints (#72)", a
   await expect(page.locator('link[href="/print/label-roll.css"]')).toHaveCount(0);
 });
 
+test("legal texts: what is missing, and a draft to start from (#68, #69, #75)", async ({ page }) => {
+  const state = await mockAdmin(page);
+  await page.goto("/admin");
+  await expect(page.getByText(/Rechtstexte: Unternehmensgegenstand fehlt im Impressum · Datenschutzerklärung fehlt/)).toBeVisible();
+  await page.getByRole("link", { name: "Zu den Rechtstexten" }).click();
+
+  const legal = page.getByRole("region", { name: "Rechtstexte" });
+  await expect(legal.getByText("Noch offen: Unternehmensgegenstand fehlt im Impressum", { exact: false })).toBeVisible();
+  // The checklist says where in Dolibarr the missing field is.
+  await expect(legal.getByText("Dolibarr: Einstellungen → Unternehmen/Institution → „Gegenstand des Unternehmens“")).toBeVisible();
+  await expect(legal.getByText("(nur wenn du eine hast)")).toBeVisible();
+  await legal.getByText("2 Stellen noch zu ergänzen", { exact: true }).click();
+  await expect(legal.getByText("[BITTE MIT DER WKO KLÄREN: nicht abgeholte Geräte]")).toBeVisible();
+
+  await legal.getByRole("button", { name: "Entwurf in Dolibarr anlegen" }).click();
+  await expect(legal.getByText(/Entwurf angelegt/)).toBeVisible();
+  expect(state.sent.some((item) => item.method === "POST" && item.path === "/admin/legal/datenschutz/draft")).toBe(true);
+  await expect(legal.getByRole("button", { name: "Entwurf in Dolibarr anlegen" })).toHaveCount(0);
+  await expect(legal.getByLabel("Artikel in Dolibarr").nth(1)).toHaveValue("11");
+
+  // The pick of another article is saved with the other settings.
+  await legal.getByLabel("Artikel in Dolibarr").nth(2).selectOption("7");
+  await legal.getByRole("button", { name: "Auswahl speichern" }).click();
+  await expect(legal.getByText("Gespeichert.")).toBeVisible();
+  expect(state.settings).toMatchObject({ dolibarr_privacy_article_id: 11, dolibarr_terms_article_id: 7 });
+  await expectNoSidewaysScroll(page);
+});
+
 // Screenshots of every admin page in every width (#55), next to the website's.
 for (const [path, title] of PAGES) {
   test(`screenshot admin ${title}`, async ({ page }, testInfo) => {

@@ -6,8 +6,7 @@ import { LoadState, Notice, PageHeader, Section, Toggle } from "../ui.jsx";
 
 const TYPES = [["repair", "Reparatur"], ["pc_build", "PC-Neubau"], ["pc_upgrade", "Upgrade"], ["controller_custom", "Controller-Umbau"],
   ["consulting", "Beratung"], ["other", "Sonstiges"], ["contact", "Kontaktnachricht"]];
-const CONTENT = [["dolibarr_content_category_id", "Kategorie der Website-Artikel"], ["dolibarr_imprint_article_id", "Ergänzung zum Impressum (optional)"],
-  ["dolibarr_privacy_article_id", "Datenschutzerklärung"], ["dolibarr_terms_article_id", "Nutzungsbedingungen"]];
+const CONTENT = [["dolibarr_content_category_id", "Kategorie der Website-Artikel (FAQ)"]];
 
 function when(value) {
   const date = value ? new Date(value) : null;
@@ -115,12 +114,11 @@ function Categories({ settings }) {
   );
 }
 
-function Content({ settings }) {
-  const overview = useAdminData("/admin/dolibarr/content");
+function Content({ overview, settings }) {
   const [choice, setChoice] = useState(Object.fromEntries(CONTENT.map(([key]) => [key, settings[key] || 0])));
   const [state, run] = useSaver();
   return (
-    <Section title="Inhalte aus Dolibarr" description="Firmendaten und Öffnungszeiten kommen aus Firma/Organisation, Rechtstexte und FAQ aus der Wissensdatenbank. Öffentlich ist nur, was die gewählte Kategorie hat und freigegeben ist.">
+    <Section title="Inhalte aus Dolibarr" description="Firmendaten und Öffnungszeiten kommen aus Unternehmen/Institution, die FAQ aus der Wissensbasis. Öffentlich ist nur, was die gewählte Kategorie hat und freigegeben ist. Die Rechtstexte stehen im nächsten Block.">
       <LoadState state={overview}>
         {(data) => (
           <>
@@ -136,10 +134,8 @@ function Content({ settings }) {
                 {CONTENT.map(([key, label]) => (
                   <Field key={key} label={label} as="select" value={choice[key] || 0}
                     onChange={(event) => setChoice((current) => ({ ...current, [key]: Number(event.target.value) }))}>
-                    <option value={0}>{key === "dolibarr_content_category_id" ? "– keine Kategorie –" : "– kein Artikel –"}</option>
-                    {key === "dolibarr_content_category_id"
-                      ? (data.categories || []).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)
-                      : (data.articles || []).map((item) => <option key={item.id} value={item.id}>{item.question}{item.status === 0 ? " (Entwurf)" : ""}</option>)}
+                    <option value={0}>– keine Kategorie –</option>
+                    {(data.categories || []).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
                   </Field>
                 ))}
                 <Notice tone="success">{state.done}</Notice>
@@ -152,6 +148,119 @@ function Content({ settings }) {
                   <button type="button" className="btn-outline" onClick={overview.reload}>Neu laden</button>
                 </div>
               </div>
+            </div>
+          </>
+        )}
+      </LoadState>
+    </Section>
+  );
+}
+
+const LEGAL_HELP = {
+  impressum: "Gewerbe, Behörde, Kammer und Rechtsform – dafür hat Dolibarr kein Feld. Der Rest des Impressums kommt aus den Firmendaten.",
+  datenschutz: "Was mit den Daten deiner Kunden passiert, wie lange und welche Rechte sie haben.",
+  nutzungsbedingungen: "Angebot, Daten auf dem Gerät, Abholung, Bezahlung, Gewährleistung und das Rücktrittsrecht bei Online-Zusagen.",
+};
+const LEGAL_STATES = {
+  missing: ["fehlt", "bg-badge text-badge-ink"],
+  draft: ["Entwurf", "bg-badge text-badge-ink"],
+  released: ["freigegeben", "bg-[#E3F1EA] text-[#1E6B45]"],
+};
+
+function Check({ ok, required }) {
+  const [sign, colours, words] = ok ? ["✓", "bg-[#E3F1EA] text-[#1E6B45]", "erledigt:"]
+    : required ? ["!", "bg-badge text-badge-ink", "fehlt:"] : ["–", "bg-line-soft text-ink", "leer, nicht nötig:"];
+  return (
+    <span className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold ${colours}`}>
+      <span aria-hidden="true">{sign}</span>
+      <span className="sr-only">{words}</span>
+    </span>
+  );
+}
+
+/** Imprint, privacy policy and terms (#68, #69, #75): what is missing, and drafts to start from. */
+function LegalTexts({ overview, settings }) {
+  const [choice, setChoice] = useState(Object.fromEntries(
+    ["dolibarr_imprint_article_id", "dolibarr_privacy_article_id", "dolibarr_terms_article_id"].map((key) => [key, settings[key] || 0])));
+  const [state, run] = useSaver();
+
+  const draft = async (text) => {
+    const created = await run(() => adminRequest("POST", `/admin/legal/${text.kind}/draft`),
+      `Entwurf angelegt. Jetzt in Dolibarr die markierten Stellen ergänzen und den Artikel freigeben.`);
+    if (created) {
+      setChoice((current) => ({ ...current, [text.setting]: created.article_id }));
+      overview.reload();
+    }
+  };
+
+  return (
+    <Section title="Rechtstexte"
+      description="Das Impressum entsteht aus den Firmendaten in Dolibarr, Datenschutzerklärung und Nutzungsbedingungen sind Artikel der Wissensbasis. Die Entwürfe sind in einfacher Sprache; was nur du weißt, ist mit „BITTE …“ markiert. Vor der Freigabe am besten von der WKO prüfen lassen.">
+      <LoadState state={overview}>
+        {({ legal }) => (
+          <>
+            {legal.error && <Notice tone="warning">{legal.error}</Notice>}
+            {legal.todo.length === 0
+              ? <Notice tone="success">Impressum, Datenschutzerklärung und Nutzungsbedingungen sind vollständig und freigegeben.</Notice>
+              : <Notice tone="warning">Noch offen: {legal.todo.join(" · ")}</Notice>}
+            <div className="flex flex-col gap-3">
+              <h3 className="m-0 text-lg font-bold">Impressum aus den Firmendaten</h3>
+              <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                {legal.imprint.map((item) => (
+                  <li key={item.label} className="flex items-start gap-3 text-[15px]">
+                    <Check ok={item.ok} required={item.required} />
+                    <span>
+                      <b>{item.label}</b>{!item.required && <span className="text-muted"> ({item.note})</span>}
+                      {!item.ok && <span className="block text-sm text-body">{item.where}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="grid gap-4 xl:grid-cols-3">
+              {legal.texts.map((text) => (
+                <div key={text.kind} className="flex flex-col gap-3 rounded-xl border border-line p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="m-0 text-lg font-bold">{text.label}</h3>
+                    <span className={`rounded-full px-2.5 py-1 text-[13px] font-semibold ${LEGAL_STATES[text.state][1]}`}>{LEGAL_STATES[text.state][0]}</span>
+                  </div>
+                  <p className="m-0 text-sm text-body">{LEGAL_HELP[text.kind]}</p>
+                  {text.gone && <Notice tone="warning">Der gewählte Artikel ist in Dolibarr nicht mehr da oder veraltet.</Notice>}
+                  {text.open_points.length > 0 && (
+                    <details className="text-sm">
+                      <summary className="cursor-pointer font-semibold">
+                        {text.open_points.length} {text.open_points.length === 1 ? "Stelle" : "Stellen"} noch zu ergänzen
+                      </summary>
+                      <ul className="mb-0 mt-2 flex flex-col gap-1 pl-5 text-body">
+                        {text.open_points.map((point, index) => <li key={`${text.kind}-${index}`}>{point}</li>)}
+                      </ul>
+                    </details>
+                  )}
+                  <Field label="Artikel in Dolibarr" as="select" value={choice[text.setting] || 0}
+                    onChange={(event) => setChoice((current) => ({ ...current, [text.setting]: Number(event.target.value) }))}>
+                    <option value={0}>– kein Artikel –</option>
+                    {legal.choices.map((item) => <option key={item.id} value={item.id}>{item.question}{item.status === 0 ? " (Entwurf)" : ""}</option>)}
+                  </Field>
+                  {text.state === "missing" && !choice[text.setting] && (
+                    <button type="button" className="btn-outline self-start border-line" disabled={state.busy} onClick={() => draft(text)}>
+                      Entwurf in Dolibarr anlegen
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="m-0 text-[15px] text-body">
+              So gibst du einen Text frei: in Dolibarr <b>Wissensbasis</b> → Artikel öffnen → <b>Ändern</b> → markierte Stellen ergänzen → <b>Speichern</b> → <b>Freigeben</b>.
+              Danach hier <b>Neu laden</b>.
+            </p>
+            <Notice tone="success">{state.done}</Notice>
+            <Notice tone="error">{state.error}</Notice>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" className="btn-primary" disabled={state.busy}
+                onClick={async () => { if (await run(() => adminRequest("PUT", "/admin/settings", choice), "Gespeichert.")) overview.reload(); }}>
+                Auswahl speichern
+              </button>
+              <button type="button" className="btn-outline" onClick={overview.reload}>Neu laden</button>
             </div>
           </>
         )}
@@ -237,6 +346,8 @@ function Migration() {
 /** Every Dolibarr switch on one page (#62). */
 export default function Dolibarr() {
   const settings = useAdminData("/admin/settings");
+  // Read once, freshly from Dolibarr, for both the content and the legal texts.
+  const overview = useAdminData("/admin/dolibarr/content");
   return (
     <>
       <PageHeader title="Dolibarr" description="Kunden, Anfragen, Firmendaten, Rechtstexte und FAQ liegen in Dolibarr. Hier stellst du ein, wie die Website damit spricht." />
@@ -244,7 +355,8 @@ export default function Dolibarr() {
         {(data) => (
           <>
             <Connection settings={data} />
-            <Content settings={data} />
+            <Content overview={overview} settings={data} />
+            <LegalTexts overview={overview} settings={data} />
             <Categories settings={data} />
           </>
         )}
