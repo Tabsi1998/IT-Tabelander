@@ -96,7 +96,10 @@ def overview(data: dict, settings: dict) -> dict:
     for article in legal.values():
         if article:
             choices.setdefault(article["id"], article)
-    todo = [f"{item['label']} fehlt im Impressum" for item in checklist if item["required"] and not item["ok"]]
+    if data.get("company"):
+        todo = [f"{item['label']} fehlt im Impressum" for item in checklist if item["required"] and not item["ok"]]
+    else:
+        todo = ["Das Impressum fehlt auf der Website, weil noch keine Firmendaten aus Dolibarr kommen"]
     for text in texts:
         if text["state"] == "missing":
             todo.append(f"{text['label']} fehlt")
