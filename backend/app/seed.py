@@ -94,25 +94,12 @@ async def seed_settings():
         return
     await db.settings.insert_one({
         "_id": "site",
-        "company_name": "IT-Tabelander",
-        "tagline": "IT-Technik, die funktioniert.",
-        "email": "",
-        "phone": "",
-        "address": "",
-        "city": "",
-        "region": "Tirol",
-        "postal_code": "",
-        "country": "Österreich",
         "service_area": "Tirol & Österreich",
-        "opening_hours": [],
-        "social_links": {},
-        "ga_measurement_id": os.environ.get("GA_MEASUREMENT_ID", ""),
         "canonical_base_url": os.environ.get(
             "CANONICAL_BASE_URL", "https://it.tabelander.co.at"
         ),
         "dolibarr_timeout_seconds": 8,
         "dolibarr_country_code": "AT",
-        "dolibarr_public_ticket_enabled": False,
         "dolibarr_ticket_categories": {},
         "seo_default_title": (
             "IT-Tabelander – IT-Service, Reparatur & Gaming-Hardware in Tirol"
@@ -121,9 +108,6 @@ async def seed_settings():
             "Professionelle IT-Technik, Reparatur und individuelle Gaming-Hardware "
             "aus einer Hand. CompTIA A+ zertifiziert, Ausbildung am WIFI Tirol."
         ),
-        "impressum_html": "",
-        "datenschutz_html": "",
-        "legal_reviewed": False,
         "updated_at": now_utc(),
     })
 

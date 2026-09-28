@@ -42,7 +42,6 @@ class PublicRequestGuardMiddleware:
 
     RULES = {
         ("POST", "/api/inquiries"): (10, 60 * 60, 128 * 1024),
-        ("POST", "/api/repairs"): (10, 60 * 60, 128 * 1024),
         ("POST", "/api/uploads/repair-attachment"): (
             30, 60 * 60, 9 * 1024 * 1024,
         ),
@@ -100,8 +99,7 @@ class PublicRequestGuardMiddleware:
         client = scope.get("client")
         client_ip = client[0] if client else "unknown"
         path = scope.get("path")
-        rate_group = "/api/inquiries" if path in ("/api/inquiries", "/api/repairs") else path
-        key = (client_ip, rate_group)
+        key = (client_ip, path)
         now = time.monotonic()
         async with self.lock:
             hits = self.hits[key]

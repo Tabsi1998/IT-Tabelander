@@ -10,7 +10,7 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import quote, urlencode
+from urllib.parse import quote
 
 import httpx
 
@@ -36,11 +36,10 @@ async def get_config() -> dict:
         s.get("canonical_base_url")
         or os.environ.get("CANONICAL_BASE_URL", "https://it.tabelander.co.at")
     ).rstrip("/")
-    public_ticket_enabled = bool(s.get("dolibarr_public_ticket_enabled", False))
     ticket_categories = s.get("dolibarr_ticket_categories") or {}
     return {"api_key": api_key, "base": base, "enabled": bool(enabled_flag) and bool(api_key),
             "timeout": min(max(timeout, 1), 60), "country_code": country_code,
-            "site_base": site_base, "public_ticket_enabled": public_ticket_enabled,
+            "site_base": site_base,
             "ticket_categories": ticket_categories}
 
 
@@ -698,13 +697,6 @@ def _iso_time(value) -> str | None:
     return datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat()
 
 
-def _public_ticket_url(cfg: dict, track_id: str, email: str) -> str | None:
-    if not cfg.get("public_ticket_enabled") or not cfg.get("base") or not email:
-        return None
-    query = urlencode({"track_id": track_id, "email": email})
-    return f"{cfg['base']}/public/ticket/view.php?{query}"
-
-
 def callback_text(value) -> str:
     """The wished time as the customer's browser sent it (own UTC offset)."""
     return datetime.fromisoformat(str(value)).strftime("%d.%m.%Y um %H:%M Uhr")
@@ -832,10 +824,6 @@ async def create_ticket_for_inquiry(inquiry: dict, previous: dict | None = None,
                 notify=notify,
                 callback=_callback(inquiry),
             )
-            if result.get("synced") and track_id:
-                result["ticket_public_url"] = _public_ticket_url(
-                    cfg, track_id, str((inquiry.get("contact") or {}).get("email") or ""),
-                )
             return result
     except Exception as exc:  # noqa: BLE001
         return _sync_error(exc, cfg, stage, action,

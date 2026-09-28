@@ -286,7 +286,7 @@ automatisch weiter: nach 5, 10, 20, 40 Minuten, dann stündlich, etwa drei Tage
 lang. Wartet eine Anfrage länger als 30 Minuten, bekommst du **eine** Warn-Mail
 mit Anfragenummer und Grund – pro Anfrage nur einmal. Unter `/admin/dolibarr`
 siehst du im Block **Warteschlange**, was wartet und warum, und kannst mit
-**Jetzt erneut versuchen** sofort nachschieben. Die vom Browser erzeugte
+**Jetzt erneut senden** sofort nachschieben. Die vom Browser erzeugte
 Anfrage-ID verhindert Doppelanlagen bei einem Netzwerk-Retry.
 
 Sobald das Ticket in Dolibarr vollständig ist (mit Fotos und Rückruf-Termin),
@@ -628,7 +628,7 @@ Ein gesunder Healthcheck liefert:
 | **Entwurf in Dolibarr anlegen** meldet fehlende Rechte | dem Website-Benutzer vorübergehend **Wissensmanagement: Artikel anlegen/ändern** geben |
 | Kunde bekommt keine Eingangsbestätigung | Dolibarr unter **Einstellungen → E-Mails** eine Test-Mail senden lassen; die Website verschickt diese Mail nicht selbst |
 | Keine Warn-Mail, obwohl Anfragen warten | unter `/admin/technik` **Test-Mail senden**; unter `/admin/dolibarr` steht bei der Warteschlange, warum die Warnung nicht rausging |
-| Rückruf-Termin fehlt, Anfrage wartet mit „Anlegen des Rückruf-Termins“ | Modul **Kalender** aktivieren und dem API-Benutzer **eigene Termine anlegen** geben, dann **Jetzt erneut versuchen** |
+| Rückruf-Termin fehlt, Anfrage wartet mit „Anlegen des Rückruf-Termins“ | Modul **Agenda (Ereignisse/Termine)** aktivieren und dem API-Benutzer **eigene Termine anlegen** geben, dann unter `/admin/dolibarr` **Jetzt erneut senden** |
 | Dolibarr meldet HTTP 404 | Als Basis-URL nur die Dolibarr-Installation eintragen, z. B. `https://erp.example.at/dolibarr`, nicht `/api/index.php` anhängen |
 | Port 8001 ist belegt | fremden Dienst stoppen oder `BACKEND_PORT` in `deploy.config.local` und im Reverse Proxy gemeinsam ändern |
 | Admin-Passwort vergessen | `./start.sh --reset-admin` ausführen |

@@ -460,9 +460,6 @@ class TestSiteDataFromDolibarr:
         assert "note_private" not in company and "Interne Firmennotiz" not in json.dumps(info)
         assert {"day": "Montag", "hours": "09:00–17:00"} in info["opening_hours"]
         assert {"day": "Freitag", "hours": "09:00–12:00"} in info["opening_hours"]
-        # The current website reads the same through /api/settings.
-        settings = requests.get(f"{BASE_URL}/api/settings", timeout=60).json()
-        assert settings["company_name"] == "IT-Tabelander Test" and settings["postal_code"] == "6020"
 
     def test_a_new_address_in_dolibarr_shows_in_the_imprint(self, admin_client, website_content):
         before = requests.get(f"{BASE_URL}/api/legal/impressum", timeout=60).json()
@@ -473,7 +470,6 @@ class TestSiteDataFromDolibarr:
         assert overview["errors"] == {}, overview["errors"]
         after = requests.get(f"{BASE_URL}/api/legal/impressum", timeout=60).json()
         assert "Neue Gasse 7" in after["html"] and "Werkstattweg 1" not in after["html"]
-        assert "Neue Gasse 7" in requests.get(f"{BASE_URL}/api/settings", timeout=60).json()["impressum_html"]
 
     def test_a_draft_says_so_a_released_text_does_not(self, website_content):
         privacy = requests.get(f"{BASE_URL}/api/legal/datenschutz", timeout=60).json()

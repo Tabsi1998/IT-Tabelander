@@ -6,39 +6,19 @@ import secrets
 import string
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from .. import dolibarr, handover
 from ..db import get_db, now_utc, serialize, to_oid
 from ..website import seo_data
-from ..models import ContactInput, InquiryInput, InquiryStatusQuery, InquiryStatusUpdate
+from ..models import ContactInput, InquiryInput, InquiryStatusQuery
 from ..security import require_admin
-from .media import (
-    delete_repair_attachments,
-    mark_repair_attachments_linked,
-    release_repair_attachment_claims,
-)
+from .media import mark_repair_attachments_linked, release_repair_attachment_claims
 
 router = APIRouter(prefix="/api", tags=["inquiries"])
 logger = logging.getLogger("it-tabelander.inquiries")
-
-# New inquiries use workflow-neutral states. Historical repair-only states stay
-# accepted so existing records and older admin clients remain editable.
-STATUSES = [
-    "eingegangen",
-    "in_bearbeitung",
-    "wartet_auf_kunde",
-    "angebot_erstellt",
-    "beauftragt",
-    "abgeschlossen",
-    "abgelehnt",
-]
-LEGACY_STATUSES = ["in_diagnose", "warten_auf_teile", "in_reparatur", "fertig"]
-VALID_STATUSES = set(STATUSES + LEGACY_STATUSES)
-REQUEST_TYPES = {"repair", "pc_build", "pc_upgrade", "controller_custom", "consulting", "other", "contact"}
-
 
 def _inquiry_ref() -> str:
     alphabet = string.ascii_uppercase + string.digits
@@ -63,9 +43,6 @@ def _created_response(doc: dict, duplicate: bool = False) -> dict:
         # available to authenticated staff in the admin area.
         "dolibarr_synced": bool(dolibarr_data.get("synced")),
         "ticket_ref": dolibarr_data.get("ticket_ref") if dolibarr_data.get("synced") else None,
-        "ticket_public_url": (
-            dolibarr_data.get("ticket_public_url") if dolibarr_data.get("synced") else None
-        ),
     }
 
 
@@ -162,7 +139,6 @@ async def _claim_attachments(
 
 
 @router.post("/inquiries")
-@router.post("/repairs", include_in_schema=False)
 async def create_inquiry(payload: InquiryInput):
     if payload.honeypot:
         raise HTTPException(status_code=400, detail="Ungültige Anfrage")
@@ -346,30 +322,6 @@ async def inquiry_status_by_track_id(track_id: str):
     return await _status_response(doc, None)
 
 
-@router.get("/admin/inquiries")
-@router.get("/admin/repairs", include_in_schema=False)
-async def list_inquiries(
-    status: str | None = None,
-    request_type: str | None = Query(default=None),
-    _: dict = Depends(require_admin),
-):
-    query = {}
-    if status:
-        query["status"] = status
-    if request_type:
-        if request_type not in REQUEST_TYPES:
-            raise HTTPException(status_code=400, detail="Ungültige Anfrageart")
-        if request_type == "repair":
-            query["$or"] = [
-                {"request_type": "repair"},
-                {"request_type": {"$exists": False}},
-            ]
-        else:
-            query["request_type"] = request_type
-    docs = await get_db().repair_requests.find(query).sort("created_at", -1).to_list(500)
-    return [serialize(doc) for doc in docs]
-
-
 @router.get("/admin/labels/{ref}")
 async def device_label(ref: str, _: dict = Depends(require_admin)):
     """What the device label shows (#72): number, device, date and the QR
@@ -407,73 +359,6 @@ async def device_label(ref: str, _: dict = Depends(require_admin)):
     }
 
 
-@router.get("/admin/inquiries/{inquiry_id}")
-@router.get("/admin/repairs/{inquiry_id}", include_in_schema=False)
-async def get_inquiry(inquiry_id: str, _: dict = Depends(require_admin)):
-    doc = await get_db().repair_requests.find_one({"_id": to_oid(inquiry_id)})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Anfrage nicht gefunden")
-    return serialize(doc)
-
-
-@router.patch("/admin/inquiries/{inquiry_id}/status")
-@router.patch("/admin/repairs/{inquiry_id}/status", include_in_schema=False)
-async def update_status(
-    inquiry_id: str,
-    payload: InquiryStatusUpdate,
-    _: dict = Depends(require_admin),
-):
-    if payload.status not in VALID_STATUSES:
-        raise HTTPException(status_code=400, detail="Ungültiger Status")
-    result = await get_db().repair_requests.update_one(
-        {"_id": to_oid(inquiry_id)},
-        {"$set": {"status": payload.status, "updated_at": now_utc()}},
-    )
-    if not result.matched_count:
-        raise HTTPException(status_code=404, detail="Anfrage nicht gefunden")
-    return {"ok": True}
-
-
-@router.post("/admin/inquiries/{inquiry_id}/sync-dolibarr")
-@router.post("/admin/repairs/{inquiry_id}/sync-dolibarr", include_in_schema=False)
-async def retry_dolibarr(inquiry_id: str, _: dict = Depends(require_admin)):
-    db = get_db()
-    object_id = to_oid(inquiry_id)
-    stale_before = now_utc() - timedelta(minutes=5)
-    claimed = await db.repair_requests.find_one_and_update(
-        {
-            "_id": object_id,
-            "dolibarr.synced": {"$ne": True},
-            "$or": [
-                {"dolibarr.sync_in_progress": {"$ne": True}},
-                {"dolibarr.sync_started_at": {"$lt": stale_before}},
-            ],
-        },
-        {"$set": {
-            "dolibarr.sync_in_progress": True,
-            "dolibarr.sync_started_at": now_utc(),
-            "updated_at": now_utc(),
-        }},
-        return_document=ReturnDocument.AFTER,
-    )
-    if not claimed:
-        existing = await db.repair_requests.find_one({"_id": object_id})
-        if not existing:
-            raise HTTPException(status_code=404, detail="Anfrage nicht gefunden")
-        if (existing.get("dolibarr") or {}).get("synced"):
-            return {"ok": True, "already_synced": True,
-                    "dolibarr": serialize(existing["dolibarr"])}
-        raise HTTPException(status_code=409, detail="Dolibarr-Synchronisierung läuft bereits")
-
-    sync_result = await dolibarr.create_ticket_for_inquiry(
-        claimed, previous=claimed.get("dolibarr") or {},
-        # An old record handed over by hand gets no confirmation mail either.
-        notify=bool(claimed.get("auto_handover")),
-    )
-    await handover.store_sync_result(db, claimed, sync_result, manual=True)
-    return {"ok": bool(sync_result.get("synced")), "dolibarr": serialize(sync_result)}
-
-
 async def recover_stale_dolibarr_syncs(
     *, started_before=None, limit: int = 10,
 ) -> int:
@@ -507,25 +392,3 @@ async def recover_stale_dolibarr_syncs(
         await handover.store_sync_result(db, claimed, sync_result)
         recovered += 1
     return recovered
-
-
-@router.delete("/admin/inquiries/{inquiry_id}")
-@router.delete("/admin/repairs/{inquiry_id}", include_in_schema=False)
-async def delete_inquiry(inquiry_id: str, _: dict = Depends(require_admin)):
-    db = get_db()
-    object_id = to_oid(inquiry_id)
-    inquiry = await db.repair_requests.find_one({"_id": object_id})
-    if not inquiry:
-        raise HTTPException(status_code=404, detail="Anfrage nicht gefunden")
-    try:
-        await delete_repair_attachments(handover.attachments_of(inquiry))
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Could not delete inquiry attachments: %s", exc)
-        raise HTTPException(
-            status_code=500,
-            detail="Anfrage-Fotos konnten nicht vollständig gelöscht werden; bitte erneut versuchen",
-        ) from None
-    result = await db.repair_requests.delete_one({"_id": object_id})
-    if not result.deleted_count:
-        raise HTTPException(status_code=404, detail="Anfrage nicht gefunden")
-    return {"ok": True}
