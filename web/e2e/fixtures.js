@@ -33,7 +33,7 @@ export function reviews(count) {
 export const REVIEW_LINK = "Beispiel-Link-nur-fuer-Tests-000000000000";
 
 /** Answers every /api request of the page; `sent` records what the page posted. */
-export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, status } = {}) {
+export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, status, portal = false } = {}) {
   const sent = [];
   const json = (route, body, statusCode = 200) => route.fulfill({ status: statusCode, contentType: "application/json", body: JSON.stringify(body) });
   await page.route("**/api/**", async (route) => {
@@ -47,7 +47,9 @@ export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, 
       sent.push({ method, path, body, raw: request.postData() });
     }
     if (path === "/site-info") return json(route, { company: COMPANY, opening_hours: [{ day: "Montag", hours: "09:00–17:00" }], faq: [] });
-    if (path === "/settings") return json(route, { canonical_base_url: "https://it.tabelander.co.at", google_review_url: "https://g.page/r/bewerten" });
+    if (path === "/settings") {
+      return json(route, { canonical_base_url: "https://it.tabelander.co.at", google_review_url: "https://g.page/r/bewerten", portal_enabled: portal });
+    }
     if (path === "/services") return json(route, SERVICES);
     if (path === "/gallery") return json(route, { items: photos(gallery) });
     if (path === "/reviews") return json(route, { reviews: reviews(reviewCount), average: reviewCount ? 5 : null, count: reviewCount });

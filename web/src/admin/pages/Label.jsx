@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Field } from "../../forms/fields.jsx";
 import { useAdminData } from "../api.js";
-import QrCode from "../QrCode.jsx";
+import QrCode from "../../components/QrCode.jsx";
 import { Chips, LoadState, PageHeader, Section } from "../ui.jsx";
 
 const FORMATS = [["roll", "Etikettendrucker 62 × 29 mm"], ["sheet", "Normales Blatt (A4)"]];

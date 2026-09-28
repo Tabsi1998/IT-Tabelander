@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { qrModules, qrPath } from "./qr.js";
+import { qrModules, qrPath } from "../lib/qr.js";
 
 const QUIET = 4;
 

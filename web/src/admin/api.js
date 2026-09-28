@@ -10,6 +10,7 @@ const FIELDS = {
   warning_email: "Warnungen an", google_review_url: "Google-Profil", canonical_base_url: "Öffentliche Adresse",
   dolibarr_base_url: "Dolibarr-Adresse", dolibarr_timeout_seconds: "Wartezeit", about_text: "Text",
   about_qualifications: "Qualifikationen", about_photo_url: "Foto",
+  portal_bank_holder: "Kontoinhaber", portal_bank_iban: "IBAN", portal_bank_bic: "BIC",
 };
 
 async function detailText(response) {

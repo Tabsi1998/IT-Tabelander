@@ -23,6 +23,7 @@ PUBLIC_FIELDS = [
     "impressum_html", "datenschutz_html", "legal_reviewed",
     "logo_light_url", "logo_dark_url", "google_review_url",
     "about_text", "about_qualifications", "about_photo_url",
+    "portal_enabled",
 ]
 
 SECRET_FIELDS = ("dolibarr_api_key", "smtp_password")

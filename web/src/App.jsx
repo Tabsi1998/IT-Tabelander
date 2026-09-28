@@ -8,6 +8,8 @@ import Review from "./pages/Review.jsx";
 
 // The admin is its own part of the build: visitors never download it (#57).
 const AdminApp = lazy(() => import("./admin/AdminApp.jsx"));
+// So is the customer area (#63): loaded only by those who open it.
+const PortalApp = lazy(() => import("./portal/PortalApp.jsx"));
 
 function Site() {
   return (
@@ -26,6 +28,7 @@ export default function App() {
         <Route path="/leistungen/:slug" element={<Home />} />
         <Route path="/status/view.php" element={<Home />} />
         <Route path="/bewertung" element={<Review />} />
+        <Route path="/kundenbereich/*" element={<Suspense fallback={<div aria-busy="true" className="min-h-screen bg-page" />}><PortalApp /></Suspense>} />
         <Route path="/rechtliches" element={<Navigate to="/rechtliches/impressum" replace />} />
         <Route path="/rechtliches/:kind" element={<Legal />} />
         <Route path="*" element={<NotFound />} />

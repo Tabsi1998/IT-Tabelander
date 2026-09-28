@@ -81,6 +81,11 @@ if ($stage === 'base') {
         0, 0, '', '', 1, '', '1') <= 0) {
         rt_fail('extra field abholbereit: '.$extrafields->error);
     }
+    // The owner's block of the customer area, right on the customer (#63).
+    if ($extrafields->addExtraField('kundenbereich_gesperrt', 'Kundenbereich gesperrt', 'boolean', 100, '', 'societe',
+        0, 0, '', '', 1, '', '1') <= 0) {
+        rt_fail('extra field kundenbereich_gesperrt: '.$extrafields->error);
+    }
     rt_const($db, 'API_PRODUCTION_MODE', '0');
     // What the owner sets in Dolibarr (README, "Dolibarr einmalig vorbereiten"):
     // new tickets reach the workshop, and the link in the customer's
@@ -106,6 +111,11 @@ if ($stage === 'base') {
         array('knowledgemanagement', 'knowledgerecord', 'read'),
         array('knowledgemanagement', 'knowledgerecord', 'write'),
         array('categorie', 'lire'), array('propale', 'lire'),
+        // The customer area (#63, #64): sign-in by a contact's address, the
+        // customer's own invoices.
+        array('societe', 'contact', 'lire'), array('facture', 'lire'),
+        // Accepting or declining an offer closes it in Dolibarr (#65).
+        array('propale', 'creer'),
     ));
     // The scenarios read what the website created through an administrator.
     $adminKey = bin2hex(random_bytes(20));

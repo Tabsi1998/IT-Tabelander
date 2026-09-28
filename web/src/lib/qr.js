@@ -1,5 +1,9 @@
 import qrcode from "qrcode-generator";
 
+// Text as UTF-8 bytes: a payee like "Müller" must reach the banking app intact
+// (the library would cut every character to one byte).
+qrcode.stringToBytes = (text) => Array.from(new globalThis.TextEncoder().encode(text));
+
 /** The modules of a QR code for `text`, row by row (#72). Level M repairs up
  *  to 15 % of the code - enough for a label that gets scuffed in the shop. */
 export function qrModules(text, level = "M") {
