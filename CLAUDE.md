@@ -28,7 +28,7 @@ ignored by Git.
 | repository | every `*.sh` parses, no CRLF in the index, `git diff --check` over every tracked line (a check on a fresh checkout would see no diff), Gitleaks over the history and over uncommitted files |
 | backend | for Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, `tests/test_unit_runtime.py`, `tests/test_inquiry_dolibarr.py`, `tests/test_handover.py` and `tests/test_site_data.py` |
 | integration | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
-| dolibarr | Dolibarr 24.0.1 + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link, the website's test mail, queue with one warning while Dolibarr is unreachable, personal data gone after hand-over, migration of old records without mails, contact form without new third party, callback as agenda event, company data and imprint (with a moved address), draft marker on legal texts, FAQ only from released website articles, status steps "Angebot bereit" and "abholbereit" |
+| dolibarr | Dolibarr 23.0.3 (the owner's release; `IT_TABELANDER_DOLIBARR=24.0.1` for the next one) + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link, the website's test mail, queue with one warning while Dolibarr is unreachable, personal data gone after hand-over, migration of old records without mails, contact form without new third party, callback as agenda event, company data and imprint (with a moved address), draft marker on legal texts, FAQ only from released website articles, status steps "Angebot bereit" and "abholbereit" |
 | web | the website and its admin in `web/` (Vite 8, React 19, Tailwind 3, same toolbox as LION): frozen install, ESLint with jsx-a11y strict, Vitest, `yarn build` (Vite build + SSR build + `scripts/prerender.mjs`, checked for prerendered text and no Google fonts), Playwright in 390, 768, 1280 and 1440 px against `vite preview` with the live Content-Security-Policy (a Vitest test keeps it equal to `server.py`), axe WCAG 2.1 AA in light and dark, keyboard, nothing beyond the screen edge, screenshots of every page in `web/screenshots/`; the e2e tests answer `/api` themselves (`web/e2e/fixtures.js`) |
 | extra | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
 | deploy | `start.sh`, `stop.sh`, `update.sh` on a throwaway Ubuntu 24.04 server with systemd (`scripts/deploy-test/`): autostart, crash restart, reboot (`docker restart`), a broken update rolled back, a good update, `stop.sh --disable`, `USE_SYSTEMD=0`. With `--all` only when a deployment file changed against origin/main (about 15 minutes); `--only deploy` forces it. It tests the committed HEAD |
@@ -61,7 +61,9 @@ German (Warum / Was zu tun ist / Abnahme). Every PR names its issues with
   accept `Authorization: Bearer`. Integration tests use a logged-in
   `requests.Session` (`admin_client` in `conftest.py`).
 - Company data and legal texts come from Dolibarr (issue #74), not from the
-  website admin. Dolibarr 24.0.1 runs at erp.tabelander.co.at.
+  website admin. Dolibarr 23.0.3 runs at erp.tabelander.co.at (its login page
+  says so; the notes said 24.0.1 until 2026-09-28). All scenarios pass on
+  23.0.3 and 24.0.1.
 
 ## Website and admin in production
 
@@ -168,7 +170,7 @@ group, or `group/name` across groups. A gate that counts findings goes through
 `UNIT_TEST_FILES`, `INTEGRATION_TEST_FILES` or `DOLIBARR_TEST_FILES`, or the test
 inventory fails.
 
-Dolibarr facts the scenarios proved (24.0.1): the API user needs
+Dolibarr facts the scenarios proved (24.0.1, all hold on 23.0.3 too): the API user needs
 `societe client voir`, or it sees only third parties it is sales
 representative of; a ticket's state is written from `status` (`fk_statut` is
 read only); points in time come as Unix seconds; the customer's confirmation

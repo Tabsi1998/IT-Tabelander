@@ -49,6 +49,9 @@ test("a session that ended says so and returns to the same page (#57)", async ({
   const state = await mockAdmin(page);
   await page.goto("/admin/technik");
   await expect(page.getByRole("heading", { level: 1, name: "Technik" })).toBeVisible();
+  // Only once the page has its data: a session ending while it still loads
+  // rightly shows the sign-in form at once, and the button never comes.
+  await expect(page.getByRole("button", { name: "Test-Mail senden" })).toBeVisible();
   state.loggedIn = false;
   await page.getByRole("button", { name: "Test-Mail senden" }).click();
   await expect(page.getByText("Deine Anmeldung ist abgelaufen")).toBeVisible();

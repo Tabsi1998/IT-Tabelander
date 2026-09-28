@@ -16,7 +16,8 @@ Groups:
     integration  the API and regression suites: a MongoDB of its own, the live
                  FastAPI server over HTTPS as in production, and both suites
                  against it
-    dolibarr     the website against a real Dolibarr 24.0.1 with MariaDB and
+    dolibarr     the website against a real Dolibarr (the owner's 23.0.3; set
+                 IT_TABELANDER_DOLIBARR=24.0.1 for the next release) with MariaDB and
                  Mailpit: inquiries, photos on the ticket, confirmation mails,
                  status, existing customers left unchanged, company data,
                  legal texts and FAQ from the knowledge base
@@ -100,9 +101,17 @@ DOLIBARR_TEST_FILES = ("tests/test_dolibarr_runtime.py",)
 # The disposable Dolibarr of the "dolibarr" group: the release the owner runs,
 # built from Dolibarr's own docker repository at a pinned commit (as in
 # dolibarr-mahnwesen), with MariaDB and Mailpit. Ports stay unique per repository.
-DOLIBARR_IMAGE = "local-ci/dolibarr:24.0.1"
-DOLIBARR_BUILD = ("https://github.com/Dolibarr/dolibarr-docker.git"
-                  "#ec6b10487e52244b64142b6d8806eb26409ac406:images/24.0.1-php8.2")
+# erp.tabelander.co.at runs 23.0.3 (its login page, 2026-09-28); 24.0.1 is
+# the next release and stays checkable: IT_TABELANDER_DOLIBARR=24.0.1.
+DOLIBARR_RELEASES = {
+    "23.0.3": "73658fe7060709b3bc798e646284775ec0020101:images/23.0.3-php8.2",
+    "24.0.1": "ec6b10487e52244b64142b6d8806eb26409ac406:images/24.0.1-php8.2",
+}
+DOLIBARR_VERSION = os.environ.get("IT_TABELANDER_DOLIBARR", "23.0.3")
+if DOLIBARR_VERSION not in DOLIBARR_RELEASES:
+    raise SystemExit(f"IT_TABELANDER_DOLIBARR must be one of {', '.join(DOLIBARR_RELEASES)}")
+DOLIBARR_IMAGE = f"local-ci/dolibarr:{DOLIBARR_VERSION}"
+DOLIBARR_BUILD = f"https://github.com/Dolibarr/dolibarr-docker.git#{DOLIBARR_RELEASES[DOLIBARR_VERSION]}"
 DOLIBARR_MARIADB_IMAGE = "mariadb:11.4.13"
 DOLIBARR_MAILPIT_IMAGE = "axllent/mailpit:v1.31.1"
 DOLIBARR_WEB_PORT = 18031
@@ -1222,7 +1231,7 @@ def web_steps() -> list:
 # ------------------------------------------------------------------ dolibarr
 
 def dolibarr_stack(context: Context) -> str:
-    """Dolibarr 24.0.1 with MariaDB and Mailpit, installed on first start.
+    """Dolibarr (DOLIBARR_VERSION) with MariaDB and Mailpit, installed on first start.
 
     Databases and documents live in tmpfs, so every run starts from an empty
     Dolibarr. Passwords are new for every run and never written to a log.
@@ -1330,6 +1339,7 @@ def dolibarr_scenarios(context: Context) -> str:
         "REACT_APP_BACKEND_URL": DOLIBARR_SITE_URL,
         "REQUESTS_CA_BUNDLE": str(TLS / "cert.pem"),
         "DOLIBARR_TEST_URL": f"http://127.0.0.1:{DOLIBARR_WEB_PORT}",
+        "DOLIBARR_TEST_VERSION": DOLIBARR_VERSION,
         "DOLIBARR_TEST_WEB_KEY": fixtures["web_key"],
         "DOLIBARR_TEST_ADMIN_KEY": fixtures["admin_key"],
         "DOLIBARR_TEST_CUSTOMER_ID": str(fixtures["customer"]),
@@ -1368,7 +1378,7 @@ def dolibarr_scenarios(context: Context) -> str:
 def dolibarr_steps() -> list:
     venv = f"backend/venv-{INTEGRATION_PYTHON}"
     return [
-        Step("dolibarr", "stack", "Dolibarr 24.0.1 with MariaDB and Mailpit", dolibarr_stack),
+        Step("dolibarr", "stack", f"Dolibarr {DOLIBARR_VERSION} with MariaDB and Mailpit", dolibarr_stack),
         Step("dolibarr", "fixtures", "Modules, mail and a website API user in Dolibarr", dolibarr_fixtures,
              ("stack", "backend/snapshot")),
         Step("dolibarr", "site", "A website server of its own for the scenarios", dolibarr_site,

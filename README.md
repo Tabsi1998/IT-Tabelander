@@ -328,7 +328,7 @@ werden ausdrücklich nicht in Git aufgenommen.
 
 ### Dolibarr einmalig vorbereiten
 
-Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 24.
+Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie sind gleich).
 
 1. Unter **Einstellungen → Module/Anwendungen** aktivieren: **Geschäftspartner**,
    **Tickets**, **Agenda (Ereignisse/Termine)**, **Angebote**, **Rechnungen**,
@@ -675,8 +675,11 @@ cd web && yarn lint && yarn test && yarn build
 bash -n start.sh stop.sh update.sh
 ```
 
-Der Ablauf gegen einen echten Dolibarr 24.0.1 (mit MariaDB und Mailpit, alles
-in Docker) läuft mit `python scripts/local_check.py --only dolibarr`.
+Der Ablauf gegen einen echten Dolibarr (mit MariaDB und Mailpit, alles in
+Docker) läuft mit `python scripts/local_check.py --only dolibarr`. Geprüft wird
+die Version, die auf erp.tabelander.co.at läuft (23.0.3); vor einem
+Dolibarr-Update dieselben Szenarien gegen die neue Version:
+`IT_TABELANDER_DOLIBARR=24.0.1 python scripts/local_check.py --only dolibarr`.
 
 Die mutierenden API-Integrationstests sind absichtlich gesperrt. Sie laufen nur
 mit `IT_TABELANDER_RUN_INTEGRATION=1`, einer lokalen URL und einer `DB_NAME`, die
