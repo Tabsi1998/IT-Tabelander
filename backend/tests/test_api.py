@@ -422,12 +422,79 @@ class TestDashboard:
         r = admin_client.get(f"{BASE_URL}/api/admin/dashboard", timeout=30)
         assert r.status_code == 200
         d = r.json()
-        for k in ("new_repairs", "total_repairs", "active_services",
-                  "reviews_visible", "dolibarr_enabled"):
-            assert k in d
-        assert isinstance(d["total_repairs"], int)
-        assert d["active_services"] >= 6
+        assert d["services"]["active"] >= 6
         assert d["dolibarr_enabled"] is False
 
     def test_dashboard_requires_auth(self):
         assert requests.get(f"{BASE_URL}/api/admin/dashboard", timeout=30).status_code == 401
+
+
+# ---------------- The new admin (#57-#62) ----------------
+class TestAdminMilestone4:
+    def test_gallery_photo_lifecycle(self, admin_client, api_client):
+        """#60: upload, thumbnail, hide, order, delete - the files go with it."""
+        files = {"file": ("werkstatt.png", _png_bytes("green"), "image/png")}
+        r = admin_client.post(f"{BASE_URL}/api/admin/gallery", files=files,
+                              data={"caption": "TEST_Gaming-PC", "category": "pc_build", "visible": "true"}, timeout=60)
+        assert r.status_code == 200, r.text
+        photo = r.json()
+        assert photo["category_label"] == "PC-Bau" and photo["thumb_url"] != photo["image_url"]
+        assert api_client.get(f"{BASE_URL}{photo['thumb_url']}", timeout=30).status_code == 200
+        public = api_client.get(f"{BASE_URL}/api/gallery", timeout=30).json()["items"]
+        assert any(item["id"] == photo["id"] for item in public)
+
+        hidden = admin_client.put(f"{BASE_URL}/api/admin/gallery/{photo['id']}", json={"visible": False}, timeout=30)
+        assert hidden.status_code == 200 and hidden.json()["visible"] is False
+        public = api_client.get(f"{BASE_URL}/api/gallery", timeout=30).json()["items"]
+        assert not any(item["id"] == photo["id"] for item in public)
+        bad = admin_client.put(f"{BASE_URL}/api/admin/gallery/{photo['id']}", json={"category": "unbekannt"}, timeout=30)
+        assert bad.status_code == 422
+
+        ids = [item["id"] for item in admin_client.get(f"{BASE_URL}/api/admin/gallery", timeout=30).json()["items"]]
+        assert admin_client.post(f"{BASE_URL}/api/admin/gallery/order", json={"ids": list(reversed(ids))}, timeout=30).status_code == 200
+
+        assert admin_client.delete(f"{BASE_URL}/api/admin/gallery/{photo['id']}", timeout=30).status_code == 200
+        assert api_client.get(f"{BASE_URL}{photo['image_url']}", timeout=30).status_code == 404
+        assert api_client.get(f"{BASE_URL}{photo['thumb_url']}", timeout=30).status_code == 404
+
+    def test_gallery_is_admin_only(self, api_client):
+        files = {"file": ("x.png", _png_bytes(), "image/png")}
+        assert api_client.post(f"{BASE_URL}/api/admin/gallery", files=files, timeout=30).status_code == 401
+        assert api_client.get(f"{BASE_URL}/api/admin/gallery", timeout=30).status_code == 401
+
+    def test_service_edit_keeps_what_the_form_does_not_send(self, admin_client):
+        """#58: a partial save never blanks other fields; the address stays."""
+        created = admin_client.post(f"{BASE_URL}/api/admin/services", json={
+            "title": f"TEST_Dienst {uuid.uuid4().hex[:6]}", "short_description": "bleibt", "seo_title": "bleibt auch",
+        }, timeout=30).json()
+        try:
+            r = admin_client.put(f"{BASE_URL}/api/admin/services/{created['id']}",
+                                 json={"title": "TEST_Neuer Name", "heading": "Neu", "slug": "anders"}, timeout=30)
+            assert r.status_code == 200, r.text
+            saved = r.json()
+            assert saved["heading"] == "Neu" and saved["short_description"] == "bleibt" and saved["seo_title"] == "bleibt auch"
+            assert saved["slug"] == created["slug"]
+            listed = admin_client.get(f"{BASE_URL}/api/admin/services", timeout=30).json()
+            order = [item["id"] for item in listed]
+            order.remove(created["id"])
+            order.insert(0, created["id"])
+            assert admin_client.post(f"{BASE_URL}/api/admin/services/order", json={"ids": order}, timeout=30).status_code == 200
+            assert admin_client.get(f"{BASE_URL}/api/admin/services", timeout=30).json()[0]["id"] == created["id"]
+        finally:
+            admin_client.delete(f"{BASE_URL}/api/admin/services/{created['id']}", timeout=30)
+
+    def test_dashboard_says_what_waits_and_what_is_missing(self, admin_client):
+        data = admin_client.get(f"{BASE_URL}/api/admin/dashboard", timeout=30).json()
+        assert {"inquiries", "reviews", "gallery", "services", "dolibarr_enabled", "mail_configured"} <= set(data)
+        assert isinstance(data["inquiries"]["waiting"], int) and isinstance(data["inquiries"]["recent"], list)
+
+    def test_about_me_texts_reach_the_website(self, admin_client, api_client):
+        r = admin_client.put(f"{BASE_URL}/api/admin/settings", json={
+            "about_text": "TEST_Über mich", "about_qualifications": ["TEST_A", "TEST_A", " TEST_B "],
+        }, timeout=30)
+        assert r.status_code == 200, r.text
+        public = api_client.get(f"{BASE_URL}/api/settings", timeout=30).json()
+        assert public["about_text"] == "TEST_Über mich" and public["about_qualifications"] == ["TEST_A", "TEST_B"]
+        bad = admin_client.put(f"{BASE_URL}/api/admin/settings", json={"about_photo_url": "https://fremd.example/bild.png"}, timeout=30)
+        assert bad.status_code == 422
+        admin_client.put(f"{BASE_URL}/api/admin/settings", json={"about_text": "", "about_qualifications": []}, timeout=30)

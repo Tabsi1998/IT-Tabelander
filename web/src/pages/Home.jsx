@@ -7,6 +7,7 @@ import { useSite } from "../lib/site.jsx";
 import { useApi } from "../lib/useApi.js";
 import About from "../sections/About.jsx";
 import Contact, { CONTACT_TABS } from "../sections/Contact.jsx";
+import Faq from "../sections/Faq.jsx";
 import Hero from "../sections/Hero.jsx";
 import Process from "../sections/Process.jsx";
 import Reviews from "../sections/Reviews.jsx";
@@ -25,6 +26,7 @@ export default function Home() {
   const { settings } = useSite();
   const gallery = useApi("/gallery");
   const reviews = useApi("/reviews");
+  const faq = useApi("/faqs");
 
   // /status/view.php?track_id=… is the link in Dolibarr's confirmation mail (#48).
   const trackId = location.pathname === "/status/view.php" ? search.get("track_id") || "" : "";
@@ -48,12 +50,14 @@ export default function Home() {
 
   const galleryItems = gallery.data?.items || [];
   const reviewCount = (reviews.data?.reviews || []).filter((review) => !review.is_demo).length;
+  const faqItems = Array.isArray(faq.data) ? faq.data : [];
   const sections = [
     { key: "leistungen", label: "Leistungen" },
     { key: "ablauf", label: "Ablauf" },
     ...(galleryItems.length ? [{ key: "werkstatt", label: "Werkstatt" }] : []),
     ...(reviewCount ? [{ key: "bewertungen", label: "Bewertungen" }] : []),
     { key: "ueber", label: "Über mich" },
+    ...(faqItems.length ? [{ key: "fragen", label: "Fragen" }] : []),
     { key: "kontakt", label: "Kontakt" },
   ];
 
@@ -70,6 +74,7 @@ export default function Home() {
         <Workshop items={galleryItems} />
         <Reviews data={reviews.data} googleUrl={settings.google_review_url} />
         <About />
+        <Faq items={faqItems} />
         <Contact
           tab={tab}
           onTab={setTab}

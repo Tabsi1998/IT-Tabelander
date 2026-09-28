@@ -263,7 +263,7 @@ def test_json_ld_cannot_close_its_script_tag():
     assert "</" not in inner and json.loads(inner)["name"].startswith("</script>")
 
 
-def test_public_pages_enforce_the_security_policy_the_admin_only_reports(monkeypatch, tmp_path):
+def test_website_and_admin_enforce_the_security_policy(monkeypatch, tmp_path):
     import server
 
     monkeypatch.setattr(server, "FRONTEND_BUILD_DIR", _build(tmp_path))
@@ -282,5 +282,20 @@ def test_public_pages_enforce_the_security_policy_the_admin_only_reports(monkeyp
     public = asyncio.run(call("/"))
     admin = asyncio.run(call("/admin"))
     assert "default-src 'self'" in public.headers["content-security-policy"]
-    assert "content-security-policy" not in admin.headers
-    assert "content-security-policy-report-only" in admin.headers
+    # The new admin (#57) has no inline script either: the same strict policy.
+    assert admin.headers["content-security-policy"] == public.headers["content-security-policy"]
+    assert "content-security-policy-report-only" not in admin.headers
+
+
+def test_start_page_texts_from_the_admin_go_in_literally():
+    from app import website
+
+    page = ('<title>Alt</title><meta name="description" content="alt" />'
+            '<meta property="og:title" content="Alt" /><meta property="og:description" content="alt" />')
+    backslash = chr(92)
+    title = 'PC-Hilfe ' + backslash + 'g<0> & <Tirol>'
+    description = 'Reparatur ' + backslash + '1'
+    changed = website.with_texts(page, {'seo_default_title': title, 'seo_default_description': description})
+    assert '<title>PC-Hilfe ' + backslash + 'g&lt;0&gt; &amp; &lt;Tirol&gt;</title>' in changed
+    assert 'content="Reparatur ' + backslash + '1"' in changed and 'Alt' not in changed
+    assert website.with_texts(page, {}) == page

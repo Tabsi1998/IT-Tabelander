@@ -37,4 +37,9 @@ for (const page of PAGES) {
   writeFileSync(target, html);
   console.log(`prerendered ${page.url} -> dist/${page.file}`);
 }
+// The admin opens in the browser only; its page carries no prerendered text.
+writeFileSync(path.join(dist, "admin.html"), template
+  .replace(/<title>[^<]*<\/title>/, "<title>Verwaltung – IT-Tabelander</title>")
+  .replace("<!--app-head-->", '<meta name="robots" content="noindex" />\n    <!--app-head-->'));
+console.log("wrote the empty admin page -> dist/admin.html");
 rmSync(path.join(root, "dist-ssr"), { recursive: true, force: true });

@@ -18,10 +18,14 @@ __pycache__/
 backend/pytest-*/
 
 # ── Node / Frontend ──────────────────────────────────────────────────────
+# frontend/ held the old admin until milestone 4 (#57). A server updated
+# from then keeps these leftovers until start.sh removes them; ignored, so
+# ./update.sh does not stop at "Lokale Änderungen".
 frontend/node_modules/
 frontend/build/
 frontend/.build.*/
 frontend/.yarn/
+web/build/
 web/node_modules/
 web/dist/
 web/dist-ssr/

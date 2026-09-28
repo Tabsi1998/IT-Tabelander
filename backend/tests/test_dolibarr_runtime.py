@@ -172,6 +172,8 @@ def connected(admin_client):
     assert response.status_code == 200, response.text
     status = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/status", timeout=60).json()
     assert status["connection"]["connected"] is True, status["connection"]
+    # The admin's connection check names the version (#62).
+    assert status["connection"]["version"] == "24.0.1", status["connection"]
     yield
 
 

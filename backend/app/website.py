@@ -1,8 +1,8 @@
-"""Serving the built website and, until milestone 4, the old admin (#54),
-with the address, preview image and business data for search engines (#53).
+"""Serving the built website and its admin (#54, #57), with the address,
+preview image and business data for search engines (#53).
 
-start.sh builds both into one directory: the website's prerendered pages at
-the top, the admin as admin.html with its files next to it.
+web/'s build has the website's prerendered pages and admin.html, the empty
+page the admin starts from.
 """
 import html
 import json
@@ -121,6 +121,24 @@ async def seo_data() -> tuple[str, dict, dict]:
     return base, settings, cache
 
 
+def with_texts(page: str, settings: dict) -> str:
+    """The start page's title and description from the admin, if set (#61).
+    The texts go in literally; nothing in them is read as a pattern."""
+    title = html.escape(str(settings.get("seo_default_title") or "").strip(), quote=True)
+    description = html.escape(str(settings.get("seo_default_description") or "").strip(), quote=True)
+
+    def put(pattern: str, value: str, text: str) -> str:
+        return re.sub(pattern, lambda match: match.group(1) + value + match.group(2), text, count=1)
+
+    if title:
+        page = put(r"(<title>)[^<]*(</title>)", title, page)
+        page = put(r'(<meta property="og:title" content=")[^"]*(")', title, page)
+    if description:
+        page = put(r'(<meta name="description" content=")[^"]*(")', description, page)
+        page = put(r'(<meta property="og:description" content=")[^"]*(")', description, page)
+    return page
+
+
 def with_seo(page: str, *, base: str, canonical_path: str, extra: str = "") -> str:
     url = html.escape(base + canonical_path, quote=True)
     head = (f'<link rel="canonical" href="{url}" />\n    <meta property="og:url" content="{url}" />'
@@ -177,5 +195,6 @@ async def respond(requested_path: str, build_dir: Path):
         base, settings, cache = await seo_data()
         if canonical == "/" and clean == "":
             extra = json_ld(business_data(base, settings, cache))
+            text = with_texts(text, settings)
         text = with_seo(text, base=base, canonical_path=canonical, extra=extra)
     return HTMLResponse(text, status_code=status, headers=NO_CACHE)

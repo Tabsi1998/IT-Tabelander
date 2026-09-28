@@ -20,12 +20,14 @@ SERVICE_NAME="it-tabelander"
 RUN_DIR="$SCRIPT_DIR/run"
 LOG_DIR="$SCRIPT_DIR/logs"
 BACKEND_DIR="$SCRIPT_DIR/backend"
-FRONTEND_DIR="$SCRIPT_DIR/frontend"
-# The website (#54). frontend/ only holds the admin until milestone 4 (#57);
-# both are built into BUILD_DIR, which the backend serves.
+# The website and its admin (#54, #57), built into BUILD_DIR for the backend.
 WEB_DIR="$SCRIPT_DIR/web"
+# Until milestone 4 the old admin lived in frontend/ and the build in
+# frontend/build. After a successful start of this version it is removed; a
+# failed update still finds it, because the rollback runs the old version.
+LEGACY_FRONTEND_DIR="$SCRIPT_DIR/frontend"
 VENV_DIR="${IT_TABELANDER_VENV_DIR:-$BACKEND_DIR/venv}"
-BUILD_DIR="$FRONTEND_DIR/build"
+BUILD_DIR="$WEB_DIR/build"
 STAGED_BUILD_DIR="$RUN_DIR/frontend-build.next"
 PREVIOUS_BUILD_DIR="$RUN_DIR/frontend-build.previous"
 mkdir -p "$RUN_DIR" "$LOG_DIR"
@@ -591,14 +593,6 @@ prepare_backend() {
   fi
 }
 
-write_frontend_environment() {
-  local env_file="$FRONTEND_DIR/.env.production"
-  local expected="REACT_APP_BACKEND_URL="
-  if [[ ! -f "$env_file" || "$(< "$env_file")" != "$expected" ]]; then
-    printf '%s\n' "$expected" > "$env_file"
-  fi
-}
-
 dependency_hash() {
   node - "$1" <<'NODE'
 const crypto = require('crypto');
@@ -616,44 +610,36 @@ NODE
 }
 
 frontend_build_input_hash() {
-  node - "$FRONTEND_DIR" "$WEB_DIR" <<'NODE'
+  node - "$WEB_DIR" <<'NODE'
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const [admin, web] = process.argv.slice(2);
+const root = process.argv[2];
 const files = [];
 
-function collect(label, root, relativeDirectory) {
+function collect(relativeDirectory) {
   const absoluteDirectory = path.join(root, relativeDirectory);
   if (!fs.existsSync(absoluteDirectory)) return;
   for (const entry of fs.readdirSync(absoluteDirectory, {withFileTypes: true})) {
     const relative = path.join(relativeDirectory, entry.name);
-    if (entry.isDirectory()) collect(label, root, relative);
-    else if (entry.isFile()) files.push([label, root, relative]);
+    if (entry.isDirectory()) collect(relative);
+    else if (entry.isFile()) files.push(relative);
   }
 }
 
-function add(label, root, names) {
-  for (const name of names) {
-    if (fs.existsSync(path.join(root, name))) files.push([label, root, name]);
-  }
+collect('src');
+collect('public');
+collect('scripts');
+for (const name of ['package.json', 'yarn.lock', 'index.html', 'vite.config.mjs', 'postcss.config.js',
+                    'tailwind.config.js']) {
+  if (fs.existsSync(path.join(root, name))) files.push(name);
 }
-
-collect('frontend', admin, 'src');
-collect('frontend', admin, 'public');
-add('frontend', admin, ['package.json', 'yarn.lock', '.env.production', 'postcss.config.js', 'tailwind.config.js']);
-collect('web', web, 'src');
-collect('web', web, 'public');
-collect('web', web, 'scripts');
-add('web', web, ['package.json', 'yarn.lock', 'index.html', 'vite.config.mjs', 'postcss.config.js',
-                 'tailwind.config.js']);
-const key = ([label, , relative]) => label + '/' + relative.split(path.sep).join('/');
-files.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+files.sort();
 
 const hash = crypto.createHash('sha256');
-for (const file of files) {
-  hash.update(key(file) + '\0');
-  hash.update(fs.readFileSync(path.join(file[1], file[2])));
+for (const relative of files) {
+  hash.update(relative.split(path.sep).join('/') + '\0');
+  hash.update(fs.readFileSync(path.join(root, relative)));
   hash.update('\0');
 }
 console.log(hash.digest('hex'));
@@ -682,28 +668,10 @@ install_app_dependencies() {
   fi
 }
 
-# One directory for the backend: the website at the top, the admin's page as
-# admin.html and its files next to it. Where both have a file, the website's wins.
-assemble_site() {
-  local admin="$1" site="$2" target="$3" file
-  [[ -f "$site/index.html" ]] || die "Website-Build ist unvollständig (web/dist/index.html fehlt)."
-  [[ -f "$admin/index.html" ]] || die "Verwaltungs-Build ist unvollständig (index.html fehlt)."
-  mkdir -p -- "$target"
-  cp -R -- "$site/." "$target/"
-  mv -- "$admin/index.html" "$target/admin.html"
-  while IFS= read -r -d '' file; do
-    [[ -e "$target/$file" ]] && continue
-    mkdir -p -- "$target/$(dirname -- "$file")"
-    cp -- "$admin/$file" "$target/$file"
-  done < <(cd "$admin" && find . -type f -print0)
-}
-
 prepare_frontend() {
   local build_needed=0 new_build previous_stage build_input_hash baseline_dir="$BUILD_DIR"
 
-  write_frontend_environment
   install_app_dependencies "$WEB_DIR" "Website" "vite"
-  install_app_dependencies "$FRONTEND_DIR" "Verwaltung" "react-scripts"
 
   build_input_hash="$(frontend_build_input_hash)"
   [[ -f "$STAGED_BUILD_DIR/index.html" ]] && baseline_dir="$STAGED_BUILD_DIR"
@@ -731,15 +699,9 @@ prepare_frontend() {
     rm -f -- "$WEB_DIR/node_modules/.yarn-install-ok"
     die "Website-Build fehlgeschlagen; beim nächsten Lauf werden auch die Abhängigkeiten geprüft."
   fi
-  if ! (
-    cd "$FRONTEND_DIR"
-    BUILD_PATH="$BUILD_TMP/admin" yarn build
-  ); then
-    rm -f -- "$FRONTEND_DIR/node_modules/.yarn-install-ok"
-    die "Verwaltungs-Build fehlgeschlagen; beim nächsten Lauf werden auch die Abhängigkeiten geprüft."
-  fi
-  assemble_site "$BUILD_TMP/admin" "$WEB_DIR/dist" "$new_build"
-  [[ -f "$new_build/index.html" && -f "$new_build/admin.html" ]] || die "Frontend-Build ist unvollständig (index.html oder admin.html fehlt)."
+  [[ -f "$WEB_DIR/dist/index.html" && -f "$WEB_DIR/dist/admin.html" ]] \
+    || die "Website-Build ist unvollständig (index.html oder admin.html fehlt)."
+  cp -R -- "$WEB_DIR/dist" "$new_build"
   printf '%s\n' "$build_input_hash" > "$new_build/.build-input.sha256"
 
   if [[ -d "$STAGED_BUILD_DIR" ]]; then
@@ -754,6 +716,17 @@ prepare_frontend() {
   rm -rf -- "$BUILD_TMP"
   BUILD_TMP=""
   green "✓ Frontend-Build vollständig bereitgestellt"
+}
+
+# What is left of frontend/ (the old admin's packages and build) once this
+# version runs. Only when Git tracks nothing there any more.
+remove_legacy_frontend() {
+  [[ -d "$LEGACY_FRONTEND_DIR" ]] || return 0
+  if [[ -n "$(git -C "$SCRIPT_DIR" ls-files -- frontend 2>/dev/null)" ]]; then
+    return 0
+  fi
+  rm -rf -- "$LEGACY_FRONTEND_DIR"
+  green "✓ Altes Frontend-Verzeichnis entfernt"
 }
 
 activate_staged_frontend() {
@@ -1017,6 +990,14 @@ start_backend() {
   if ! write_pid "$RUN_DIR/backend.pid" "$pid"; then
     die "Backend-PID konnte nicht gespeichert werden."
   fi
+  # Until its exec the new process still carries this script's command line,
+  # which no check recognises as the backend: a check in that moment took it
+  # for dead and the clean-up stopped the starting server. Wait for the exec.
+  for _ in {1..50}; do
+    [[ "$(process_command "$pid" 2>/dev/null || true)" == *uvicorn* ]] && break
+    process_exists "$pid" || break
+    sleep 0.1
+  done
 }
 
 wait_for_backend() {
@@ -1109,6 +1090,7 @@ rm -f -- "$RUN_DIR/service.env"
 if [[ -d "$PREVIOUS_BUILD_DIR" ]]; then
   rm -rf -- "$PREVIOUS_BUILD_DIR"
 fi
+remove_legacy_frontend
 
 ADMIN_EMAIL_DISPLAY=""
 ADMIN_PASSWORD_DISPLAY=""
