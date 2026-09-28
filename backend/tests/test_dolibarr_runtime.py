@@ -1,4 +1,5 @@
-"""Scenarios against a real Dolibarr 24.0.1 (scripts/local_check.py, group "dolibarr").
+"""Scenarios against a real Dolibarr (scripts/local_check.py, group "dolibarr"): the
+release the owner runs, 23.0.3, or 24.0.1 with IT_TABELANDER_DOLIBARR=24.0.1.
 
 The local check starts Dolibarr with MariaDB and Mailpit, prepares it with
 tests/dolibarr_fixtures/fixtures.php and runs a website server of its own. These
@@ -173,7 +174,7 @@ def connected(admin_client):
     status = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/status", timeout=60).json()
     assert status["connection"]["connected"] is True, status["connection"]
     # The admin's connection check names the version (#62).
-    assert status["connection"]["version"] == "24.0.1", status["connection"]
+    assert status["connection"]["version"] == os.environ.get("DOLIBARR_TEST_VERSION", "23.0.3"), status["connection"]
     yield
 
 
@@ -193,7 +194,10 @@ class TestNewCustomer:
         assert int(party["client"]) == 2, "a new sender becomes a prospect"
         ticket = ticket_for(created["ref"], party["id"])
         documents = dolibarr_get("documents", modulepart="ticket", id=ticket["id"])
-        assert len(documents) == 1 and documents[0]["name"].endswith(".webp"), documents
+        # Dolibarr 23 and 24 name the file in different fields of this list.
+        stored_as = next((str(documents[0][key]) for key in ("name", "relativename", "filename", "fullname")
+                          if documents and documents[0].get(key)), "")
+        assert len(documents) == 1 and stored_as.endswith(".webp"), documents
         # The photo left the website with the hand-over (#37).
         assert requests.get(f"{BASE_URL}{photo['url']}", params={"request_id": request_id},
                             timeout=30).status_code == 404
