@@ -166,7 +166,13 @@ async def redeem(token: str) -> tuple[str, dict]:
     )
     if not link:
         raise PortalError("Dieser Link ist abgelaufen oder wurde schon verwendet. Fordere einfach einen neuen an.")
-    customers = await customers_for(link["email"])
+    try:
+        customers = await customers_for(link["email"])
+    except Exception as exc:  # noqa: BLE001 - Dolibarr away for a moment: the link stays good
+        logger.warning("Portal access not checked at sign-in: %s", type(exc).__name__)
+        await db.portal_links.update_one({"_id": link["_id"]}, {"$unset": {"used_at": ""}})
+        raise PortalError("Der Kundenbereich ist gerade nicht erreichbar. Öffne den Link in ein paar Minuten "
+                          "einfach noch einmal.") from None
     if not customers:
         raise PortalError("Für diese E-Mail-Adresse ist der Kundenbereich nicht freigeschaltet.")
     session_token = secrets.token_urlsafe(32)
@@ -259,7 +265,9 @@ def _offer(raw: dict) -> dict:
 def _invoice(raw: dict) -> dict:
     status = _int(raw.get("status", raw.get("statut")))
     remain = raw.get("remaintopay")
-    open_ = status == INVOICE_VALIDATED and _int(raw.get("paye")) == 0 and float(remain or raw.get("total_ttc") or 0) > 0
+    # Dolibarr sends what is left as text or as a number; a 0 means paid, never "take the total".
+    left = remain if remain not in (None, "") else raw.get("total_ttc")
+    open_ = status == INVOICE_VALIDATED and _int(raw.get("paye")) == 0 and float(left or 0) > 0
     state = "offen" if open_ else "storniert" if status == INVOICE_ABANDONED else "bezahlt"
     return {
         "id": _int(raw.get("id")), "ref": raw.get("ref"), "status": status, "state": state, "open": open_,
@@ -534,7 +542,13 @@ async def answer(session: dict, offer_id: int, *, accept: bool, name: str = "", 
         if response.status_code == 403:
             logger.warning("Offer answer refused by Dolibarr: the website user may not change offers")
             raise PortalError("Das hat gerade nicht geklappt. Bitte versuch es später noch einmal oder ruf kurz an.")
-        response.raise_for_status()
+        if response.status_code != 304:
+            response.raise_for_status()
+    if response.status_code == 304:
+        # A second click in the same moment: Dolibarr closed the offer already
+        # for the first one, which also sent the mails. Show the answer, no
+        # error and no second mail. (httpx counts 304 as an error status.)
+        return await offer(session, offer_id)
     ref, total = raw.get("ref"), raw.get("total_ttc")
     if accept:
         subject, text = acceptance_mail(ref=ref, total=total, name=name, when=when, start_now=start_now,

@@ -117,13 +117,44 @@ def test_dolibarr_away_or_mail_failing_tries_again(monkeypatch):
     import httpx
 
     outcome, db, sent = _check(monkeypatch, httpx.ConnectError("weg"))
-    assert outcome == "later" and not sent and not db.repair_requests.calls
+    assert outcome == "away" and not sent and not db.repair_requests.calls
 
     outcome, db, sent = _check(monkeypatch, _closed(), mail_error=mailer.MailError("Mailserver ist nicht erreichbar."))
     assert outcome == "failed" and not sent
     assert ("delete", {"_id": "invite-1"}) in db.review_invites.calls
     undo = db.repair_requests.calls[-1][2]
     assert undo["$unset"] == {"review.invited_at": ""} and "nicht erreichbar" in undo["$set"]["review.last_error"]
+
+
+def test_a_round_stops_at_the_first_sign_that_dolibarr_is_away(monkeypatch):
+    class Requests:
+        claimed = 0
+
+        async def find_one_and_update(self, *_args, **_kwargs):
+            Requests.claimed += 1
+            return {"_id": f"inq-{Requests.claimed}", "created_at": NOW}
+
+    class Db:
+        repair_requests = Requests()
+
+    checked = []
+
+    async def check(db, doc, now, **_kwargs):
+        checked.append(doc["_id"])
+        return "away"
+
+    async def mail_config():
+        return {"host": "smtp.example.com", "sender": "office@example.com", "sender_name": "IT-Tabelander"}
+
+    async def config():
+        return {"enabled": True, "site_base": "https://it.example.at"}
+
+    monkeypatch.setattr(review_invites, "get_db", lambda: Db())
+    monkeypatch.setattr(review_invites, "_check_one", check)
+    monkeypatch.setattr(mailer, "get_mail_config", mail_config)
+    monkeypatch.setattr(dolibarr, "get_config", config)
+    result = asyncio.run(review_invites.run(now=NOW))
+    assert checked == ["inq-1"] and "nicht erreichbar" in result["problem"]
 
 
 def test_a_record_someone_else_just_invited_gets_nothing(monkeypatch):

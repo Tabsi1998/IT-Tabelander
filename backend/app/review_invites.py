@@ -92,7 +92,7 @@ async def _check_one(db, doc: dict, now: datetime, *, site_base: str, sender_nam
         ticket = await dolibarr.fetch_ticket_status(str(ticket_id))
     except Exception as exc:  # noqa: BLE001 - Dolibarr away: the next round asks again
         logger.warning("Ticket state for a review request unavailable: %s", type(exc).__name__)
-        return "later"
+        return "away"
     if ticket is None:
         return await _stop(db, doc, "Das Ticket gibt es in Dolibarr nicht mehr.")
     if ticket["step"] == "abgebrochen":
@@ -166,6 +166,10 @@ async def run(*, force: bool = False, limit: int = 20, now: datetime | None = No
                                    sender_name=mail.get("sender_name") or "IT-Tabelander")
         if outcome in ("sent", "stopped", "failed"):
             result[outcome] += 1
+        if outcome == "away":
+            # The others would wait for the same timeout one by one: stop this round.
+            result["problem"] = "Dolibarr ist gerade nicht erreichbar; die nächste Runde fragt wieder."
+            break
     return result
 
 

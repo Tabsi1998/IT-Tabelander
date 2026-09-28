@@ -106,6 +106,7 @@ class Collection:
         return sum(1 for doc in self.docs if self._match(doc, query))
 
     async def insert_one(self, doc):
+        doc.setdefault("_id", f"id-{len(self.docs)}")  # as Mongo does
         self.docs.append(doc)
 
     async def find_one(self, query, *_args, **_kwargs):
@@ -121,6 +122,8 @@ class Collection:
         doc = await self.find_one(query)
         if doc:
             doc.update(update.get("$set", {}))
+            for key in update.get("$unset", {}):
+                doc.pop(key, None)
 
     async def delete_one(self, query):
         self.docs = [doc for doc in self.docs if not self._match(doc, query)]
@@ -189,6 +192,30 @@ def test_a_link_opens_once_and_only_in_time(monkeypatch):
     db.portal_links.docs[-1]["expires_at"] = datetime.now(timezone.utc) - timedelta(seconds=1)
     with pytest.raises(portal.PortalError):
         asyncio.run(portal.redeem(late))
+
+
+def test_dolibarr_away_at_sign_in_leaves_the_link_good(monkeypatch):
+    state = {"away": True}
+
+    def customers(email):
+        if state["away"]:
+            raise httpx.ConnectError("weg")
+        return [{"id": 7, "name": "Max"}]
+
+    db, sent = _setup(monkeypatch, [{"id": 7, "name": "Max"}])
+    asyncio.run(portal.send_link("max@example.com"))
+    token = sent[0][2].split("#", 1)[1].split()[0]
+
+    async def flaky(email):
+        return customers(email)
+
+    monkeypatch.setattr(portal, "customers_for", flaky)
+    with pytest.raises(portal.PortalError, match="gerade nicht erreichbar"):
+        asyncio.run(portal.redeem(token))
+    assert "used_at" not in db.portal_links.docs[0]
+    state["away"] = False
+    _session_token, session = asyncio.run(portal.redeem(token))
+    assert session["customers"] == [{"id": 7, "name": "Max"}]
 
 
 def test_a_block_in_dolibarr_ends_a_session_at_the_next_check(monkeypatch):
@@ -330,6 +357,32 @@ def test_without_the_request_to_start_the_owner_is_told_to_wait(monkeypatch):
     asyncio.run(portal.answer(_session(7), 31, accept=False, reason="Zu teuer <script>alert(1)</script>"))
     assert closed[1]["status"] == 3 and "Grund: Zu teuer &lt;script&gt;" in closed[1]["note_private"]
     assert "<script>" not in closed[1]["note_private"]
+
+
+def test_a_second_click_in_the_same_moment_sends_no_second_mail(monkeypatch):
+    """Both clicks passed the check; Dolibarr closes once and answers the second with 304."""
+    def handler(request):
+        if request.method == "POST":
+            return httpx.Response(304)
+        return httpx.Response(200, json={"id": "31", "ref": "PR1", "socid": "7", "status": "1", "total_ttc": "1"})
+
+    _with_dolibarr(monkeypatch, handler)
+    told = []
+
+    async def send(*args, **_kwargs):
+        told.append(args)
+
+    monkeypatch.setattr(mailer, "send_mail", send)
+    monkeypatch.setattr(portal, "_notify_owner", send)
+    asyncio.run(portal.answer(_session(7), 31, accept=True, name="Max", start_now=True))
+    assert told == []
+
+
+def test_an_invoice_with_nothing_left_is_paid_whatever_type_the_zero_has():
+    for left in (0, 0.0, "0", "0.00000000"):
+        item = portal._invoice({"id": "41", "ref": "FA1", "status": "1", "paye": "0", "total_ttc": "89", "remaintopay": left})
+        assert item["open"] is False and item["state"] == "bezahlt", left
+    assert portal._invoice({"id": "41", "status": "1", "paye": "0", "total_ttc": "89"})["open"] is True
 
 
 def test_an_answered_or_expired_offer_cannot_be_answered_again(monkeypatch):
