@@ -16,6 +16,7 @@ Every reading goes to Dolibarr with the customer ids of the session and
 keeps only what belongs to them; nothing from Dolibarr is stored here.
 """
 import hashlib
+import html
 import logging
 import re
 import secrets
@@ -511,19 +512,21 @@ async def answer(session: dict, offer_id: int, *, accept: bool, name: str = "", 
 
     cfg = await _config()
     when = _local_time(now_utc())
+    # What the customer typed lands in a note Dolibarr shows as HTML: never as markup.
+    signed, why = html.escape(name, quote=False), html.escape(reason, quote=False)
     async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
         raw = await _owned(client, cfg, "proposals", offer_id, session)
         if _int(raw.get("status")) != 1 or _expired(raw):
             raise PortalError("Dieses Angebot kann nicht mehr beantwortet werden. Schreib mir einfach, dann klären wir es.")
         if accept:
-            note = (f"Im Kundenbereich der Website angenommen am {when} Uhr, bestätigt mit dem Namen „{name}“, "
+            note = (f"Im Kundenbereich der Website angenommen am {when} Uhr, bestätigt mit dem Namen „{signed}“, "
                     f"angemeldet als {session['email']}, IP {ip or 'unbekannt'}. "
                     + ("Sofort beginnen verlangt: ja (Hinweis zum Rücktrittsrecht bestätigt)."
                        if start_now else
                        "Sofort beginnen verlangt: NEIN - vor Ablauf der 14 Tage nur nach Rückfrage beginnen."))
         else:
             note = (f"Im Kundenbereich der Website abgelehnt am {when} Uhr, angemeldet als {session['email']}, "
-                    f"IP {ip or 'unbekannt'}." + (f" Grund: {reason}" if reason else ""))
+                    f"IP {ip or 'unbekannt'}." + (f" Grund: {why}" if why else ""))
         response = await client.post(
             f"{cfg['base']}/api/index.php/proposals/{int(offer_id)}/close", headers=dolibarr._headers(cfg),
             json={"status": 2 if accept else 3, "note_private": note, "notrigger": 0},

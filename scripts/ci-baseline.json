@@ -1,11 +1,6 @@
 {
   "line-endings": [],
   "osv": [],
-  "shellcheck": [
-    "start.sh: SC1091 (info)",
-    "start.sh: SC2015 (info)",
-    "start.sh: SC2034 (warning)",
-    "stop.sh: SC2034 (warning)"
-  ],
+  "shellcheck": [],
   "whitespace": []
 }

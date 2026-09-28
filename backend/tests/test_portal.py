@@ -327,8 +327,9 @@ def test_without_the_request_to_start_the_owner_is_told_to_wait(monkeypatch):
     monkeypatch.setattr(portal, "_company", company)
     asyncio.run(portal.answer(_session(7), 31, accept=True, name="Max", start_now=False))
     assert "Sofort beginnen verlangt: NEIN" in closed[0]["note_private"]
-    asyncio.run(portal.answer(_session(7), 31, accept=False, reason="Zu teuer"))
-    assert closed[1]["status"] == 3 and "Grund: Zu teuer" in closed[1]["note_private"]
+    asyncio.run(portal.answer(_session(7), 31, accept=False, reason="Zu teuer <script>alert(1)</script>"))
+    assert closed[1]["status"] == 3 and "Grund: Zu teuer &lt;script&gt;" in closed[1]["note_private"]
+    assert "<script>" not in closed[1]["note_private"]
 
 
 def test_an_answered_or_expired_offer_cannot_be_answered_again(monkeypatch):

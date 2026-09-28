@@ -22,13 +22,13 @@ const NAV = [
 function Header({ email, onSignOut }) {
   return (
     <header className="border-b border-line bg-surface">
-      <div className="mx-auto flex h-[60px] max-w-[1440px] items-center gap-3 px-4 md:h-[72px] md:gap-6 md:px-8 lg:px-12">
-        <Link to="/" aria-label="IT-Tabelander – zur Startseite" className="flex shrink-0"><Logo className="h-6 w-auto md:h-[30px]" /></Link>
-        <span className="truncate border-l border-line pl-3 font-display text-[17px] font-bold md:pl-6 md:text-lg">Kundenbereich</span>
+      <div className="mx-auto flex h-[60px] max-w-[1440px] items-center gap-2.5 px-4 md:h-[72px] md:gap-6 md:px-8 lg:px-12">
+        <Link to="/" aria-label="IT-Tabelander – zur Startseite" className="flex shrink-0"><Logo className="h-5 w-auto md:h-[30px]" /></Link>
+        <span className="truncate border-l border-line pl-2.5 font-display text-base font-bold md:pl-6 md:text-lg">Kundenbereich</span>
         {onSignOut ? (
           <div className="ml-auto flex items-center gap-4 text-[15px]">
             <span className="hidden text-muted md:inline">Angemeldet als <b className="text-ink">{email}</b></span>
-            <button type="button" onClick={onSignOut} className="btn-outline min-h-[40px] border-line px-3.5 text-[15px]">Abmelden</button>
+            <button type="button" onClick={onSignOut} className="btn-outline min-h-[40px] border-line px-3 text-[15px] md:px-3.5">Abmelden</button>
           </div>
         ) : (
           <Link to="/" className="btn-outline ml-auto min-h-[40px] border-line px-3.5 text-[15px]">Zur Startseite</Link>
