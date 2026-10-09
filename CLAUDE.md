@@ -1,196 +1,87 @@
 # CLAUDE.md
 
-Notes for Claude Code sessions on IT-Tabelander: how the local checks are set
-up and how to extend them. Answer the owner (Tabsi1998) in German. Commits and
-PR titles stay English.
+Build, test and code rules for IT-Tabelander. Operating and setup docs are in
+`README.md` (German). Answer the owner (Tabsi1998) in German; commit and PR
+titles stay English, PR bodies German with `Closes #N` (a German "Schließt"
+alone closes nothing).
 
-## Local checks are the gate; GitHub only warns
+## Local checks are the gate
 
-The repository is private; GitHub Actions would cost minutes and stayed red
-for billing, so there is no workflow at all (removed 2026-09-27 at the
-owner's request). GitHub keeps only what it does for free: Dependabot alerts
-for packages with known vulnerabilities (OSV checks the same here). Before
-every push:
+There is no GitHub workflow (private repository); GitHub only sends
+Dependabot alerts. Before every push:
 
 ```bash
 python scripts/local_check.py                  # everything but extra
-python scripts/local_check.py --all            # plus the gates GitHub does not run
-python scripts/local_check.py --only integration
+python scripts/local_check.py --all            # plus extra; deploy only if a deploy file changed
+python scripts/local_check.py --only dolibarr  # one group
 python scripts/local_check.py --list           # the steps, without running them
+IT_TABELANDER_DOLIBARR=24.0.1 python scripts/local_check.py --only dolibarr
 ```
 
-Results: `.local-testing/local-check.json`, logs in `.local-testing/logs/`,
-live progress in `.local-testing/local-check.progress.json`. All of it is
-ignored by Git.
+Results in `.local-testing/local-check.json`, logs in `.local-testing/logs/`
+(ignored by Git).
 
 | Group | Runs |
 | --- | --- |
-| repository | every `*.sh` parses, no CRLF in the index, `git diff --check` over every tracked line (a check on a fresh checkout would see no diff), Gitleaks over the history and over uncommitted files |
-| backend | for Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, `tests/test_unit_runtime.py`, `tests/test_inquiry_dolibarr.py`, `tests/test_handover.py` and `tests/test_site_data.py` |
-| integration | a MongoDB container, uvicorn over HTTPS on Python 3.14, `tests/test_api.py` and `tests/test_regression_iter2.py` against it |
-| dolibarr | Dolibarr 23.0.3 (the owner's release; `IT_TABELANDER_DOLIBARR=24.0.1` for the next one) + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php` (modules, mail, an API user with only the website's rights, an existing customer), a website server of its own, `tests/test_dolibarr_runtime.py`: prospect + ticket + photo document, existing customer unchanged, confirmation and workshop mails, status by number/e-mail and by link, the website's test mail, queue with one warning while Dolibarr is unreachable, personal data gone after hand-over, migration of old records without mails, contact form without new third party, callback as agenda event, company data and imprint (with a moved address), draft marker on legal texts, FAQ only from released website articles, status steps "Angebot bereit" and "abholbereit" |
-| web | the website and its admin in `web/` (Vite 8, React 19, Tailwind 3, same toolbox as LION): frozen install, ESLint with jsx-a11y strict, Vitest, `yarn build` (Vite build + SSR build + `scripts/prerender.mjs`, checked for prerendered text and no Google fonts), Playwright in 390, 768, 1280 and 1440 px against `vite preview` with the live Content-Security-Policy (a Vitest test keeps it equal to `server.py`), axe WCAG 2.1 AA in light and dark, keyboard, nothing beyond the screen edge, screenshots of every page in `web/screenshots/`; the e2e tests answer `/api` themselves (`web/e2e/fixtures.js`) |
-| extra | every test file is run by some gate, OSV over the lockfiles, ShellCheck |
-| deploy | `start.sh`, `stop.sh`, `update.sh` on a throwaway Ubuntu 24.04 server with systemd (`scripts/deploy-test/`): autostart, crash restart, reboot (`docker restart`), a broken update rolled back, a good update, `stop.sh --disable`, `USE_SYSTEMD=0`. With `--all` only when a deployment file changed against origin/main (about 15 minutes); `--only deploy` forces it. It tests the committed HEAD |
+| repository | shell scripts parse, no CRLF, `git diff --check`, Gitleaks |
+| backend | Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, unit tests |
+| integration | MongoDB container, uvicorn over HTTPS, `tests/test_api.py`, `tests/test_regression_iter2.py` |
+| dolibarr | Dolibarr 23.0.3 (live release) + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php`, `tests/test_dolibarr_runtime.py` |
+| web | `web/`: frozen install, ESLint (jsx-a11y strict), Vitest, build + prerender, Playwright at 390/768/1280/1440 px with axe WCAG 2.1 AA |
+| extra | test inventory, OSV over the lockfiles, ShellCheck (ratchet) |
+| deploy | `start.sh`/`stop.sh`/`update.sh` on a throwaway Ubuntu 24.04 with systemd (`scripts/deploy-test/`), tests the committed HEAD |
 
-Tools the checks expect: Docker Desktop (MongoDB, OSV, ShellCheck), Git for
-Windows (bash, openssl), gitleaks, Python 3.10 and 3.14 through the `py`
-launcher, Node 24 with Corepack. A missing tool skips its steps with a hint.
+Tools: Docker Desktop, Git for Windows (bash, openssl), gitleaks, Python 3.10
+and 3.14 via `py`, Node 24 with Corepack. A missing tool skips its steps.
 
-## How the backend steps are isolated
+## Rules for tests
 
-- They run against `.local-testing/snapshot/backend`, a copy of what Git would
-  commit. `server.py` loads `backend/.env`; a real `.env` with SMTP or Dolibarr
-  credentials must never reach a test.
-- The integration server speaks HTTPS with a throwaway certificate
-  (`.local-testing/tls`). The login sets `Secure; SameSite=Lax` cookies, which a
-  client never returns over plain HTTP; `REQUESTS_CA_BUNDLE` trusts the
-  certificate for the test run only.
-- Settings are throwaway values (`integration_env()`); the database name
-  contains "test", as `conftest.py` requires.
-
-## Work plan
-
-The rework (design, Dolibarr as the single customer system, customer portal)
-is planned as GitHub issues #25 onward with milestones "0 Design" to
-"5 Kundenportal", "Rechtliches" and "Ideen (offen)". Issues are written in
-German (Warum / Was zu tun ist / Abnahme). Every PR names its issues with
-`Closes #N`; a German "Schließt" alone closes nothing.
-
-- The login lives only in httpOnly cookies (`SameSite=Lax`); the API does not
-  accept `Authorization: Bearer`. Integration tests use a logged-in
-  `requests.Session` (`admin_client` in `conftest.py`).
-- Company data and legal texts come from Dolibarr (issue #74), not from the
-  website admin. Dolibarr 23.0.3 runs at erp.tabelander.co.at (its login page
-  says so; the notes said 24.0.1 until 2026-09-28). All scenarios pass on
-  23.0.3 and 24.0.1.
-
-## Website and admin in production
-
-`web/` is one Vite app: the website (prerendered) and the admin under
-`/admin` (`src/admin/`, a lazy chunk visitors never download; `admin.html` is
-its empty shell from `scripts/prerender.mjs`). `start.sh` builds it and
-activates `web/dist` as `web/build`; staging, activation and rollback work on
-that one directory. `backend/app/website.py` answers every address outside
-`/api`: `/admin*` gets `admin.html`, old addresses redirect (301,
-`OLD_ADDRESSES`), known pages get the SEO head (canonical, absolute og:image,
-the admin's start page title/description, LocalBusiness JSON-LD from the
-cached Dolibarr copy - a page never waits for Dolibarr), everything else
-`404.html` with 404. The Content-Security-Policy is enforced everywhere.
-
-`frontend/` (the old CRA admin) was removed in milestone 4. A server updated
-from before still has `frontend/build` and `frontend/node_modules` (ignored
-by Git); `start.sh` removes them after the first successful start of the new
-version (`remove_legacy_frontend`), never before, because a failed update
-rolls back to the old version, which serves `frontend/build`. The deploy
-group plants such leftovers and checks they are gone.
-
-Review request (#71, `backend/app/review_invites.py`): only for inquiries
-with `review_ok` (an opt-in in the form, also written into the ticket). The
-maintenance loop claims due records by moving `review.next_check_at` 30
-minutes ahead, asks Dolibarr for the ticket state and, for a closed ticket,
-marks `review.invited_at` before it sends one mail to the ticket's
-`origin_email` - never another address, at most once. The link is
-`/bewertung#<token>` (the fragment keeps the token out of logs and Referer);
-`review_invites` stores its SHA-256 only. `/api/review-invites/check` and
-`/submit` take the token in the body; the review is stored hidden with
-`pending`, and `PUT /admin/reviews/{id}` with `visible: true` releases it. The
-public review list is a field whitelist (`PUBLIC_FIELDS`).
-
-Legal texts (#68, #69, #75, `backend/app/legal_texts.py`): the imprint is
-the company data (checklist `IMPRINT_FIELDS`) plus an article; privacy policy
-and terms are articles. A picked legal article is read by its number
-(`site_data.fetch_article`), not through the website category - picking it is
-the decision to publish it. Plain-language drafts live in
-`backend/app/legal_drafts/*.html`; `POST /api/admin/legal/{kind}/draft`
-writes one into the knowledge base as a draft and picks it. Places for the
-owner are marked `[BITTE ERGÄNZEN|PRÜFEN|ENTSCHEIDEN|MIT DER WKO KLÄREN ...]`;
-`open_points` counts them and the dashboard's `legal_todo` lists everything
-open. A unit test keeps the periods in the privacy text equal to the code
-(`ATTACHMENT_TTL`, `LINK_VALID`). Uvicorn runs with `--no-access-log`: the
-website keeps no visitor IPs, the reverse proxy logs requests.
-
-Customer area (#63-#66, `backend/app/portal.py`, `web/src/portal/`): sign-in
-by a one-time link (15 min, hash in `portal_links`, `/kundenbereich/anmelden#token`,
-3 per address per 15 min) to an address that `customers_for` finds in Dolibarr
-(active customer/prospect or active contact; not closed, not the extra field
-`kundenbereich_gesperrt`); the request always answers the same and sends in
-the background. Session: opaque cookie `portal_session` (path `/api/portal`,
-7 days, hash in `portal_sessions`), access asked again every 5 minutes. Every
-Dolibarr reading is filtered by the session's customer ids and checked again
-(`_owned`: other customer or draft = 404). Accepting closes the proposal via
-`POST proposals/{id}/close` (status 2/3) with the proof in `note_private`, then
-mails the customer the confirmation with the withdrawal right (FAGG) and the
-owner a notice. Open invoices carry an EPC QR payload (`epc_payload`, UTF-8,
-drawn by `src/lib/qr.js`); the bank account is a website setting because
-reading it from Dolibarr needs the bank right. Off (`portal_enabled`) until
-the owner switches it on; `kundenbereich.html` is an empty shell like the admin.
-
-Device label (#72): `GET /api/admin/labels/{ref}` (inquiry or ticket number)
-gives number, title (the local subject before the hand-over, the Dolibarr
-ticket subject after it), date and the status link with the track id. The QR
-code is drawn as SVG from `qrcode-generator` (`src/admin/qr.js`); a Vitest
-test reads it back with jsQR. The paper size comes from
-`public/print/label-roll.css` or `label-sheet.css`, linked only while the
-label page is open; Playwright checks the PDF page size (62 x 29 mm, A4).
-
-The admin (#57): `src/admin/api.js` renews an expired access cookie once via
-`/api/auth/refresh` and retries; if that fails too, `admin-session-expired`
-shows the sign-in form in place, and the same page opens after signing in.
-`LoadState` renders a form only after its data loaded (a failed load can
-never save over data). `ErrorBoundary` per page. Error texts come from the
-backend's `detail` (pydantic lists mapped to field names in German).
+- Backend steps run against `.local-testing/snapshot/backend`. `server.py`
+  loads `backend/.env`; a real `.env` with SMTP or Dolibarr credentials must
+  never reach a test.
+- The integration server speaks HTTPS with a throwaway certificate: the login
+  sets `Secure; SameSite=Lax` cookies. Tests use the cookie session
+  `admin_client` from `conftest.py`; the API accepts no `Authorization: Bearer`.
+- Mutating integration tests run only with `IT_TABELANDER_RUN_INTEGRATION=1`,
+  a local URL and a `DB_NAME` containing "test".
+- A new test file goes into `UNIT_TEST_FILES`, `INTEGRATION_TEST_FILES` or
+  `DOLIBARR_TEST_FILES`, or the test inventory fails.
+- Test values must not look like secrets (Gitleaks): low entropy, names
+  without "token".
 
 ## Ratchet
 
 The extra group compares against `scripts/ci-baseline.json`: known findings
-are debt, new ones fail. After paying debt down, run
-`python scripts/local_check.py --all --record` and commit the baseline. The hard gates (repository, backend, integration, dolibarr, web) are never
-ratcheted. Debt on 2026-09-28: none. No OSV findings (the 29 of the old CRA
-admin's `frontend/yarn.lock` left with it in milestone 4) and no ShellCheck
-findings (the last 4 fixed after milestone 5).
+are debt, new ones fail. After paying debt down:
+`python scripts/local_check.py --all --record` and commit the baseline. The
+gates repository, backend, integration, dolibarr and web are never ratcheted.
 
 ## Extending the checks
 
-`scripts/local_check.py` has three parts:
+`scripts/local_check.py`: header (paths, groups, Python matrix, ports), shared
+core (same copy in OmniFM, dolibarr-mahnwesen and THE-LION_SQUAD website - a
+fix is worth porting), IT-Tabelander steps and `plan()`. A step is
+`(context) -> str`; it raises `StepFailed` (reason + fix) or `StepSkipped`.
+Register with `Step(group, name, describe, action, needs)`; counting gates go
+through `ratchet(context, key, found, what)`.
 
-1. **Header** - paths, groups, the Python matrix, ports.
-2. **Shared core** - `Step`, `Context`, the runner, the ratchet, Gitleaks, OSV,
-   ShellCheck, MongoDB and process helpers. OmniFM, dolibarr-mahnwesen and
-   THE-LION_SQUAD-eSPORT-Webseite carry the same copy; a fix here is worth
-   porting there.
-3. **IT-Tabelander steps** and `plan()`.
+Ports stay unique: API 18011, MongoDB 27018, Dolibarr 18031, Mailpit 18131
+(SMTP 18125), Dolibarr scenario site 18013, `vite preview` 18015, `yarn dev`
+3010, production 8001.
 
-A step is a function `(context) -> str`. It returns its one-line result,
-raises `StepFailed` with the reason and how to fix it, or `StepSkipped` when it
-cannot run on this machine. Register it with
-`Step(group, name, describe, action, needs)`; `needs` names steps of the same
-group, or `group/name` across groups. A gate that counts findings goes through
-`ratchet(context, key, found, what)`. A new test file must be added to
-`UNIT_TEST_FILES`, `INTEGRATION_TEST_FILES` or `DOLIBARR_TEST_FILES`, or the test
-inventory fails.
+## Code map
 
-Dolibarr facts the scenarios proved (24.0.1, all hold on 23.0.3 too): the API user needs
-`societe client voir`, or it sees only third parties it is sales
-representative of; a ticket's state is written from `status` (`fk_statut` is
-read only); points in time come as Unix seconds; the customer's confirmation
-carries the status link only with `TICKET_ENABLE_PUBLIC_INTERFACE`, and the
-ticket number only in the workshop mail's subject; `users/info` needs
-"modify own user" (the website takes the ticket's `fk_user_create` as event
-owner instead); an agenda event links to its ticket through `elementid`
-(`fk_element` is refused in API requests); `setup/company` answers with the
-private company note too, so the website keeps a whitelist; the
-`API_LOGINS_ALLOWED_FOR_*` constants hold one login, not a list; creating a
-knowledge article needs `status` in the request; the category API cannot tag
-knowledge articles; the rights class of proposals is `propale`.
-
-Keep the ports unique, so repositories can be checked side by side: API 18011,
-MongoDB 27018 (container `it-tabelander-local-check-mongo`). The deploy group
-publishes no port; its container is `it-tabelander-local-check-deploy`. The
-dolibarr group: Dolibarr 18031, Mailpit 18131 (SMTP 18125), its website server 18013
-(containers `it-tabelander-dolibarr-db/-mail/-web`, network
-`it-tabelander-dolibarr-net`). The web group: `vite preview` for Playwright on
-18015; `yarn dev` uses 3010.
+- `backend/app/`: `dolibarr.py` (client), `handover.py` (queue to Dolibarr),
+  `site_data.py` (company data, opening hours, knowledge articles, cache),
+  `legal_texts.py` + `legal_drafts/`, `portal.py` (customer area),
+  `review_invites.py`, `mailer.py`, `website.py` (pages, redirects, SEO head,
+  404), `routers/`.
+- `web/`: one Vite app - website (prerendered), admin `src/admin/`, customer
+  area `src/portal/` (lazy chunks, empty shells from `scripts/prerender.mjs`).
+- Customer data lives only in Dolibarr; the website never changes an existing
+  third party. Public output goes through field whitelists.
+- The Content-Security-Policy is enforced everywhere; a Vitest test keeps the
+  `vite preview` copy equal to `server.py`.
 
 ## Windows notes
 
@@ -198,10 +89,3 @@ dolibarr group: Dolibarr 18031, Mailpit 18131 (SMTP 18125), its website server 1
 - Environment variables that look like credentials are withheld from every
   step; only their names are printed.
 - `tzdata` goes into the venvs: Windows has no zoneinfo database.
-
-## Machine-local helpers (not in Git)
-
-- `.ci-panel/test_checks.py` with `.vscode/settings.json`: every step in the VS
-  Code Testing panel through pytest. Hidden through `.git/info/exclude`.
-- `C:\Programmieren\check-all.py --serve`: live dashboard over all
-  repositories. `C:\Programmieren\Programmieren.code-workspace` opens all five.
