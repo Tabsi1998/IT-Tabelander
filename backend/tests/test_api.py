@@ -470,6 +470,8 @@ class TestAdminMilestone4:
         data = admin_client.get(f"{BASE_URL}/api/admin/dashboard", timeout=30).json()
         assert {"inquiries", "reviews", "gallery", "services", "dolibarr_enabled", "mail_configured"} <= set(data)
         assert isinstance(data["inquiries"]["waiting"], int) and isinstance(data["inquiries"]["recent"], list)
+        # Without Dolibarr (as here) the missing imprint shows first (#68).
+        assert data["legal_todo"][0].startswith("Das Impressum fehlt auf der Website"), data["legal_todo"]
 
     def test_about_me_texts_reach_the_website(self, admin_client, api_client):
         r = admin_client.put(f"{BASE_URL}/api/admin/settings", json={

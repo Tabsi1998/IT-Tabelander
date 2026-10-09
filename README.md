@@ -520,8 +520,28 @@ zeigt die Website den Link „Kundenbereich“ im Kopf und im Fuß.
 
 Mit dem Kundenbereich braucht kein Kunde mehr die Dolibarr-Oberfläche. Die
 Anmeldeseite von Dolibarr sollte deshalb von außen nicht mehr erreichbar sein.
-Die Website braucht nur die Schnittstelle unter `/api/`. Drei Wege, vom
-einfachsten zum sichersten:
+Die Website braucht nur die Schnittstelle unter `/api/`.
+
+**Mit dem Nginx Proxy Manager** (it.tabelander.co.at und erp.tabelander.co.at
+laufen über denselben Proxy, der sich als „openresty“ meldet – das ist typisch
+für den Nginx Proxy Manager):
+
+1. Die Website spricht Dolibarr intern an: im Admin unter **Dolibarr →
+   Verbindung** als Adresse die interne Adresse von Dolibarr eintragen, z. B.
+   `http://192.168.1.20:8080` (IP und Port im Heimnetz) oder den Namen des
+   Containers, wenn beide im selben Docker-Netz laufen. **Verbindung prüfen**
+   muss grün sein, **bevor** du Schritt 3 machst.
+2. Im Nginx Proxy Manager **Access Lists → Add Access List**: Name z. B.
+   „Nur intern“; im Reiter **Access** je eine Regel **allow** für dein
+   Heimnetz (z. B. `192.168.1.0/24`) und – falls vorhanden – dein VPN-Netz,
+   als letzte Regel **deny** `all`. Keine Benutzer im Reiter Authorization.
+   Speichern.
+3. **Hosts → Proxy Hosts →** erp.tabelander.co.at **→ Edit →** bei **Access
+   List** „Nur intern“ wählen, Speichern.
+4. Prüfen wie unten beschrieben. Von unterwegs kommst du dann nur noch über
+   ein VPN an Dolibarr (z. B. WireGuard auf dem Router oder Tailscale).
+
+**Andere Reverse Proxys** – drei Wege, vom einfachsten zum sichersten:
 
 1. **Nur aus dem Heimnetz oder über VPN** (z. B. WireGuard oder Tailscale auf
    dem Server): Dolibarr erlaubt nur Adressen aus diesen Netzen.

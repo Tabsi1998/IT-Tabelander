@@ -95,6 +95,13 @@ def test_the_overview_lists_everything_still_to_do():
     assert {choice["id"] for choice in result["choices"]} == {3, 7}
 
 
+def test_without_company_data_the_missing_imprint_comes_first():
+    """Dolibarr not connected yet: the live website has no imprint at all (#68)."""
+    todo = legal_texts.overview({"company": None, "legal": {}}, {})["todo"]
+    assert todo[0] == "Das Impressum fehlt auf der Website, weil noch keine Firmendaten aus Dolibarr kommen"
+    assert "Datenschutzerklärung fehlt" in todo
+
+
 def test_all_released_and_complete_leaves_nothing_to_do():
     settings = {"dolibarr_imprint_article_id": 1, "dolibarr_privacy_article_id": 2, "dolibarr_terms_article_id": 4}
     legal = {kind: _article(number, "<p>Fertig.</p>", site_data.ARTICLE_VALIDATED)
