@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.4] - 2026-11-24
+
+- Dark mode of automatically sent e-mails: every tag gets a class from its inline colours before wrapping (`classFromColours`), the dark stylesheet uses these classes. Samsung Mail switched the background and the logo but ignored the attribute selectors, so the text stayed dark on dark. Attribute selectors without the CSS4 ` i` flag stay as a fallback.
+
 ## [1.0.3] - 2026-11-24
 
 - E-mail templates without `<style>` and without layout tables: only blocks with inline styles. Dolibarr's WAF refuses `<style` in every form (templates could not be saved, hand-sent mails not sent), and editors drew frames around table cells.

@@ -287,9 +287,11 @@ class WerkbankMailTemplates
 
 	/**
 	 * The full document the automatic send puts around a template: light and
-	 * dark. Dark rules find their elements by the inline colours of the light
-	 * version (attribute selectors), because the template itself carries no
-	 * classes; only the logo pair has classes (it comes from a variable).
+	 * dark. The template itself carries no classes (Dolibarr strips them when
+	 * saving), so before wrapping, every tag gets a class from its inline
+	 * colours (classFromColours). Samsung Mail ignores attribute selectors in
+	 * its dark-mode media query but honours classes (seen 24.11.2026).
+	 * Attribute selectors stay as a fallback for other clients.
 	 *
 	 * @param string $content Template after substitution
 	 * @return string
@@ -299,13 +301,21 @@ class WerkbankMailTemplates
 		if (preg_match('/^\s*<html/i', $content)) {
 			return $content;
 		}
+		$content = self::classFromColours($content);
 		$dark = array(
-			'body, .ittab-page, [style*="background:#ffffff" i]' => 'background:#0D1823 !important;background-color:#0D1823 !important;',
-			'[style*="3b4d63" i]' => 'color:#C5D0DC !important;',
-			'[style*="color:#1b3348" i]' => 'color:#EEF2F6 !important;',
-			'[style*="color:#4a5b6e" i]' => 'color:#A9B8CA !important;',
-			'[style*="f7f9fb" i]' => 'background:#14263A !important;background-color:#14263A !important;',
-			'[style*="d6dee7" i]' => 'border-color:#2C4763 !important;',
+			'.wb-bg' => 'background:#0D1823 !important;background-color:#0D1823 !important;',
+			'.wb-tx' => 'color:#C5D0DC !important;',
+			'.wb-ink' => 'color:#EEF2F6 !important;',
+			'.wb-mu' => 'color:#A9B8CA !important;',
+			'.wb-box' => 'background:#14263A !important;background-color:#14263A !important;',
+			'.wb-ln' => 'border-color:#2C4763 !important;',
+			'body, .ittab-page' => 'background:#0D1823 !important;background-color:#0D1823 !important;',
+			'[style*="background:#ffffff"], [style*="background:#FFFFFF"]' => 'background:#0D1823 !important;background-color:#0D1823 !important;',
+			'[style*="3B4D63"], [style*="3b4d63"]' => 'color:#C5D0DC !important;',
+			'[style*="color:#1B3348"], [style*="color:#1b3348"]' => 'color:#EEF2F6 !important;',
+			'[style*="color:#4A5B6E"], [style*="color:#4a5b6e"]' => 'color:#A9B8CA !important;',
+			'[style*="F7F9FB"], [style*="f7f9fb"]' => 'background:#14263A !important;background-color:#14263A !important;',
+			'[style*="D6DEE7"], [style*="d6dee7"]' => 'border-color:#2C4763 !important;',
 			'.ittab-logo-light' => 'display:none !important;',
 			'.ittab-logo-dark' => 'display:block !important;max-height:none !important;overflow:visible !important;width:auto !important;',
 		);
@@ -330,6 +340,46 @@ class WerkbankMailTemplates
 			.$outlook
 			.'</style></head>'
 			.'<body class="ittab-page" style="margin:0;padding:0;background:#ffffff;">'.$content.'</body></html>';
+	}
+
+	/**
+	 * Add classes to every opening tag that carries one of the brand colours
+	 * inline, so the dark-mode stylesheet can address it by class.
+	 *
+	 * @param string $html HTML
+	 * @return string
+	 */
+	public static function classFromColours($html)
+	{
+		$map = array(
+			'wb-tx' => '/(^|;)\s*color\s*:\s*#3b4d63/i',
+			'wb-ink' => '/(^|;)\s*color\s*:\s*#1b3348/i',
+			'wb-mu' => '/(^|;)\s*color\s*:\s*#4a5b6e/i',
+			'wb-box' => '/background(-color)?\s*:\s*#f7f9fb/i',
+			'wb-bg' => '/background(-color)?\s*:\s*#ffffff/i',
+			'wb-ln' => '/border[a-z-]*\s*:[^;]*#d6dee7/i',
+		);
+		return (string) preg_replace_callback('/<([a-z][a-z0-9]*)(\s[^>]*?)?(\/?)>/i', static function ($m) use ($map) {
+			$attrs = isset($m[2]) ? $m[2] : '';
+			if (!preg_match('/\sstyle\s*=\s*"([^"]*)"/i', $attrs, $st)) {
+				return $m[0];
+			}
+			$classes = array();
+			foreach ($map as $class => $pattern) {
+				if (preg_match($pattern, $st[1])) {
+					$classes[] = $class;
+				}
+			}
+			if (empty($classes)) {
+				return $m[0];
+			}
+			if (preg_match('/\sclass\s*=\s*"([^"]*)"/i', $attrs)) {
+				$attrs = (string) preg_replace('/(\sclass\s*=\s*")([^"]*)"/i', '$1$2 '.implode(' ', $classes).'"', $attrs, 1);
+			} else {
+				$attrs .= ' class="'.implode(' ', $classes).'"';
+			}
+			return '<'.$m[1].$attrs.$m[3].'>';
+		}, $html);
 	}
 
 	/**
