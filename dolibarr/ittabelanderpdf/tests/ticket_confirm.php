@@ -4,7 +4,8 @@
  * of scripts/dev_dolibarr.py (after "fixtures"):
  *
  *   php ticket_confirm.php enable   Tickets module + public interface (own process)
- *   php ticket_confirm.php run      four tickets; the mails land in Mailpit
+ *   php ticket_confirm.php run      four tickets; customer confirmations and owner
+ *                                   notices land in Mailpit, none of Dolibarr's own
  *
  * Never run against a real Dolibarr.
  */
@@ -21,6 +22,7 @@ if ($stage === 'enable') {
 	rt_modules(array('modTicket'));
 	rt_const($db, 'TICKET_ENABLE_PUBLIC_INTERFACE', '1');
 	rt_const($db, 'TICKET_NOTIFICATION_EMAIL_FROM', 'office@tabelander.co.at');
+	rt_const($db, 'TICKET_NOTIFICATION_EMAIL_TO', 'inhaber@tabelander.example');
 	echo json_encode(array('enable' => 'ok')), "\n";
 	exit(0);
 }
@@ -46,7 +48,7 @@ foreach ($cases as $name => $case) {
 	$ticket->ref = $ticket->getDefaultRef();
 	$ticket->track_id = bin2hex(random_bytes(8));
 	$ticket->subject = $case['subject'];
-	$ticket->message = "Hallo,\nseit gestern geht nichts mehr.\n<b>Danke</b>";
+	$ticket->message = "Hinweis: intern, nur für den Inhaber.\n\nHallo,\nseit gestern geht nichts mehr.\n\nKontakt:\nTelefon: –";
 	$ticket->type_code = 'ISSUE';
 	$ticket->category_code = 'OTHER';
 	$ticket->severity_code = 'NORMAL';
@@ -57,7 +59,7 @@ foreach ($cases as $name => $case) {
 	if ($ticket->create($admin) <= 0) {
 		rt_fail('ticket '.$name.': '.$ticket->error.' '.implode(',', (array) $ticket->errors));
 	}
-	$out[$name] = array('ref' => $ticket->ref, 'notify_after' => (int) $ticket->notify_tiers_at_create);
+	$out[$name] = array('ref' => $ticket->ref, 'notify_after' => (int) $ticket->notify_tiers_at_create, 'disabled_after' => (int) !empty($ticket->context['disableticketemail']));
 }
 echo json_encode($out), "\n";
 exit(0);

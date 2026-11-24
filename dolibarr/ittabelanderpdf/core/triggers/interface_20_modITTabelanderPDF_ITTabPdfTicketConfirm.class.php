@@ -12,15 +12,21 @@
 require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
 
 /**
- * Replaces Dolibarr's built-in confirmation for a new ticket.
+ * Replaces Dolibarr's built-in mails for a new ticket.
  *
- * Dolibarr 23 composes that mail from language strings only (no template,
- * no signature, "please do not reply", every ticket extra field as a line).
- * This trigger runs before Dolibarr's own ticket trigger (priority 20 < 50),
- * sends the confirmation in the house style and then clears
- * notify_tiers_at_create on the object, so Dolibarr does not send its own.
- * If anything fails here, it leaves the flag alone and Dolibarr's mail goes
- * out as before - a customer never gets no confirmation at all.
+ * Dolibarr 23 composes them from language strings only: the customer gets
+ * "please do not reply" and every extra field as a line, the owner an
+ * English list in the API user's language. This trigger runs before
+ * Dolibarr's own ticket trigger (priority 20 < 50) and sends both in the
+ * house style:
+ *  - the customer's confirmation (number, subject, status link; not the
+ *    ticket text, which may carry internal notes from the website), then it
+ *    clears notify_tiers_at_create so Dolibarr skips its own;
+ *  - the owner's notice to TICKET_NOTIFICATION_EMAIL_TO in German with the
+ *    full text and a button into Dolibarr, then it sets
+ *    context['disableticketemail'] so Dolibarr skips its admin mail - only
+ *    when nothing else depends on that flag (customer handled, no assignee).
+ * If a send fails, the flags stay and Dolibarr's own mail goes out.
  *
  * Switch: ITTABPDF_TICKET_CONFIRM (default on).
  */
@@ -34,7 +40,7 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 		$this->db = $db;
 		$this->name = preg_replace('/^Interface/i', '', get_class($this));
 		$this->family = 'other';
-		$this->description = 'Ticket confirmation in the IT-Tabelander style instead of Dolibarr\'s built-in text.';
+		$this->description = 'Ticket confirmation and owner notice in the IT-Tabelander style instead of Dolibarr\'s built-in texts.';
 		$this->version = self::VERSIONS['prod'];
 		$this->picto = 'email';
 	}
@@ -52,37 +58,57 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 		if ($action !== 'TICKET_CREATE' || !isModEnabled('ittabelanderpdf') || !getDolGlobalInt('ITTABPDF_TICKET_CONFIRM', 1)) {
 			return 0;
 		}
-		if (!empty($object->context['disableticketemail']) || empty($object->notify_tiers_at_create)
-			|| getDolGlobalString('TICKET_DISABLE_ALL_MAILS') || getDolGlobalString('TICKET_DISABLE_CUSTOMER_MAILS')) {
+		if (!empty($object->context['disableticketemail']) || getDolGlobalString('TICKET_DISABLE_ALL_MAILS')) {
 			return 0;
 		}
-		try {
-			$to = $this->recipient($object);
-			if ($to === '') {
-				return 0;
+		dol_include_once('/ittabelanderpdf/class/werkbankmailtemplates.class.php');
+		require_once DOL_DOCUMENT_ROOT.'/core/class/CMailFile.class.php';
+		$done = 0;
+
+		// The customer.
+		if (!empty($object->notify_tiers_at_create) && !getDolGlobalString('TICKET_DISABLE_CUSTOMER_MAILS')) {
+			try {
+				$to = $this->recipient($object);
+				if ($to !== '' && $this->sendCustomer($object, $to)) {
+					// Dolibarr's ticket trigger (priority 50) must not send its text as well.
+					$object->notify_tiers_at_create = 0;
+					$done = 1;
+				}
+			} catch (Throwable $e) {
+				dol_syslog('ittabelanderpdf: ticket confirmation failed, Dolibarr sends its own: '.$e->getMessage(), LOG_ERR);
 			}
-			if (!$this->send($object, $to)) {
-				return 0;
-			}
-		} catch (Throwable $e) {
-			dol_syslog('ittabelanderpdf: ticket confirmation failed, Dolibarr sends its own: '.$e->getMessage(), LOG_ERR);
-			return 0;
 		}
-		// Sent: Dolibarr's own ticket trigger (priority 50) must not send its text as well.
-		$object->notify_tiers_at_create = 0;
-		return 1;
+
+		// The owner. Dolibarr has no switch for its admin mail alone, only
+		// disableticketemail, which also stops the customer and assignee mails.
+		$adminTo = getDolGlobalString('TICKET_NOTIFICATION_EMAIL_TO');
+		$assignee = !empty($object->fk_user_assign) && (int) $object->fk_user_assign !== (int) $user->id;
+		if ($adminTo !== '' && empty($object->notify_tiers_at_create) && !$assignee) {
+			try {
+				if ($this->sendOwner($object, $adminTo)) {
+					if (!is_array($object->context)) {
+						$object->context = array();
+					}
+					$object->context['disableticketemail'] = 1;
+					$done = 1;
+				}
+			} catch (Throwable $e) {
+				dol_syslog('ittabelanderpdf: ticket notice failed, Dolibarr sends its own: '.$e->getMessage(), LOG_ERR);
+			}
+		}
+		return $done;
 	}
 
 	/**
-	 * The same recipient Dolibarr's ticket trigger would use: the chosen
-	 * contact, else the third party, else the e-mail the ticket came from.
+	 * The recipient Dolibarr's ticket trigger would use: the chosen contact,
+	 * else the third party, else the e-mail the ticket came from.
 	 *
 	 * @param Ticket $object Ticket
 	 * @return string        E-mail address or ''
 	 */
 	private function recipient($object)
 	{
-		$contactid = GETPOSTINT('contactid');
+		$contactid = empty($object->context['contact_id']) ? 0 : (int) $object->context['contact_id'];
 		if ($contactid > 0) {
 			require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
 			$contact = new Contact($this->db);
@@ -90,14 +116,30 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 				return (string) $contact->email;
 			}
 		}
-		if (!empty($object->fk_soc)) {
-			require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
-			$thirdparty = new Societe($this->db);
-			if ($thirdparty->fetch((int) $object->fk_soc) > 0 && !empty($thirdparty->email)) {
-				return (string) $thirdparty->email;
-			}
+		$thirdparty = $this->thirdparty($object);
+		if ($thirdparty && !empty($thirdparty->email)) {
+			return (string) $thirdparty->email;
 		}
 		return (string) ($object->origin_email ?? '');
+	}
+
+	/**
+	 * @param Ticket $object Ticket
+	 * @return Societe|null
+	 */
+	private function thirdparty($object)
+	{
+		static $cache = array();
+		$id = (int) ($object->fk_soc ?? 0);
+		if ($id <= 0) {
+			return null;
+		}
+		if (!array_key_exists($id, $cache)) {
+			require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+			$thirdparty = new Societe($this->db);
+			$cache[$id] = $thirdparty->fetch($id) > 0 ? $thirdparty : null;
+		}
+		return $cache[$id];
 	}
 
 	/**
@@ -109,31 +151,102 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 	 */
 	private function greeting($object)
 	{
-		if (!empty($object->fk_soc)) {
-			require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
-			$thirdparty = new Societe($this->db);
-			if ($thirdparty->fetch((int) $object->fk_soc) > 0) {
-				$thirdparty->fetch_optionals();
-				$du = !empty($thirdparty->array_options['options_ittab_du']);
-				list($hallo, $gutentag) = WerkbankMailData::greetings($thirdparty);
-				return array($du ? 'du' : 'sie', $du ? $hallo : $gutentag);
-			}
+		$thirdparty = $this->thirdparty($object);
+		if ($thirdparty) {
+			$thirdparty->fetch_optionals();
+			$du = !empty($thirdparty->array_options['options_ittab_du']);
+			list($hallo, $gutentag) = WerkbankMailData::greetings($thirdparty);
+			return array($du ? 'du' : 'sie', $du ? $hallo : $gutentag);
 		}
 		return array('sie', 'Guten Tag,');
 	}
 
 	/**
+	 * Text as HTML: kept when it is HTML, else escaped with its line breaks.
+	 *
+	 * @param string $text Text
+	 * @return string
+	 */
+	private static function textHtml($text)
+	{
+		$text = (string) $text;
+		return dol_textishtml($text) ? dol_htmlwithnojs($text) : dol_nl2br(dol_escape_htmltag($text, 0, 1));
+	}
+
+	/**
+	 * @return string Sender "Company <address>"
+	 */
+	private static function from()
+	{
+		global $mysoc;
+		$name = (string) ($mysoc->name ?? '');
+		$address = getDolGlobalString('TICKET_NOTIFICATION_EMAIL_FROM', getDolGlobalString('MAIN_MAIL_EMAIL_FROM', (string) ($mysoc->email ?? '')));
+		return ($name !== '' ? dol_string_nospecial($name, ' ', array(',')).' ' : '').'<'.$address.'>';
+	}
+
+	/**
+	 * The sheet around a body: logo, orange line, body, footer.
+	 *
+	 * @param string $body Body HTML
+	 * @return string      Full document (light and dark)
+	 */
+	private static function document($body)
+	{
+		global $mysoc;
+		$e = function ($text) {
+			return dol_escape_htmltag((string) $text);
+		};
+		$phone = WerkbankMailData::phoneLink(!empty($mysoc->phone_mobile) ? $mysoc->phone_mobile : $mysoc->phone);
+		$address = trim(str_replace("\n", ', ', trim((string) $mysoc->address)).', '.trim($mysoc->zip.' '.$mysoc->town), ', ');
+		return WerkbankMailTemplates::wrapDocument(WerkbankMailTemplates::sheet(WerkbankMailData::logoHtml(true), $body, WerkbankMailTemplates::footerLines(
+			$e($mysoc->name), $e($mysoc->managers), $e($address), $e($mysoc->email), $e($mysoc->url),
+			$e(WerkbankBuilder::bareUrl((string) $mysoc->url)), $phone
+		)));
+	}
+
+	/**
+	 * @param string $label Small caps line
+	 * @param string $title Bold line (HTML)
+	 * @return string       Facts box
+	 */
+	private static function requestBox($label, $title)
+	{
+		$small = 'font-family:'.WerkbankMailTemplates::FONT.';font-size:12px;line-height:20px;letter-spacing:1px;text-transform:uppercase;color:'.WerkbankMailTemplates::MUTED.';';
+		$bold = 'margin:4px 0 0 0;font-family:'.WerkbankMailTemplates::FONT.';font-size:16px;line-height:1.5;font-weight:bold;color:'.WerkbankMailTemplates::INK.';';
+		return WerkbankMailData::box('<div style="'.$small.'">'.$label.'</div>'.($title !== '' ? '<div style="'.$bold.'">'.$title.'</div>' : ''));
+	}
+
+	/**
+	 * @param string $subject Subject
+	 * @param string $to      Recipient
+	 * @param string $html    Full document
+	 * @param int    $id      Ticket id (track id tic<id>)
+	 * @return bool           True when the mail went out
+	 */
+	private static function mail($subject, $to, $html, $id)
+	{
+		$mail = new CMailFile($subject, $to, self::from(), $html, array(), array(), array(), '', '', 0, 1, '', '', 'tic'.$id, '', 'ticket');
+		if (!empty($mail->error) || !empty($mail->errors)) {
+			dol_syslog('ittabelanderpdf: ticket mail not built: '.$mail->error, LOG_ERR);
+			return false;
+		}
+		if (!$mail->sendfile()) {
+			dol_syslog('ittabelanderpdf: ticket mail not sent: '.$mail->error, LOG_ERR);
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * The customer's confirmation.
+	 *
 	 * @param Ticket $object Ticket
 	 * @param string $to     Recipient
 	 * @return bool          True when the mail went out
 	 */
-	private function send($object, $to)
+	private function sendCustomer($object, $to)
 	{
 		global $mysoc;
-
-		dol_include_once('/ittabelanderpdf/class/werkbankmailtemplates.class.php');
-		require_once DOL_DOCUMENT_ROOT.'/core/class/CMailFile.class.php';
-
 		$e = function ($text) {
 			return dol_escape_htmltag((string) $text);
 		};
@@ -145,16 +258,7 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 		$body .= WerkbankMailTemplates::paragraph($du
 			? 'danke für deine Anfrage. Sie ist bei mir angekommen, ich sehe sie mir an und melde mich bei dir.'
 			: 'danke für Ihre Anfrage. Sie ist bei mir angekommen, ich sehe sie mir an und melde mich bei Ihnen.');
-
-		$message = (string) $object->message;
-		$message = dol_textishtml($message) ? dol_htmlwithnojs($message) : dol_nl2br($e($message));
-		$label = 'font-family:'.WerkbankMailTemplates::FONT.';font-size:12px;line-height:20px;letter-spacing:1px;text-transform:uppercase;color:'.WerkbankMailTemplates::MUTED.';';
-		$body .= WerkbankMailData::box(
-			'<div style="'.$label.'">'.($du ? 'Deine Anfrage' : 'Ihre Anfrage').' '.$e($object->ref).'</div>'
-			.($subjectText !== '' ? '<div style="margin:4px 0 0 0;font-family:'.WerkbankMailTemplates::FONT.';font-size:16px;line-height:1.5;font-weight:bold;color:'.WerkbankMailTemplates::INK.';">'.$e($subjectText).'</div>' : '')
-			.(trim(strip_tags($message)) !== '' ? '<div style="margin:8px 0 0 0;font-family:'.WerkbankMailTemplates::FONT.';font-size:15px;line-height:1.6;color:'.WerkbankMailTemplates::BODY.';">'.$message.'</div>' : '')
-		);
-
+		$body .= self::requestBox(($du ? 'Deine Anfrage' : 'Ihre Anfrage').' '.$e($object->ref), $e($subjectText));
 		if (getDolGlobalInt('TICKET_ENABLE_PUBLIC_INTERFACE') && !empty($object->track_id)) {
 			$url = getDolGlobalString('TICKET_URL_PUBLIC_INTERFACE', dol_buildpath('/public/ticket/', 2));
 			$url = rtrim($url, '/').'/view.php?track_id='.urlencode((string) $object->track_id);
@@ -167,26 +271,62 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 			: 'Ergänzungen schicken Sie einfach als Antwort auf diese E-Mail, bei Fragen erreichen Sie mich unter '.$phone.'.');
 		$body .= WerkbankMailTemplates::closing($du ? 'Liebe Grüße' : 'Mit freundlichen Grüßen', $e($mysoc->managers), $e($mysoc->name));
 
-		$address = trim(str_replace("\n", ', ', trim((string) $mysoc->address)).', '.trim($mysoc->zip.' '.$mysoc->town), ', ');
-		$html = WerkbankMailTemplates::sheet(WerkbankMailData::logoHtml(true), $body, WerkbankMailTemplates::footerLines(
-			$e($mysoc->name), $e($mysoc->managers), $e($address), $e($mysoc->email), $e($mysoc->url),
-			$e(WerkbankBuilder::bareUrl((string) $mysoc->url)), $phone
-		));
+		$subject = ($du ? 'Deine' : 'Ihre').' Anfrage '.$object->ref.($subjectText !== '' ? ': '.$subjectText : '');
+		return self::mail($subject, $to, self::document($body), (int) $object->id);
+	}
 
-		$name = (string) ($mysoc->name ?? '');
-		$fromAddress = getDolGlobalString('TICKET_NOTIFICATION_EMAIL_FROM', getDolGlobalString('MAIN_MAIL_EMAIL_FROM', (string) ($mysoc->email ?? '')));
-		$from = ($name !== '' ? dol_string_nospecial($name, ' ', array(',')).' ' : '').'<'.$fromAddress.'>';
-		$subject = ($du ? 'Deine' : 'Ihre').' Anfrage '.$object->ref.($subjectText !== '' ? ': '.$subjectText : '').' – '.$name;
+	/**
+	 * The owner's notice: everything the ticket says, in German.
+	 *
+	 * @param Ticket $object Ticket
+	 * @param string $to     TICKET_NOTIFICATION_EMAIL_TO
+	 * @return bool          True when the mail went out
+	 */
+	private function sendOwner($object, $to)
+	{
+		global $conf;
+		$e = function ($text) {
+			return dol_escape_htmltag((string) $text);
+		};
+		$de = new Translate('', $conf);
+		$de->setDefaultLang('de_DE');
+		$de->loadLangs(array('main', 'ticket'));
+		$label = function ($prefix, $table, $code) use ($de) {
+			$code = (string) $code;
+			if ($code === '') {
+				return '';
+			}
+			$text = (string) $de->getLabelFromKey($this->db, $prefix.$code, $table, 'code', 'label', $code);
+			return $text === $prefix.$code ? $code : $text;
+		};
+		$subjectText = trim((string) $object->subject);
 
-		$mail = new CMailFile($subject, $to, $from, WerkbankMailTemplates::wrapDocument($html), array(), array(), array(), '', '', 0, 1, '', '', 'tic'.$object->id, '', 'ticket');
-		if (!empty($mail->error) || !empty($mail->errors)) {
-			dol_syslog('ittabelanderpdf: ticket confirmation not built: '.$mail->error, LOG_ERR);
-			return false;
+		$rows = array(
+			'Ticket' => $e($object->ref),
+			'Art' => $e($label('TicketTypeShort', 'c_ticket_type', $object->type_code)),
+			'Gruppe' => $e($label('TicketCategoryShort', 'c_ticket_category', $object->category_code)),
+			'Dringlichkeit' => $e($label('TicketSeverityShort', 'c_ticket_severity', $object->severity_code)),
+		);
+		$thirdparty = $this->thirdparty($object);
+		if ($thirdparty) {
+			$rows['Kunde'] = $e($thirdparty->name).(!empty($thirdparty->code_client) ? ' ('.$e($thirdparty->code_client).')' : '');
 		}
-		if (!$mail->sendfile()) {
-			dol_syslog('ittabelanderpdf: ticket confirmation not sent: '.$mail->error, LOG_ERR);
-			return false;
+		$email = (string) ($object->origin_email ?: ($thirdparty ? $thirdparty->email : ''));
+		if ($email !== '') {
+			$rows['E-Mail'] = '<a href="mailto:'.$e($email).'" style="color:'.WerkbankMailTemplates::INK.';">'.$e($email).'</a>';
 		}
-		return true;
+		$facts = '';
+		foreach (array_filter($rows, 'strlen') as $name => $value) {
+			$facts .= WerkbankMailData::factRow($e($name), $value);
+		}
+
+		$body = WerkbankMailTemplates::paragraph('Neue Anfrage: <strong style="color:'.WerkbankMailTemplates::INK.';">'.$e($subjectText !== '' ? $subjectText : $object->ref).'</strong>');
+		$body .= WerkbankMailData::box($facts);
+		$body .= '<div style="margin:0 0 24px 0;font-family:'.WerkbankMailTemplates::FONT.';font-size:15px;line-height:1.6;color:'.WerkbankMailTemplates::BODY.';">'.self::textHtml($object->message).'</div>';
+		$url = dol_buildpath('/ticket/card.php', 2).'?track_id='.urlencode((string) $object->track_id);
+		$body .= '<div style="margin:4px 0 8px 0;"><a href="'.$e($url).'" style="display:block;padding:14px 20px;border-radius:4px;background:'.WerkbankMailTemplates::BRAND.';color:#fff;font-family:'.WerkbankMailTemplates::FONT.';font-size:16px;font-weight:bold;line-height:1.3;text-align:center;text-decoration:none;">Ticket in Dolibarr öffnen</a></div>';
+
+		$subject = 'Neue Anfrage '.$object->ref.($subjectText !== '' ? ': '.$subjectText : '');
+		return self::mail($subject, $to, self::document($body), (int) $object->id);
 	}
 }

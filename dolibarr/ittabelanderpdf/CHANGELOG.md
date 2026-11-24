@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.7] - 2026-11-24
+
+- Ticket confirmation: line breaks of plain-text tickets were shown as a literal `
+` (escaping without keeping them). The customer's confirmation no longer repeats the ticket text, which may carry internal notes from the website; it shows number, subject and status link. Subject without the company suffix.
+- New: the owner's notice for a new ticket (`TICKET_NOTIFICATION_EMAIL_TO`) in German in the same sheet: facts box (ticket, type, group, severity, customer, e-mail), the full text and a button into Dolibarr. Replaces Dolibarr's English list in the API user's language. Dolibarr's own notice still goes out if sending fails, if the customer confirmation failed, or if the ticket has an assignee.
+- Recipient of the confirmation taken from `context['contact_id']` like Dolibarr.
+
 ## [1.0.6] - 2026-11-24
 
 - Own confirmation for a new ticket (trigger `ITTabPdfTicketConfirm`, runs before Dolibarr's ticket trigger): the sheet of the automatic send with logo, greeting by Du/Sie of the third party, the request (number, subject, text) in the facts box, link to the public ticket page, closing and footer, light and dark. Dolibarr's built-in text ("please do not reply", every extra field as a line, no signature) is no longer sent. If sending fails, Dolibarr's own confirmation goes out as before. Switch `ITTABPDF_TICKET_CONFIRM` (default on).
