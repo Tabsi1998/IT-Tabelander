@@ -277,6 +277,85 @@ def _invoice(raw: dict) -> dict:
     }
 
 
+# The other documents of a customer (#100), by their path in Dolibarr's API:
+# "module" names their files for documents/download, "dates" are tried in
+# turn for the date shown, "states" name the released states. A draft
+# (status 0) never shows.
+DOCUMENT_KINDS = {
+    "orders": {"module": "commande", "dates": ("date", "date_commande"),
+               "states": {-1: "storniert", 1: "bestätigt", 2: "in Lieferung", 3: "geliefert"}},
+    "shipments": {"module": "expedition", "dates": ("date_shipping", "date_expedition", "date_valid", "date_creation"),
+                  "states": {-1: "storniert", 1: "versendet", 2: "zugestellt", 3: "in Lieferung"}},
+    "interventions": {"module": "ficheinter", "dates": ("datev", "datec"),
+                      "states": {1: "freigegeben", 2: "abgerechnet", 3: "erledigt"}},
+    "contracts": {"module": "contract", "dates": ("date_contrat", "date_creation"),
+                  "states": {1: "aktiv", 2: "beendet"}},
+}
+MODULES = {"proposals": "propal", "invoices": "facture", **{kind: spec["module"] for kind, spec in DOCUMENT_KINDS.items()}}
+CONTRACT_LINE_STATES = {0: "noch nicht aktiv", 4: "läuft", 5: "beendet"}
+
+
+def _status(raw: dict) -> int:
+    return _int(raw.get("status", raw.get("statut")))
+
+
+def _first_time(raw: dict, keys) -> str | None:
+    return next((found for found in (dolibarr._iso_time(raw.get(key)) for key in keys) if found), None)
+
+
+def _document(kind: str, raw: dict) -> dict:
+    status = _status(raw)
+    return {
+        "kind": kind, "id": _int(raw.get("id")), "ref": raw.get("ref"), "status": status,
+        "state": DOCUMENT_KINDS[kind]["states"].get(status, ""),
+        "date": _first_time(raw, DOCUMENT_KINDS[kind]["dates"]),
+        "total": raw.get("total_ttc") if kind == "orders" else None,
+        "has_pdf": bool(raw.get("last_main_doc")),
+    }
+
+
+def _hours(seconds) -> float:
+    return round(_int(seconds) / 3600, 2)
+
+
+def _details(kind: str, raw: dict) -> dict:
+    """What the detail page of each kind shows, from a whitelist."""
+    from .site_data import plain_text
+
+    if kind == "orders":
+        return {"lines": _lines(raw), "net": raw.get("total_ht"), "vat": raw.get("total_tva"),
+                "delivery": _first_time(raw, ("delivery_date", "date_livraison"))}
+    if kind == "shipments":
+        lines = [{key: line[key] for key in ("text", "details")} | {"qty": raw_line.get("qty_shipped", raw_line.get("qty"))}
+                 for line, raw_line in zip(_lines(raw), raw.get("lines") or [])]
+        return {"lines": lines, "tracking": str(raw.get("tracking_number") or ""),
+                "delivery": _first_time(raw, ("date_delivery",))}
+    if kind == "interventions":
+        lines = [{"text": plain_text(line.get("desc") or line.get("description") or ""),
+                  "date": _first_time(line, ("date", "datei")), "hours": _hours(line.get("duration", line.get("duree")))}
+                 for line in raw.get("lines") or []]
+        return {"description": plain_text(raw.get("description") or ""), "lines": lines,
+                "hours": _hours(raw.get("duration", raw.get("duree")))}
+    lines = [{**line, "state": CONTRACT_LINE_STATES.get(_status(raw_line), ""),
+              "start": _first_time(raw_line, ("date_start_real", "date_start")),
+              "end": _first_time(raw_line, ("date_end_real", "date_end"))}
+             for line, raw_line in zip(_lines(raw), raw.get("lines") or [])]
+    return {"lines": lines}
+
+
+async def _optional_list(client: httpx.AsyncClient, cfg: dict, path: str, params: dict) -> list:
+    """A kind the website may not read - right not given, module off - stays
+    empty instead of taking the whole customer area down."""
+    try:
+        return await _list(client, cfg, path, params)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code not in (403, 501):
+            raise
+        logger.warning("Customer area without %s: Dolibarr answers %s (module off or read right missing)",
+                       path, exc.response.status_code)
+        return []
+
+
 async def overview(session: dict) -> dict:
     """Everything of this customer: inquiries and repairs, offers, invoices."""
     cfg = await dolibarr.get_config()
@@ -293,6 +372,9 @@ async def overview(session: dict) -> dict:
                                                            "sortorder": "DESC", "limit": 100, "loadlinkedobjects": 1})
         invoices = await _list(client, cfg, "invoices", {"thirdparty_ids": joined, "sortfield": "t.datef",
                                                          "sortorder": "DESC", "limit": 100})
+        others = {kind: await _optional_list(client, cfg, kind, {"thirdparty_ids": joined, "sortfield": "t.rowid",
+                                                                 "sortorder": "DESC", "limit": 100})
+                  for kind in DOCUMENT_KINDS}
     allowed = {str(value) for value in ids}
     # Dolibarr filtered already; checking again costs nothing and keeps customers apart for sure.
     tickets = [item for item in tickets if str(item.get("fk_soc") or item.get("socid")) in allowed]
@@ -313,6 +395,8 @@ async def overview(session: dict) -> dict:
             "repairs_running": sum(1 for item in ticket_items if item["open"]),
         },
         "tickets": ticket_items, "offers": offers, "invoices": bills,
+        **{kind: [_document(kind, item) for item in items if _socid(item) in allowed and _status(item) != 0]
+           for kind, items in others.items()},
     }
 
 
@@ -386,19 +470,58 @@ async def invoice(session: dict, invoice_id: int) -> dict:
     return item
 
 
+async def document_detail(session: dict, kind: str, object_id: int) -> dict:
+    """An order confirmation, delivery note, work report or contract of this
+    customer (#100); someone else's or a draft is not there."""
+    if kind not in DOCUMENT_KINDS:
+        raise NotFound("Das gibt es hier nicht.")
+    cfg = await _config()
+    async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
+        raw = await _owned(client, cfg, kind, object_id, session)
+        pdf = await _pdf_file(client, cfg, kind, raw)
+    return {**_document(kind, raw), "has_pdf": bool(pdf), **_details(kind, raw)}
+
+
+async def _pdf_file(client: httpx.AsyncClient, cfg: dict, kind: str, raw: dict) -> str | None:
+    """"<ref>/<file>.pdf" in the document's own folder, or None.
+
+    Dolibarr names the newest PDF in last_main_doc ("commande/CO1/CO1.pdf").
+    A shipment has no such field: then the files of the document's folder
+    tell. Only the folder named like the document's reference counts, so a
+    path can never lead to another customer's file."""
+    ref = str(raw.get("ref") or "")
+    doc = str(raw.get("last_main_doc") or "")
+    if doc:
+        parts = doc.split("/")
+        original = "/".join(parts[-2:])
+        if len(parts) < 2 or parts[-2] != ref or ".." in parts or not DOC_PATH.fullmatch(original):
+            return None
+        return original
+    response = await client.get(f"{cfg['base']}/api/index.php/documents", headers=dolibarr._headers(cfg),
+                                params={"modulepart": MODULES[kind], "id": _int(raw.get("id"))})
+    if response.status_code != 200:
+        return None  # 404: no files yet; anything else: no PDF to offer
+    names = [str(item.get("name") or "") for item in (response.json() or []) if isinstance(item, dict)]
+    names = [name for name in names if DOC_PATH.fullmatch(f"{ref}/{name}")]
+    if not names:
+        return None
+    return f"{ref}/{f'{ref}.pdf' if f'{ref}.pdf' in names else names[0]}"
+
+
 async def document(session: dict, kind: str, object_id: int) -> tuple[str, bytes]:
-    """The PDF Dolibarr made for this offer or invoice."""
+    """The PDF Dolibarr made for this document of the customer."""
     import base64
 
+    if kind not in MODULES:
+        raise NotFound("Das gibt es hier nicht.")
     cfg = await _config()
     async with httpx.AsyncClient(timeout=max(cfg["timeout"], 20)) as client:
         raw = await _owned(client, cfg, kind, object_id, session)
-        _folder, _, original = str(raw.get("last_main_doc") or "").partition("/")
-        if not original or not DOC_PATH.fullmatch(original) or ".." in original:
+        original = await _pdf_file(client, cfg, kind, raw)
+        if not original:
             raise NotFound("Für dieses Dokument gibt es noch kein PDF.")
-        module = "propal" if kind == "proposals" else "facture"
         response = await client.get(f"{cfg['base']}/api/index.php/documents/download", headers=dolibarr._headers(cfg),
-                                    params={"modulepart": module, "original_file": original})
+                                    params={"modulepart": MODULES[kind], "original_file": original})
         if response.status_code == 404:
             raise NotFound("Für dieses Dokument gibt es noch kein PDF.")
         response.raise_for_status()

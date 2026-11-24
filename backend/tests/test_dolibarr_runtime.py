@@ -826,3 +826,122 @@ class TestCustomerArea:
         website_db().portal_sessions.update_many(
             {"email": world["b"]}, {"$set": {"checked_at": datetime.now(timezone.utc) - timedelta(hours=1)}})
         assert b.get(f"{BASE_URL}/api/portal/overview", timeout=60).status_code == 401
+
+
+# ---------------------------------------------------------------- all documents (#100)
+
+def build_pdf(module: str, ref: str, template: str) -> None:
+    """The PDF as the owner makes it in Dolibarr (production: the IT-Tabelander PDF module)."""
+    response = requests.put(f"{DOLIBARR}/api/index.php/documents/builddoc",
+                            headers={"DOLAPIKEY": ADMIN_KEY, "Accept": "application/json"}, timeout=60,
+                            json={"modulepart": module, "original_file": f"{ref}/{ref}.pdf", "doctemplate": template,
+                                  "langcode": "de_DE"})
+    assert response.status_code == 200, f"{module} {ref}: {response.text}"
+
+
+def customer_documents(socid: int, invoice_id: int, name: str) -> dict:
+    """Every other kind of document, released and with its PDF, plus a draft order."""
+    line = {"desc": f"SSD einbauen {name}", "qty": 1, "subprice": 100, "tva_tx": 20, "product_type": 0}
+    found = {}
+    credit = int(dolibarr_post("invoices", {"socid": socid, "type": 2, "fk_facture_source": invoice_id,
+                                            "date": int(time.time()), "lines": [{**line, "desc": f"Gutschrift {name}",
+                                                                                 "subprice": 10}]}))
+    dolibarr_post(f"invoices/{credit}/validate", {"notrigger": 0})
+    found["credit_note"] = dolibarr_get(f"invoices/{credit}")
+    build_pdf("invoice", found["credit_note"]["ref"], "sponge")
+
+    order = int(dolibarr_post("orders", {"socid": socid, "date": int(time.time()), "lines": [line]}))
+    dolibarr_post(f"orders/{order}/validate", {"notrigger": 0})
+    found["order"] = dolibarr_get(f"orders/{order}")
+    build_pdf("order", found["order"]["ref"], "einstein")
+    found["draft_order"] = {"id": int(dolibarr_post("orders", {"socid": socid, "date": int(time.time()), "lines": [line]}))}
+
+    shipment = int(dolibarr_post(f"orders/{order}/shipment/0", {}))
+    dolibarr_post(f"shipments/{shipment}/validate", {"notrigger": 0})
+    found["shipment"] = dolibarr_get(f"shipments/{shipment}")
+    build_pdf("shipment", found["shipment"]["ref"], "rouget")
+
+    intervention = int(dolibarr_post("interventions", {"socid": socid, "fk_project": 0,
+                                                       "description": f"Notebook gereinigt {name}"}))
+    dolibarr_post(f"interventions/{intervention}/lines", {"description": f"Lüfter gereinigt {name}",
+                                                          "date": int(time.time()), "duration": 3600})
+    dolibarr_post(f"interventions/{intervention}/validate", {"notrigger": 0})
+    found["intervention"] = dolibarr_get(f"interventions/{intervention}")
+    build_pdf("ficheinter", found["intervention"]["ref"], "soleil")
+
+    contract = int(dolibarr_post("contracts", {"socid": socid, "date_contrat": int(time.time()),
+                                               "commercial_signature_id": 1, "commercial_suivi_id": 1}))
+    dolibarr_post(f"contracts/{contract}/lines", {"desc": f"Wartung {name}", "qty": 1, "subprice": 25, "tva_tx": 20,
+                                                  "date_start": int(time.time()),
+                                                  "date_end": int(time.time()) + 365 * 24 * 3600})
+    dolibarr_post(f"contracts/{contract}/validate", {"notrigger": 0})
+    found["contract"] = dolibarr_get(f"contracts/{contract}")
+    build_pdf("contract", found["contract"]["ref"], "strato")
+    return found
+
+
+DOCUMENT_PATHS = {"order": "orders", "shipment": "shipments", "intervention": "interventions", "contract": "contracts"}
+
+
+@pytest.fixture(scope="class")
+def documents_world(admin_client):
+    """Customer E with every kind of document, customer F with its own."""
+    use_mailpit_for_website_mail(admin_client)
+    switched = admin_client.put(f"{BASE_URL}/api/admin/settings", json={"portal_enabled": True}, timeout=30)
+    assert switched.status_code == 200, switched.text
+    tag = uuid.uuid4().hex[:8]
+    world = {"tag": tag}
+    for key in ("e", "f"):
+        world[key] = f"belege-{key}-{tag}@example.com"
+        world[f"{key}_id"] = new_customer(f"Belege {key.upper()} {tag}", world[key])
+        world[f"{key}_invoice"] = new_document("invoices", world[f"{key}_id"], f"Reparatur {key.upper()}", 120)
+        world[f"{key}_docs"] = customer_documents(world[f"{key}_id"], world[f"{key}_invoice"]["id"], key.upper())
+    world["e_session"] = portal_session(world["e"])
+    return world
+
+
+class TestAllDocuments:
+    def test_the_customer_sees_every_kind_with_its_pdf(self, documents_world):
+        """#100: credit notes with the invoices, order confirmations, delivery notes, work reports, contracts."""
+        world = documents_world
+        e, docs = world["e_session"], world["e_docs"]
+        overview = e.get(f"{BASE_URL}/api/portal/overview", timeout=60).json()
+        credit = next(item for item in overview["invoices"] if item["ref"] == docs["credit_note"]["ref"])
+        assert credit["credit_note"] is True
+        pdf = e.get(f"{BASE_URL}/api/portal/invoices/{credit['id']}/pdf", timeout=60)
+        assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+        for key, kind in DOCUMENT_PATHS.items():
+            assert [item["ref"] for item in overview[kind]] == [docs[key]["ref"]], (kind, overview[kind])
+            detail = e.get(f"{BASE_URL}/api/portal/documents/{kind}/{docs[key]['id']}", timeout=60)
+            assert detail.status_code == 200, (kind, detail.text)
+            assert detail.json()["has_pdf"] is True and detail.json()["state"], (kind, detail.json())
+            pdf = e.get(f"{BASE_URL}/api/portal/documents/{kind}/{docs[key]['id']}/pdf", timeout=60)
+            assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF"), (kind, pdf.text[:200])
+            assert pdf.headers["content-type"] == "application/pdf" and "no-store" in pdf.headers["cache-control"]
+        work = e.get(f"{BASE_URL}/api/portal/documents/interventions/{docs['intervention']['id']}", timeout=60).json()
+        assert work["description"] == "Notebook gereinigt E" and work["lines"][0]["text"] == "Lüfter gereinigt E"
+        contract = e.get(f"{BASE_URL}/api/portal/documents/contracts/{docs['contract']['id']}", timeout=60).json()
+        assert contract["lines"][0]["text"] == "Wartung E"
+
+    def test_a_draft_is_not_there(self, documents_world):
+        e, draft = documents_world["e_session"], documents_world["e_docs"]["draft_order"]
+        overview = e.get(f"{BASE_URL}/api/portal/overview", timeout=60).json()
+        assert draft["id"] not in [item["id"] for item in overview["orders"]]
+        assert e.get(f"{BASE_URL}/api/portal/documents/orders/{draft['id']}", timeout=60).status_code == 404
+        assert e.get(f"{BASE_URL}/api/portal/documents/orders/{draft['id']}/pdf", timeout=60).status_code == 404
+
+    def test_a_foreign_customer_sees_nothing_of_it(self, documents_world):
+        """Customer E never reaches F's documents, by list, detail or PDF, and nobody without sign-in."""
+        world = documents_world
+        e, foreign = world["e_session"], world["f_docs"]
+        text = json.dumps(e.get(f"{BASE_URL}/api/portal/overview", timeout=60).json())
+        for key in ("credit_note", *DOCUMENT_PATHS):
+            assert foreign[key]["ref"] not in text, key
+        assert e.get(f"{BASE_URL}/api/portal/invoices/{foreign['credit_note']['id']}/pdf", timeout=60).status_code == 404
+        for key, kind in DOCUMENT_PATHS.items():
+            for suffix in ("", "/pdf"):
+                path = f"{BASE_URL}/api/portal/documents/{kind}/{foreign[key]['id']}{suffix}"
+                assert e.get(path, timeout=60).status_code == 404, path
+                assert requests.get(path, timeout=60).status_code == 401, path
+        for path in ("documents/users/1", "documents/proposals/1/pdf", "documents/invoices/1/pdf"):
+            assert e.get(f"{BASE_URL}/api/portal/{path}", timeout=60).status_code == 404, path

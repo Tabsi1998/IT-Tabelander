@@ -58,7 +58,9 @@ if ($stage === 'base') {
     rt_const($db, 'MAIN_DISABLE_ALL_MAILS', '0');
 
     rt_modules(array('modSociete', 'modTicket', 'modApi', 'modPropale', 'modFacture', 'modAgenda',
-        'modCategorie', 'modKnowledgeManagement'));
+        'modCategorie', 'modKnowledgeManagement',
+        // All documents of a customer in the customer area (#100).
+        'modCommande', 'modExpedition', 'modFicheinter', 'modContrat'));
     // Company data and opening hours as the owner keeps them in the setup (#74).
     rt_const($db, 'MAIN_INFO_SOCIETE_ADDRESS', 'Werkstattweg 1');
     rt_const($db, 'MAIN_INFO_SOCIETE_ZIP', '6020');
@@ -116,6 +118,8 @@ if ($stage === 'base') {
         array('societe', 'contact', 'lire'), array('facture', 'lire'),
         // Accepting or declining an offer closes it in Dolibarr (#65).
         array('propale', 'creer'),
+        // Order confirmations, delivery notes, work reports, contracts (#100): read only.
+        array('commande', 'lire'), array('expedition', 'lire'), array('ficheinter', 'lire'), array('contrat', 'lire'),
     ));
     // The scenarios read what the website created through an administrator.
     $adminKey = bin2hex(random_bytes(20));

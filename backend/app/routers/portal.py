@@ -147,6 +147,26 @@ async def invoice_pdf(invoice_id: int, request: Request):
         raise _problem(exc) from None
 
 
+@router.get("/documents/{kind}/{object_id}")
+async def document(kind: str, object_id: int, request: Request):
+    """Order confirmations, delivery notes, work reports and contracts (#100)."""
+    try:
+        return await portal.document_detail(await _session(request), kind, object_id)
+    except (portal.PortalError, httpx.HTTPError) as exc:
+        raise _problem(exc) from None
+
+
+@router.get("/documents/{kind}/{object_id}/pdf")
+async def document_pdf(kind: str, object_id: int, request: Request):
+    session = await _session(request)
+    if kind not in portal.DOCUMENT_KINDS:  # offers and invoices have their own address
+        raise HTTPException(status_code=404, detail="Das gibt es hier nicht.")
+    try:
+        return _pdf(*await portal.document(session, kind, object_id))
+    except (portal.PortalError, httpx.HTTPError) as exc:
+        raise _problem(exc) from None
+
+
 @router.get("/overview")
 async def overview(request: Request):
     session = await _session(request)
