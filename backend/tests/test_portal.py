@@ -8,7 +8,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from app import dolibarr, mailer, portal
+from app import dolibarr, mail_layout, mailer, portal
 from app.models import SettingsInput, check_iban
 
 REAL_CLIENT = httpx.AsyncClient
@@ -145,16 +145,12 @@ def _setup(monkeypatch, customers):
     async def config():
         return CFG
 
-    async def mail_config():
-        return {"sender_name": "IT-Tabelander"}
-
-    async def send(to, subject, text):
-        sent.append((to, subject, text))
+    async def send(to, subject, text, html=None):
+        sent.append((to, subject, text, html))
 
     monkeypatch.setattr(portal, "get_db", lambda: db)
     monkeypatch.setattr(portal, "customers_for", customers_for)
     monkeypatch.setattr(dolibarr, "get_config", config)
-    monkeypatch.setattr(mailer, "get_mail_config", mail_config)
     monkeypatch.setattr(mailer, "send_mail", send)
     return db, sent
 
@@ -165,11 +161,56 @@ def test_the_link_goes_only_to_the_typed_address_of_a_customer(monkeypatch):
     assert sent == [] and db.portal_links.docs == []
 
     assert asyncio.run(portal.send_link("Max@Example.com")) is True
-    [(to, subject, text)] = sent
+    [(to, subject, text, html)] = sent
     assert to == "max@example.com" and subject == "Dein Link zum Kundenbereich" and "15 Minuten" in text
     token = text.split("/kundenbereich/anmelden#", 1)[1].split()[0]
+    assert f'href="{CFG["site_base"]}/kundenbereich/anmelden#{token}"' in html
     [link] = db.portal_links.docs
     assert link["token_hash"] == portal.token_hash(token) and token not in json.dumps(link, default=str)
+
+
+def test_the_sign_in_mail_says_liebe_gruesse_in_text_and_html():
+    """#114: the customer area says Du, so the closing is "Liebe Grüße", never "Viele Grüße"."""
+    subject, text, html = portal.link_mail("https://it.example.at/kundenbereich/anmelden#abc",
+                                           site_base="https://it.example.at")
+    assert subject == "Dein Link zum Kundenbereich"
+    for body in (text, html):
+        assert "Viele Grüße" not in body and "Liebe Grüße" in body
+        assert "Fabian Tabelander" in body and "IT-Tabelander" in body
+        assert "15 Minuten" in body and "einmal" in body and "löschen" in body
+        assert "https://it.example.at/kundenbereich/anmelden#abc" in body
+    assert "Liebe Grüße\nFabian Tabelander\nIT-Tabelander\n" in text
+    assert "<" not in text
+    # The button, and the link written out below it.
+    assert 'href="https://it.example.at/kundenbereich/anmelden#abc" style="display:block;' in html
+    assert "Zum Kundenbereich</a>" in html
+
+
+def test_the_mail_sheet_looks_like_the_dolibarr_mails():
+    """Logo from the module's endpoint (light and dark), orange line, 560 px, footer, dark mode by class."""
+    text, html = mail_layout.render([mail_layout.paragraph("Hallo,")], site_base="https://it.example.at")
+    assert html.startswith("<!DOCTYPE html>") and 'lang="de"' in html
+    assert 'src="https://erp.tabelander.co.at/custom/ittabelanderpdf/public/maillogo.php"' in html
+    assert 'src="https://erp.tabelander.co.at/custom/ittabelanderpdf/public/maillogo.php?variant=dark"' in html
+    assert "max-width:560px" in html and "border-top:2px solid #FE5A23" in html and "width:56px" in html
+    assert "font-size:16px" in html and "color:#3B4D63" in html and "color:#1B3348" in html
+    assert "border-top:1px solid #D6DEE7" in html and "color:#4A5B6E" in html
+    for line in ("Spridrichstraße 17, 6410 Telfs", "office@tabelander.co.at", "it.tabelander.co.at", "+43 676 6039945"):
+        assert line in html and line in text
+    # Exactly one style block; its dark rules address classes only, because
+    # Samsung Mail ignores attribute selectors there.
+    style = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    assert html.count("<style") == 1 and "@media (prefers-color-scheme: dark){" in style
+    assert "[style" not in style and ".wb-tx{" in style and ".ittab-logo-dark{" in style
+    assert 'class="wb-bg wb-tx"' in html and 'class="ittab-page"' in html
+    assert "<table" not in html and "data:" not in html and "cid:" not in html
+
+
+def test_what_a_mail_shows_is_escaped():
+    _text, html = mail_layout.render([mail_layout.paragraph("Name <script>alert(1)</script> & Co"),
+                                      mail_layout.button("Los", 'https://x.example/?a=1&b="2"')])
+    assert "<script>" not in html and "&lt;script&gt;" in html and "&amp; Co" in html
+    assert 'href="https://x.example/?a=1&amp;b=&quot;2&quot;"' in html
 
 
 def test_three_links_per_quarter_hour_are_enough(monkeypatch):
@@ -307,8 +348,8 @@ def test_a_yes_closes_the_offer_as_signed_with_the_proof(monkeypatch):
     _with_dolibarr(monkeypatch, handler)
     mails, owner = [], []
 
-    async def send(to, subject, text):
-        mails.append((to, subject, text))
+    async def send(to, subject, text, html=None):
+        mails.append((to, subject, text, html))
 
     async def notify(subject, text):
         owner.append((subject, text))
@@ -325,10 +366,13 @@ def test_a_yes_closes_the_offer_as_signed_with_the_proof(monkeypatch):
     [close] = closed
     assert close["status"] == 2 and "„Max Muster“" in close["note_private"] and "IP 203.0.113.7" in close["note_private"]
     assert "max@example.com" in close["note_private"] and "Sofort beginnen verlangt: ja" in close["note_private"]
-    [(to, subject, text)] = mails
+    [(to, subject, text, html)] = mails
     assert to == "max@example.com" and subject == "Bestätigung: Angebot PR2609-0007 angenommen"
-    assert "Muster-Widerrufsformular" in text and "innerhalb von 14 Tagen" in text and "Gasse 1, 6410 Telfs" in text
-    assert "189,00 €" in text
+    for body in (text, html):
+        assert "Muster-Widerrufsformular" in body and "innerhalb von 14 Tagen" in body
+        assert "Gasse 1, 6410 Telfs" in body and "189,00 €" in body and "„Max Muster“" in body
+        assert "Liebe Grüße" in body and "Viele Grüße" not in body
+    assert "<li" in html and f"{CFG['site_base']}/rechtliches/nutzungsbedingungen" in html
     assert owner and owner[0][0] == "Angebot PR2609-0007 angenommen"
 
 

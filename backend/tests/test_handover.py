@@ -325,6 +325,15 @@ def test_mail_goes_out_with_sender_and_subject(monkeypatch):
     assert address == ("smtp.example.at", 587)
     assert message["To"] == "eva@example.com" and message["Subject"] == "Hallo"
     assert message["From"] == "IT-Tabelander <office@example.at>"
+    assert message.get_content_type() == "text/plain"
+
+    # With HTML (#114): text and HTML as alternatives, the text first.
+    FakeSMTP.sent.clear()
+    asyncio.run(mailer.send_mail("eva@example.com", "Hallo", "Text", html="<p>Text</p>"))
+    _address, message = FakeSMTP.sent[0]
+    assert message.get_content_type() == "multipart/alternative"
+    assert [part.get_content_type() for part in message.iter_parts()] == ["text/plain", "text/html"]
+    assert message.get_body(("html",)).get_content().strip() == "<p>Text</p>"
 
     FakeSMTP.refuse_login = True
     try:

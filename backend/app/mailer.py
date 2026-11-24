@@ -244,8 +244,9 @@ def _explain(exc: Exception, cfg: dict) -> str:
     return f"Senden fehlgeschlagen ({type(exc).__name__})."
 
 
-async def send_mail(to, subject: str, text: str) -> None:
-    """Send one plain-text mail; raise MailNotConfigured or MailError."""
+async def send_mail(to, subject: str, text: str, html: str | None = None) -> None:
+    """Send one mail, plain text or text with an HTML alternative (#114);
+    raise MailNotConfigured or MailError."""
     cfg = await get_mail_config()
     if not cfg["host"] or not cfg["sender"]:
         raise MailNotConfigured("Der E-Mail-Versand ist noch nicht eingerichtet (Mailserver und Absender fehlen).")
@@ -256,6 +257,8 @@ async def send_mail(to, subject: str, text: str) -> None:
     message["To"] = ", ".join(recipients)
     message["Message-ID"] = make_msgid(domain=cfg["sender"].rpartition("@")[2] or None)
     message.set_content(text)
+    if html:
+        message.add_alternative(html, subtype="html")
     try:
         await asyncio.to_thread(_send_blocking, cfg, message)
     except MailCertificateChanged as exc:

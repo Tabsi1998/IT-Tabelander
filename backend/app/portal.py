@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 import httpx
 from pymongo import ReturnDocument
 
-from . import dolibarr, mailer
+from . import dolibarr, mail_layout, mailer
 from .db import get_db, now_utc
 
 logger = logging.getLogger("it-tabelander.portal")
@@ -111,22 +111,17 @@ async def customers_for(email: str) -> list[dict]:
             for socid, party in sorted(found.items()) if socid and may_enter(party)]
 
 
-def link_mail(link: str, *, sender_name: str, site_base: str) -> tuple[str, str]:
+def link_mail(link: str, *, site_base: str) -> tuple[str, str, str]:
+    """Subject, plain text and HTML of the sign-in mail (#114)."""
     subject = "Dein Link zum Kundenbereich"
-    text = f"""Hallo,
-
-hier ist dein Link zum Kundenbereich von IT-Tabelander:
-
-{link}
-
-Er gilt 15 Minuten und funktioniert einmal. Hast du ihn nicht angefordert,
-kannst du diese Mail einfach löschen - ohne den Link kommt niemand hinein.
-
-Viele Grüße
-{sender_name}
-{site_base}
-"""
-    return subject, text
+    text, body = mail_layout.render([
+        mail_layout.paragraph("Hallo,"),
+        mail_layout.paragraph("hier ist dein Link zum Kundenbereich von IT-Tabelander:"),
+        mail_layout.button("Zum Kundenbereich", link),
+        mail_layout.paragraph("Er gilt 15 Minuten und funktioniert einmal. Hast du ihn nicht angefordert, kannst du "
+                              "diese Mail einfach löschen – ohne den Link kommt niemand hinein."),
+    ], site_base=site_base)
+    return subject, text, body
 
 
 async def send_link(email: str) -> bool:
@@ -146,10 +141,8 @@ async def send_link(email: str) -> bool:
         await db.portal_links.insert_one({"token_hash": token_hash(token), "email": email,
                                           "created_at": now, "expires_at": now + LINK_VALID})
         cfg = await dolibarr.get_config()
-        mail = await mailer.get_mail_config()
-        subject, text = link_mail(f"{cfg['site_base']}/kundenbereich/anmelden#{token}",
-                                  sender_name=mail.get("sender_name") or "IT-Tabelander", site_base=cfg["site_base"])
-        await mailer.send_mail(email, subject, text)
+        subject, text, body = link_mail(f"{cfg['site_base']}/kundenbereich/anmelden#{token}", site_base=cfg["site_base"])
+        await mailer.send_mail(email, subject, text, html=body)
         return True
     except Exception as exc:  # noqa: BLE001 - nobody waits for this answer
         logger.warning("Sign-in link not sent: %s", type(exc).__name__)
@@ -582,48 +575,44 @@ def money(value) -> str:
 
 
 def acceptance_mail(*, ref: str, total, name: str, when: str, start_now: bool, company: dict,
-                    site_base: str) -> tuple[str, str]:
+                    site_base: str) -> tuple[str, str, str]:
     """The confirmation on a durable medium the law asks for (FAGG), with the
-    withdrawal right and the model form."""
+    withdrawal right and the model form. Subject, plain text and HTML (#114)."""
     town = " ".join(part for part in (company.get("zip"), company.get("town")) if part)
     address = ", ".join(part for part in (company.get("name") or "IT-Tabelander", company.get("address"), town,
                                           company.get("email")) if part)
-    start = ("Du hast verlangt, dass ich sofort beginne. Trittst du zurück, bevor ich fertig bin, zahlst du den Teil,\n"
+    start = ("Du hast verlangt, dass ich sofort beginne. Trittst du zurück, bevor ich fertig bin, zahlst du den Teil, "
              "der bis dahin gemacht ist. Ist die Arbeit fertig, kannst du nicht mehr zurücktreten."
              if start_now else
-             "Du hast nicht verlangt, dass ich sofort beginne. Ich melde mich deshalb, bevor ich vor Ablauf\n"
+             "Du hast nicht verlangt, dass ich sofort beginne. Ich melde mich deshalb, bevor ich vor Ablauf "
              "der 14 Tage anfange.")
     subject = f"Bestätigung: Angebot {ref} angenommen"
-    text = f"""Hallo,
-
-du hast im Kundenbereich das Angebot {ref} über {money(total)} angenommen,
-am {when} Uhr, bestätigt mit dem Namen „{name}“.
-
-{start}
-
-Dein Rücktrittsrecht
-Bist du Verbraucherin oder Verbraucher, kannst du innerhalb von 14 Tagen ab
-heute ohne Angabe von Gründen vom Vertrag zurücktreten. Schick mir dazu eine
-eindeutige Nachricht, zum Beispiel per E-Mail. Du kannst dafür das
-Muster-Formular unten verwenden.
-
-Muster-Widerrufsformular
-(Wenn Sie den Vertrag widerrufen wollen, dann füllen Sie bitte dieses Formular aus und senden Sie es zurück.)
-- An {address}:
-- Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über den Kauf der folgenden Waren (*)/die Erbringung der folgenden Dienstleistung (*): Angebot {ref}
-- Bestellt am (*)/erhalten am (*)
-- Name des/der Verbraucher(s)
-- Anschrift des/der Verbraucher(s)
-- Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier)
-- Datum
-(*) Unzutreffendes streichen.
-
-Alle Bedingungen: {site_base}/rechtliches/nutzungsbedingungen
-
-Viele Grüße
-{company.get("name") or "IT-Tabelander"}
-"""
-    return subject, text
+    text, body = mail_layout.render([
+        mail_layout.paragraph("Hallo,"),
+        mail_layout.paragraph(f"du hast im Kundenbereich das Angebot {ref} über {money(total)} angenommen, "
+                              f"am {when} Uhr, bestätigt mit dem Namen „{name}“."),
+        mail_layout.paragraph(start),
+        mail_layout.heading("Dein Rücktrittsrecht"),
+        mail_layout.paragraph("Bist du Verbraucherin oder Verbraucher, kannst du innerhalb von 14 Tagen ab heute ohne "
+                              "Angabe von Gründen vom Vertrag zurücktreten. Schick mir dazu eine eindeutige Nachricht, "
+                              "zum Beispiel per E-Mail. Du kannst dafür das Muster-Formular unten verwenden."),
+        mail_layout.heading("Muster-Widerrufsformular"),
+        mail_layout.paragraph("(Wenn Sie den Vertrag widerrufen wollen, dann füllen Sie bitte dieses Formular aus und "
+                              "senden Sie es zurück.)"),
+        mail_layout.items(
+            f"An {address}:",
+            "Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über den Kauf der folgenden "
+            f"Waren (*)/die Erbringung der folgenden Dienstleistung (*): Angebot {ref}",
+            "Bestellt am (*)/erhalten am (*)",
+            "Name des/der Verbraucher(s)",
+            "Anschrift des/der Verbraucher(s)",
+            "Unterschrift des/der Verbraucher(s) (nur bei Mitteilung auf Papier)",
+            "Datum",
+        ),
+        mail_layout.paragraph("(*) Unzutreffendes streichen."),
+        mail_layout.link("Alle Bedingungen", f"{site_base}/rechtliches/nutzungsbedingungen"),
+    ], site_base=site_base)
+    return subject, text, body
 
 
 async def _notify_owner(subject: str, text: str) -> None:
@@ -676,10 +665,10 @@ async def answer(session: dict, offer_id: int, *, accept: bool, name: str = "", 
         return await offer(session, offer_id)
     ref, total = raw.get("ref"), raw.get("total_ttc")
     if accept:
-        subject, text = acceptance_mail(ref=ref, total=total, name=name, when=when, start_now=start_now,
-                                        company=await _company(), site_base=cfg["site_base"])
+        subject, text, body = acceptance_mail(ref=ref, total=total, name=name, when=when, start_now=start_now,
+                                              company=await _company(), site_base=cfg["site_base"])
         try:
-            await mailer.send_mail(session["email"], subject, text)
+            await mailer.send_mail(session["email"], subject, text, html=body)
         except Exception as exc:  # noqa: BLE001 - accepted in Dolibarr; the owner hears about the missing mail
             logger.warning("Acceptance confirmation not sent: %s", type(exc).__name__)
             note += " Die Bestätigungsmail an den Kunden ging NICHT hinaus - bitte selbst schicken."

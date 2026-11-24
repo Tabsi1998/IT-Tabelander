@@ -75,8 +75,10 @@ Ports stay unique: API 18011, MongoDB 27018, Dolibarr 18031, Mailpit 18131
 - `backend/app/`: `dolibarr.py` (client), `handover.py` (queue to Dolibarr),
   `site_data.py` (company data, opening hours, knowledge articles, cache),
   `legal_texts.py` + `legal_drafts/`, `portal.py` (customer area),
-  `review_invites.py`, `mailer.py`, `website.py` (pages, redirects, SEO head,
-  404), `routers/`.
+  `review_invites.py`, `mailer.py`, `mail_layout.py` (HTML + text of customer
+  mails in the look of the Dolibarr module's mails: one style block for dark
+  mode by class only, no tables; Du, so always "Liebe Grüße", never "Viele
+  Grüße"), `website.py` (pages, redirects, SEO head, 404), `routers/`.
 - `web/`: one Vite app - website (prerendered), admin `src/admin/`, customer
   area `src/portal/` (lazy chunks, empty shells from `scripts/prerender.mjs`).
 - Customer data lives only in Dolibarr; the website never changes an existing
