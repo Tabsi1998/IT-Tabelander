@@ -856,7 +856,8 @@ def customer_documents(socid: int, invoice_id: int, name: str) -> dict:
     build_pdf("order", found["order"]["ref"], "einstein")
     found["draft_order"] = {"id": int(dolibarr_post("orders", {"socid": socid, "date": int(time.time()), "lines": [line]}))}
 
-    shipment = int(dolibarr_post(f"orders/{order}/shipment/0", {}))
+    # The API wants a warehouse number; without the stock module nothing checks it.
+    shipment = int(dolibarr_post(f"orders/{order}/shipment/1", {}))
     dolibarr_post(f"shipments/{shipment}/validate", {"notrigger": 0})
     found["shipment"] = dolibarr_get(f"shipments/{shipment}")
     build_pdf("shipment", found["shipment"]["ref"], "rouget")
@@ -867,7 +868,7 @@ def customer_documents(socid: int, invoice_id: int, name: str) -> dict:
                                                           "date": int(time.time()), "duration": 3600})
     dolibarr_post(f"interventions/{intervention}/validate", {"notrigger": 0})
     found["intervention"] = dolibarr_get(f"interventions/{intervention}")
-    build_pdf("ficheinter", found["intervention"]["ref"], "soleil")
+    build_pdf("fichinter", found["intervention"]["ref"], "soleil")
 
     contract = int(dolibarr_post("contracts", {"socid": socid, "date_contrat": int(time.time()),
                                                "commercial_signature_id": 1, "commercial_suivi_id": 1}))

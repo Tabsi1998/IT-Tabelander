@@ -476,58 +476,59 @@ async def document_detail(session: dict, kind: str, object_id: int) -> dict:
     if kind not in DOCUMENT_KINDS:
         raise NotFound("Das gibt es hier nicht.")
     cfg = await _config()
-    async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
+    async with httpx.AsyncClient(timeout=max(cfg["timeout"], 20)) as client:
         raw = await _owned(client, cfg, kind, object_id, session)
-        pdf = await _pdf_file(client, cfg, kind, raw)
-    return {**_document(kind, raw), "has_pdf": bool(pdf), **_details(kind, raw)}
+        original = _pdf_file(kind, raw)
+        # Without last_main_doc only asking for the file tells whether there is one.
+        has_pdf = bool(original) and (bool(raw.get("last_main_doc")) or bool(await _download(client, cfg, kind, original)))
+    return {**_document(kind, raw), "has_pdf": has_pdf, **_details(kind, raw)}
 
 
-async def _pdf_file(client: httpx.AsyncClient, cfg: dict, kind: str, raw: dict) -> str | None:
+def _pdf_file(kind: str, raw: dict) -> str | None:
     """The PDF as "<ref>/<file>.pdf" in the document's own folder, or None.
 
     Dolibarr names the newest PDF in last_main_doc ("commande/CO1/CO1.pdf").
-    A shipment has no such field: then the files of the document's folder
-    tell. Only the folder named like the document's reference counts, so a
-    path can never lead to another customer's file."""
+    A shipment has no such field (Expedition::fetch does not read it, and the
+    file list of the API looks in the wrong folder for shipments): there the
+    standard name "<ref>/<ref>.pdf" stands in. Only the folder named like the
+    document's reference counts, so a path can never lead to another
+    customer's file."""
     # The folder is the reference as Dolibarr's dol_sanitizeFileName writes it.
     ref = re.sub(r'[\\/:*?"<>|\[\],;=]', "_", str(raw.get("ref") or ""))
     doc = str(raw.get("last_main_doc") or "")
-    if doc:
-        parts = doc.split("/")
-        original = "/".join(parts[-2:])
-        if len(parts) < 2 or parts[-2] != ref or ".." in parts or not DOC_PATH.fullmatch(original):
-            return None
-        return original
-    response = await client.get(f"{cfg['base']}/api/index.php/documents", headers=dolibarr._headers(cfg),
-                                params={"modulepart": MODULES[kind], "id": _int(raw.get("id"))})
-    if response.status_code != 200:
-        return None  # 404: no files yet; anything else: no PDF to offer
-    names = [str(item.get("name") or "") for item in (response.json() or []) if isinstance(item, dict)]
-    names = [name for name in names if DOC_PATH.fullmatch(f"{ref}/{name}")]
-    if not names:
+    if not doc:
+        original = f"{ref}/{ref}.pdf" if kind == "shipments" else ""
+        return original if original and DOC_PATH.fullmatch(original) else None
+    parts = doc.split("/")
+    original = "/".join(parts[-2:])
+    if len(parts) < 2 or parts[-2] != ref or ".." in parts or not DOC_PATH.fullmatch(original):
         return None
-    return f"{ref}/{f'{ref}.pdf' if f'{ref}.pdf' in names else names[0]}"
+    return original
+
+
+async def _download(client: httpx.AsyncClient, cfg: dict, kind: str, original: str) -> bytes | None:
+    import base64
+
+    response = await client.get(f"{cfg['base']}/api/index.php/documents/download", headers=dolibarr._headers(cfg),
+                                params={"modulepart": MODULES[kind], "original_file": original})
+    if response.status_code == 404:
+        return None
+    response.raise_for_status()
+    return base64.b64decode((response.json() or {}).get("content") or "")
 
 
 async def document(session: dict, kind: str, object_id: int) -> tuple[str, bytes]:
     """The PDF Dolibarr made for this document of the customer."""
-    import base64
-
     if kind not in MODULES:
         raise NotFound("Das gibt es hier nicht.")
     cfg = await _config()
     async with httpx.AsyncClient(timeout=max(cfg["timeout"], 20)) as client:
         raw = await _owned(client, cfg, kind, object_id, session)
-        original = await _pdf_file(client, cfg, kind, raw)
-        if not original:
-            raise NotFound("Für dieses Dokument gibt es noch kein PDF.")
-        response = await client.get(f"{cfg['base']}/api/index.php/documents/download", headers=dolibarr._headers(cfg),
-                                    params={"modulepart": MODULES[kind], "original_file": original})
-        if response.status_code == 404:
-            raise NotFound("Für dieses Dokument gibt es noch kein PDF.")
-        response.raise_for_status()
-        body = response.json() or {}
-    return original.rsplit("/", 1)[-1], base64.b64decode(body.get("content") or "")
+        original = _pdf_file(kind, raw)
+        content = await _download(client, cfg, kind, original) if original else None
+    if content is None:
+        raise NotFound("Für dieses Dokument gibt es noch kein PDF.")
+    return original.rsplit("/", 1)[-1], content
 
 
 # ------------------------------------------------------------ payment (#66)

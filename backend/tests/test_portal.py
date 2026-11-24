@@ -433,9 +433,6 @@ def _documents_handler(lists=None, objects=None, files=None, refused=()):
             if (request.url.params["modulepart"], request.url.params["original_file"]) in files:
                 return httpx.Response(200, json={"content": "JVBERi0xLjQ="})
             return httpx.Response(404, json={})
-        if path == "documents":
-            names = files.get(("list", request.url.params["id"])) or []
-            return httpx.Response(200, json=[{"name": name} for name in names]) if names else httpx.Response(404, json={})
         if path in lists:
             return httpx.Response(200, json=lists[path])
         if path in objects:
@@ -557,19 +554,19 @@ def test_a_pdf_comes_only_from_the_documents_own_folder(monkeypatch):
             asyncio.run(portal.document(_session(7), kind, object_id))
 
 
-def test_a_delivery_note_pdf_is_found_in_its_folder(monkeypatch):
-    """Dolibarr keeps no last_main_doc for shipments: the website asks for the files of the shipment."""
+def test_a_delivery_note_pdf_is_found_under_its_standard_name(monkeypatch):
+    """Dolibarr keeps no last_main_doc for shipments: the website asks for "<ref>/<ref>.pdf"."""
     calls = _with_dolibarr(monkeypatch, _documents_handler(
         objects={"shipments/61": {"id": "61", "ref": "SH1", "socid": "7", "status": "1"},
                  "shipments/62": {"id": "62", "ref": "SH2", "socid": "7", "status": "1"}},
-        files={("list", "61"): ["notiz.txt", "SH1.pdf"], ("expedition", "SH1/SH1.pdf"): 1}))
+        files={("expedition", "SH1/SH1.pdf"): 1}))
     assert asyncio.run(portal.document_detail(_session(7), "shipments", 61))["has_pdf"] is True
     assert asyncio.run(portal.document(_session(7), "shipments", 61)) == ("SH1.pdf", b"%PDF-1.4")
     assert asyncio.run(portal.document_detail(_session(7), "shipments", 62))["has_pdf"] is False
     with pytest.raises(portal.NotFound):
         asyncio.run(portal.document(_session(7), "shipments", 62))
-    listing = [call for call in calls if call.url.path.endswith("/documents")][0]
-    assert listing.url.params["modulepart"] == "expedition" and listing.url.params["id"] == "61"
+    asked = [call.url.params["original_file"] for call in calls if call.url.path.endswith("/documents/download")]
+    assert set(asked) == {"SH1/SH1.pdf", "SH2/SH2.pdf"}
 
 
 def test_a_credit_note_is_marked_in_the_invoices():

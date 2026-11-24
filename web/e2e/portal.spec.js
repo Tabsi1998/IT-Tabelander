@@ -114,6 +114,9 @@ test("an open invoice: transfer data to copy and the code for the banking app (#
   await expectNoSidewaysScroll(page);
 });
 
+// The documents of the list, not the filter above it.
+const DOCUMENT_LINK = /^(Rechnung|Gutschrift|Auftragsbestätigung|Lieferschein|Arbeitsbericht|Vertrag) /;
+
 test("every document under Belege, filtered by kind (#100)", async ({ page }) => {
   await signedIn(page, "/kundenbereich/belege");
   await expect(page.getByRole("heading", { level: 1, name: "Belege" })).toBeVisible();
@@ -127,7 +130,7 @@ test("every document under Belege, filtered by kind (#100)", async ({ page }) =>
   await kinds.getByRole("link", { name: /Lieferscheine/ }).click();
   await expect(page).toHaveURL(/\/kundenbereich\/belege\/lieferscheine$/);
   await expect(page.getByRole("heading", { level: 1, name: "Lieferscheine" })).toBeVisible();
-  await expect(page.getByRole("main").getByRole("listitem")).toHaveCount(1);
+  await expect(page.getByRole("main").getByRole("link", { name: DOCUMENT_LINK })).toHaveCount(1);
   await page.getByRole("link", { name: /Lieferschein SH2609-0002/ }).click();
   await expect(page).toHaveURL(/\/kundenbereich\/belege\/lieferscheine\/61$/);
   await expect(page.getByRole("heading", { level: 1, name: "Lieferschein SH2609-0002" })).toBeVisible();
@@ -139,7 +142,7 @@ test("every document under Belege, filtered by kind (#100)", async ({ page }) =>
   await expect(page.getByRole("heading", { level: 1, name: "Rechnungen" })).toBeVisible();
   const nav = page.getByRole("navigation", { name: page.viewportSize().width < 1024 ? "Kundenbereich unten" : "Kundenbereich", exact: true });
   await expect(nav.getByRole("link", { name: /Belege/ })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("main").getByRole("listitem")).toHaveCount(3);
+  await expect(page.getByRole("main").getByRole("link", { name: DOCUMENT_LINK })).toHaveCount(3);
   await expectNoSidewaysScroll(page);
 });
 
