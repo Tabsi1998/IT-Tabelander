@@ -967,7 +967,9 @@ def hosting_contract(socid: int, tag: str, name: str, *, terms: bool) -> dict:
     line = dolibarr_get(f"contracts/{contract}")["lines"][0]
     response = requests.put(f"{DOLIBARR}/api/index.php/contracts/{contract}/lines/{line['id']}/activate",
                             headers={"DOLAPIKEY": ADMIN_KEY, "Accept": "application/json"},
-                            json={"datestart": int(time.time())}, timeout=30)
+                            # Activating sets the planned end anew; without it the end is gone.
+                            json={"datestart": int(time.time()), "dateend": int(time.time()) + 365 * 24 * 3600},
+                            timeout=30)
     assert response.status_code == 200, response.text
     found = dolibarr_get(f"contracts/{contract}")
     build_pdf("contract", found["ref"], "strato")
