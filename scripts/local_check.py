@@ -9,7 +9,7 @@ Groups:
     repository   every shell script parses, no CRLF stored, whitespace across
                  every tracked line, Gitleaks over the history and over
                  uncommitted and new files
-    backend      for Python 3.10 and 3.14 (oldest and newest supported): a
+    backend      for Python 3.11 and 3.14 (oldest and newest supported): a
                  pinned environment, pip check, a full compile, the server
                  imports, and the unit tests - all against a copy of what
                  Git would commit, so a local .env never reaches a test
@@ -86,7 +86,7 @@ TLS = STATE / "tls"
 CACHE = Path.home() / ".local-ci" / ROOT.name
 
 # Both ends of the supported Python range, because a server may run either.
-PYTHON_VERSIONS = ("3.10", "3.14")
+PYTHON_VERSIONS = ("3.11", "3.14")
 INTEGRATION_PYTHON = "3.14"
 NODE_MAJOR = 24
 
