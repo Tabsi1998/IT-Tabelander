@@ -2,40 +2,13 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 import QrCode from "../../components/QrCode.jsx";
 import { day, ibanText, money, usePortalData } from "../api.js";
-import { usePortal } from "../PortalApp.jsx";
-import { Badge, Empty, Loading, PageTitle, Problem } from "./parts.jsx";
+import { Badge, Loading, PageTitle, Problem } from "./parts.jsx";
 
-function State({ invoice }) {
+/** The badge of an invoice; a credit note is named as such (#100). */
+export function InvoiceState({ invoice }) {
   if (invoice.credit_note) return <Badge>Gutschrift</Badge>;
   if (invoice.open) return <Badge tone="warn">offen</Badge>;
   return <Badge tone={invoice.state === "bezahlt" ? "good" : "plain"}>{invoice.state}</Badge>;
-}
-
-export function Invoices() {
-  const { overview } = usePortal();
-  if (overview.loading && !overview.data) return <Loading />;
-  if (overview.error) return <Problem error={overview.error} onRetry={overview.reload} />;
-  const invoices = overview.data.invoices;
-  return (
-    <>
-      <PageTitle text="Deine Rechnungen. Offene bezahlst du per Überweisung – am einfachsten mit dem QR-Code.">Rechnungen</PageTitle>
-      {invoices.length === 0 ? <Empty>Noch keine Rechnungen.</Empty> : (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
-          {invoices.map((item) => (
-            <li key={item.id}>
-              <Link to={`/kundenbereich/rechnungen/${item.id}`} className="card flex flex-wrap items-center justify-between gap-3 p-5 no-underline hover:border-ink">
-                <span className="flex flex-col">
-                  <b className="font-display text-lg">Rechnung {item.ref}</b>
-                  <span className="text-sm text-muted">{[day(item.date), item.open && item.due && `fällig am ${day(item.due)}`].filter(Boolean).join(" · ")}</span>
-                </span>
-                <span className="flex items-center gap-3"><b>{money(item.open ? item.remain ?? item.total : item.total)}</b><State invoice={item} /></span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
-  );
 }
 
 function Copy({ value, label }) {
@@ -99,7 +72,7 @@ export function InvoiceDetail() {
         <PageTitle text={[day(item.date), item.open && item.due && `fällig am ${day(item.due)}`].filter(Boolean).join(" · ")}>
           {item.credit_note ? "Gutschrift" : "Rechnung"} {item.ref}
         </PageTitle>
-        <State invoice={item} />
+        <InvoiceState invoice={item} />
       </div>
       {item.payment && <Payment payment={item.payment} />}
       {item.open && !item.payment && (

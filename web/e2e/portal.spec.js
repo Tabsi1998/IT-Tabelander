@@ -114,12 +114,62 @@ test("an open invoice: transfer data to copy and the code for the banking app (#
   await expectNoSidewaysScroll(page);
 });
 
+test("every document under Belege, filtered by kind (#100)", async ({ page }) => {
+  await signedIn(page, "/kundenbereich/belege");
+  await expect(page.getByRole("heading", { level: 1, name: "Belege" })).toBeVisible();
+  const kinds = page.getByRole("navigation", { name: "Belegarten" });
+  await expect(kinds.getByRole("link", { name: /Alle/ })).toHaveAttribute("aria-current", "page");
+  for (const ref of ["FA2609-0012", "AV2609-0001", "CO2609-0004", "SH2609-0002", "FI2609-0003", "CT2609-0001"]) {
+    await expect(page.getByRole("main").getByRole("link", { name: new RegExp(ref) })).toBeVisible();
+  }
+  await expect(page.getByRole("link", { name: /Gutschrift AV2609-0001/ })).toContainText("Gutschrift");
+
+  await kinds.getByRole("link", { name: /Lieferscheine/ }).click();
+  await expect(page).toHaveURL(/\/kundenbereich\/belege\/lieferscheine$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Lieferscheine" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("listitem")).toHaveCount(1);
+  await page.getByRole("link", { name: /Lieferschein SH2609-0002/ }).click();
+  await expect(page).toHaveURL(/\/kundenbereich\/belege\/lieferscheine\/61$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Lieferschein SH2609-0002" })).toBeVisible();
+  await expect(page.getByText("Sendungsnummer AT123456789")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Lieferschein als PDF" })).toHaveAttribute("href", "/api/portal/documents/shipments/61/pdf");
+
+  // The invoices keep their address from the mails and belong to the tab Belege.
+  await page.goto("/kundenbereich/rechnungen");
+  await expect(page.getByRole("heading", { level: 1, name: "Rechnungen" })).toBeVisible();
+  const nav = page.getByRole("navigation", { name: page.viewportSize().width < 1024 ? "Kundenbereich unten" : "Kundenbereich", exact: true });
+  await expect(nav.getByRole("link", { name: /Belege/ })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("main").getByRole("listitem")).toHaveCount(3);
+  await expectNoSidewaysScroll(page);
+});
+
+test("a work report and a contract show what was done and what runs (#100)", async ({ page }) => {
+  await signedIn(page, "/kundenbereich/belege/arbeitsberichte/71");
+  await expect(page.getByRole("heading", { level: 1, name: "Arbeitsbericht FI2609-0003" })).toBeVisible();
+  await expect(page.getByText("Notebook gereinigt und Lüfter getauscht.")).toBeVisible();
+  await expect(page.getByRole("row", { name: /Gesamt/ })).toContainText("1,5 Std.");
+  await expect(page.getByRole("link", { name: "Arbeitsbericht als PDF" })).toHaveAttribute("href", "/api/portal/documents/interventions/71/pdf");
+
+  await page.goto("/kundenbereich/belege/vertraege/81");
+  await expect(page.getByRole("heading", { level: 1, name: "Vertrag CT2609-0001" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: /Wartung Büro-PCs/ })).toContainText("läuft");
+  await expect(page.getByText("Für diesen Beleg gibt es noch kein PDF.")).toBeVisible();
+
+  await page.goto("/kundenbereich/belege/vertraege/99");
+  await expect(page.getByRole("alert")).toHaveText(/Das gibt es hier nicht/);
+  await page.goto("/kundenbereich/belege/unbekannt");
+  await expect(page).toHaveURL(/\/kundenbereich\/belege$/);
+});
+
 for (const scheme of ["light", "dark"]) {
   for (const [name, path, heading, signIn] of [
     ["anmelden", "/kundenbereich", "Anmelden ohne Passwort", false],
     ["uebersicht", "/kundenbereich", "Dein Kundenbereich", true],
     ["angebot", "/kundenbereich/angebote/31", "Angebot PR2609-0007", true],
     ["rechnung", "/kundenbereich/rechnungen/41", "Rechnung FA2609-0012", true],
+    ["belege", "/kundenbereich/belege", "Belege", true],
+    ["auftrag", "/kundenbereich/belege/auftraege/51", "Auftragsbestätigung CO2609-0004", true],
+    ["arbeitsbericht", "/kundenbereich/belege/arbeitsberichte/71", "Arbeitsbericht FI2609-0003", true],
   ]) {
     test(`customer area ${name} is accessible in ${scheme === "light" ? "hell" : "dunkel"} (#63)`, async ({ page }, testInfo) => {
       await page.emulateMedia({ colorScheme: scheme });

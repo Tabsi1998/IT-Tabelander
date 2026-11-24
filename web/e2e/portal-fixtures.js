@@ -23,6 +23,32 @@ const INVOICE = {
   },
 };
 
+// The other documents (#100): one of each kind, plus a credit note with the invoices.
+const ORDER = {
+  kind: "orders", id: 51, ref: "CO2609-0004", status: 2, state: "in Lieferung", date: "2026-09-18T08:00:00+00:00",
+  total: "249.00000000", has_pdf: true, net: "207.50000000", vat: "41.50000000", delivery: "2026-09-25T00:00:00+00:00",
+  lines: [{ text: "SSD Samsung 990 Pro 2 TB", details: "inkl. Einbau und Datenübernahme", qty: "1", total: "249.00000000" }],
+};
+const SHIPMENT = {
+  kind: "shipments", id: 61, ref: "SH2609-0002", status: 2, state: "zugestellt", date: "2026-09-24T08:00:00+00:00",
+  total: null, has_pdf: true, tracking: "AT123456789", delivery: null,
+  lines: [{ text: "SSD Samsung 990 Pro 2 TB", details: "", qty: "1" }],
+};
+const INTERVENTION = {
+  kind: "interventions", id: 71, ref: "FI2609-0003", status: 3, state: "erledigt", date: "2026-09-22T08:00:00+00:00",
+  total: null, has_pdf: true, description: "Notebook gereinigt und Lüfter getauscht.", hours: 1.5,
+  lines: [{ text: "Gehäuse geöffnet, Lüfter getauscht", date: "2026-09-22T08:00:00+00:00", hours: 1 },
+    { text: "Belastungstest", date: "2026-09-22T09:00:00+00:00", hours: 0.5 }],
+};
+const CONTRACT = {
+  kind: "contracts", id: 81, ref: "CT2609-0001", status: 1, state: "aktiv", date: "2026-09-01T08:00:00+00:00",
+  total: null, has_pdf: false,
+  lines: [{ text: "Wartung Büro-PCs", details: "monatlich, 3 Geräte", qty: "1", total: "45.00000000", state: "läuft",
+    start: "2026-09-01T00:00:00+00:00", end: "2027-08-31T00:00:00+00:00" }],
+};
+const CREDIT_NOTE = { id: 44, ref: "AV2609-0001", status: 1, state: "bezahlt", open: false, credit_note: true,
+  date: "2026-09-21T08:00:00+00:00", due: null, total: "-20.00000000", remain: "0", has_pdf: true };
+
 export function portalState(overrides = {}) {
   return {
     enabled: true,
@@ -40,8 +66,10 @@ export function portalState(overrides = {}) {
       offers: [{ ...OFFER }, { id: 22, ref: "PR2608-0003", status: 2, state: "angenommen", date: "2026-08-14T08:00:00+00:00",
         valid_until: null, total: "140.00000000", has_pdf: true }],
       invoices: [{ ...INVOICE }, { id: 33, ref: "FA2608-0009", status: 2, state: "bezahlt", open: false, credit_note: false,
-        date: "2026-08-30T08:00:00+00:00", due: null, total: "140.00000000", remain: "0", has_pdf: true }],
+        date: "2026-08-30T08:00:00+00:00", due: null, total: "140.00000000", remain: "0", has_pdf: true }, { ...CREDIT_NOTE }],
+      orders: [{ ...ORDER }], shipments: [{ ...SHIPMENT }], interventions: [{ ...INTERVENTION }], contracts: [{ ...CONTRACT }],
     },
+    documents: { "orders/51": ORDER, "shipments/61": SHIPMENT, "interventions/71": INTERVENTION, "contracts/81": CONTRACT },
     offers: { 31: { ...OFFER } },
     invoices: { 41: { ...INVOICE } },
     sent: [],
@@ -75,7 +103,7 @@ export async function mockPortal(page, state = portalState()) {
     if (path === "/me") return json(route, state.me);
     if (path === "/overview") return json(route, state.overview);
 
-    const pdf = path.match(/^\/(offers|invoices)\/(\d+)\/pdf$/);
+    const pdf = path.match(/^\/(offers|invoices|documents\/[a-z]+)\/(\d+)\/pdf$/);
     if (pdf) return route.fulfill({ status: 200, contentType: "application/pdf", body: "%PDF-1.4\n%%EOF\n" });
     const offer = path.match(/^\/offers\/(\d+)(\/answer)?$/);
     if (offer) {
@@ -87,6 +115,11 @@ export async function mockPortal(page, state = portalState()) {
         return json(route, state.offers[offer[1]]);
       }
       return json(route, item);
+    }
+    const found = path.match(/^\/documents\/([a-z]+\/\d+)$/);
+    if (found) {
+      const item = state.documents[found[1]];
+      return item ? json(route, item) : json(route, { detail: "Das gibt es hier nicht." }, 404);
     }
     const invoice = path.match(/^\/invoices\/(\d+)$/);
     if (invoice) {

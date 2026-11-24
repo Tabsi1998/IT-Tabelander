@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Link, NavLink, Route, Routes, useLocation, useNavigate } from "react-router";
+import { Link, Route, Routes, useLocation, useNavigate } from "react-router";
 import Footer from "../components/Footer.jsx";
 import Logo from "../components/Logo.jsx";
 import { Field, FormError } from "../forms/fields.jsx";
 import { portalRequest, usePortalData } from "./api.js";
 import Inquiries from "./pages/Inquiries.jsx";
 import { OfferDetail, Offers } from "./pages/Offers.jsx";
-import { InvoiceDetail, Invoices } from "./pages/Invoices.jsx";
+import { DocumentDetail, Documents } from "./pages/Documents.jsx";
+import { InvoiceDetail } from "./pages/Invoices.jsx";
 import Overview from "./pages/Overview.jsx";
 
 const PortalContext = createContext(null);
@@ -16,7 +17,9 @@ const NAV = [
   { to: "/kundenbereich", label: "Übersicht", end: true },
   { to: "/kundenbereich/anfragen", label: "Anfragen", count: "repairs_running" },
   { to: "/kundenbereich/angebote", label: "Angebote", count: "offers_open" },
-  { to: "/kundenbereich/rechnungen", label: "Rechnungen", count: "invoices_open" },
+  // Invoices, credit notes and every other document under one tab (#100);
+  // /kundenbereich/rechnungen stays the address of the invoices from the mails.
+  { to: "/kundenbereich/belege", label: "Belege", count: "invoices_open", also: "/kundenbereich/rechnungen" },
 ];
 
 function Header({ email, onSignOut }) {
@@ -132,26 +135,30 @@ function Redeem({ onSignedIn }) {
 }
 
 function Nav({ counts }) {
+  const { pathname } = useLocation();
+  // Active also below its address, and for Belege on the invoice pages (#100).
+  const on = (entry) => (entry.end ? pathname.replace(/\/$/, "") === entry.to
+    : [entry.to, entry.also].some((base) => base && (pathname === base || pathname.startsWith(`${base}/`))));
   const item = (active) => `flex min-h-[46px] items-center justify-between rounded-[10px] px-4 text-base font-semibold no-underline ${
     active ? "bg-navy text-on-navy hover:text-on-navy" : "text-ink"}`;
   return (
     <>
       <nav aria-label="Kundenbereich" className="hidden flex-col gap-1 border-r border-line bg-surface px-4 py-7 lg:flex">
         {NAV.map((entry) => (
-          <NavLink key={entry.to} to={entry.to} end={entry.end} className={({ isActive }) => item(isActive)}>
+          <Link key={entry.to} to={entry.to} aria-current={on(entry) ? "page" : undefined} className={item(on(entry))}>
             {entry.label}
             {entry.count && counts?.[entry.count] > 0 && (
               <span className="rounded-full bg-accent px-2 text-[13px] font-bold text-on-accent">{counts[entry.count]}</span>
             )}
-          </NavLink>
+          </Link>
         ))}
       </nav>
       <nav aria-label="Kundenbereich unten" className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-4 border-t border-line bg-surface lg:hidden">
         {NAV.map((entry) => (
-          <NavLink key={entry.to} to={entry.to} end={entry.end}
-            className={({ isActive }) => `flex items-center justify-center text-sm font-bold no-underline ${isActive ? "text-link-hover" : "text-muted"}`}>
+          <Link key={entry.to} to={entry.to} aria-current={on(entry) ? "page" : undefined}
+            className={`flex items-center justify-center text-sm font-bold no-underline ${on(entry) ? "text-link-hover" : "text-muted"}`}>
             {entry.label}
-          </NavLink>
+          </Link>
         ))}
       </nav>
     </>
@@ -171,8 +178,11 @@ function SignedIn({ me, onSignOut }) {
               <Route path="anfragen" element={<Inquiries />} />
               <Route path="angebote" element={<Offers />} />
               <Route path="angebote/:id" element={<OfferDetail />} />
-              <Route path="rechnungen" element={<Invoices />} />
+              <Route path="rechnungen" element={<Documents art="rechnungen" />} />
               <Route path="rechnungen/:id" element={<InvoiceDetail />} />
+              <Route path="belege" element={<Documents />} />
+              <Route path="belege/:art" element={<Documents />} />
+              <Route path="belege/:art/:id" element={<DocumentDetail />} />
               <Route path="*" element={<Overview />} />
             </Routes>
           </main>
