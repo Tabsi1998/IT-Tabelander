@@ -7,7 +7,9 @@ Produktion liefert FastAPI die Website, den Admin unter `/admin` und `/api`
 
 ## Schnellstart – ein Befehl
 
-Empfohlen ist Ubuntu 24.04 LTS. Im Projektverzeichnis genügt:
+Empfohlen ist Ubuntu 24.04 LTS. Nötig ist Python 3.11 bis 3.14 (Pillow 13
+läuft nicht mehr auf 3.10; Ubuntu 22.04 bringt nur 3.10 mit). Im
+Projektverzeichnis genügt:
 
 ```bash
 cd /var/www/IT-Tabelander
