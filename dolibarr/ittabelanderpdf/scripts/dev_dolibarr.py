@@ -2,9 +2,10 @@
 """A disposable local Dolibarr 23.0.3 to render the Werkbank PDFs and e-mails against.
 
 Same stack as IT-Tabelander's local check (scripts/local_check.py, group
-"dolibarr"): Dolibarr's own docker image built at a pinned commit, MariaDB,
-Mailpit catching every e-mail, no data that survives. Never talks to the
-production ERP.
+"dolibarr", the same image): Dolibarr's own docker image built at a pinned
+commit, MariaDB, Mailpit catching every e-mail, no data that survives. Never
+talks to the production ERP. The module lives in dolibarr/ittabelanderpdf/ of
+the IT-Tabelander repository; run this from that folder.
 
     python scripts/dev_dolibarr.py up         start Dolibarr + MariaDB + Mailpit (fresh install)
     python scripts/dev_dolibarr.py install    build the ZIP and unpack it into custom/
@@ -13,17 +14,27 @@ production ERP.
     python scripts/dev_dolibarr.py mails      e-mail scenarios, then Mailpit's messages into docs/beispiele/mails/
     python scripts/dev_dolibarr.py rollout    Mahnwesen and ticket texts into docs/rollout/, sent to Mailpit
     python scripts/dev_dolibarr.py ui         log in and check the card banner and the queue page
-    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui
+    python scripts/dev_dolibarr.py tickets    the module's own ticket confirmation (tests/ticket_confirm.php), checked in Mailpit
+    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets
     python scripts/dev_dolibarr.py down       remove containers, volumes and network
 
 Standard library only. Passwords are new on every start; the local test
 administrator's login is kept in .local-testing/ (git-ignored) for the ui step.
+
+IT-Tabelander's local check (group "dolibarr-modul") runs the same steps with
+its own containers and ports and writes the examples outside docs/, so a check
+never changes committed files:
+    ITTABPDF_PREFIX    container names (default ittpdf-dolibarr)
+    ITTABPDF_PORT      Dolibarr's port (default 18051)
+    ITTABPDF_MAIL_PORT Mailpit's port (default 18151)
+    ITTABPDF_OUT       folder for beispiele/ and rollout/ (default docs/)
 """
 
 from __future__ import annotations
 
 import http.cookiejar
 import json
+import os
 import re
 import secrets
 import shutil
@@ -34,28 +45,39 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+from html import unescape
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / ".local-testing"
-EXAMPLES = ROOT / "docs" / "beispiele"
+OUT = Path(os.environ.get("ITTABPDF_OUT") or ROOT / "docs").resolve()
+EXAMPLES = OUT / "beispiele"
 MAILS = EXAMPLES / "mails"
+ROLLOUT = OUT / "rollout"
 IMAGE = "local-ci/dolibarr:23.0.3"
 BUILD = "https://github.com/Dolibarr/dolibarr-docker.git#73658fe7060709b3bc798e646284775ec0020101:images/23.0.3-php8.2"
 MARIADB = "mariadb:11.4.13"
 MAILPIT = "axllent/mailpit:v1.31.1"
-PREFIX = "ittpdf-dolibarr"
+PREFIX = os.environ.get("ITTABPDF_PREFIX") or "ittpdf-dolibarr"
 NETWORK = f"{PREFIX}-net"
 WEB = f"{PREFIX}-web"
 DB = f"{PREFIX}-db"
 MAIL = f"{PREFIX}-mail"
-PORT = 18051
-MAIL_PORT = 18151
+PORT = int(os.environ.get("ITTABPDF_PORT") or 18051)
+MAIL_PORT = int(os.environ.get("ITTABPDF_MAIL_PORT") or 18151)
 URL = f"http://127.0.0.1:{PORT}"
 MAILPIT_URL = f"http://127.0.0.1:{MAIL_PORT}"
 FIXTURES = "/opt/ittpdf-fixtures"
 MODULE = "ittabelanderpdf"
 LOGIN = STATE / "admin-login.json"
+
+
+def shown(path: Path) -> str:
+    """A path relative to the module folder when it lies inside, else in full."""
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
 
 
 def docker(*args: str, check: bool = True, capture: bool = True) -> subprocess.CompletedProcess:
@@ -126,16 +148,17 @@ def install() -> None:
     print("installed", archive.name)
 
 
-def php(*args: str) -> dict:
-    done = docker("exec", "-u", "www-data", WEB, "php", f"{FIXTURES}/fixtures.php", *args, check=False)
+def php(*args: str, script: str = "fixtures.php") -> dict:
+    done = docker("exec", "-u", "www-data", WEB, "php", f"{FIXTURES}/{script}", *args, check=False)
     if done.returncode != 0:
-        raise SystemExit(f"fixtures {' '.join(args)} failed:\n{done.stdout}{done.stderr}")
+        raise SystemExit(f"{script} {' '.join(args)} failed:\n{done.stdout}{done.stderr}")
     return json.loads(done.stdout.strip().splitlines()[-1])
 
 
 def fixtures() -> None:
     php("base")
     print(json.dumps(php("setup"), indent=2, ensure_ascii=False))
+    print("company, bank account, customers and documents are in place")
 
 
 def pdf(only: str = "") -> None:
@@ -144,7 +167,7 @@ def pdf(only: str = "") -> None:
     EXAMPLES.mkdir(parents=True, exist_ok=True)
     docker("cp", f"{WEB}:/tmp/ittpdf-out/.", str(EXAMPLES))
     for target in sorted(EXAMPLES.glob("*.pdf")):
-        print(f"{target.relative_to(ROOT)}  {target.stat().st_size // 1024} KB")
+        print(f"{shown(target)}  {target.stat().st_size // 1024} KB")
 
 
 def mailpit(path: str) -> dict:
@@ -178,13 +201,13 @@ def mails() -> None:
                         "attachments": attachments, "inline": inline, "greeting": greeting})
     (MAILS / "uebersicht.json").write_text(json.dumps({"scenarios": result, "messages": summary}, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    print(f"{len(summary)} messages -> {MAILS.relative_to(ROOT)}")
+    print(f"{len(summary)} messages -> {shown(MAILS)}")
 
 
 def rollout() -> None:
     """Texts for production outside this module, into docs/rollout/, and their mails."""
     result = php("rollout")
-    target = ROOT / "docs" / "rollout"
+    target = ROLLOUT
     target.mkdir(parents=True, exist_ok=True)
     docker("cp", f"{WEB}:/tmp/ittpdf-rollout/.", str(target))
     docker("cp", f"{WEB}:/tmp/ittpdf-out/mahnwesen-brieftext-simulation.pdf", str(EXAMPLES / "mahnwesen-brieftext-simulation.pdf"))
@@ -202,7 +225,7 @@ def rollout() -> None:
         slug = f"rollout-{number:02d}-" + re.sub(r"[^a-z0-9]+", "-", detail["Subject"].lower()).strip("-")[:70]
         (MAILS / f"{slug}.html").write_text(detail.get("HTML") or "", encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    print(f"{number} rollout messages -> {MAILS.relative_to(ROOT)}")
+    print(f"{number} rollout messages -> {shown(MAILS)}")
 
 
 def ui() -> None:
@@ -236,7 +259,7 @@ def ui() -> None:
         checks.append({"page": "dark maillogo without login", "ok": answer.status == 200 and data[1:4] == b"PNG"
                        and int.from_bytes(data[16:20], "big") <= 480, "missing": [f"{answer.status} {len(data)} bytes"]})
     # Dolibarr's WAF checks every POST: the texts must pass it, or nobody can save them.
-    samples = [ROOT / "docs" / "rollout" / "mahnwesen" / "mahnung-1.html", ROOT / "docs" / "rollout" / "ticket" / "signatur.html",
+    samples = [ROLLOUT / "mahnwesen" / "mahnung-1.html", ROLLOUT / "ticket" / "signatur.html",
                next(MAILS.glob("*von-hand*angebot*.html"), None) or next(MAILS.glob("*von-hand*.html"))]
     for sample in samples:
         page = opener.open(f"{URL}/custom/ittabelanderpdf/admin/setup.php", timeout=30).read().decode("utf-8", "replace")
@@ -261,17 +284,72 @@ def ui() -> None:
     print(json.dumps(checks, indent=2, ensure_ascii=False))
     if not all(check["ok"] for check in checks):
         raise SystemExit("ui check failed")
+    print(f"{len(checks)} page checks passed")
+
+
+def tickets() -> None:
+    """The module's own mails for a new ticket (tests/ticket_confirm.php), checked in Mailpit.
+
+    The customer gets the confirmation by Du or Sie without the ticket text
+    (it may carry internal notes), the owner the German notice with the full
+    text, and Dolibarr's built-in mails do not go out as well. Saved as
+    ticket-*.html next to the other e-mails.
+    """
+    urllib.request.urlopen(urllib.request.Request(f"{MAILPIT_URL}/api/v1/messages", method="DELETE"), timeout=30)
+    php("enable", script="ticket_confirm.php")
+    created = php("run", script="ticket_confirm.php")
+    time.sleep(2)
+    messages = [mailpit(f"message/{item['ID']}") for item in
+                sorted(mailpit("messages?limit=200").get("messages", []), key=lambda entry: entry["Created"])]
+    for old in MAILS.glob("ticket-*.html"):
+        old.unlink()
+    MAILS.mkdir(parents=True, exist_ok=True)
+    for number, detail in enumerate(messages, 1):
+        slug = f"ticket-{number:02d}-" + re.sub(r"[^a-z0-9]+", "-", detail["Subject"].lower()).strip("-")[:70]
+        (MAILS / f"{slug}.html").write_text(detail.get("HTML") or "", encoding="utf-8")
+
+    def to(detail: dict) -> set:
+        return {entry["Address"] for entry in detail.get("To") or []}
+
+    internal = "intern, nur für den Inhaber"
+    checks = []
+    expected = {"du": ("max@mustermann.example", "Deine Anfrage", "Liebe Grüße"),
+                "sie": ("office@musterfirma.example", "Ihre Anfrage", "Mit freundlichen Grüßen"),
+                "website": ("anna@beispiel.example", "Ihre Anfrage", "Mit freundlichen Grüßen")}
+    for case, (address, opening, closing) in expected.items():
+        ref = created[case]["ref"]
+        mine = [detail for detail in messages if address in to(detail)]
+        html = unescape(mine[0].get("HTML") or "") if len(mine) == 1 else ""
+        checks.append({"check": f"{case}: one confirmation to {address}",
+                       "ok": len(mine) == 1 and mine[0]["Subject"].startswith(f"{opening} {ref}")
+                       and closing in html and internal not in html and "\\n" not in html,
+                       "found": [detail["Subject"] for detail in mine]})
+        notice = [detail for detail in messages if "inhaber@tabelander.example" in to(detail) and ref in detail["Subject"]]
+        checks.append({"check": f"{case}: one owner notice with the full text",
+                       "ok": len(notice) == 1 and notice[0]["Subject"].startswith(f"Neue Anfrage {ref}")
+                       and internal in unescape(notice[0].get("HTML") or ""),
+                       "found": [detail["Subject"] for detail in notice]})
+    off = created["off"]["ref"]
+    silent = [detail["Subject"] for detail in messages if "still@beispiel.example" in to(detail) or off in detail["Subject"]]
+    checks.append({"check": "off: no mail at all", "ok": not silent, "found": silent})
+    checks.append({"check": "no other mail (Dolibarr's own texts stay away)", "ok": len(messages) == 6,
+                   "found": [detail["Subject"] for detail in messages]})
+    print(json.dumps({"tickets": created, "checks": checks}, indent=2, ensure_ascii=False))
+    print(f"{len(messages)} ticket messages -> {shown(MAILS)}")
+    if not all(check["ok"] for check in checks):
+        raise SystemExit("ticket check failed")
 
 
 def main() -> int:
-    steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui, "down": down}
+    steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
+             "tickets": tickets, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets"):
                 steps[name]()
         elif step in steps:
             steps[step]()

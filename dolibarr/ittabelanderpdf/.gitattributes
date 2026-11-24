@@ -8,3 +8,6 @@
 *.zip binary
 *.z binary
 *.ttf binary
+
+# Mail samples are Mailpit's output as received; their trailing spaces are the mail, not a typo.
+docs/beispiele/mails/*.html -whitespace
