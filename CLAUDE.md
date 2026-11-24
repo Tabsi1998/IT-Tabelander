@@ -24,14 +24,14 @@ Results in `.local-testing/local-check.json`, logs in `.local-testing/logs/`
 | Group | Runs |
 | --- | --- |
 | repository | shell scripts parse, no CRLF, `git diff --check`, Gitleaks |
-| backend | Python 3.10 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, unit tests |
+| backend | Python 3.11 and 3.14: venv from `requirements-dev.txt`, `pip check`, compileall, `import server`, unit tests |
 | integration | MongoDB container, uvicorn over HTTPS, `tests/test_api.py`, `tests/test_regression_iter2.py` |
 | dolibarr | Dolibarr 23.0.3 (live release) + MariaDB + Mailpit in Docker, prepared by `backend/tests/dolibarr_fixtures/fixtures.php`, `tests/test_dolibarr_runtime.py` |
 | web | `web/`: frozen install, ESLint (jsx-a11y strict), Vitest, build + prerender, Playwright at 390/768/1280/1440 px with axe WCAG 2.1 AA |
 | extra | test inventory, OSV over the lockfiles, ShellCheck (ratchet) |
 | deploy | `start.sh`/`stop.sh`/`update.sh` on a throwaway Ubuntu 24.04 with systemd (`scripts/deploy-test/`), tests the committed HEAD |
 
-Tools: Docker Desktop, Git for Windows (bash, openssl), gitleaks, Python 3.10
+Tools: Docker Desktop, Git for Windows (bash, openssl), gitleaks, Python 3.11
 and 3.14 via `py`, Node 24 with Corepack. A missing tool skips its steps.
 
 ## Rules for tests

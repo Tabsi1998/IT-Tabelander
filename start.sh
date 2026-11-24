@@ -230,8 +230,8 @@ require_command curl
 require_command mktemp
 require_command tail
 
-if ! "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] <= (3, 14) else 1)'; then
-  die "$PYTHON_BIN muss Python 3.10 bis 3.14 sein (gefunden: $("$PYTHON_BIN" --version 2>&1))."
+if ! "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if (3, 11) <= sys.version_info[:2] <= (3, 14) else 1)'; then
+  die "$PYTHON_BIN muss Python 3.11 bis 3.14 sein (gefunden: $("$PYTHON_BIN" --version 2>&1))."
 fi
 
 NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])')"
