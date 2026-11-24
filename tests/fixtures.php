@@ -1,0 +1,376 @@
+<?php
+/*
+ * Test data and sample PDFs for the disposable Dolibarr of scripts/dev_dolibarr.py.
+ *
+ *   php fixtures.php base     modules and constants (own process: Dolibarr reads
+ *                             the module folders only at start)
+ *   php fixtures.php setup    company like production, bank account, customers,
+ *                             products and every sample document
+ *   php fixtures.php render   build every sample document with werkbank into /tmp/ittpdf-out
+ *   php fixtures.php const NAME VALUE   set one constant (to try a variant)
+ *
+ * Never run against a real Dolibarr: it rewrites the company setup.
+ */
+
+require __DIR__.'/bootstrap.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/images.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
+require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+require_once DOL_DOCUMENT_ROOT.'/comm/propal/class/propal.class.php';
+require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+require_once DOL_DOCUMENT_ROOT.'/compta/paiement/class/paiement.class.php';
+require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
+
+const RT_STATE = '/tmp/ittpdf-docs.json';
+const RT_OUT = '/tmp/ittpdf-out';
+
+$stage = $argv[1] ?? '';
+$admin = rt_admin($db);
+$user = $admin;
+$GLOBALS['user'] = $admin;
+$langs->setDefaultLang('de_DE');
+$langs->loadLangs(array('main', 'bills', 'propal', 'companies'));
+
+/** Timestamp of a date at noon, server time. */
+function rt_day($text)
+{
+	list($year, $month, $day) = array_map('intval', explode('-', $text));
+	return dol_mktime(12, 0, 0, $month, $day, $year);
+}
+
+/** A product or service with a unit. */
+function rt_product($db, $admin, $ref, $label, $price, $desc = '', $unit = 'P', $type = 1, array $extra = array())
+{
+	$product = new Product($db);
+	$product->ref = $ref;
+	$product->label = $label;
+	$product->description = $desc;
+	$product->type = $type;
+	$product->price = $price;
+	$product->price_base_type = 'HT';
+	$product->tva_tx = 0;
+	$product->status = 1;
+	$product->status_buy = 1;
+	$product->fk_unit = (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."c_units WHERE code = '".$db->escape($unit)."'");
+	foreach ($extra as $field => $value) {
+		$product->$field = $value;
+	}
+	if ($product->create($admin) <= 0) {
+		rt_fail('product '.$ref.': '.$product->error.' '.implode(',', $product->errors));
+	}
+	return $product;
+}
+
+/** Add product lines to a proposal or an invoice: array(product|null, qty, discount, desc, date_start, date_end). */
+function rt_lines($object, array $lines)
+{
+	foreach ($lines as $line) {
+		list($product, $qty) = $line;
+		$discount = $line[2] ?? 0;
+		$desc = $line[3] ?? ($product ? $product->description : '');
+		$start = $line[4] ?? '';
+		$end = $line[5] ?? '';
+		$price = $product ? $product->price : ($line[6] ?? 0);
+		$fkProduct = $product ? $product->id : 0;
+		$type = $product ? $product->type : 1;
+		$unit = $product ? $product->fk_unit : null;
+		if ($object instanceof Propal) {
+			$result = $object->addline($desc, $price, $qty, 0, 0, 0, $fkProduct, $discount, 'HT', 0, 0, $type, -1, 0, 0, 0, 0, '', $start, $end, array(), $unit);
+		} else {
+			$result = $object->addline($desc, $price, $qty, 0, 0, 0, $fkProduct, $discount, $start, $end, 0, 0, 0, 'HT', 0, $type, -1, 0, '', 0, 0, null, 0, '', array(), 100, 0, $unit);
+		}
+		if ($result <= 0) {
+			rt_fail('line on '.$object->element.': '.$object->error.' '.implode(',', (array) $object->errors));
+		}
+	}
+}
+
+/** A validated (or draft) invoice. */
+function rt_invoice($db, $admin, $socid, array $fields, array $lines, $validate = true)
+{
+	$invoice = new Facture($db);
+	$invoice->socid = $socid;
+	$invoice->type = Facture::TYPE_STANDARD;
+	$invoice->date = rt_day('2026-11-24');
+	$invoice->cond_reglement_id = (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."c_payment_term WHERE code = '30D'");
+	$invoice->mode_reglement_id = (int) rt_value($db, "SELECT id FROM ".MAIN_DB_PREFIX."c_paiement WHERE code = 'VIR'");
+	foreach ($fields as $field => $value) {
+		$invoice->$field = $value;
+	}
+	if ($invoice->create($admin) <= 0) {
+		rt_fail('invoice: '.$invoice->error.' '.implode(',', (array) $invoice->errors));
+	}
+	rt_lines($invoice, $lines);
+	if ($validate && $invoice->validate($admin) <= 0) {
+		rt_fail('validate invoice: '.$invoice->error.' '.implode(',', (array) $invoice->errors));
+	}
+	$invoice->fetch($invoice->id);
+	return $invoice;
+}
+
+/** A payment of $amount on an invoice into the test account. */
+function rt_pay($db, $admin, $invoice, $amount, $accountId, $date)
+{
+	$payment = new Paiement($db);
+	$payment->datepaye = rt_day($date);
+	$payment->amounts = array($invoice->id => $amount);
+	$payment->paiementid = (int) rt_value($db, "SELECT id FROM ".MAIN_DB_PREFIX."c_paiement WHERE code = 'VIR'");
+	$payment->paiementcode = 'VIR';
+	if ($payment->create($admin, 1) <= 0) {
+		rt_fail('payment: '.$payment->error);
+	}
+	if ($payment->addPaymentToBank($admin, 'payment', '(CustomerInvoicePayment)', $accountId, '', '') <= 0) {
+		rt_fail('payment to bank: '.$payment->error);
+	}
+}
+
+if ($stage === 'base') {
+	rt_const($db, 'MAIN_LANG_DEFAULT', 'de_DE');
+	rt_const($db, 'MAIN_MONNAIE', 'EUR');
+	rt_modules(array('modSociete', 'modPropale', 'modFacture', 'modBanque', 'modProduct', 'modService', 'modITTabelanderPDF'));
+	// Werkbank as the default, as the owner sets it after activation.
+	rt_const($db, 'PROPALE_ADDON_PDF', 'werkbank');
+	rt_const($db, 'FACTURE_ADDON_PDF', 'werkbank');
+	echo json_encode(array('base' => 'ok')), "\n";
+	exit(0);
+}
+
+if ($stage === 'setup') {
+	// One transaction: a failed run leaves nothing behind and can simply run again.
+	$db->begin();
+
+	// Company as in production (erp.tabelander.co.at), but a sample IBAN.
+	rt_const($db, 'MAIN_INFO_SOCIETE_NOM', 'IT-Tabelander');
+	rt_const($db, 'MAIN_INFO_SOCIETE_ADDRESS', 'Spridrichstraße 17');
+	rt_const($db, 'MAIN_INFO_SOCIETE_ZIP', '6410');
+	rt_const($db, 'MAIN_INFO_SOCIETE_TOWN', 'Telfs');
+	rt_const($db, 'MAIN_INFO_SOCIETE_COUNTRY', '41:AT:Österreich');
+	rt_const($db, 'MAIN_INFO_SOCIETE_MANAGERS', 'Fabian Tabelander');
+	rt_const($db, 'MAIN_INFO_SOCIETE_MOBILE', '+436766039945');
+	rt_const($db, 'MAIN_INFO_SOCIETE_MAIL', 'office@tabelander.co.at');
+	rt_const($db, 'MAIN_INFO_SOCIETE_WEB', 'https://it.tabelander.co.at');
+	rt_const($db, 'MAIN_INFO_SIRET', 'Innsbruck');
+	rt_const($db, 'MAIN_INFO_RCS', 'GISA-Zahl: 39417879');
+	rt_const($db, 'MAIN_INFO_PROFID6', 'GLN: 9110039041378');
+	rt_const($db, 'FACTURE_TVAOPTION', '0');
+	rt_const($db, 'PRODUCT_USE_UNITS', '1');
+	rt_const($db, 'INVOICE_POINTOFTAX_DATE', '1');
+	rt_const($db, 'FACTURE_DRAFT_WATERMARK', 'ENTWURF');
+	rt_const($db, 'PROPALE_DRAFT_WATERMARK', 'ENTWURF');
+	rt_const($db, 'MAIN_PDF_PROPAL_USE_ELECTRONIC_SIGNING', '1');
+	rt_const($db, 'INVOICE_FREE_TEXT', 'Umsatzsteuerbefreit – Kleinunternehmer gem. § 6 Abs. 1 Z 27 UStG. Fragen zur Rechnung: __FROM_EMAIL__');
+
+	// Units as the owner keeps them: "Stk" for pieces and a kilometre unit.
+	rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."c_units SET short_label = 'Stk' WHERE code = 'P'");
+	if (!rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."c_units WHERE code = 'KM'")) {
+		rt_exec($db, "INSERT INTO ".MAIN_DB_PREFIX."c_units (code, sortorder, scale, label, short_label, unit_type, active) VALUES ('KM', 205, 3, 'Kilometer', 'km', 'size', 1)");
+	}
+
+	// Logo, with Dolibarr's own thumbnails.
+	$logoDir = $conf->mycompany->dir_output.'/logos';
+	dol_mkdir($logoDir.'/thumbs');
+	copy(__DIR__.'/logo.png', $logoDir.'/it-tabelander.png');
+	vignette($logoDir.'/it-tabelander.png', 160, 120, '_small', 50, 'thumbs');
+	vignette($logoDir.'/it-tabelander.png', 64, 64, '_mini', 50, 'thumbs');
+	rt_const($db, 'MAIN_INFO_SOCIETE_LOGO', 'it-tabelander.png');
+	rt_const($db, 'MAIN_INFO_SOCIETE_LOGO_SMALL', 'it-tabelander_small.png');
+	rt_const($db, 'MAIN_INFO_SOCIETE_LOGO_MINI', 'it-tabelander_mini.png');
+
+	$account = new Account($db);
+	$account->ref = 'GIRO';
+	$account->label = 'Geschäftskonto';
+	$account->courant = Account::TYPE_CURRENT;
+	$account->bank = 'Beispielbank';
+	$account->iban = 'AT611904300234573201';
+	$account->bic = 'BKAUATWW';
+	$account->owner_name = 'Fabian Tabelander';
+	$account->proprio = 'Fabian Tabelander';
+	$account->currency_code = 'EUR';
+	$account->country_id = 41;
+	$account->date_solde = dol_now();
+	if ($account->create($admin) <= 0) {
+		rt_fail('bank account: '.$account->error);
+	}
+	rt_const($db, 'FACTURE_RIB_NUMBER', $account->id);
+
+	$firm = new Societe($db);
+	$firm->name = 'Musterfirma GmbH';
+	$firm->client = 1;
+	$firm->code_client = 'CU2611-00006';
+	$firm->address = 'Hauptstraße 12';
+	$firm->zip = '6020';
+	$firm->town = 'Innsbruck';
+	$firm->country_id = 41;
+	$firm->email = 'office@musterfirma.example';
+	if ($firm->create($admin) <= 0) {
+		rt_fail('customer: '.$firm->error);
+	}
+	$contact = new Contact($db);
+	$contact->socid = $firm->id;
+	$contact->firstname = 'Maria';
+	$contact->lastname = 'Muster';
+	$contact->email = 'maria.muster@musterfirma.example';
+	if ($contact->create($admin) <= 0) {
+		rt_fail('contact: '.$contact->error);
+	}
+	$private = new Societe($db);
+	$private->name = 'Max Mustermann';
+	$private->client = 1;
+	$private->code_client = 'CU2611-00007';
+	$private->address = 'Untermarktstraße 5';
+	$private->zip = '6410';
+	$private->town = 'Telfs';
+	$private->country_id = 41;
+	$private->email = 'max@mustermann.example';
+	if ($private->create($admin) <= 0) {
+		rt_fail('customer: '.$private->error);
+	}
+
+	$p = array();
+	$p['ssd'] = rt_product($db, $admin, 'DL-HW-SSD', 'SSD-Upgrade inkl. Systemumzug', 49.90, 'Einbau der neuen SSD und Umzug des bestehenden Systems mit allen Programmen und Daten. SSD wird separat verrechnet.');
+	$p['mat'] = rt_product($db, $admin, 'MATERIAL', 'Samsung SSD 990 PRO, 1 TB NVMe', 124.90, 'Modell MZ-V9P1T0BW, PCIe 4.0', 'P', 0);
+	$p['win'] = rt_product($db, $admin, 'DL-PC-WIN', 'Windows-Neuinstallation inkl. Treiber und Updates', 69.90, 'Neuinstallation, aktuelle Treiber und Updates, Grundeinrichtung (Benutzerkonto, Browser, Sicherheit). Windows-Lizenz nicht enthalten.');
+	$p['daten'] = rt_product($db, $admin, 'DL-PC-DATEN', 'Datenübernahme vom Altgerät', 49.90, 'Sicherung und Übertragung der persönlichen Daten auf das neu installierte System.');
+	$p['std'] = rt_product($db, $admin, 'DL-STD-WERK', 'Werkstattstunde (Hardware, Controller)', 45.00, 'Arbeitszeit, die nicht in einer Pauschale enthalten ist.', 'H');
+	$p['km'] = rt_product($db, $admin, 'DL-ANFAHRT-KM', 'Kilometergeld je weiterem km', 0.50, '', 'KM');
+	$p['akku'] = rt_product($db, $admin, 'DL-PS5-AKKU', 'Akkuwechsel PS5 Controller inkl. Funktionstest', 24.90, 'Austausch des Controller-Akkus inkl. Öffnen, Zusammenbau, Lade- und Funktionstest.');
+	$p['akkumat'] = rt_product($db, $admin, 'MAT-PS5-AKKU-2600', 'Akku-Upgrade PS5 DualSense – 2600 mAh', 29.90, '', 'P', 0);
+	$p['versand'] = rt_product($db, $admin, 'DL-VERSAND', 'Rückversand innerhalb Österreichs', 7.90);
+	$p['wartung'] = rt_product($db, $admin, 'DL-WARTUNG-M', 'IT-Betreuung Kleinbüro, monatlich', 89.00, 'Updates, Datensicherung prüfen, Fernwartung bis 1 Stunde im Monat.', 'P', 1, array('duration_value' => 1, 'duration_unit' => 'm'));
+	$p['hosting'] = rt_product($db, $admin, 'DL-HOSTING-J', 'Webhosting mit Domain, jährlich', 120.00, 'Speicher 10 GB, SSL-Zertifikat, tägliche Sicherung.', 'P', 1, array('duration_value' => 1, 'duration_unit' => 'y'));
+
+	$term14 = (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."c_payment_term WHERE code = '30D'");
+	$vir = (int) rt_value($db, "SELECT id FROM ".MAIN_DB_PREFIX."c_paiement WHERE code = 'VIR'");
+	$docs = array();
+
+	// (1) The proposal of the approved design.
+	$prop = new Propal($db);
+	$prop->socid = $firm->id;
+	$prop->date = rt_day('2026-11-24');
+	$prop->duree_validite = 14;
+	$prop->cond_reglement_id = $term14;
+	$prop->mode_reglement_id = $vir;
+	$prop->ref_client = 'PC-Reparatur nach Überspannung';
+	$prop->note_public = 'Bei der Überprüfung wurde ein Überspannungsschaden festgestellt. Die folgenden Arbeiten bringen das System wieder in einen sauberen, getesteten Zustand.';
+	if ($prop->create($admin) <= 0) {
+		rt_fail('proposal: '.$prop->error);
+	}
+	rt_lines($prop, array(array($p['ssd'], 1), array($p['mat'], 1), array($p['win'], 1), array($p['daten'], 1), array($p['std'], 0.5), array($p['km'], 14)));
+	$prop->add_contact($contact->id, 'CUSTOMER', 'external');
+	$prop->valid($admin);
+	$docs['angebot-1-wie-entwurf'] = array('propal', $prop->id);
+	$proposalOne = $prop;
+
+	// (2) Many lines over several pages, a discount and a free line.
+	$prop = new Propal($db);
+	$prop->socid = $firm->id;
+	$prop->date = rt_day('2026-11-24');
+	$prop->duree_validite = 30;
+	$prop->cond_reglement_id = $term14;
+	$prop->mode_reglement_id = $vir;
+	$prop->ref_client = 'Neuausstattung Büro, 8 Arbeitsplätze';
+	$prop->note_public = "Wie besprochen: acht Arbeitsplätze, ein kleiner Server für Dateien und Sicherung, das Netzwerk dazu.\nAlles wird vor der Lieferung bei uns aufgesetzt und getestet.";
+	if ($prop->create($admin) <= 0) {
+		rt_fail('proposal: '.$prop->error);
+	}
+	$lines = array();
+	$cycle = array('ssd', 'mat', 'win', 'daten', 'std', 'akku', 'versand');
+	for ($i = 0; $i < 23; $i++) {
+		$key = $cycle[$i % count($cycle)];
+		$lines[] = array($p[$key], 1 + ($i % 3), $i === 4 ? 10 : 0);
+	}
+	rt_lines($prop, $lines);
+	rt_lines($prop, array(array(null, 1, 0, "Pauschale Projektleitung\nAbstimmung, Planung und Übergabe an einem Termin vor Ort.", '', '', 150.00)));
+	rt_lines($prop, array(array($p['km'], 28, 5)));
+	$prop->add_contact($contact->id, 'CUSTOMER', 'external');
+	$prop->valid($admin);
+	$docs['angebot-2-mehrseitig'] = array('propal', $prop->id);
+
+	// (3) Invoice with QR code, linked to proposal 1; service date = invoice date.
+	$inv = rt_invoice($db, $admin, $private->id, array('note_public' => 'Vielen Dank für den Auftrag. Bitte den Betrag unter Angabe der Rechnungsnummer überweisen.'),
+		array(array($p['akku'], 1), array($p['akkumat'], 1), array($p['versand'], 1)));
+	$inv->add_object_linked('propal', $proposalOne->id);
+	$docs['rechnung-1-qr'] = array('facture', $inv->id);
+	$invoiceOne = $inv;
+
+	// (4) Partly paid, service period from the line dates.
+	$inv = rt_invoice($db, $admin, $firm->id, array('ref_client' => 'Betreuung November'), array(
+		array($p['wartung'], 1, 0, '', rt_day('2026-11-01'), rt_day('2026-11-30')),
+		array($p['std'], 2.5, 0, 'Einrichtung neuer Drucker im Empfang.', rt_day('2026-11-12'), rt_day('2026-11-12')),
+	));
+	rt_pay($db, $admin, $inv, 100.00, $account->id, '2026-11-26');
+	$docs['rechnung-2-teilzahlung'] = array('facture', $inv->id);
+
+	// (5) Down payment invoice with a tax point date.
+	$inv = rt_invoice($db, $admin, $firm->id, array('type' => Facture::TYPE_DEPOSIT, 'date_pointoftax' => rt_day('2026-11-20'), 'ref_client' => 'Neuausstattung Büro'),
+		array(array(null, 1, 0, "Anzahlung 30 %\nZum Angebot Neuausstattung Büro, 8 Arbeitsplätze.", '', '', 900.00)));
+	$docs['rechnung-3-anzahlung'] = array('facture', $inv->id);
+
+	// (6) Credit note for invoice 3, open.
+	$credit = rt_invoice($db, $admin, $private->id, array('type' => Facture::TYPE_CREDIT_NOTE, 'fk_facture_source' => $invoiceOne->id, 'note_public' => 'Der Rückversand entfällt, der Controller wurde abgeholt.'),
+		array(array($p['versand'], 1)));
+	$docs['gutschrift-1-offen'] = array('facture', $credit->id);
+
+	// (7) Credit note refunded by bank transfer.
+	$credit = rt_invoice($db, $admin, $firm->id, array('type' => Facture::TYPE_CREDIT_NOTE, 'fk_facture_source' => $invoiceOne->id),
+		array(array($p['std'], 0.5, 0, 'Zu viel verrechnete Arbeitszeit.')));
+	rt_pay($db, $admin, $credit, -22.50, $account->id, '2026-11-27');
+	$credit->setPaid($admin);
+	$docs['gutschrift-2-erstattet'] = array('facture', $credit->id);
+
+	// (8) Replacement invoice for a wrong invoice.
+	$wrong = rt_invoice($db, $admin, $private->id, array(), array(array($p['akku'], 2)));
+	$repl = rt_invoice($db, $admin, $private->id, array('type' => Facture::TYPE_REPLACEMENT, 'fk_facture_source' => $wrong->id), array(array($p['akku'], 1)), false);
+	if ($repl->validate($admin) <= 0) {
+		rt_fail('replacement: '.$repl->error.' '.implode(',', (array) $repl->errors));
+	}
+	$docs['rechnung-4-ersatz'] = array('facture', $repl->id);
+
+	// (9) A draft with the watermark.
+	$draft = rt_invoice($db, $admin, $firm->id, array('ref_client' => 'Notebook-Reinigung'), array(array($p['std'], 1, 0, 'Lüfter gereinigt, Wärmeleitpaste erneuert.')), false);
+	$docs['entwurf-rechnung'] = array('facture', $draft->id);
+
+	$db->commit();
+	file_put_contents(RT_STATE, json_encode($docs));
+	echo json_encode(array('documents' => array_keys($docs))), "\n";
+	exit(0);
+}
+
+if ($stage === 'render') {
+	$only = $argv[2] ?? '';
+	$docs = json_decode((string) file_get_contents(RT_STATE), true);
+	dol_mkdir(RT_OUT);
+	$classes = array('propal' => 'Propal', 'facture' => 'Facture');
+	$done = array();
+	foreach ($docs as $name => $entry) {
+		list($element, $id) = $entry;
+		if ($only !== '' && strpos($name, $only) === false) {
+			continue;
+		}
+		$class = $classes[$element];
+		$object = new $class($db);
+		$object->fetch($id);
+		$object->fetch_thirdparty();
+		if ($object->generateDocument('werkbank', $langs) <= 0) {
+			rt_fail($name.': '.$object->error.' '.implode(',', (array) $object->errors));
+		}
+		$ref = dol_sanitizeFileName($object->ref);
+		$source = $object->last_main_doc ? DOL_DATA_ROOT.'/'.$object->last_main_doc : '';
+		if (!is_file($source)) {
+			rt_fail($name.': no PDF at '.$source);
+		}
+		copy($source, RT_OUT.'/'.$name.'.pdf');
+		$done[] = $name.' ('.$ref.')';
+	}
+	echo json_encode(array('rendered' => $done)), "\n";
+	exit(0);
+}
+
+if ($stage === 'const') {
+	rt_const($db, $argv[2], $argv[3] ?? '');
+	echo json_encode(array($argv[2] => $argv[3] ?? '')), "\n";
+	exit(0);
+}
+
+rt_fail('unknown stage '.$stage);

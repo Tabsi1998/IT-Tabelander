@@ -1,0 +1,68 @@
+# IT-Tabelander PDF - Werkbank
+ModuleITTabelanderPDFName = IT-Tabelander PDF
+ModuleITTabelanderPDFDesc = PDF templates in the IT-Tabelander Werkbank design
+ModuleITTabelanderPDFDescLong = Documents (proposals, invoices and more) in the Werkbank design with the IT-Tabelander brand fonts.
+WerkbankModelDescription = Werkbank – IT-Tabelander design with brand fonts
+WerkbankUnsupported = The werkbank template does not know the document type %s.
+WerkbankSetup = IT-Tabelander PDF setup
+WerkbankSetupPdf = PDF template werkbank
+WerkbankSetupAcceptText = "Accept" text on proposals
+WerkbankSetupTaxNotice = Notice below the total when the company charges no VAT
+WerkbankSetupModels = The template is called <b>werkbank</b>. Make it the default in the setup of each document type (e.g. proposals, invoices) → document templates.
+
+# Page and table
+WerkbankPageOf = Page %s / %s
+WerkbankColPos = No.
+WerkbankColService = Service
+WerkbankColArticle = Item
+WerkbankColActivity = Activity
+WerkbankColQty = Qty
+WerkbankColPrice = Unit price
+WerkbankColTotal = Total
+WerkbankAttention = Attn.
+WerkbankVatId = VAT ID
+WerkbankCourt = Place of jurisdiction %s
+WerkbankDiscount = Discount %s
+WerkbankOnDate = On
+WerkbankPeriod = Period
+WerkbankTaxNoticeDefault = VAT exempt – small business according to § 6 (1) 27 UStG
+WerkbankNet = Net
+WerkbankVat = VAT %s
+WerkbankCustomerCode = Customer no.
+WerkbankSupplierCode = Supplier no.
+WerkbankDate = Date
+WerkbankTotal = Total
+WerkbankPayment = Payment
+
+# Proposal
+WerkbankProposal = Proposal
+WerkbankProposalNo = Proposal no.
+WerkbankValidUntil = Valid until
+WerkbankAccept = Accept
+WerkbankAcceptDefault = Online in the customer area at it.tabelander.co.at or by e-mail. Work starts after your confirmation.
+WerkbankSignCustomer = Date, signature of the customer
+
+# Invoice
+WerkbankInvoice = Invoice
+WerkbankDepositInvoice = Down payment invoice
+WerkbankReplacementInvoice = Replacement invoice
+WerkbankCreditNote = Credit note
+WerkbankInvoiceNo = Invoice no.
+WerkbankCreditNoteNo = Credit note no.
+WerkbankServiceDate = Date of service
+WerkbankAsInvoiceDate = as invoice date
+WerkbankDueDate = Due on
+WerkbankForInvoice = For invoice
+WerkbankReplaces = Replaces
+WerkbankForProposal = For proposal
+WerkbankToPay = To pay
+WerkbankOpen = Open
+WerkbankInvoiceAmount = Invoice amount
+WerkbankAlreadyPaid = Already paid
+WerkbankCreditsUsed = Credit notes
+WerkbankRefunded = Refunded
+WerkbankCredited = Credited
+WerkbankCreditAmount = Credit
+WerkbankTransfer = Bank transfer
+WerkbankReference = Reference
+WerkbankQrText = Scan with your banking app: amount, IBAN and reference are already filled in.

@@ -1,0 +1,68 @@
+# IT-Tabelander PDF - Werkbank
+ModuleITTabelanderPDFName = IT-Tabelander PDF
+ModuleITTabelanderPDFDesc = PDF-Vorlagen im Werkbank-Design von IT-Tabelander
+ModuleITTabelanderPDFDescLong = Belege (Angebote, Rechnungen und weitere) im Werkbank-Design mit den Markenschriften von IT-Tabelander.
+WerkbankModelDescription = Werkbank – IT-Tabelander-Design mit Markenschriften
+WerkbankUnsupported = Die Vorlage werkbank kennt den Belegtyp %s nicht.
+WerkbankSetup = Einstellungen IT-Tabelander PDF
+WerkbankSetupPdf = PDF-Vorlage werkbank
+WerkbankSetupAcceptText = Text „Annehmen“ auf Angeboten
+WerkbankSetupTaxNotice = Hinweis unter dem Gesamtbetrag, wenn die Firma keine Umsatzsteuer verrechnet
+WerkbankSetupModels = Die Vorlage heißt <b>werkbank</b>. Als Standard setzen: Einstellungen der jeweiligen Belegart (z. B. Angebote, Rechnungen) → Dokumentvorlagen.
+
+# Page and table
+WerkbankPageOf = Seite %s / %s
+WerkbankColPos = Pos.
+WerkbankColService = Leistung
+WerkbankColArticle = Artikel
+WerkbankColActivity = Tätigkeit
+WerkbankColQty = Menge
+WerkbankColPrice = Einzelpreis
+WerkbankColTotal = Gesamt
+WerkbankAttention = z. H.
+WerkbankVatId = UID
+WerkbankCourt = Gerichtsstand %s
+WerkbankDiscount = Rabatt %s
+WerkbankOnDate = Am
+WerkbankPeriod = Zeitraum
+WerkbankTaxNoticeDefault = Umsatzsteuerbefreit – Kleinunternehmer gem. § 6 Abs. 1 Z 27 UStG
+WerkbankNet = Netto
+WerkbankVat = USt %s
+WerkbankCustomerCode = Kundennr.
+WerkbankSupplierCode = Lieferantennr.
+WerkbankDate = Datum
+WerkbankTotal = Gesamt
+WerkbankPayment = Zahlung
+
+# Proposal
+WerkbankProposal = Angebot
+WerkbankProposalNo = Angebot Nr.
+WerkbankValidUntil = Gültig bis
+WerkbankAccept = Annehmen
+WerkbankAcceptDefault = Online im Kundenbereich auf it.tabelander.co.at oder per E-Mail. Gearbeitet wird erst nach Zusage.
+WerkbankSignCustomer = Datum, Unterschrift Auftraggeber
+
+# Invoice
+WerkbankInvoice = Rechnung
+WerkbankDepositInvoice = Anzahlungsrechnung
+WerkbankReplacementInvoice = Ersatzrechnung
+WerkbankCreditNote = Gutschrift
+WerkbankInvoiceNo = Rechnung Nr.
+WerkbankCreditNoteNo = Gutschrift Nr.
+WerkbankServiceDate = Leistungsdatum
+WerkbankAsInvoiceDate = wie Rechnungsdatum
+WerkbankDueDate = Fällig am
+WerkbankForInvoice = Zu Rechnung
+WerkbankReplaces = Ersetzt
+WerkbankForProposal = Zu Angebot
+WerkbankToPay = Zu zahlen
+WerkbankOpen = Offen
+WerkbankInvoiceAmount = Rechnungsbetrag
+WerkbankAlreadyPaid = Bereits bezahlt
+WerkbankCreditsUsed = Gutschriften
+WerkbankRefunded = Erstattet
+WerkbankCredited = Gutgeschrieben
+WerkbankCreditAmount = Gutschrift
+WerkbankTransfer = Überweisung
+WerkbankReference = Verwendungszweck
+WerkbankQrText = Mit der Banking-App scannen: Betrag, IBAN und Verwendungszweck sind schon ausgefüllt.
