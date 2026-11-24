@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rebuild fonts/ from the brand's WOFF files: WOFF 1.0 -> TTF -> TCPDF font files.
 
-The WOFF files come from the website repository (@fontsource packages, latin
+The WOFF files come from the website in the same repository (@fontsource, latin
 subset, SIL Open Font License). WOFF 1.0 is the TTF tables, each zlib
 compressed, so the standard library unpacks it. TCPDF's own converter
 (TCPDF_FONTS::addTTFfont) then runs inside the local Dolibarr container
@@ -24,7 +24,8 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FONTSOURCE = Path(r"C:\Programmieren\IT-Tabelander\web\node_modules\@fontsource")
+# The website in the same repository: dolibarr/ittabelanderpdf/ -> web/ (yarn install there first).
+FONTSOURCE = ROOT.parents[1] / "web" / "node_modules" / "@fontsource"
 CONTAINER = "ittpdf-dolibarr-web"
 
 # TCPDF font name -> (package, file). Names stay lowercase letters only: TCPDF

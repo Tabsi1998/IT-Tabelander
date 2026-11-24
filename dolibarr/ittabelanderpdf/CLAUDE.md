@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Dolibarr module `ittabelanderpdf` (module number 756230): Werkbank PDFs, e-mail templates, automatic sending. The repository root is the module folder; the ZIP wraps it in `ittabelanderpdf/`. Commit and PR titles English, docs German.
+Dolibarr module `ittabelanderpdf` (module number 756230): Werkbank PDFs, e-mail templates, automatic sending. The module lives in `dolibarr/ittabelanderpdf/` of the IT-Tabelander repository (since 1.0.7; before that a repository of its own), the ZIP wraps this folder in `ittabelanderpdf/`. The root `CLAUDE.md` of IT-Tabelander applies too (issues, branches, local check, release `dolibarr-vX.Y.Z`). Commit and PR titles English, docs German. Licence GPL-3.0-or-later, fonts OFL 1.1.
 
 ## Layout of the code
 
@@ -12,10 +12,12 @@ Dolibarr module `ittabelanderpdf` (module number 756230): Werkbank PDFs, e-mail 
 ## Check locally
 
 ```bash
-python scripts/dev_dolibarr.py all    # Dolibarr 23.0.3 + MariaDB + Mailpit in Docker, module from the ZIP, sample data, PDFs, e-mail scenarios, rollout texts, UI check
+python scripts/dev_dolibarr.py all    # Dolibarr 23.0.3 + MariaDB + Mailpit in Docker, module from the ZIP, sample data, PDFs, e-mail scenarios, rollout texts, UI check, ticket mails
 python scripts/dev_dolibarr.py down
 python scripts/build_release.py       # dist/module_ittabelanderpdf-x.y.z.zip
 ```
+
+The gate is the repository's `python scripts/local_check.py --only dolibarr-modul` (from the repository root): the same steps in containers of their own, examples into `.local-testing/`. `build_release.py` packs only files Git tracks: `git add` new files first.
 
 The `mails` step fails when one of its checks fails (see `docs/beispiele/mails/uebersicht.json`). Look at the PDFs in `docs/beispiele/` after layout changes. Never test against erp.tabelander.co.at.
 
