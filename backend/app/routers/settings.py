@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 from .. import mailer, site_data
 from ..db import get_db, now_utc, serialize
@@ -18,12 +18,24 @@ SECRET_FIELDS = ("dolibarr_api_key", "smtp_password")
 # Where mail goes out and with which account: super admins only, like the
 # Dolibarr key (#38).
 SMTP_PROTECTED = ("smtp_host", "smtp_port", "smtp_security", "smtp_username")
+# The trusted certificate of the mail server (#109): set only through
+# /admin/settings/smtp-trust, never with the form.
+SMTP_PIN_FIELDS = ("smtp_pinned_sha256", "smtp_pinned_at", "smtp_pinned_subject", "smtp_certificate_problem")
+
+
 def _admin_response(doc: dict) -> dict:
-    allowed = set(SettingsInput.model_fields)
+    allowed = set(SettingsInput.model_fields) | set(SMTP_PIN_FIELDS)
     result = {key: value for key, value in doc.items() if key in allowed}
     for field in SECRET_FIELDS:
         result[f"{field}_configured"] = bool(result.pop(field, ""))
+    if result.get("smtp_pinned_sha256"):
+        result["smtp_pinned_sha256_text"] = mailer.fingerprint_text(result["smtp_pinned_sha256"])
     return serialize(result)
+
+
+def _require_super_admin(admin: dict, what: str) -> None:
+    if admin.get("role") != "super_admin":
+        raise HTTPException(status_code=403, detail=f"Nur Super-Admins dürfen {what}.")
 
 
 @router.get("/settings")
@@ -88,6 +100,11 @@ async def update_settings(payload: SettingsInput, admin: dict = Depends(require_
     for field in SECRET_FIELDS:
         if field in data and not str(data[field]).strip():
             data.pop(field)
+    if any(field in data for field in ("smtp_host", "smtp_port", "smtp_security")):
+        # A trusted certificate belongs to one server: another server starts strict again (#109).
+        current = await db.settings.find_one({"_id": "site"}) or {}
+        if any(field in data and data[field] != current.get(field) for field in ("smtp_host", "smtp_port", "smtp_security")):
+            unset.update({field: "" for field in SMTP_PIN_FIELDS})
     data["updated_at"] = now_utc()
     update = {"$set": data}
     if unset:
@@ -117,6 +134,50 @@ async def send_test_mail(payload: TestMailInput, admin: dict = Depends(require_a
             "Wenn du sie liest, funktioniert der E-Mail-Versand: Warnungen zu Anfragen, "
             "die nicht in Dolibarr ankommen, erreichen dich.\n",
         )
+    except mailer.MailCertificateUntrusted as exc:
+        # The admin compares the fingerprint and may trust it (#109).
+        raise HTTPException(status_code=400, detail={
+            "message": str(exc), "certificate": exc.certificate,
+            "changed": isinstance(exc, mailer.MailCertificateChanged)}) from None
     except (mailer.MailNotConfigured, mailer.MailError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     return {"ok": True, "to": recipient, "message": f"Test-Mail an {recipient} gesendet."}
+
+
+class TrustInput(BaseModel):
+    sha256: str
+
+    @field_validator("sha256")
+    @classmethod
+    def valid_fingerprint(cls, value):
+        return mailer.clean_fingerprint(value)
+
+
+@router.post("/admin/settings/smtp-trust")
+async def trust_certificate(payload: TrustInput, admin: dict = Depends(require_admin)):
+    """"Diesem Zertifikat vertrauen" (#109): only the fingerprint the server
+    shows right now, so a stale or mistyped one is never stored."""
+    _require_super_admin(admin, "einem Zertifikat vertrauen")
+    try:
+        current = await mailer.server_certificate()
+    except mailer.MailError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    if current["sha256"] != payload.sha256:
+        raise HTTPException(status_code=409, detail="Der Mailserver zeigt inzwischen ein anderes Zertifikat. "
+                                                    "Bitte die Test-Mail noch einmal senden und neu vergleichen.")
+    db = get_db()
+    await db.settings.update_one({"_id": "site"}, {
+        "$set": {"smtp_pinned_sha256": payload.sha256, "smtp_pinned_at": now_utc(),
+                 "smtp_pinned_subject": current["subject"], "updated_at": now_utc()},
+        "$unset": {"smtp_certificate_problem": ""}}, upsert=True)
+    return _admin_response(await db.settings.find_one({"_id": "site"}))
+
+
+@router.delete("/admin/settings/smtp-trust")
+async def forget_certificate(admin: dict = Depends(require_admin)):
+    """"Vertrauen entfernen": back to the strict check."""
+    _require_super_admin(admin, "das Vertrauen entfernen")
+    db = get_db()
+    await db.settings.update_one({"_id": "site"}, {"$unset": {field: "" for field in SMTP_PIN_FIELDS},
+                                                   "$set": {"updated_at": now_utc()}}, upsert=True)
+    return _admin_response(await db.settings.find_one({"_id": "site"}))
