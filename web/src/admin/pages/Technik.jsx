@@ -57,9 +57,92 @@ function Website({ settings }) {
   );
 }
 
-function Mail({ settings }) {
+function day(value) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString("de-AT") : "–";
+}
+
+/** The certificate the mail server showed, to compare with the one on the server (#109). */
+function CertificateFacts({ certificate }) {
+  return (
+    <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[15px]">
+      <dt className="text-muted">Fingerabdruck (SHA-256)</dt>
+      <dd className="m-0 break-all font-mono text-sm">{certificate.sha256_text}</dd>
+      <dt className="text-muted">Ausgestellt für</dt><dd className="m-0 break-words">{certificate.subject || "–"}</dd>
+      <dt className="text-muted">Ausgestellt von</dt>
+      <dd className="m-0 break-words">{certificate.issuer || "–"}{certificate.self_signed ? " (selbst signiert)" : ""}</dd>
+      <dt className="text-muted">Gültig</dt><dd className="m-0">{day(certificate.not_before)} bis {day(certificate.not_after)}</dd>
+    </dl>
+  );
+}
+
+/** Trust the mail server's own certificate by its fingerprint, or stop trusting it (#109). */
+function Certificate({ settings, offered, superAdmin, onChange }) {
+  const [confirming, setConfirming] = useState(false);
+  const [state, run] = useSaver();
+  const trust = () => run(async () => {
+    const saved = await adminRequest("POST", "/admin/settings/smtp-trust", { sha256: offered.sha256 });
+    setConfirming(false);
+    onChange(saved, null);
+    return saved;
+  }, "Gespeichert. Die Website vertraut jetzt genau diesem Zertifikat – sende die Test-Mail noch einmal.");
+  const forget = () => run(async () => {
+    const saved = await adminRequest("DELETE", "/admin/settings/smtp-trust");
+    onChange(saved, null);
+    return saved;
+  }, "Vertrauen entfernt. Die Website prüft das Zertifikat wieder streng.");
+  const problem = settings.smtp_certificate_problem;
+  return (
+    <div className="flex flex-col gap-3">
+      {settings.smtp_pinned_sha256 && (
+        <div className="flex flex-col gap-2 rounded-[10px] border border-line p-4">
+          <p className="m-0 font-semibold">Die Website vertraut dem Zertifikat des Mailservers mit diesem Fingerabdruck:</p>
+          <p className="m-0 break-all font-mono text-sm">{settings.smtp_pinned_sha256_text}</p>
+          {settings.smtp_pinned_subject && <p className="m-0 text-[15px] text-muted">Ausgestellt für {settings.smtp_pinned_subject}</p>}
+          {superAdmin && (
+            <button type="button" className="btn-outline self-start border-line" disabled={state.busy} onClick={forget}>Vertrauen entfernen</button>
+          )}
+        </div>
+      )}
+      {problem && (
+        <Notice tone="error">
+          Der Mailserver hat am {day(problem.at)} ein anderes Zertifikat gezeigt ({problem.sha256_text}). Seitdem geht keine Mail hinaus.
+          Stimmt das neue Zertifikat, sende eine Test-Mail und vertraue ihm.
+        </Notice>
+      )}
+      {offered && (
+        <section aria-label="Zertifikat des Mailservers" className="flex flex-col gap-3 rounded-[10px] border border-line p-4">
+          <CertificateFacts certificate={offered} />
+          {superAdmin ? (
+            confirming ? (
+              <div className="flex flex-col gap-2">
+                <p className="m-0 text-[15px]">
+                  Stimmt dieser Fingerabdruck mit dem auf deinem Mailserver überein? Danach nimmt die Website genau dieses
+                  Zertifikat an – ein anderes lehnt sie ab.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="btn-primary" disabled={state.busy} onClick={trust}>Ja, vertrauen</button>
+                  <button type="button" className="btn-outline border-line" onClick={() => setConfirming(false)}>Abbrechen</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="btn-outline self-start" onClick={() => setConfirming(true)}>Diesem Zertifikat vertrauen</button>
+            )
+          ) : (
+            <Notice tone="info">Einem Zertifikat vertrauen kann nur der Super-Admin.</Notice>
+          )}
+        </section>
+      )}
+      <Status state={state} />
+    </div>
+  );
+}
+
+function Mail({ settings: loaded }) {
   const { user } = useSession();
   const superAdmin = user?.role === "super_admin";
+  const [settings, setSettings] = useState(loaded);
+  const [offered, setOffered] = useState(null);
   const [form, setForm] = useState({
     smtp_host: settings.smtp_host || "", smtp_port: settings.smtp_port || "", smtp_security: settings.smtp_security || "starttls",
     smtp_username: settings.smtp_username || "", smtp_password: "", smtp_from: settings.smtp_from || "",
@@ -77,7 +160,8 @@ function Mail({ settings }) {
       if (form.smtp_port) body.smtp_port = Number(form.smtp_port);
       if (form.smtp_password) body.smtp_password = form.smtp_password;
     }
-    return adminRequest("PUT", "/admin/settings", body);
+    // Another mail server drops a trusted certificate: show what is saved now (#109).
+    return adminRequest("PUT", "/admin/settings", body).then((saved) => { setSettings(saved); return saved; });
   }, "Gespeichert. Mit „Test-Mail senden“ prüfst du, ob alles stimmt.");
 
   return (
@@ -105,11 +189,24 @@ function Mail({ settings }) {
       <div className="flex flex-col gap-2 border-t border-line-soft pt-4 sm:flex-row sm:items-end">
         <Field label="Test-Mail an" hint="(leer = deine Login-E-Mail)" type="email" className="sm:flex-1" value={testTo} onChange={(event) => setTestTo(event.target.value)} />
         <button type="button" className="btn-outline" disabled={testState.busy}
-          onClick={() => runTest(() => adminRequest("POST", "/admin/settings/test-mail", testTo ? { to: testTo } : {}), (result) => result?.message || "Gesendet.")}>
+          onClick={() => runTest(async () => {
+            setOffered(null);
+            try {
+              return await adminRequest("POST", "/admin/settings/test-mail", testTo ? { to: testTo } : {});
+            } catch (error) {
+              if (error.detail?.certificate) setOffered(error.detail.certificate);
+              throw error;
+            }
+          }, (result) => result?.message || "Gesendet.")}>
           {testState.busy ? "Wird gesendet …" : "Test-Mail senden"}
         </button>
       </div>
       <Status state={testState} />
+      {form.smtp_security === "none" && (
+        <Notice tone="info">Ohne Verschlüsselung gehen Passwort und Mails lesbar durchs Netz – nur im eigenen Netz und nur, wenn es nicht anders geht.</Notice>
+      )}
+      <Certificate settings={settings} offered={offered} superAdmin={superAdmin}
+        onChange={(saved, next) => { setSettings(saved); setOffered(next); }} />
     </Section>
   );
 }

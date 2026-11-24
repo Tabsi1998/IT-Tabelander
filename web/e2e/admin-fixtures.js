@@ -118,7 +118,24 @@ export async function mockAdmin(page, state = adminState()) {
       state.settings = { ...state.settings, ...body };
       return json(route, state.settings);
     }
-    if (path === "/admin/settings/test-mail") return json(route, { ok: true, message: "Test-Mail an chef@example.at gesendet." });
+    if (path === "/admin/settings/test-mail") {
+      // A self-signed certificate until it is trusted (#109).
+      if (state.mailCertificate && state.settings.smtp_pinned_sha256 !== state.mailCertificate.sha256) {
+        return json(route, { detail: { message: "Der Mailserver zeigt ein Zertifikat, dem die Website nicht vertraut (zum Beispiel selbst signiert).",
+          certificate: state.mailCertificate, changed: false } }, 400);
+      }
+      return json(route, { ok: true, message: "Test-Mail an chef@example.at gesendet." });
+    }
+    if (path === "/admin/settings/smtp-trust" && method === "POST") {
+      state.settings = { ...state.settings, smtp_pinned_sha256: body.sha256, smtp_pinned_sha256_text: state.mailCertificate.sha256_text,
+        smtp_pinned_subject: state.mailCertificate.subject };
+      return json(route, state.settings);
+    }
+    if (path === "/admin/settings/smtp-trust" && method === "DELETE") {
+      const { smtp_pinned_sha256: _pin, smtp_pinned_sha256_text: _text, smtp_pinned_subject: _subject, ...rest } = state.settings;
+      state.settings = rest;
+      return json(route, state.settings);
+    }
     if (path === "/admin/media") return json(route, { id: nextId("m"), url: "/assets/img/services/service-overview-640.webp" });
 
     if (path === "/admin/services" && method === "GET") return json(route, state.services);
