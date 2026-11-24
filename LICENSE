@@ -1,0 +1,40 @@
+Copyright © 2026 IT-Tabelander (Inhaber: Fabian Tabelander). Alle Rechte vorbehalten.
+
+Dieses Repository – die Website it.tabelander.co.at mit Kundenbereich, Verwaltung und Server – und alle darin
+enthaltenen Dateien (Quelltext, Texte, Gestaltung, Grafiken, Logos, Skripte und Dokumentation) sind
+urheberrechtlich geschützt. Mit dieser Datei wird keine Lizenz erteilt.
+
+Ohne vorherige schriftliche Zustimmung von IT-Tabelander ist es nicht erlaubt,
+
+- den Inhalt ganz oder in Teilen zu nutzen, zu kopieren, zu verändern oder weiterzugeben,
+- ihn selbst zu betreiben, zu veröffentlichen oder in andere Projekte zu übernehmen,
+- ihn für Text- und Data-Mining zu verwenden, zum Beispiel zum Training von KI-Modellen. Dieser Vorbehalt gilt
+  ausdrücklich im Sinne von § 42h des österreichischen Urheberrechtsgesetzes und Art. 4 Abs. 3 der
+  Richtlinie (EU) 2019/790.
+
+Dass das Repository öffentlich einsehbar ist, ändert daran nichts. Die Nutzungsbedingungen von GitHub erlauben
+anderen GitHub-Nutzern nur, es auf GitHub anzusehen und dort eine Kopie („Fork“) anzulegen. Weitere Rechte
+entstehen daraus nicht.
+
+Nutzungsrechte vergibt ausschließlich IT-Tabelander (Fabian Tabelander); Anfragen über
+https://it.tabelander.co.at oder https://github.com/Tabsi1998.
+
+Ausgenommen sind:
+
+- Bestandteile Dritter mit eigener Lizenz. Bibliotheken und Schriften, die über npm oder pip geladen werden
+  (zum Beispiel die Schriften Sora, Source Sans 3 und Michroma unter der SIL Open Font License), sind nicht
+  Teil dieses Repositorys und stehen unter ihren eigenen Lizenzen.
+- Namen, Marken und Logos Dritter (zum Beispiel Dolibarr, Google, Hersteller von Hardware und Konsolen).
+  Sie gehören ihren jeweiligen Inhabern und werden mit dieser Datei nicht freigegeben.
+
+-------------------------------------------------------------------------------------------------------------------
+
+English summary (the German text above is binding)
+
+Copyright © 2026 IT-Tabelander (owner: Fabian Tabelander). All rights reserved. No licence is granted. Without
+prior written permission you may not use, copy, modify, distribute, host, publish or incorporate any part of this
+repository, nor use it for text and data mining such as training AI models (reservation under § 42h of the
+Austrian Copyright Act and Art. 4(3) of Directive (EU) 2019/790). Public visibility on GitHub only allows viewing
+and forking on GitHub under GitHub's Terms of Service and grants no further rights. Third-party components keep
+their own licences (packages and fonts installed via npm or pip). Names, logos and trademarks of third parties
+belong to their owners and are not licensed here.
