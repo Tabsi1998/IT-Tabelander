@@ -10,12 +10,13 @@ test("send a message (#49)", async ({ page }) => {
   const contact = page.locator("#kontakt");
   await contact.getByLabel("Name").fill("Eva Muster");
   await contact.getByLabel("E-Mail").fill("eva@example.at");
+  await contact.getByLabel("Worum geht es?").fill("Öffnungszeiten");
   await contact.getByRole("textbox", { name: "Nachricht" }).fill("Habt ihr am Samstag geöffnet?");
   await contact.getByLabel(/Meine Angaben dürfen/).check();
   await contact.getByRole("button", { name: "Nachricht senden" }).click();
   await expect(contact.getByText("Danke, deine Nachricht ist da.")).toBeVisible();
   const post = sent.find((item) => item.path === "/contact");
-  expect(post.body).toMatchObject({ name: "Eva Muster", email: "eva@example.at", consent: true, honeypot: "" });
+  expect(post.body).toMatchObject({ name: "Eva Muster", email: "eva@example.at", topic: "Öffnungszeiten", consent: true, honeypot: "" });
   expect(post.body.request_id).toMatch(/^kontakt-/);
   await expectNoSidewaysScroll(page);
 });
@@ -67,6 +68,7 @@ test("a callback wish needs a phone number and sends the local time (#73)", asyn
   const contact = page.locator("#kontakt");
   await contact.getByRole("button", { name: /^Beratung/ }).click();
   await contact.getByRole("button", { name: "Weiter" }).click();
+  await contact.getByLabel("Worum geht es?").fill("Laptop fürs Studium");
   await contact.getByLabel("Was ist passiert?").fill("Welcher Laptop passt fürs Studium?");
   await contact.getByRole("button", { name: "Weiter" }).click();
   await contact.getByLabel("Name").fill("Max Muster");
@@ -82,6 +84,7 @@ test("a callback wish needs a phone number and sends the local time (#73)", asyn
   const inquiry = sent.find((item) => item.path === "/inquiries").body;
   expect(inquiry.callback_at).toMatch(/T14:00:00[+-]\d\d:\d\d$/);
   expect(inquiry.contact.preferred_contact).toBe("phone");
+  expect(inquiry.topic).toBe("Laptop fürs Studium");
 });
 
 const STEP_LABELS = {
