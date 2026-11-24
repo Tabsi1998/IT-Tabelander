@@ -44,16 +44,19 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->picto = 'pdf';
 
 		$this->module_parts = array(
-			'triggers' => 0,
+			// Plans the automatic e-mails on validation and payment.
+			'triggers' => 1,
 			'login' => 0,
-			'substitutions' => 0,
+			// The __ITTAB_*__ e-mail variables.
+			'substitutions' => 1,
 			'menus' => 0,
 			'tpl' => 0,
 			'barcode' => 0,
 			'models' => 1,
 			'printing' => 0,
 			'theme' => 0,
-			'hooks' => array(),
+			// Banner "automatic e-mail planned / failed" on the cards.
+			'hooks' => array('propalcard', 'invoicecard'),
 			'moduleforexternal' => 0,
 		);
 
@@ -67,13 +70,52 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->phpmin = array(7, 4);
 		$this->need_dolibarr_version = array(21, 0);
 
+		// Automatic sending starts switched off; the owner turns each event on.
 		$this->const = array(
 			0 => array('ITTABPDF_ACCEPT_TEXT', 'chaine', 'Online im Kundenbereich auf it.tabelander.co.at oder per E-Mail. Gearbeitet wird erst nach Zusage.', 'How a customer accepts a proposal (Werkbank PDF)', 0, 'current', 0),
 			1 => array('ITTABPDF_TAX_NOTICE', 'chaine', 'Umsatzsteuerbefreit – Kleinunternehmer gem. § 6 Abs. 1 Z 27 UStG', 'Notice below the total when the company charges no VAT (Werkbank PDF)', 0, 'current', 0),
+			2 => array('ITTABPDF_AUTOSEND_PROPAL', 'chaine', '0', 'Send a validated proposal automatically', 0, 'current', 0),
+			3 => array('ITTABPDF_AUTOSEND_INVOICE', 'chaine', '0', 'Send a validated invoice automatically', 0, 'current', 0),
+			4 => array('ITTABPDF_AUTOSEND_PAID', 'chaine', '0', 'Send a payment confirmation when an invoice is paid', 0, 'current', 0),
+			5 => array('ITTABPDF_AUTOSEND_DELAY', 'chaine', '5', 'Minutes between the event and the automatic e-mail', 0, 'current', 0),
+			6 => array('ITTABPDF_PORTAL_URL', 'chaine', 'https://it.tabelander.co.at/kundenbereich', 'Customer area of the website', 0, 'current', 0),
+		);
+
+		// Every 5 minutes: send the automatic e-mails that are due.
+		$this->cronjobs = array(
+			0 => array(
+				'label' => 'IT-Tabelander PDF: automatic e-mails',
+				'jobtype' => 'method',
+				'class' => '/ittabelanderpdf/class/werkbankmailqueue.class.php',
+				'objectname' => 'WerkbankMailQueue',
+				'method' => 'runCron',
+				'parameters' => '',
+				'comment' => 'Sends the planned proposal, invoice and payment e-mails once their delay is over.',
+				'frequency' => 5,
+				'unitfrequency' => 60,
+				'status' => 1,
+				'test' => 'isModEnabled("ittabelanderpdf")',
+				'priority' => 50,
+			),
 		);
 
 		$this->rights = array();
 		$this->menu = array();
+		$this->menu[0] = array(
+			'fk_menu' => 'fk_mainmenu=billing',
+			'type' => 'left',
+			'titre' => 'WerkbankAutoTitle',
+			'prefix' => img_picto('', 'email', 'class="pictofixedwidth"'),
+			'mainmenu' => 'billing',
+			'leftmenu' => 'ittabpdf_queue',
+			'url' => '/ittabelanderpdf/queue.php',
+			'langs' => 'ittabelanderpdf@ittabelanderpdf',
+			'position' => 1900,
+			'enabled' => 'isModEnabled("ittabelanderpdf")',
+			'perms' => '$user->hasRight("facture", "lire") || $user->hasRight("propal", "lire")',
+			'target' => '',
+			'user' => 0,
+		);
 	}
 
 	/**
@@ -85,20 +127,36 @@ class modITTabelanderPDF extends DolibarrModules
 	 */
 	public function init($options = '')
 	{
+		include_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 		$extrafields = new ExtraFields($this->db);
 		// Contracts for ongoing services: printed in the info block of the
 		// contract PDF when filled, never with a default.
+		// The third party's form of address for the automatic e-mails: 0 = Sie.
 		$fields = array(
-			array('ittab_mindestlaufzeit', 'WerkbankExtraMinimumTerm', 'int', 100, '10', 'contrat'),
-			array('ittab_kuendigungsfrist', 'WerkbankExtraNoticePeriod', 'varchar', 101, '128', 'contrat'),
+			array('ittab_mindestlaufzeit', 'WerkbankExtraMinimumTerm', 'int', 100, '10', 'contrat', ''),
+			array('ittab_kuendigungsfrist', 'WerkbankExtraNoticePeriod', 'varchar', 101, '128', 'contrat', ''),
+			array('ittab_du', 'WerkbankExtraDu', 'boolean', 100, '', 'societe', '0'),
 		);
 		foreach ($fields as $field) {
-			$result = $extrafields->addExtraField($field[0], $field[1], $field[2], $field[3], $field[4], $field[5], 0, 0, '', '', 1, '', '1', '', '', '', 'ittabelanderpdf@ittabelanderpdf', 'isModEnabled("ittabelanderpdf")');
+			$result = $extrafields->addExtraField($field[0], $field[1], $field[2], $field[3], $field[4], $field[5], 0, 0, $field[6], '', 1, '', '1', '', '', '', 'ittabelanderpdf@ittabelanderpdf', 'isModEnabled("ittabelanderpdf")');
 			if ($result < 0) {
 				$this->error = $extrafields->error;
 				return -1;
 			}
+		}
+
+		if ($this->_load_tables('/ittabelanderpdf/sql/') < 0) {
+			return -1;
+		}
+		dol_include_once('/ittabelanderpdf/class/werkbankmailtemplates.class.php');
+		if (WerkbankMailTemplates::install($this->db, (int) $GLOBALS['conf']->entity) < 0) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		// BCC of the automatic e-mails: the company address unless set.
+		if (!getDolGlobalString('ITTABPDF_AUTOSEND_BCC') && !empty($GLOBALS['mysoc']->email)) {
+			dolibarr_set_const($this->db, 'ITTABPDF_AUTOSEND_BCC', $GLOBALS['mysoc']->email, 'chaine', 0, '', $GLOBALS['conf']->entity);
 		}
 
 		$sql = array();

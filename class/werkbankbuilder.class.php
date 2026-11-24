@@ -174,7 +174,7 @@ abstract class WerkbankBuilder
 	 * @param string $phone Phone number
 	 * @return string
 	 */
-	protected function phone($phone)
+	public static function phone($phone)
 	{
 		$digits = preg_replace('/[^\d+]/', '', (string) $phone);
 		if (preg_match('/^\+43(6\d\d)(\d+)$/', $digits, $match)) {
@@ -190,7 +190,7 @@ abstract class WerkbankBuilder
 	 * @param string $url URL
 	 * @return string     Without scheme and trailing slash
 	 */
-	protected static function bareUrl($url)
+	public static function bareUrl($url)
 	{
 		return rtrim((string) preg_replace('#^https?://#i', '', trim($url)), '/');
 	}
@@ -310,7 +310,7 @@ abstract class WerkbankBuilder
 	 * @param string $iban IBAN in any spacing
 	 * @return string      In groups of four
 	 */
-	protected static function iban($iban)
+	public static function iban($iban)
 	{
 		return trim(chunk_split(strtoupper(preg_replace('/\s+/', '', (string) $iban)), 4, ' '));
 	}

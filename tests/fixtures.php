@@ -130,7 +130,15 @@ if ($stage === 'base') {
 	rt_const($db, 'MAIN_MONNAIE', 'EUR');
 	rt_modules(array('modSociete', 'modPropale', 'modFacture', 'modBanque', 'modProduct', 'modService', 'modStock',
 		'modCommande', 'modExpedition', 'modFicheinter', 'modContrat', 'modFournisseur', 'modSupplierProposal', 'modReception',
-		'modITTabelanderPDF'));
+		'modAgenda', 'modCron', 'modITTabelanderPDF'));
+	// Every e-mail goes to Mailpit.
+	rt_const($db, 'MAIN_MAIL_SENDMODE', 'smtps');
+	rt_const($db, 'MAIN_MAIL_SMTP_SERVER', 'mail');
+	rt_const($db, 'MAIN_MAIL_SMTP_PORT', '1025');
+	rt_const($db, 'MAIN_MAIL_EMAIL_TLS', '0');
+	rt_const($db, 'MAIN_MAIL_EMAIL_STARTTLS', '0');
+	rt_const($db, 'MAIN_DISABLE_ALL_MAILS', '0');
+	rt_const($db, 'MAIN_MAIL_EMAIL_FROM', 'office@tabelander.co.at');
 	// Werkbank as the default, as the owner sets it after activation.
 	foreach (array('PROPALE_ADDON_PDF', 'FACTURE_ADDON_PDF', 'COMMANDE_ADDON_PDF', 'EXPEDITION_ADDON_PDF', 'FICHEINTER_ADDON_PDF',
 		'CONTRACT_ADDON_PDF', 'SUPPLIER_PROPOSAL_ADDON_PDF', 'COMMANDE_SUPPLIER_ADDON_PDF', 'RECEPTION_ADDON_PDF') as $const) {
@@ -215,6 +223,7 @@ if ($stage === 'setup') {
 	$contact->socid = $firm->id;
 	$contact->firstname = 'Maria';
 	$contact->lastname = 'Muster';
+	$contact->civility_code = 'MME';
 	$contact->email = 'maria.muster@musterfirma.example';
 	if ($contact->create($admin) <= 0) {
 		rt_fail('contact: '.$contact->error);
@@ -228,6 +237,9 @@ if ($stage === 'setup') {
 	$private->town = 'Telfs';
 	$private->country_id = 41;
 	$private->email = 'max@mustermann.example';
+	$private->typent_id = (int) rt_value($db, "SELECT id FROM ".MAIN_DB_PREFIX."c_typent WHERE code = 'TE_PRIVATE'");
+	// Max is addressed with "Du" (module extra field).
+	$private->array_options = array('options_ittab_du' => 1);
 	if ($private->create($admin) <= 0) {
 		rt_fail('customer: '.$private->error);
 	}
@@ -456,6 +468,7 @@ if ($stage === 'setup') {
 	$supplier->name = 'Hardware Großhandel GmbH';
 	$supplier->fournisseur = 1;
 	$supplier->code_fournisseur = 'SU2611-00001';
+	$supplier->email = 'vertrieb@grosshandel.example';
 	$supplier->address = 'Industriestraße 4';
 	$supplier->zip = '1230';
 	$supplier->town = 'Wien';
@@ -565,6 +578,204 @@ if ($stage === 'render') {
 	}
 	echo json_encode(array('rendered' => $done)), "\n";
 	exit(0);
+}
+
+/** Load a document of the sample set. */
+function rt_load($db, $element, $id)
+{
+	$classes = array(
+		'propal' => array('Propal', '/comm/propal/class/propal.class.php'),
+		'facture' => array('Facture', '/compta/facture/class/facture.class.php'),
+		'commande' => array('Commande', '/commande/class/commande.class.php'),
+		'shipping' => array('Expedition', '/expedition/class/expedition.class.php'),
+		'fichinter' => array('Fichinter', '/fichinter/class/fichinter.class.php'),
+		'contrat' => array('Contrat', '/contrat/class/contrat.class.php'),
+		'supplier_proposal' => array('SupplierProposal', '/supplier_proposal/class/supplier_proposal.class.php'),
+		'order_supplier' => array('CommandeFournisseur', '/fourn/class/fournisseur.commande.class.php'),
+	);
+	require_once DOL_DOCUMENT_ROOT.$classes[$element][1];
+	$object = new $classes[$element][0]($db);
+	if ($object->fetch($id) <= 0) {
+		rt_fail('cannot load '.$element.' '.$id);
+	}
+	$object->fetch_thirdparty();
+	return $object;
+}
+
+/** The queue row of a document and event. */
+function rt_queue($db, $element, $id, $event)
+{
+	$resql = $db->query("SELECT rowid, status, date_due, date_creation, error, recipient, fk_template FROM ".MAIN_DB_PREFIX."ittabpdf_mailqueue"
+		." WHERE element = '".$db->escape($element)."' AND fk_object = ".((int) $id)." AND event = '".$db->escape($event)."'");
+	return $resql ? $db->fetch_object($resql) : null;
+}
+
+/** Make a planned row due now, as if the delay were over. */
+function rt_due($db, $element, $id)
+{
+	rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."ittabpdf_mailqueue SET date_due = '".$db->idate(dol_now() - 60)."' WHERE element = '".$db->escape($element)."' AND fk_object = ".((int) $id)." AND status = 'planned'");
+}
+
+if ($stage === 'mails') {
+	dol_include_once('/ittabelanderpdf/class/werkbankmailqueue.class.php');
+	require_once DOL_DOCUMENT_ROOT.'/comm/propal/class/propal.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+	$docs = json_decode((string) file_get_contents(RT_STATE), true);
+	$queue = new WerkbankMailQueue($db);
+	$checks = array();
+	$check = function ($name, $ok, $detail = '') use (&$checks) {
+		$checks[$name] = $ok ? 'ok' : 'FAILED: '.$detail;
+	};
+
+	// Installation: templates, extra field, cron job.
+	$templates = (int) rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf'");
+	$check('templates installed (22)', $templates === 22, (string) $templates);
+	$check('extra field ittab_du', (bool) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."extrafields WHERE name = 'ittab_du' AND elementtype = 'societe'"));
+	$check('cron job registered', (bool) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."cronjob WHERE objectname = 'WerkbankMailQueue' AND methodename = 'runCron' AND frequency = 5 AND unitfrequency = 60"));
+
+	// 1. Every template, Sie and Du, through the module's own send path.
+	$firm = new Societe($db);
+	$firm->fetch(0, 'Musterfirma GmbH');
+	$private = new Societe($db);
+	$private->fetch(0, 'Max Mustermann');
+	$paidInvoice = rt_invoice($db, $admin, $private->id, array(), array(array(null, 1, 0, "Fernwartung\nDrucker neu eingerichtet.", '', '', 45.00)));
+	$account = (int) getDolGlobalInt('FACTURE_RIB_NUMBER');
+	rt_pay($db, $admin, $paidInvoice, 45.00, $account, '2026-11-24');
+	$samples = array(
+		'propal' => array('propal', $docs['angebot-1-wie-entwurf'][1], 1),
+		'invoice' => array('facture', $docs['rechnung-2-teilzahlung'][1], 1),
+		'deposit' => array('facture', $docs['rechnung-3-anzahlung'][1], 1),
+		'creditnote' => array('facture', $docs['gutschrift-1-offen'][1], 1),
+		'paid' => array('facture', $paidInvoice->id, 0),
+		'order' => array('commande', $docs['auftrag-1'][1], 1),
+		'shipping' => array('shipping', $docs['lieferschein-1'][1], 1),
+		'fichinter' => array('fichinter', $docs['arbeitsbericht-1'][1], 1),
+		'contract' => array('contrat', $docs['vertrag-1-gemischt'][1], 1),
+		'thirdparty' => array('societe', $firm->id, 0),
+		'supplier_proposal' => array('supplier_proposal', $docs['preisanfrage-1'][1], 1),
+		'order_supplier' => array('order_supplier', $docs['bestellung-1'][1], 1),
+	);
+	$definitions = WerkbankMailTemplates::definitions();
+	foreach ($samples as $key => $sample) {
+		$object = $sample[0] === 'societe' ? $firm : rt_load($db, $sample[0], $sample[1]);
+		$forms = $definitions[$key][4] === null ? array('sie') : array('sie', 'du');
+		foreach ($forms as $form) {
+			$result = $queue->send($object, $key, $admin, (bool) $sample[2], '', $form);
+			$check('template '.$key.' '.$form, $result['ok'], $result['error']);
+		}
+	}
+
+	// 2. Automatic sending: switched on, 5 minutes delay.
+	rt_const($db, 'ITTABPDF_AUTOSEND_PROPAL', '1');
+	rt_const($db, 'ITTABPDF_AUTOSEND_INVOICE', '1');
+	rt_const($db, 'ITTABPDF_AUTOSEND_PAID', '1');
+	rt_const($db, 'ITTABPDF_AUTOSEND_DELAY', '5');
+	$contactId = (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."socpeople WHERE lastname = 'Muster'");
+	$newProposal = function ($label) use ($db, $admin, $firm, $contactId) {
+		$prop = new Propal($db);
+		$prop->socid = $firm->id;
+		$prop->date = dol_now();
+		$prop->duree_validite = 14;
+		$prop->ref_client = $label;
+		if ($prop->create($admin) <= 0) {
+			rt_fail('proposal: '.$prop->error);
+		}
+		rt_lines($prop, array(array(null, 1, 0, "Fernwartung\nEinrichtung des neuen Notebooks.", '', '', 90.00)));
+		$prop->add_contact($contactId, 'CUSTOMER', 'external');
+		return $prop;
+	};
+
+	// a) Validation plans the e-mail 5 minutes ahead; a run before then sends nothing.
+	$prop = $newProposal('Automatischer Versand');
+	$prop->valid($admin);
+	$row = rt_queue($db, 'propal', $prop->id, 'propal_validated');
+	$delay = $row ? $db->jdate($row->date_due) - $db->jdate($row->date_creation) : -1;
+	$check('proposal planned with 5 min delay', $row && $row->status === 'planned' && $delay >= 295 && $delay <= 305, $row ? $row->status.' '.$delay.' s' : 'no row');
+	$queue->runCron();
+	$row = rt_queue($db, 'propal', $prop->id, 'propal_validated');
+	$check('not sent before the delay', $row && $row->status === 'planned', $row ? $row->status : 'no row');
+	rt_due($db, 'propal', $prop->id);
+	$queue->runCron();
+	$row = rt_queue($db, 'propal', $prop->id, 'propal_validated');
+	$check('sent after the delay', $row && $row->status === 'sent', $row ? $row->status.' '.$row->error : 'no row');
+	$check('recipient is the proposal contact', $row && strpos((string) $row->recipient, 'maria.muster@musterfirma.example') !== false, $row ? (string) $row->recipient : '');
+	$event = $db->fetch_object($db->query("SELECT id, note, label FROM ".MAIN_DB_PREFIX."actioncomm WHERE elementtype = 'propal' AND fk_element = ".((int) $prop->id)." AND code = 'AC_PROPAL_SENTBYMAIL'"));
+	$check('agenda entry like a manual send', (bool) $event, 'no actioncomm AC_PROPAL_SENTBYMAIL');
+	$check('Sie greeting with civility', $event && strpos((string) $event->note, 'Guten Tag Frau Muster,') !== false);
+
+	// b) Validating again after going back to draft sends no second e-mail.
+	$prop->setDraft($admin);
+	$prop->valid($admin);
+	$row = rt_queue($db, 'propal', $prop->id, 'propal_validated');
+	$check('no second send after re-validation', $row && $row->status === 'sent', $row ? $row->status : '');
+
+	// c) Cancelled before the delay: never sent.
+	$inv = rt_invoice($db, $admin, $firm->id, array('ref_client' => 'Abbruch-Test'), array(array(null, 1, 0, 'Fernwartung', '', '', 30.00)));
+	$row = rt_queue($db, 'facture', $inv->id, 'invoice_validated');
+	$check('invoice planned', $row && $row->status === 'planned');
+	$check('cancel works', $row && $queue->cancel((int) $row->rowid, $admin) === 1);
+	rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."ittabpdf_mailqueue SET date_due = '".$db->idate(dol_now() - 60)."' WHERE rowid = ".((int) $row->rowid));
+	$queue->runCron();
+	$row = rt_queue($db, 'facture', $inv->id, 'invoice_validated');
+	$check('cancelled stays unsent', $row && $row->status === 'cancelled', $row ? $row->status : '');
+
+	// d) Back to draft before the delay: cancelled by the run.
+	$inv = rt_invoice($db, $admin, $firm->id, array('ref_client' => 'Entwurf-Test'), array(array(null, 1, 0, 'Fernwartung', '', '', 30.00)));
+	$inv->setDraft($admin);
+	rt_due($db, 'facture', $inv->id);
+	$queue->runCron();
+	$row = rt_queue($db, 'facture', $inv->id, 'invoice_validated');
+	$check('draft again is not sent', $row && $row->status === 'cancelled', $row ? $row->status.' '.$row->error : '');
+
+	// e) No address anywhere: error, visible on the card and in the list.
+	$nomail = new Societe($db);
+	$nomail->name = 'Ohne Mail KG '.dol_print_date(dol_now(), '%H%M%S');
+	$nomail->client = 1;
+	$nomail->code_client = 'CU-NOMAIL-'.dol_print_date(dol_now(), '%H%M%S');
+	$nomail->country_id = 41;
+	$nomail->create($admin);
+	$inv = rt_invoice($db, $admin, $nomail->id, array(), array(array(null, 1, 0, 'Fernwartung', '', '', 30.00)));
+	rt_due($db, 'facture', $inv->id);
+	$queue->runCron();
+	$row = rt_queue($db, 'facture', $inv->id, 'invoice_validated');
+	$check('no address gives an error', $row && $row->status === 'error' && strpos((string) $row->error, 'Keine E-Mail-Adresse') !== false, $row ? $row->status.' '.$row->error : '');
+	$check('error shows in the card banner', count($queue->openFor('facture', (int) $inv->id)) === 1);
+
+	// f) Du, invoice, then the payment confirmation without attachment.
+	$inv = rt_invoice($db, $admin, $private->id, array(), array(array(null, 1, 0, "Akkuwechsel\nController geöffnet, Akku getauscht, getestet.", '', '', 54.80)));
+	rt_due($db, 'facture', $inv->id);
+	$queue->runCron();
+	$row = rt_queue($db, 'facture', $inv->id, 'invoice_validated');
+	$check('invoice sent (Du)', $row && $row->status === 'sent', $row ? $row->status.' '.$row->error : '');
+	$check('Du template chosen', $row && (int) $row->fk_template === WerkbankMailTemplates::find($db, 'invoice', 'du', $conf->entity));
+	rt_pay($db, $admin, $inv, 54.80, $account, '2026-11-24');
+	$row = rt_queue($db, 'facture', $inv->id, 'invoice_paid');
+	$check('payment confirmation planned', $row && $row->status === 'planned', $row ? $row->status : 'no row');
+	rt_due($db, 'facture', $inv->id);
+	$queue->runCron();
+	$row = rt_queue($db, 'facture', $inv->id, 'invoice_paid');
+	$check('payment confirmation sent', $row && $row->status === 'sent', $row ? $row->status.' '.$row->error : '');
+
+	// g) Credit note and down payment invoice get their own templates.
+	$credit = rt_invoice($db, $admin, $private->id, array('type' => Facture::TYPE_CREDIT_NOTE, 'fk_facture_source' => $inv->id), array(array(null, 1, 0, 'Kulanz', '', '', 10.00)));
+	$deposit = rt_invoice($db, $admin, $firm->id, array('type' => Facture::TYPE_DEPOSIT), array(array(null, 1, 0, 'Anzahlung 50 %', '', '', 200.00)));
+	rt_due($db, 'facture', $credit->id);
+	rt_due($db, 'facture', $deposit->id);
+	$queue->runCron();
+	$row = rt_queue($db, 'facture', $credit->id, 'invoice_validated');
+	$check('credit note template', $row && $row->status === 'sent' && (int) $row->fk_template === WerkbankMailTemplates::find($db, 'creditnote', 'du', $conf->entity), $row ? $row->status.' '.$row->error : '');
+	$row = rt_queue($db, 'facture', $deposit->id, 'invoice_validated');
+	$check('deposit template', $row && $row->status === 'sent' && (int) $row->fk_template === WerkbankMailTemplates::find($db, 'deposit', 'sie', $conf->entity), $row ? $row->status.' '.$row->error : '');
+
+	// h) One proposal stays planned for the look at the card banner.
+	$planned = $newProposal('Banner-Test');
+	$planned->valid($admin);
+
+	$failed = array_filter($checks, function ($value) {
+		return $value !== 'ok';
+	});
+	echo json_encode(array('checks' => $checks, 'failed' => count($failed), 'planned_propal' => (int) $planned->id)), "\n";
+	exit($failed ? 4 : 0);
 }
 
 if ($stage === 'const') {
