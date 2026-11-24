@@ -246,6 +246,7 @@ async def create_contact_message(payload: ContactInput):
         "source": "website",
         "request_id": payload.request_id,
         "description": payload.message,
+        **({"topic": payload.topic} if payload.topic else {}),
         "contact": {
             "name": payload.name,
             "email": str(payload.email).lower(),

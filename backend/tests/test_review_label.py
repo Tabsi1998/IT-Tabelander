@@ -209,6 +209,11 @@ def test_the_ticket_subject_names_the_device_in_words():
     other = {**repair, "device_type": "other", "manufacturer": "Samsung", "model": ""}
     assert dolibarr.inquiry_subject(other) == "Reparatur: Samsung (ANF-7K3M9Q2X)"
     assert dolibarr.inquiry_subject({"request_type": "pc_build", "ref": "ANF-7K3M9Q2X"}) == "PC-Neubau (ANF-7K3M9Q2X)"
+    # Without a device: what the customer named, else the first words (#107); a device wins.
+    build = {"request_type": "pc_build", "ref": "ANF-7K3M9Q2X", "topic": "Gaming-PC", "description": "Für WQHD, leise."}
+    assert dolibarr.inquiry_subject(build) == "PC-Neubau: Gaming-PC (ANF-7K3M9Q2X)"
+    assert dolibarr.inquiry_subject({**build, "topic": ""}) == "PC-Neubau: Für WQHD, leise. (ANF-7K3M9Q2X)"
+    assert dolibarr.inquiry_subject({**repair, "topic": "egal"}) == "Reparatur: Notebook Lenovo ThinkPad T14 (ANF-7K3M9Q2X)"
     assert dolibarr.subject_without_ref("Reparatur: Notebook (ANF-7K3M9Q2X)", "ANF-7K3M9Q2X") == "Reparatur: Notebook"
     # A subject the owner rewrote in Dolibarr stays as it is.
     assert dolibarr.subject_without_ref("Akku tauschen", "ANF-7K3M9Q2X") == "Akku tauschen"

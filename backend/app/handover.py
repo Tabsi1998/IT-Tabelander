@@ -30,7 +30,7 @@ STALE_CLAIM = timedelta(minutes=5)
 
 # Everything a customer typed. After the hand-over it lives in Dolibarr only.
 PERSONAL_FIELDS = (
-    "contact", "description", "device_type", "device_source", "manufacturer",
+    "contact", "topic", "description", "device_type", "device_source", "manufacturer",
     "model", "issues", "desired_services", "budget", "timeframe", "attachment_ids",
     "attachments", "callback_at", "source", "consent",
 )

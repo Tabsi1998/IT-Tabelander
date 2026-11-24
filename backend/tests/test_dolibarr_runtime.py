@@ -399,8 +399,17 @@ class TestContactForm:
         ticket = ticket_with(created["ref"])
         assert no_third_party(ticket) and ticket["origin_email"] == email
         assert "Habt ihr am Samstag geöffnet?" in str(ticket["message"])
+        # #107: without a subject the first words of the message name the ticket.
+        assert ticket["subject"] == f"Kontaktnachricht: Habt ihr am Samstag geöffnet? ({created['ref']})"
         assert not third_party_exists(email)
         assert mails_to(email), "Dolibarr sent the sender no confirmation"
+
+    def test_the_subject_the_sender_typed_names_the_ticket(self):
+        """#107."""
+        response = send_contact(f"kontakt-{uuid.uuid4().hex[:10]}@example.com", topic="Termin am Samstag")
+        assert response.status_code == 200, response.text
+        ticket = ticket_with(response.json()["ref"])
+        assert ticket["subject"] == f"Kontaktnachricht: Termin am Samstag ({response.json()['ref']})"
 
     def test_a_known_customer_is_linked_and_left_unchanged(self):
         before = dolibarr_get(f"thirdparties/{CUSTOMER_ID}")
