@@ -370,7 +370,11 @@ Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie
 
 1. Unter **Einstellungen → Module/Anwendungen** aktivieren: **Geschäftspartner**,
    **Tickets**, **Agenda (Ereignisse/Termine)**, **Angebote**, **Rechnungen**,
-   **Wissensmanagement-System**, **Kategorien** und **REST-API**.
+   **Wissensmanagement-System**, **Kategorien** und **REST-API**. Für alle
+   Belege im Kundenbereich außerdem die Module, die du nutzt:
+   **Kundenaufträge**, **Lieferungen** (Versand), **Serviceaufträge**
+   (Arbeitsberichte) und **Verträge/Abonnements**. Ein ausgeschaltetes Modul
+   bleibt im Kundenbereich einfach leer.
 2. Einen eigenen Benutzer für die Website anlegen (kein Administrator) und ihm
    unter **Benutzer → Berechtigungen** genau diese Rechte geben:
    - Geschäftspartner: **einsehen** und **anlegen/bearbeiten**,
@@ -385,7 +389,11 @@ Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie
      (Rechtstexte, FAQ),
    - Angebote: **lesen** (Schritt „Angebot bereit“) und **anlegen/ändern**
      (Annehmen und Ablehnen im Kundenbereich),
-   - Rechnungen: **lesen** (Kundenbereich).
+   - Rechnungen: **lesen** (Kundenbereich),
+   - Kundenaufträge, Lieferungen, Serviceaufträge und Verträge: jeweils nur
+     **lesen** (Auftragsbestätigungen, Lieferscheine, Arbeitsberichte und
+     Verträge im Kundenbereich). Fehlt eines dieser Rechte, bleibt die Belegart
+     leer und im Log der Website steht eine Warnung.
    Im Benutzer einen API-Schlüssel erzeugen. **Keine** Admin-Rechte.
    Nur vorübergehend zusätzlich „Wissensmanagement: Artikel anlegen/ändern“ –
    für die Entwürfe der Rechtstexte und den einmaligen Umzug der alten FAQ –,
@@ -508,7 +516,9 @@ Datenschutzerklärung.
 ### Kundenbereich
 
 Unter `/kundenbereich` sehen Kunden ihre Anfragen und Reparaturen, ihre
-Angebote und Rechnungen. Alles kommt bei jedem Aufruf frisch aus Dolibarr,
+Angebote und unter **Belege** alles andere: Rechnungen und Gutschriften,
+Auftragsbestätigungen, Lieferscheine, Arbeitsberichte (Serviceaufträge) und
+Verträge, jeweils mit PDF. Alles kommt bei jedem Aufruf frisch aus Dolibarr,
 immer nur für diesen einen Kunden; die Website speichert davon nichts.
 
 **Anmelden ohne Passwort:** Der Kunde gibt seine E-Mail-Adresse ein. Gehört sie
@@ -517,7 +527,7 @@ Kontakt eines solchen, bekommt genau diese Adresse einen Link, der 15 Minuten
 gilt und einmal funktioniert. Die Seite sagt nie, ob eine Adresse bekannt ist.
 Danach bleibt der Kunde 7 Tage angemeldet. Konten legt niemand an – jede
 E-Mail-Adresse aus Dolibarr funktioniert. Ein Kontakt einer Firma sieht die
-Anfragen, Angebote und Rechnungen der Firma.
+Anfragen, Angebote und Belege der Firma.
 
 **Sperren** geht direkt in Dolibarr am Kunden, und die Website fragt spätestens
 alle 5 Minuten neu:
@@ -549,6 +559,22 @@ und Rechnungsnummer als Verwendungszweck – zum Kopieren und als QR-Code, den
 dafür trägst du unter **Technik → Kundenbereich** ein (dasselbe Konto wie auf
 den Rechnungen aus Dolibarr): Sie aus Dolibarr zu lesen, bräuchte ein Recht,
 das auch alle Kontobewegungen zeigt. Die IBAN wird beim Speichern geprüft.
+
+**Belege:** Der Kunde sieht nur freigegebene Belege, nie Entwürfe. Das PDF
+ist das, das Dolibarr zuletzt erzeugt hat (mit dem Modul „IT-Tabelander PDF“
+die Vorlage Werkbank); ohne PDF steht das beim Beleg. Die Adressen:
+
+| Belegart | Liste | Einzelner Beleg |
+| --- | --- | --- |
+| alle | `/kundenbereich/belege` | |
+| Rechnungen und Gutschriften | `/kundenbereich/rechnungen` | `/kundenbereich/rechnungen/<id>` |
+| Auftragsbestätigungen | `/kundenbereich/belege/auftraege` | `/kundenbereich/belege/auftraege/<id>` |
+| Lieferscheine | `/kundenbereich/belege/lieferscheine` | `/kundenbereich/belege/lieferscheine/<id>` |
+| Arbeitsberichte | `/kundenbereich/belege/arbeitsberichte` | `/kundenbereich/belege/arbeitsberichte/<id>` |
+| Verträge | `/kundenbereich/belege/vertraege` | `/kundenbereich/belege/vertraege/<id>` |
+
+`<id>` ist die interne Nummer des Belegs in Dolibarr (wie `id=12` in der Adresse
+seiner Karte); Angebote bleiben unter `/kundenbereich/angebote/<id>`.
 
 **Einschalten:** Rechte und Zusatzfeld in Dolibarr wie oben, E-Mail-Versand der
 Website eingerichtet, dann **Technik → Kundenbereich** einschalten. Erst dann

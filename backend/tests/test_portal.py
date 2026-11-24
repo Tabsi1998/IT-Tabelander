@@ -417,3 +417,158 @@ def test_the_bank_account_is_checked_before_it_is_saved():
     assert SettingsInput(portal_bank_bic="bkau atww").portal_bank_bic == "BKAUATWW"
     with pytest.raises(ValidationError):
         SettingsInput(portal_bank_bic="KURZ")
+
+
+# ------------------------------------------------------------ all documents (#100)
+
+def _documents_handler(lists=None, objects=None, files=None, refused=()):
+    """Dolibarr with lists per kind, single objects by path and stored files."""
+    lists, objects, files = lists or {}, objects or {}, files or {}
+
+    def handler(request):
+        path = request.url.path.replace("/api/index.php/", "")
+        if path in refused:
+            return httpx.Response(403, json={"error": {"code": 403}})
+        if path == "documents/download":
+            if (request.url.params["modulepart"], request.url.params["original_file"]) in files:
+                return httpx.Response(200, json={"content": "JVBERi0xLjQ="})
+            return httpx.Response(404, json={})
+        if path in lists:
+            return httpx.Response(200, json=lists[path])
+        if path in objects:
+            return httpx.Response(200, json=objects[path])
+        return httpx.Response(404, json={})
+    return handler
+
+
+def test_the_overview_lists_released_documents_of_this_customer_only(monkeypatch):
+    calls = _with_dolibarr(monkeypatch, _documents_handler(lists={
+        "orders": [
+            {"id": "51", "ref": "CO1", "socid": "7", "status": "1", "date": 1790000000, "total_ttc": "120",
+             "last_main_doc": "commande/CO1/CO1.pdf", "note_private": "intern"},
+            {"id": "52", "ref": "CO-ENTWURF", "socid": "7", "status": "0"},
+            {"id": "53", "ref": "CO-FREMD", "socid": "8", "status": "1"},
+            {"id": "54", "ref": "CO3", "socid": "7", "status": "3"},
+        ],
+        "shipments": [{"id": "61", "ref": "SH1", "socid": "7", "status": "1", "date_shipping": 1790000000,
+                       "tracking_number": "TRACK-1"},
+                      {"id": "62", "ref": "SH-ENTWURF", "socid": "7", "status": "0"}],
+        "interventions": [{"id": "71", "ref": "FI1", "socid": "7", "status": "1", "datec": 1790000000},
+                          {"id": "72", "ref": "FI-FREMD", "socid": "9", "status": "1"}],
+        "contracts": [{"id": "81", "ref": "CT1", "socid": "7", "status": "1", "date_contrat": 1790000000}],
+    }))
+    data = asyncio.run(portal.overview(_session(7)))
+    assert [(item["ref"], item["state"]) for item in data["orders"]] == [("CO1", "bestätigt"), ("CO3", "geliefert")]
+    assert data["orders"][0] == {"kind": "orders", "id": 51, "ref": "CO1", "status": 1, "state": "bestätigt",
+                                 "date": dolibarr._iso_time(1790000000), "total": "120", "has_pdf": True}
+    assert [item["ref"] for item in data["shipments"]] == ["SH1"]
+    assert [item["ref"] for item in data["interventions"]] == ["FI1"]
+    assert [item["ref"] for item in data["contracts"]] == ["CT1"]
+    assert "intern" not in json.dumps(data) and "TRACK-1" not in json.dumps(data)
+    for call in calls:
+        query = parse_qs(urlparse(str(call.url)).query)
+        assert query.get("socid", query.get("thirdparty_ids")) == ["7"], call.url
+
+
+def test_a_kind_dolibarr_refuses_stays_empty_and_the_rest_shows(monkeypatch):
+    """A right not yet given or a module switched off must not take the whole customer area down."""
+    _with_dolibarr(monkeypatch, _documents_handler(
+        lists={"invoices": [{"id": "41", "ref": "FA1", "socid": "7", "status": "1", "paye": "0", "total_ttc": "9"}]},
+        refused=("orders", "contracts")))
+    data = asyncio.run(portal.overview(_session(7)))
+    assert data["orders"] == [] and data["contracts"] == [] and [item["ref"] for item in data["invoices"]] == ["FA1"]
+
+
+@pytest.mark.parametrize("kind", ["orders", "shipments", "interventions", "contracts"])
+def test_a_document_of_someone_else_or_a_draft_is_not_there(monkeypatch, kind):
+    _with_dolibarr(monkeypatch, _documents_handler(objects={
+        f"{kind}/90": {"id": "90", "ref": "X1", "socid": "8", "status": "1", "last_main_doc": "x/X1/X1.pdf"},
+        f"{kind}/91": {"id": "91", "ref": "X2", "socid": "7", "status": "0", "last_main_doc": "x/X2/X2.pdf"},
+    }, files={(module, "X1/X1.pdf"): 1 for module in ("commande", "expedition", "ficheinter", "contract")}))
+    for object_id in (90, 91, 92):
+        with pytest.raises(portal.NotFound):
+            asyncio.run(portal.document_detail(_session(7), kind, object_id))
+        with pytest.raises(portal.NotFound):
+            asyncio.run(portal.document(_session(7), kind, object_id))
+
+
+def test_an_unknown_kind_is_not_there(monkeypatch):
+    calls = _with_dolibarr(monkeypatch, _documents_handler())
+    for kind in ("users", "thirdparties", "../setup"):
+        with pytest.raises(portal.NotFound):
+            asyncio.run(portal.document_detail(_session(7), kind, 1))
+        with pytest.raises(portal.NotFound):
+            asyncio.run(portal.document(_session(7), kind, 1))
+    assert calls == []
+
+
+def test_each_kind_shows_its_own_details_and_nothing_internal(monkeypatch):
+    _with_dolibarr(monkeypatch, _documents_handler(objects={
+        "orders/51": {"id": "51", "ref": "CO1", "socid": "7", "status": "2", "total_ttc": "120", "total_ht": "100",
+                      "total_tva": "20", "delivery_date": 1791000000, "note_private": "intern",
+                      "last_main_doc": "commande/CO1/CO1.pdf",
+                      "lines": [{"product_label": "SSD 1 TB", "desc": "<p>eingebaut</p>", "qty": "1", "total_ttc": "120"}]},
+        "shipments/61": {"id": "61", "ref": "SH1", "socid": "7", "status": "2", "tracking_number": "TRACK-1",
+                         "date_shipping": 1790000000, "note_private": "intern",
+                         "lines": [{"product_label": "SSD 1 TB", "description": "", "qty_shipped": "1", "total_ttc": "120"}]},
+        "interventions/71": {"id": "71", "ref": "FI1", "socid": "7", "status": "3", "datec": 1790000000,
+                             "description": "<p>Notebook gereinigt</p>", "duration": "5400", "note_private": "intern",
+                             "lines": [{"desc": "Lüfter gereinigt", "date": 1790000000, "duration": "3600"},
+                                       {"desc": "Test", "date": 1790003600, "duration": "1800"}]},
+        "contracts/81": {"id": "81", "ref": "CT1", "socid": "7", "status": "1", "date_contrat": 1790000000,
+                         "note_private": "intern",
+                         "lines": [{"product_label": "Wartung", "desc": "monatlich", "qty": "1", "total_ttc": "30",
+                                    "status": "4", "date_start": 1790000000, "date_end": 1821536000, "pa_ht": "1"}]},
+    }))
+    order = asyncio.run(portal.document_detail(_session(7), "orders", 51))
+    assert order["state"] == "in Lieferung"
+    assert order["lines"] == [{"text": "SSD 1 TB", "details": "eingebaut", "qty": "1", "total": "120"}]
+    assert order["net"] == "100" and order["vat"] == "20" and order["delivery"] and order["has_pdf"] is True
+    shipment = asyncio.run(portal.document_detail(_session(7), "shipments", 61))
+    assert shipment["state"] == "zugestellt" and shipment["tracking"] == "TRACK-1"
+    assert shipment["lines"] == [{"text": "SSD 1 TB", "details": "", "qty": "1"}], "a delivery note shows no prices"
+    work = asyncio.run(portal.document_detail(_session(7), "interventions", 71))
+    assert work["state"] == "erledigt" and work["description"] == "Notebook gereinigt" and work["hours"] == 1.5
+    assert [(line["text"], line["hours"]) for line in work["lines"]] == [("Lüfter gereinigt", 1.0), ("Test", 0.5)]
+    contract = asyncio.run(portal.document_detail(_session(7), "contracts", 81))
+    assert contract["state"] == "aktiv" and contract["lines"][0]["state"] == "läuft"
+    assert contract["lines"][0]["text"] == "Wartung" and contract["lines"][0]["total"] == "30"
+    for item in (order, shipment, work, contract):
+        assert "intern" not in json.dumps(item) and "pa_ht" not in json.dumps(item)
+
+
+def test_a_pdf_comes_only_from_the_documents_own_folder(monkeypatch):
+    _with_dolibarr(monkeypatch, _documents_handler(objects={
+        "orders/51": {"id": "51", "ref": "CO1", "socid": "7", "status": "1", "last_main_doc": "commande/CO1/CO1.pdf"},
+        "orders/52": {"id": "52", "ref": "CO2", "socid": "7", "status": "1", "last_main_doc": "commande/CO9/CO9.pdf"},
+        "orders/53": {"id": "53", "ref": "CO/3", "socid": "7", "status": "1", "last_main_doc": "commande/CO_3/CO_3.pdf"},
+        "contracts/81": {"id": "81", "ref": "CT1", "socid": "7", "status": "1",
+                         "last_main_doc": "contract/../x/CT1/CT1.pdf"},
+    }, files={("commande", "CO1/CO1.pdf"): 1, ("commande", "CO9/CO9.pdf"): 1, ("commande", "CO_3/CO_3.pdf"): 1,
+              ("contract", "CT1/CT1.pdf"): 1}))
+    assert asyncio.run(portal.document(_session(7), "orders", 51)) == ("CO1.pdf", b"%PDF-1.4")
+    # Dolibarr writes a reference with a slash as a folder with "_".
+    assert asyncio.run(portal.document(_session(7), "orders", 53)) == ("CO_3.pdf", b"%PDF-1.4")
+    for kind, object_id in (("orders", 52), ("contracts", 81)):
+        with pytest.raises(portal.NotFound):
+            asyncio.run(portal.document(_session(7), kind, object_id))
+
+
+def test_a_delivery_note_pdf_is_found_under_its_standard_name(monkeypatch):
+    """Dolibarr keeps no last_main_doc for shipments: the website asks for "<ref>/<ref>.pdf"."""
+    calls = _with_dolibarr(monkeypatch, _documents_handler(
+        objects={"shipments/61": {"id": "61", "ref": "SH1", "socid": "7", "status": "1"},
+                 "shipments/62": {"id": "62", "ref": "SH2", "socid": "7", "status": "1"}},
+        files={("expedition", "SH1/SH1.pdf"): 1}))
+    assert asyncio.run(portal.document_detail(_session(7), "shipments", 61))["has_pdf"] is True
+    assert asyncio.run(portal.document(_session(7), "shipments", 61)) == ("SH1.pdf", b"%PDF-1.4")
+    assert asyncio.run(portal.document_detail(_session(7), "shipments", 62))["has_pdf"] is False
+    with pytest.raises(portal.NotFound):
+        asyncio.run(portal.document(_session(7), "shipments", 62))
+    asked = [call.url.params["original_file"] for call in calls if call.url.path.endswith("/documents/download")]
+    assert set(asked) == {"SH1/SH1.pdf", "SH2/SH2.pdf"}
+
+
+def test_a_credit_note_is_marked_in_the_invoices():
+    item = portal._invoice({"id": "45", "ref": "AV1", "type": "2", "status": "1", "paye": "0", "total_ttc": "-20"})
+    assert item["credit_note"] is True and item["open"] is False
