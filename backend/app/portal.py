@@ -483,13 +483,14 @@ async def document_detail(session: dict, kind: str, object_id: int) -> dict:
 
 
 async def _pdf_file(client: httpx.AsyncClient, cfg: dict, kind: str, raw: dict) -> str | None:
-    """"<ref>/<file>.pdf" in the document's own folder, or None.
+    """The PDF as "<ref>/<file>.pdf" in the document's own folder, or None.
 
     Dolibarr names the newest PDF in last_main_doc ("commande/CO1/CO1.pdf").
     A shipment has no such field: then the files of the document's folder
     tell. Only the folder named like the document's reference counts, so a
     path can never lead to another customer's file."""
-    ref = str(raw.get("ref") or "")
+    # The folder is the reference as Dolibarr's dol_sanitizeFileName writes it.
+    ref = re.sub(r'[\\/:*?"<>|\[\],;=]', "_", str(raw.get("ref") or ""))
     doc = str(raw.get("last_main_doc") or "")
     if doc:
         parts = doc.split("/")

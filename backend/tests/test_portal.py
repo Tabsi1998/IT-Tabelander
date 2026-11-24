@@ -544,10 +544,14 @@ def test_a_pdf_comes_only_from_the_documents_own_folder(monkeypatch):
     _with_dolibarr(monkeypatch, _documents_handler(objects={
         "orders/51": {"id": "51", "ref": "CO1", "socid": "7", "status": "1", "last_main_doc": "commande/CO1/CO1.pdf"},
         "orders/52": {"id": "52", "ref": "CO2", "socid": "7", "status": "1", "last_main_doc": "commande/CO9/CO9.pdf"},
+        "orders/53": {"id": "53", "ref": "CO/3", "socid": "7", "status": "1", "last_main_doc": "commande/CO_3/CO_3.pdf"},
         "contracts/81": {"id": "81", "ref": "CT1", "socid": "7", "status": "1",
                          "last_main_doc": "contract/../x/CT1/CT1.pdf"},
-    }, files={("commande", "CO1/CO1.pdf"): 1, ("commande", "CO9/CO9.pdf"): 1, ("contract", "CT1/CT1.pdf"): 1}))
+    }, files={("commande", "CO1/CO1.pdf"): 1, ("commande", "CO9/CO9.pdf"): 1, ("commande", "CO_3/CO_3.pdf"): 1,
+              ("contract", "CT1/CT1.pdf"): 1}))
     assert asyncio.run(portal.document(_session(7), "orders", 51)) == ("CO1.pdf", b"%PDF-1.4")
+    # Dolibarr writes a reference with a slash as a folder with "_".
+    assert asyncio.run(portal.document(_session(7), "orders", 53)) == ("CO_3.pdf", b"%PDF-1.4")
     for kind, object_id in (("orders", 52), ("contracts", 81)):
         with pytest.raises(portal.NotFound):
             asyncio.run(portal.document(_session(7), kind, object_id))
