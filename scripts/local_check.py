@@ -94,7 +94,7 @@ NODE_MAJOR = 24
 # database, the Dolibarr file a test Dolibarr; their groups provide both.
 UNIT_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py", "tests/test_handover.py",
                  "tests/test_site_data.py", "tests/test_review_label.py", "tests/test_legal_texts.py",
-                 "tests/test_portal.py")
+                 "tests/test_portal.py", "tests/test_mail_certificate.py")
 INTEGRATION_TEST_FILES = ("tests/test_api.py", "tests/test_regression_iter2.py")
 DOLIBARR_TEST_FILES = ("tests/test_dolibarr_runtime.py",)
 

@@ -13,10 +13,14 @@ const FIELDS = {
   portal_bank_holder: "Kontoinhaber", portal_bank_iban: "IBAN", portal_bank_bic: "BIC",
 };
 
-async function detailText(response) {
+async function detailText(response, extra) {
   try {
     const body = await response.json();
     if (typeof body?.detail === "string") return body.detail;
+    if (typeof body?.detail?.message === "string") {
+      Object.assign(extra, body.detail);
+      return body.detail.message;
+    }
     if (Array.isArray(body?.detail)) {
       return body.detail.map((item) => {
         const field = FIELDS[item.loc?.[item.loc.length - 1]];
@@ -59,7 +63,12 @@ export async function adminRequest(method, path, body, { signal, quiet = false }
       throw new ApiError(401, "Deine Anmeldung ist abgelaufen. Bitte melde dich neu an.");
     }
   }
-  if (!response.ok) throw new ApiError(response.status, await detailText(response));
+  if (!response.ok) {
+    const extra = {};
+    const error = new ApiError(response.status, await detailText(response, extra));
+    error.detail = extra;
+    throw error;
+  }
   const type = response.headers.get("content-type") || "";
   return type.includes("application/json") ? response.json() : null;
 }

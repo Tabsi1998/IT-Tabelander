@@ -17,6 +17,8 @@ const DEVICES = [
 ];
 const SOURCES = [["new_controller", "Neuen Controller mitbestellen"], ["send_in", "Eigenen einsenden"], ["unsure", "Noch unsicher"]];
 const NEEDS_DEVICE = new Set(["repair", "pc_upgrade", "other"]);
+// No device needed: these say in a few words what it is about, for the ticket subject (#107).
+const WITHOUT_DEVICE = new Set(["pc_build", "consulting"]);
 const WITH_BUDGET = new Set(["pc_build", "pc_upgrade", "controller_custom"]);
 const STEPS = ["Anliegen", "Gerät & Fotos", "Kontakt"];
 const MAX_PHOTOS = 5;
@@ -42,7 +44,7 @@ export default function InquiryForm({ preset, onShowStatus }) {
   const [draftId, setDraftId] = useState(() => requestId("anfrage"));
   const [step, setStep] = useState(0);
   const [type, setType] = useState(preset?.requestType || "");
-  const [device, setDevice] = useState({ device_type: "", device_source: "", manufacturer: "", model: "", description: "", budget: "", timeframe: "" });
+  const [device, setDevice] = useState({ device_type: "", device_source: "", manufacturer: "", model: "", topic: "", description: "", budget: "", timeframe: "" });
   const [contact, setContact] = useState({ name: "", email: "", phone: "", preferred_contact: "email", contact_type: "private", company_name: "" });
   const [callback, setCallback] = useState({ wanted: false, date: "", time: "10:00" });
   const [photos, setPhotos] = useState([]);
@@ -92,6 +94,7 @@ export default function InquiryForm({ preset, onShowStatus }) {
       device_type: device.device_type || (type === "controller_custom" ? "controller" : ""),
       ...(type === "controller_custom" ? { device_source: device.device_source } : {}),
       manufacturer: device.manufacturer, model: device.model, description: device.description.trim(),
+      ...(WITHOUT_DEVICE.has(type) ? { topic: device.topic.trim() } : {}),
       budget: device.budget, timeframe: device.timeframe,
       attachment_ids: photos.map((photo) => photo.id),
       contact: { ...contact, preferred_contact: callback.wanted ? "phone" : contact.preferred_contact },
@@ -133,7 +136,7 @@ export default function InquiryForm({ preset, onShowStatus }) {
     photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
     setDraftId(requestId("anfrage"));
     setStep(0); setType(""); setPhotos([]); setConsent(false); setReviewOk(false);
-    setDevice({ device_type: "", device_source: "", manufacturer: "", model: "", description: "", budget: "", timeframe: "" });
+    setDevice({ device_type: "", device_source: "", manufacturer: "", model: "", topic: "", description: "", budget: "", timeframe: "" });
     setState({ busy: false, error: "", done: null });
   };
 
@@ -211,6 +214,10 @@ export default function InquiryForm({ preset, onShowStatus }) {
               <Field label="Hersteller" hint={type === "controller_custom" ? "" : "(optional)"} placeholder="z. B. Lenovo" maxLength={160} value={device.manufacturer} onChange={setD("manufacturer")} />
               <Field label="Modell" hint={type === "controller_custom" ? "" : "(optional)"} placeholder="z. B. ThinkPad T14" maxLength={160} value={device.model} onChange={setD("model")} />
             </div>
+            {WITHOUT_DEVICE.has(type) && (
+              <Field label="Worum geht es?" hint="(optional)" placeholder={type === "pc_build" ? "z. B. Gaming-PC" : "z. B. Laptop fürs Studium"}
+                maxLength={80} value={device.topic} onChange={setD("topic")} />
+            )}
             <Field label={type === "pc_build" ? "Wofür soll der PC sein?" : "Was ist passiert?"} as="textarea" rows={4} maxLength={10000}
               placeholder={type === "pc_build" ? "z. B. Gaming in WQHD, leise, Budget grob 1.500 €" : "z. B. Startet seit gestern nicht mehr, Lüfter läuft kurz an und geht wieder aus."}
               value={device.description} onChange={setD("description")} />
