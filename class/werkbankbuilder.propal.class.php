@@ -48,7 +48,11 @@ class WerkbankBuilderPropal extends WerkbankBuilder
 		if ($payment !== '') {
 			$doc['left'][] = array('cap' => $langs->transnoentities('WerkbankPayment'), 'text' => $payment);
 		}
-		$accept = getDolGlobalString('ITTABPDF_ACCEPT_TEXT', $langs->transnoentities('WerkbankAcceptDefault'));
+		// Without the website's customer area the proposal is accepted by e-mail.
+		$accept = getDolGlobalInt('ITTABPDF_PORTAL_ENABLED')
+			? getDolGlobalString('ITTABPDF_ACCEPT_TEXT', $langs->transnoentities('WerkbankAcceptDefault'))
+			: getDolGlobalString('ITTABPDF_ACCEPT_TEXT_NOPORTAL', $langs->transnoentities('WerkbankAcceptNoPortalDefault'));
+		$accept = trim($this->substitute($accept));
 		if ($accept !== '') {
 			$doc['left'][] = array('cap' => $langs->transnoentities('WerkbankAccept'), 'text' => $accept);
 		}

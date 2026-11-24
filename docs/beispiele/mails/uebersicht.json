@@ -26,6 +26,13 @@
       "template thirdparty du": "ok",
       "template supplier_proposal sie": "ok",
       "template order_supplier sie": "ok",
+      "portal off: no button": "ok",
+      "portal off: reply sentence": "ok",
+      "logo as data image": "ok",
+      "portal on: button to the proposal": "ok",
+      "portal on: customer area sentence": "ok",
+      "template propal sie (portal on)": "ok",
+      "template propal du (portal on)": "ok",
       "proposal planned with 5 min delay": "ok",
       "not sent before the delay": "ok",
       "sent after the delay": "ok",
@@ -47,7 +54,7 @@
       "deposit template": "ok"
     },
     "failed": 0,
-    "planned_propal": 4
+    "planned_propal": 6
   },
   "messages": [
     {
@@ -57,6 +64,9 @@
       "bcc": "office@tabelander.co.at",
       "attachments": [
         "PR2611-0001.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Guten Tag Frau\r\nMuster,"
     },
@@ -68,6 +78,9 @@
       "attachments": [
         "PR2611-0001.pdf"
       ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Hallo\r\nMaria,"
     },
     {
@@ -77,6 +90,9 @@
       "bcc": "office@tabelander.co.at",
       "attachments": [
         "IN2611-0002.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Guten Tag,"
     },
@@ -88,6 +104,9 @@
       "attachments": [
         "IN2611-0002.pdf"
       ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Hallo,"
     },
     {
@@ -97,6 +116,9 @@
       "bcc": "office@tabelander.co.at",
       "attachments": [
         "ID2611-0001.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Guten Tag,"
     },
@@ -108,6 +130,9 @@
       "attachments": [
         "ID2611-0001.pdf"
       ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Hallo,"
     },
     {
@@ -117,6 +142,9 @@
       "bcc": "office@tabelander.co.at",
       "attachments": [
         "IC2611-0001.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Guten Tag Max\r\nMustermann,"
     },
@@ -128,22 +156,31 @@
       "attachments": [
         "IC2611-0001.pdf"
       ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Hallo Max,"
     },
     {
-      "file": "09-zahlung-erhalten-rechnung-in2611-0005-max-mustermann-example.html",
-      "subject": "Zahlung erhalten: Rechnung IN2611-0005",
+      "file": "09-zahlung-erhalten-rechnung-in2611-0010-max-mustermann-example.html",
+      "subject": "Zahlung erhalten: Rechnung IN2611-0010",
       "to": "max@mustermann.example",
       "bcc": "office@tabelander.co.at",
       "attachments": [],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Guten Tag Max\r\nMustermann,"
     },
     {
-      "file": "10-zahlung-erhalten-rechnung-in2611-0005-max-mustermann-example.html",
-      "subject": "Zahlung erhalten: Rechnung IN2611-0005",
+      "file": "10-zahlung-erhalten-rechnung-in2611-0010-max-mustermann-example.html",
+      "subject": "Zahlung erhalten: Rechnung IN2611-0010",
       "to": "max@mustermann.example",
       "bcc": "office@tabelander.co.at",
       "attachments": [],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Hallo Max,"
     },
     {
@@ -153,6 +190,9 @@
       "bcc": "office@tabelander.co.at",
       "attachments": [
         "SO2611-0001.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Guten Tag,"
     },
@@ -164,6 +204,9 @@
       "attachments": [
         "SO2611-0001.pdf"
       ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Hallo,"
     },
     {
@@ -173,6 +216,9 @@
       "bcc": "office@tabelander.co.at",
       "attachments": [
         "SH2611-0001.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Guten Tag Frau\r\nMuster,"
     },
@@ -184,6 +230,9 @@
       "attachments": [
         "SH2611-0001.pdf"
       ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Hallo\r\nMaria,"
     },
     {
@@ -193,6 +242,9 @@
       "bcc": "office@tabelander.co.at",
       "attachments": [
         "FI2611-0001.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Guten Tag,"
     },
@@ -204,6 +256,9 @@
       "attachments": [
         "FI2611-0001.pdf"
       ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Hallo,"
     },
     {
@@ -214,15 +269,23 @@
       "attachments": [
         "CT2611-0001.pdf"
       ],
-      "greeting": "Hallo,"
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
+      "greeting": "Guten Tag,"
     },
     {
-      "file": "18-nachricht-von-it-tabelander-office-musterfirma-example.html",
-      "subject": "Nachricht von IT-Tabelander",
+      "file": "18-vertrag-ct2611-0001-von-it-tabelander-office-musterfirma-example.html",
+      "subject": "Vertrag CT2611-0001 von IT-Tabelander",
       "to": "office@musterfirma.example",
       "bcc": "office@tabelander.co.at",
-      "attachments": [],
-      "greeting": "Guten Tag,"
+      "attachments": [
+        "CT2611-0001.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
+      "greeting": "Hallo,"
     },
     {
       "file": "19-nachricht-von-it-tabelander-office-musterfirma-example.html",
@@ -230,83 +293,134 @@
       "to": "office@musterfirma.example",
       "bcc": "office@tabelander.co.at",
       "attachments": [],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
+      "greeting": "Guten Tag,"
+    },
+    {
+      "file": "20-nachricht-von-it-tabelander-office-musterfirma-example.html",
+      "subject": "Nachricht von IT-Tabelander",
+      "to": "office@musterfirma.example",
+      "bcc": "office@tabelander.co.at",
+      "attachments": [],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Hallo,"
     },
     {
-      "file": "20-preisanfrage-rq2611-0001-von-it-tabelander-vertrieb-grosshandel-example.html",
+      "file": "21-preisanfrage-rq2611-0001-von-it-tabelander-vertrieb-grosshandel-example.html",
       "subject": "Preisanfrage RQ2611-0001 von IT-Tabelander",
       "to": "vertrieb@grosshandel.example",
       "bcc": "office@tabelander.co.at",
       "attachments": [
         "RQ2611-0001.pdf"
       ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Guten Tag,"
     },
     {
-      "file": "21-bestellung-po-0001-von-it-tabelander-vertrieb-grosshandel-example.html",
+      "file": "22-bestellung-po-0001-von-it-tabelander-vertrieb-grosshandel-example.html",
       "subject": "Bestellung PO-0001 von IT-Tabelander",
       "to": "vertrieb@grosshandel.example",
       "bcc": "office@tabelander.co.at",
       "attachments": [
         "PO-0001.pdf"
       ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Guten Tag,"
     },
     {
-      "file": "22-angebot-pr2611-0003-von-it-tabelander-maria-muster-musterfirma-example.html",
-      "subject": "Angebot PR2611-0003 von IT-Tabelander",
+      "file": "23-angebot-pr2611-0001-von-it-tabelander-maria-muster-musterfirma-example.html",
+      "subject": "Angebot PR2611-0001 von IT-Tabelander",
       "to": "maria.muster@musterfirma.example",
       "bcc": "office@tabelander.co.at",
       "attachments": [
-        "PR2611-0003.pdf"
+        "PR2611-0001.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Guten Tag Frau\r\nMuster,"
     },
     {
-      "file": "23-rechnung-in2611-0009-von-it-tabelander-max-mustermann-example.html",
-      "subject": "Rechnung IN2611-0009 von IT-Tabelander",
+      "file": "24-angebot-pr2611-0001-von-it-tabelander-maria-muster-musterfirma-example.html",
+      "subject": "Angebot PR2611-0001 von IT-Tabelander",
+      "to": "maria.muster@musterfirma.example",
+      "bcc": "office@tabelander.co.at",
+      "attachments": [
+        "PR2611-0001.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
+      "greeting": "Hallo\r\nMaria,"
+    },
+    {
+      "file": "25-angebot-pr2611-0005-von-it-tabelander-maria-muster-musterfirma-example.html",
+      "subject": "Angebot PR2611-0005 von IT-Tabelander",
+      "to": "maria.muster@musterfirma.example",
+      "bcc": "office@tabelander.co.at",
+      "attachments": [
+        "PR2611-0005.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
+      "greeting": "Guten Tag Frau\r\nMuster,"
+    },
+    {
+      "file": "26-rechnung-in2611-0014-von-it-tabelander-max-mustermann-example.html",
+      "subject": "Rechnung IN2611-0014 von IT-Tabelander",
       "to": "max@mustermann.example",
       "bcc": "office@tabelander.co.at",
       "attachments": [
-        "IN2611-0009.pdf"
+        "IN2611-0014.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Hallo Max,"
     },
     {
-      "file": "24-zahlung-erhalten-rechnung-in2611-0009-max-mustermann-example.html",
-      "subject": "Zahlung erhalten: Rechnung IN2611-0009",
+      "file": "27-zahlung-erhalten-rechnung-in2611-0014-max-mustermann-example.html",
+      "subject": "Zahlung erhalten: Rechnung IN2611-0014",
       "to": "max@mustermann.example",
       "bcc": "office@tabelander.co.at",
       "attachments": [],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
+      ],
       "greeting": "Hallo Max,"
     },
     {
-      "file": "25-gutschrift-ic2611-0003-von-it-tabelander-max-mustermann-example.html",
-      "subject": "Gutschrift IC2611-0003 von IT-Tabelander",
+      "file": "28-gutschrift-ic2611-0004-von-it-tabelander-max-mustermann-example.html",
+      "subject": "Gutschrift IC2611-0004 von IT-Tabelander",
       "to": "max@mustermann.example",
       "bcc": "office@tabelander.co.at",
       "attachments": [
-        "IC2611-0003.pdf"
+        "IC2611-0004.pdf"
+      ],
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Hallo Max,"
     },
     {
-      "file": "26-anzahlungsrechnung-id2611-0002-von-it-tabelander-office-musterfirma-example.html",
-      "subject": "Anzahlungsrechnung ID2611-0002 von IT-Tabelander",
+      "file": "29-anzahlungsrechnung-id2611-0003-von-it-tabelander-office-musterfirma-example.html",
+      "subject": "Anzahlungsrechnung ID2611-0003 von IT-Tabelander",
       "to": "office@musterfirma.example",
       "bcc": "office@tabelander.co.at",
       "attachments": [
-        "ID2611-0002.pdf"
+        "ID2611-0003.pdf"
       ],
-      "greeting": "Guten Tag,"
-    },
-    {
-      "file": "27-vertrag-ct2611-0001-von-it-tabelander-office-musterfirma-example.html",
-      "subject": "Vertrag CT2611-0001 von IT-Tabelander",
-      "to": "office@musterfirma.example",
-      "bcc": "office@tabelander.co.at",
-      "attachments": [
-        "CT2611-0001.pdf"
+      "inline": [
+        "cid0001d5d0504094e5c7c13bec3690b7bc68d"
       ],
       "greeting": "Guten Tag,"
     }

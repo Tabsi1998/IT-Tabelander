@@ -79,6 +79,9 @@ class modITTabelanderPDF extends DolibarrModules
 			4 => array('ITTABPDF_AUTOSEND_PAID', 'chaine', '0', 'Send a payment confirmation when an invoice is paid', 0, 'current', 0),
 			5 => array('ITTABPDF_AUTOSEND_DELAY', 'chaine', '5', 'Minutes between the event and the automatic e-mail', 0, 'current', 0),
 			6 => array('ITTABPDF_PORTAL_URL', 'chaine', 'https://it.tabelander.co.at/kundenbereich', 'Customer area of the website', 0, 'current', 0),
+			// The website's customer area is not live yet: off until the owner switches it on.
+			7 => array('ITTABPDF_PORTAL_ENABLED', 'yesno', '0', 'Customer area of the website is live', 0, 'current', 0),
+			8 => array('ITTABPDF_ACCEPT_TEXT_NOPORTAL', 'chaine', 'Bitte kurz per E-Mail an __MYCOMPANY_EMAIL__ bestätigen. Gearbeitet wird erst nach Zusage.', 'How a customer accepts a proposal without the customer area (Werkbank PDF)', 0, 'current', 0),
 		);
 
 		// Every 5 minutes: send the automatic e-mails that are due.

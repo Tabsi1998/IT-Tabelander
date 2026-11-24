@@ -157,6 +157,7 @@ def mails() -> None:
     urllib.request.urlopen(urllib.request.Request(f"{MAILPIT_URL}/api/v1/messages", method="DELETE"), timeout=30)
     result = php("mails")
     (STATE / "ui.json").write_text(json.dumps({"planned_propal": result.get("planned_propal")}), encoding="utf-8")
+    docker("cp", f"{WEB}:/tmp/ittpdf-out/angebot-1-kundenbereich-an.pdf", str(EXAMPLES / "angebot-1-kundenbereich-an.pdf"))
     MAILS.mkdir(parents=True, exist_ok=True)
     for old in MAILS.glob("*"):
         old.unlink()
@@ -167,12 +168,13 @@ def mails() -> None:
         to = ", ".join(entry["Address"] for entry in detail.get("To") or [])
         bcc = ", ".join(entry["Address"] for entry in detail.get("Bcc") or [])
         attachments = [entry["FileName"] for entry in detail.get("Attachments") or []]
+        inline = [entry.get("ContentID", "") for entry in detail.get("Inline") or []]
         slug = f"{number:02d}-" + re.sub(r"[^a-z0-9]+", "-", f"{detail['Subject']} {to}".lower()).strip("-")[:80]
         (MAILS / f"{slug}.html").write_text(detail.get("HTML") or "", encoding="utf-8")
         found = re.search(r">\s*((?:Hallo|Guten Tag)[^<]*)<", detail.get("HTML") or "")
         greeting = found.group(1).strip() if found else ""
         summary.append({"file": f"{slug}.html", "subject": detail["Subject"], "to": to, "bcc": bcc,
-                        "attachments": attachments, "greeting": greeting})
+                        "attachments": attachments, "inline": inline, "greeting": greeting})
     (MAILS / "uebersicht.json").write_text(json.dumps({"scenarios": result, "messages": summary}, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print(f"{len(summary)} messages -> {MAILS.relative_to(ROOT)}")

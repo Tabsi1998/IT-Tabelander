@@ -42,9 +42,9 @@ class WerkbankMailTemplates
 		return array(
 			'propal' => array('propal_send', 'Angebot', 'Angebot __REF__ von __MYCOMPANY_NAME__',
 				array('anbei das Angebot __REF__ als PDF.',
-					'Sie können es online im Kundenbereich annehmen oder einfach auf diese E-Mail antworten. Ich fange erst an, wenn Ihre Zusage da ist.'),
+					'__ITTAB_ANNAHME_SATZ__'),
 				array('anbei mein Angebot __REF__ als PDF.',
-					'Du kannst es online im Kundenbereich annehmen oder einfach auf diese Mail antworten. Ich fange erst an, wenn deine Zusage da ist.'),
+					'__ITTAB_ANNAHME_SATZ_DU__'),
 				1),
 			'invoice' => array('facture_send', 'Rechnung', 'Rechnung __REF__ von __MYCOMPANY_NAME__',
 				array('anbei die Rechnung __REF__ als PDF. Danke für den Auftrag.',
@@ -154,9 +154,8 @@ class WerkbankMailTemplates
 		}
 		$extra = '';
 		if ($key === 'propal') {
-			$extra .= '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 18px 0;"><tr>'
-				.'<td bgcolor="'.self::BRAND.'" style="border-radius:3px;"><a href="__ITTAB_KUNDENBEREICH_URL__" style="display:inline-block;padding:11px 20px;font-family:'.self::FONT.';font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;">'
-				.'Angebot im Kundenbereich ansehen</a></td></tr></table>';
+			// Button or nothing, depending on ITTABPDF_PORTAL_ENABLED.
+			$extra .= '__ITTAB_KUNDENBEREICH_BLOCK__';
 		}
 		if ($key === 'invoice' || $key === 'deposit') {
 			$extra .= '__ITTAB_UEBERWEISUNG__';
@@ -173,9 +172,9 @@ class WerkbankMailTemplates
 		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="'.self::PAGE.'" style="background:'.self::PAGE.';">'
 			.'<tr><td align="center" style="padding:24px 12px;">'
 			.'<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:4px;">'
-			// Word mark and the brand rule: ink with an orange start.
+			// Logo (or the word mark without one) and the brand rule: ink with an orange start.
 			.'<tr><td style="padding:26px 32px 16px 32px;font-family:'.self::FONT.';font-size:21px;font-weight:bold;letter-spacing:1px;color:'.self::INK.';">'
-			.'<span style="color:'.self::BRAND.';">IT</span>&#8209;TABELANDER</td></tr>'
+			.'__ITTAB_LOGO__</td></tr>'
 			.'<tr><td style="padding:0 32px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
 			.'<td width="60" height="3" bgcolor="'.self::BRAND.'" style="font-size:0;line-height:0;">&nbsp;</td>'
 			.'<td height="3" bgcolor="'.self::INK.'" style="font-size:0;line-height:0;">&nbsp;</td></tr></table></td></tr>'
@@ -259,21 +258,36 @@ class WerkbankMailTemplates
 		return $obj ? (int) $obj->rowid : 0;
 	}
 
+	/**
+	 * The orange button to the document in the customer area.
+	 *
+	 * @param string $url Link
+	 * @return string
+	 */
+	public static function portalButton($url)
+	{
+		return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 18px 0;"><tr>'
+			.'<td bgcolor="'.self::BRAND.'" style="border-radius:3px;"><a href="'.dol_escape_htmltag($url).'" style="display:inline-block;padding:11px 20px;font-family:'.self::FONT.';font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;">'
+			.'Angebot im Kundenbereich ansehen</a></td></tr></table>';
+	}
+
 	// ------------------------------------------------------------ rollout pieces
 	// Self-contained blocks for texts that Dolibarr or another module puts
 	// together from parts (ticket intro/signature, Mahnwesen letters): every
 	// block closes its own tags, so the parts can stand next to anything.
 
 	/**
-	 * Word mark and brand rule, at most 600 px wide.
+	 * Logo or word mark and brand rule, at most 600 px wide.
 	 *
+	 * @param bool $logo __ITTAB_LOGO__ (for texts that run through Dolibarr's
+	 *                   substitutions) instead of the fixed word mark
 	 * @return string
 	 */
-	public static function headerBlock()
+	public static function headerBlock($logo = false)
 	{
 		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;"><tr>'
 			.'<td style="padding:8px 0 12px 0;font-family:'.self::FONT.';font-size:21px;font-weight:bold;letter-spacing:1px;color:'.self::INK.';">'
-			.'<span style="color:'.self::BRAND.';">IT</span>&#8209;TABELANDER</td></tr>'
+			.($logo ? '__ITTAB_LOGO__' : '<span style="color:'.self::BRAND.';">IT</span>&#8209;TABELANDER').'</td></tr>'
 			.'<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
 			.'<td width="60" height="3" bgcolor="'.self::BRAND.'" style="font-size:0;line-height:0;">&nbsp;</td>'
 			.'<td height="3" bgcolor="'.self::INK.'" style="font-size:0;line-height:0;">&nbsp;</td></tr></table></td></tr>'

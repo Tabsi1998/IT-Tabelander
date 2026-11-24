@@ -6,7 +6,10 @@ WerkbankModelDescription = Werkbank – IT-Tabelander-Design mit Markenschriften
 WerkbankUnsupported = Die Vorlage werkbank kennt den Belegtyp %s nicht.
 WerkbankSetup = Einstellungen IT-Tabelander PDF
 WerkbankSetupPdf = PDF-Vorlage werkbank
-WerkbankSetupAcceptText = Text „Annehmen“ auf Angeboten
+WerkbankSetupAcceptText = Text „Annehmen“ auf Angeboten (Kundenbereich aktiv)
+WerkbankSetupAcceptTextNoPortal = Text „Annehmen“ auf Angeboten (ohne Kundenbereich, __MYCOMPANY_EMAIL__ = E-Mail der Firma)
+WerkbankSetupPortalEnabled = Kundenbereich der Website aktiv
+WerkbankSetupPortalEnabledHelp = Angebots-PDF und -Mails verweisen auf den Kundenbereich (Button, Annahme online). Aus: Annahme per Antwort auf die E-Mail.
 WerkbankSetupTaxNotice = Hinweis unter dem Gesamtbetrag, wenn die Firma keine Umsatzsteuer verrechnet
 WerkbankSetupModels = Die Vorlage heißt <b>werkbank</b>. Als Standard setzen: Einstellungen der jeweiligen Belegart (z. B. Angebote, Rechnungen) → Dokumentvorlagen.
 
@@ -40,6 +43,7 @@ WerkbankProposalNo = Angebot Nr.
 WerkbankValidUntil = Gültig bis
 WerkbankAccept = Annehmen
 WerkbankAcceptDefault = Online im Kundenbereich auf it.tabelander.co.at oder per E-Mail. Gearbeitet wird erst nach Zusage.
+WerkbankAcceptNoPortalDefault = Bitte kurz per E-Mail an __MYCOMPANY_EMAIL__ bestätigen. Gearbeitet wird erst nach Zusage.
 WerkbankSignCustomer = Datum, Unterschrift Auftraggeber
 
 # Invoice

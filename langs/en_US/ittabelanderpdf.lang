@@ -6,7 +6,10 @@ WerkbankModelDescription = Werkbank – IT-Tabelander design with brand fonts
 WerkbankUnsupported = The werkbank template does not know the document type %s.
 WerkbankSetup = IT-Tabelander PDF setup
 WerkbankSetupPdf = PDF template werkbank
-WerkbankSetupAcceptText = "Accept" text on proposals
+WerkbankSetupAcceptText = "Accept" text on proposals (customer area live)
+WerkbankSetupAcceptTextNoPortal = "Accept" text on proposals (no customer area, __MYCOMPANY_EMAIL__ = company e-mail)
+WerkbankSetupPortalEnabled = Customer area of the website is live
+WerkbankSetupPortalEnabledHelp = Proposal PDF and e-mails point to the customer area (button, accept online). Off: accept by replying to the e-mail.
 WerkbankSetupTaxNotice = Notice below the total when the company charges no VAT
 WerkbankSetupModels = The template is called <b>werkbank</b>. Make it the default in the setup of each document type (e.g. proposals, invoices) → document templates.
 
@@ -40,6 +43,7 @@ WerkbankProposalNo = Proposal no.
 WerkbankValidUntil = Valid until
 WerkbankAccept = Accept
 WerkbankAcceptDefault = Online in the customer area at it.tabelander.co.at or by e-mail. Work starts after your confirmation.
+WerkbankAcceptNoPortalDefault = Please confirm briefly by e-mail to __MYCOMPANY_EMAIL__. Work starts after your confirmation.
 WerkbankSignCustomer = Date, signature of the customer
 
 # Invoice

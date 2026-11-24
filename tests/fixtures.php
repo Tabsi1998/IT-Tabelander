@@ -665,6 +665,35 @@ if ($stage === 'mails') {
 		}
 	}
 
+	// 1b. Customer area switch: off (default) above, now on for the proposal
+	// mails and PDF, then off again.
+	$proposal = rt_load($db, 'propal', $docs['angebot-1-wie-entwurf'][1]);
+	$vars = function () use ($langs, $proposal) {
+		$substitutions = getCommonSubstitutionArray($langs, 0, null, $proposal);
+		complete_substitutions_array($substitutions, $langs, $proposal, array('mode' => 'formemail'));
+		return $substitutions;
+	};
+	$off = $vars();
+	$check('portal off: no button', $off['__ITTAB_KUNDENBEREICH_BLOCK__'] === '');
+	$check('portal off: reply sentence', strpos($off['__ITTAB_ANNAHME_SATZ__'], 'antworten Sie einfach auf diese E-Mail') !== false && strpos($off['__ITTAB_ANNAHME_SATZ_DU__'], 'antworte einfach auf diese Mail') !== false);
+	$check('logo as data image', strpos($off['__ITTAB_LOGO__'], 'src="data:image/png;base64,') !== false);
+	rt_const($db, 'ITTABPDF_PORTAL_ENABLED', '1');
+	$conf->global->ITTABPDF_PORTAL_ENABLED = '1';
+	$on = $vars();
+	$check('portal on: button to the proposal', strpos($on['__ITTAB_KUNDENBEREICH_BLOCK__'], '/kundenbereich/angebote/'.$proposal->id) !== false);
+	$check('portal on: customer area sentence', strpos($on['__ITTAB_ANNAHME_SATZ__'], 'im Kundenbereich annehmen') !== false);
+	foreach (array('sie', 'du') as $form) {
+		$result = $queue->send($proposal, 'propal', $admin, true, '', $form);
+		$check('template propal '.$form.' (portal on)', $result['ok'], $result['error']);
+	}
+	if ($proposal->generateDocument('werkbank', $langs) > 0) {
+		dol_mkdir(RT_OUT);
+		copy(DOL_DATA_ROOT.'/'.$proposal->last_main_doc, RT_OUT.'/angebot-1-kundenbereich-an.pdf');
+	}
+	rt_const($db, 'ITTABPDF_PORTAL_ENABLED', '0');
+	$conf->global->ITTABPDF_PORTAL_ENABLED = '0';
+	$proposal->generateDocument('werkbank', $langs);
+
 	// 2. Automatic sending: switched on, 5 minutes delay.
 	rt_const($db, 'ITTABPDF_AUTOSEND_PROPAL', '1');
 	rt_const($db, 'ITTABPDF_AUTOSEND_INVOICE', '1');
@@ -840,11 +869,15 @@ if ($stage === 'rollout') {
 			}
 		}
 		$body .= $T::paragraph('Mit freundlichen Grüßen<br><strong style="color:#1B3348;">'.dol_escape_htmltag($mysoc->managers).'</strong><br>{COMPANY_NAME}');
-		$html = '<div style="max-width:600px;">'.$body.'</div>'.$end.'<div style="max-width:600px;margin-top:8px;">'.$T::headerBlock().$footer.'</div>';
+		// Mahnwesen runs its texts through complete_substitutions_array, so the
+		// logo variable of this module works there (FormMail::setSubstitFromObject).
+		$html = '<div style="max-width:600px;">'.$body.'</div>'.$end.'<div style="max-width:600px;margin-top:8px;">'.$T::headerBlock(true).$footer.'</div>';
 		file_put_contents($out.'/mahnwesen/'.$name.'.html', $html."\n");
 		file_put_contents($out.'/mahnwesen/'.$name.'.betreff.txt', $subject."\n");
-		// Sent with sample values, as the plugin replaces its placeholders.
-		$mail = new CMailFile(strtr($subject, $sample), 'max@mustermann.example', 'IT-Tabelander <office@tabelander.co.at>', strtr($html, $sample), array(), array(), array(), '', '', 0, 1);
+		// Sent with sample values, substituted as the plugin does it.
+		$substitutions = getCommonSubstitutionArray($langs, 0, null, null);
+		complete_substitutions_array($substitutions, $langs, null);
+		$mail = new CMailFile(strtr($subject, $sample), 'max@mustermann.example', 'IT-Tabelander <office@tabelander.co.at>', make_substitutions(strtr($html, $sample), $substitutions), array(), array(), array(), '', '', 0, 1);
 		$sent['mahnwesen '.$name] = $mail->sendfile() ? 'ok' : 'FAILED '.$mail->error;
 	}
 

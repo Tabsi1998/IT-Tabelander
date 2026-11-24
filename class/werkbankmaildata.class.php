@@ -92,6 +92,55 @@ class WerkbankMailData
 	}
 
 	/**
+	 * The company logo for e-mails: the logo of the company setup, scaled to
+	 * 440 px wide (shown at 220 px), as a data: image. Dolibarr's CMailFile
+	 * turns data: images into inline attachments (cid:) before sending
+	 * (MAIN_MAIL_ADD_INLINE_IMAGES_IF_DATA, on by default), so mail clients
+	 * that block data: URIs still show it. Without a usable logo: the word mark.
+	 *
+	 * @return string HTML
+	 */
+	public static function logoHtml()
+	{
+		global $conf, $mysoc;
+		static $html = null;
+		if ($html !== null) {
+			return $html;
+		}
+		$name = (string) $mysoc->name;
+		$html = $name === 'IT-Tabelander' ? '<span style="color:#FE5A23;">IT</span>&#8209;TABELANDER' : dol_escape_htmltag(dol_strtoupper($name));
+		$file = empty($mysoc->logo) ? '' : $conf->mycompany->dir_output.'/logos/'.$mysoc->logo;
+		if ($file === '' || !is_readable($file) || !function_exists('imagecreatefromstring')) {
+			return $html;
+		}
+		$cacheDir = DOL_DATA_ROOT.'/ittabelanderpdf';
+		$cache = $cacheDir.'/mail-logo-'.md5($file.'|'.filemtime($file)).'.png';
+		if (!is_readable($cache)) {
+			$source = @imagecreatefromstring((string) file_get_contents($file));
+			if (!$source) {
+				return $html;
+			}
+			$width = imagesx($source);
+			$height = imagesy($source);
+			$target = min(440, $width);
+			$scaled = imagecreatetruecolor($target, (int) round($height * $target / $width));
+			imagealphablending($scaled, false);
+			imagesavealpha($scaled, true);
+			imagefill($scaled, 0, 0, imagecolorallocatealpha($scaled, 0, 0, 0, 127));
+			imagecopyresampled($scaled, $source, 0, 0, 0, 0, imagesx($scaled), imagesy($scaled), $width, $height);
+			dol_mkdir($cacheDir);
+			if (!imagepng($scaled, $cache, 9)) {
+				return $html;
+			}
+		}
+		$size = getimagesize($cache);
+		$shown = (int) ceil($size[0] / 2);
+		$html = '<img src="data:image/png;base64,'.base64_encode((string) file_get_contents($cache)).'" width="'.$shown.'"'
+			.' alt="'.dol_escape_htmltag($name).'" style="display:block;border:0;height:auto;max-width:'.$shown.'px;">';
+		return $html;
+	}
+
+	/**
 	 * Where the customer finds the document in the website's customer area.
 	 *
 	 * @param CommonObject $object Document

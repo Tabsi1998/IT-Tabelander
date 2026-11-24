@@ -57,7 +57,8 @@ Damit die Rechnung Kontodaten und QR-Code zeigt, muss bei den Rechnungseinstellu
 
 **Einstellungen → Module → IT-Tabelander PDF (Zahnrad)**:
 
-- Text „Annehmen“ auf Angeboten (Standard: „Online im Kundenbereich auf it.tabelander.co.at oder per E-Mail. Gearbeitet wird erst nach Zusage.“)
+- Kundenbereich der Website aktiv (Standard: aus). Steuert den Annehmen-Text im Angebots-PDF und Button/Satz in den Angebotsmails.
+- Text „Annehmen“ auf Angeboten mit Kundenbereich (Standard: „Online im Kundenbereich auf it.tabelander.co.at oder per E-Mail. Gearbeitet wird erst nach Zusage.“) und ohne (Standard: „Bitte kurz per E-Mail an __MYCOMPANY_EMAIL__ bestätigen. Gearbeitet wird erst nach Zusage.“, die Variable wird durch die Firmen-E-Mail ersetzt)
 - Kleinunternehmer-Hinweis unter dem Gesamtbetrag (Standard: „Umsatzsteuerbefreit – Kleinunternehmer gem. § 6 Abs. 1 Z 27 UStG“)
 - Automatischer Versand je Anlass ein/aus (Standard: aus), Verzögerung in Minuten (Standard 5), Blindkopie an (Standard: E-Mail der Firma), Adresse des Kundenbereichs, Vorlage je Anlass für Sie und Du (Standard: die Vorlagen des Moduls).
 
@@ -84,7 +85,12 @@ Zusätzlich zu Dolibarrs eigenen Variablen (`__REF__`, `__MYCOMPANY_NAME__`, …
 | `__ITTAB_UEBERWEISUNG__` | Kontoinhaber, IBAN, BIC, Verwendungszweck (nur bei offener Rechnung) |
 | `__ITTAB_SENDUNG__` | Sendungsnummer mit Link (nur Lieferungen mit Sendungsnummer) |
 | `__ITTAB_KUNDENBEREICH_URL__` | Link auf den Beleg im Kundenbereich der Website |
+| `__ITTAB_KUNDENBEREICH_BLOCK__` | Button „Angebot im Kundenbereich ansehen“, leer solange „Kundenbereich der Website aktiv“ aus ist |
+| `__ITTAB_ANNAHME_SATZ__`, `__ITTAB_ANNAHME_SATZ_DU__` | Satz zur Annahme des Angebots (Sie/Du): mit Kundenbereich „online im Kundenbereich annehmen oder antworten“, ohne „einfach auf diese E-Mail antworten“ |
+| `__ITTAB_LOGO__` | Firmenlogo aus den Firmeneinstellungen, verkleinert und eingebettet (ohne Logo: Wortmarke als Text) |
 | `__ITTAB_INHABER__`, `__ITTAB_TELEFON__`, `__ITTAB_ADRESSE__`, `__ITTAB_WEB__`, `__ITTAB_RECHTLICHES__` | Firmendaten für Gruß und Fuß |
+
+Das Logo kommt als `data:`-Bild in den Text; Dolibarrs `CMailFile` macht daraus beim Senden einen eingebetteten Anhang (`cid:`, Einstellung `MAIN_MAIL_ADD_INLINE_IMAGES_IF_DATA`, standardmäßig an). So zeigen es auch Gmail und Outlook, ohne dass Dolibarr von außen erreichbar sein muss. Das gilt für den händischen Versand genauso wie für den automatischen.
 
 Die Vorlagen nutzen bewusst keinen Online-Zahlungslink (`__ONLINE_PAYMENT_URL__`); der lässt sich bei Bedarf in der Vorlage ergänzen.
 

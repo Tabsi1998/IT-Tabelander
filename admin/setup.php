@@ -38,6 +38,7 @@ if (!$user->admin) {
 
 $texts = array(
 	'ITTABPDF_ACCEPT_TEXT' => 'WerkbankSetupAcceptText',
+	'ITTABPDF_ACCEPT_TEXT_NOPORTAL' => 'WerkbankSetupAcceptTextNoPortal',
 	'ITTABPDF_TAX_NOTICE' => 'WerkbankSetupTaxNotice',
 );
 $switches = array(
@@ -59,6 +60,7 @@ if ($action === 'save') {
 	foreach (array_keys($texts) as $const) {
 		$error += dolibarr_set_const($db, $const, GETPOST($const, 'restricthtml'), 'chaine', 0, '', $conf->entity) > 0 ? 0 : 1;
 	}
+	$error += dolibarr_set_const($db, 'ITTABPDF_PORTAL_ENABLED', GETPOST('ITTABPDF_PORTAL_ENABLED') ? '1' : '0', 'yesno', 0, '', $conf->entity) > 0 ? 0 : 1;
 	foreach (array_keys($switches) as $const) {
 		$error += dolibarr_set_const($db, $const, GETPOST($const) ? '1' : '0', 'chaine', 0, '', $conf->entity) > 0 ? 0 : 1;
 	}
@@ -113,6 +115,9 @@ print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="save">';
 print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
 print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankSetupPdf').'</td><td>'.$langs->trans('Value').'</td></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('WerkbankSetupPortalEnabled').'</td><td>';
+print '<input type="checkbox" name="ITTABPDF_PORTAL_ENABLED" value="1"'.(getDolGlobalInt('ITTABPDF_PORTAL_ENABLED') ? ' checked' : '').'> '.$langs->trans('WerkbankSetupPortalEnabledHelp');
+print '</td></tr>';
 foreach ($texts as $const => $label) {
 	print '<tr class="oddeven"><td class="titlefield">'.$langs->trans($label).'</td><td>';
 	print '<textarea name="'.$const.'" class="quatrevingtpercent" rows="2">'.dol_escape_htmltag(getDolGlobalString($const)).'</textarea>';

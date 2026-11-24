@@ -46,7 +46,9 @@ Dateien: `docs/rollout/mahnwesen/` (je Stufe `*.html` = Inhalt, `*.betreff.txt` 
 
 In der jeweiligen Vorlage den Editor auf **Quelltext** stellen, den bisherigen Inhalt ersetzen, speichern. Falls die Produktionstexte gegenüber den Plugin-Standardtexten geändert wurden: vorher vergleichen (die neuen Texte folgen inhaltlich den Standardtexten).
 
-Wichtig: Mahnwesen druckt den E-Mail-Text auch in den Mahnbrief (PDF), und zwar alles **vor** `<!--MAHNWESEN_PDF_END-->`. Deshalb stehen Wortmarke und dunkler Fuß in diesen Vorlagen **nach** der Marke, nur in der E-Mail; im Brief kommen Logo und Fuß aus dem Mahnwesen-Briefkopf. Die Marke nicht entfernen.
+Wichtig: Mahnwesen druckt den E-Mail-Text auch in den Mahnbrief (PDF), und zwar alles **vor** `<!--MAHNWESEN_PDF_END-->`. Deshalb stehen Logo und dunkler Fuß in diesen Vorlagen **nach** der Marke, nur in der E-Mail; im Brief kommen Logo und Fuß aus dem Mahnwesen-Briefkopf. Die Marke nicht entfernen.
+
+Das Logo steht in den Mahnwesen-Texten als `__ITTAB_LOGO__`. Mahnwesen schickt seine Texte durch Dolibarrs Variablen-Ersetzung, dabei setzt dieses Modul das Firmenlogo ein. Das funktioniert nur, solange IT-Tabelander PDF aktiv ist; sonst steht dort der Text `__ITTAB_LOGO__`.
 
 ## 6. Ticket-Texte
 
@@ -63,7 +65,7 @@ Deshalb enthält die Einleitung Wortmarke und Anrede, die Signatur Gruß und Fu�
 | `TICKET_MESSAGE_MAIL_INTRO` | Einstellungen → Module → Tickets | `einleitung.html` |
 | `TICKET_MESSAGE_MAIL_SIGNATURE` | Einstellungen → Module → Tickets | `signatur.html` |
 
-Im Editor auf Quelltext stellen und einfügen. Die Texte siezen neutral („Guten Tag,“), weil Anfragen von der Website ohne Du/Sie-Angabe kommen.
+Im Editor auf Quelltext stellen und einfügen. Die Texte siezen neutral („Guten Tag,“), weil Anfragen von der Website ohne Du/Sie-Angabe kommen. Die Ticket-Texte zeigen die Wortmarke als Text statt des Logos: Dolibarr ersetzt in `TICKET_MESSAGE_MAIL_NEW` keine Variablen, ein Logo ginge dort nur als fest eingebettetes Bild.
 
 ## 7. Fußtexte entschlacken
 
@@ -80,6 +82,7 @@ Bei Kunden, die geduzt werden, das Feld **„Anrede per Du“** setzen. Ohne Hä
 - Angebot freigegeben / Rechnung freigegeben / Rechnung bezahlt: je nach Wunsch einschalten.
 - Verzögerung: 5 Minuten. Blindkopie: `office@tabelander.co.at` (vorbelegt mit der Firmen-E-Mail).
 - Adresse des Kundenbereichs: `https://it.tabelander.co.at/kundenbereich`.
+- **„Kundenbereich der Website aktiv“ bleibt aus**, solange der Kundenbereich auf der Website nicht freigeschaltet ist. Dann steht im Angebots-PDF „Bitte kurz per E-Mail an office@tabelander.co.at bestätigen. Gearbeitet wird erst nach Zusage.“ und die Angebotsmails bitten um eine Antwort auf die Mail, ohne Button. Sobald der Kundenbereich live ist, nur diesen Schalter einschalten: PDF und Mails zeigen dann Kundenbereich und Button, an den Vorlagen ist nichts zu ändern.
 
 Unter **Einstellungen → Geplante Jobs** prüfen, dass „IT-Tabelander PDF: automatic e-mails“ aktiv ist (alle 5 Minuten).
 
