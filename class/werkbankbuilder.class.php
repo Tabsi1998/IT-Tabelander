@@ -211,26 +211,29 @@ abstract class WerkbankBuilder
 	 * Name and address lines of the recipient through Dolibarr's own
 	 * pdf_build_address(); a contact of the document becomes "z. H. ...".
 	 *
-	 * @param string $contactType Contact type code
-	 * @return string[]           array(name, address)
+	 * @param string            $contactType Contact type code
+	 * @param CommonObject|null $source      Object holding the contacts (a shipment's order), default the document
+	 * @return string[]                      array(name, address)
 	 */
-	protected function recipient($contactType)
+	protected function recipient($contactType, $source = null)
 	{
 		$object = $this->object;
+		$source = is_object($source) ? $source : $object;
 		$thirdparty = $object->thirdparty;
 		$usecontact = false;
-		if ($contactType !== '' && method_exists($object, 'getIdContact')) {
-			$ids = $object->getIdContact('external', $contactType);
-			if (count($ids) > 0 && $object->fetch_contact($ids[0]) > 0) {
+		if ($contactType !== '' && method_exists($source, 'getIdContact')) {
+			$ids = $source->getIdContact('external', $contactType);
+			if (count($ids) > 0 && $source->fetch_contact($ids[0]) > 0) {
 				$usecontact = true;
 			}
 		}
+		$contact = $usecontact ? $source->contact : '';
 		$named = $thirdparty;
-		if ($usecontact && $object->contact->socid != $thirdparty->id && (!isset($GLOBALS['conf']->global->MAIN_USE_COMPANY_NAME_OF_CONTACT) || getDolGlobalString('MAIN_USE_COMPANY_NAME_OF_CONTACT'))) {
-			$named = $object->contact;
+		if ($usecontact && $contact->socid != $thirdparty->id && (!isset($GLOBALS['conf']->global->MAIN_USE_COMPANY_NAME_OF_CONTACT) || getDolGlobalString('MAIN_USE_COMPANY_NAME_OF_CONTACT'))) {
+			$named = $contact;
 		}
 		$name = pdfBuildThirdpartyName($named, $this->langs);
-		$address = pdf_build_address($this->langs, $this->mysoc, $thirdparty, $usecontact ? $object->contact : '', $usecontact ? 1 : 0, 'target', $object);
+		$address = pdf_build_address($this->langs, $this->mysoc, $thirdparty, $contact, $usecontact ? 1 : 0, 'target', $object);
 		$address = trim((string) $address);
 		if ($usecontact) {
 			$lines = explode("\n", $address);

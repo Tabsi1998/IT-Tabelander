@@ -19,7 +19,7 @@ class modITTabelanderPDF extends DolibarrModules
 	/**
 	 * Document model types this module ships pdf_werkbank for (llx_document_model.type).
 	 */
-	const MODEL_TYPES = array('propal', 'invoice');
+	const MODEL_TYPES = array('propal', 'invoice', 'order', 'shipping', 'ficheinter', 'contract', 'supplier_proposal', 'order_supplier', 'reception');
 
 	/**
 	 * @param DoliDB $db Database handler
@@ -77,14 +77,30 @@ class modITTabelanderPDF extends DolibarrModules
 	}
 
 	/**
-	 * Activation: constants, and the Werkbank models switched on (not made
-	 * the default; that stays a choice in each setup page).
+	 * Activation: constants, extra fields, and the Werkbank models switched
+	 * on (not made the default; that stays a choice in each setup page).
 	 *
 	 * @param string $options Options when enabling module ('', 'noboxes')
 	 * @return int<-1,1>      1 if OK, <=0 if KO
 	 */
 	public function init($options = '')
 	{
+		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		// Contracts for ongoing services: printed in the info block of the
+		// contract PDF when filled, never with a default.
+		$fields = array(
+			array('ittab_mindestlaufzeit', 'WerkbankExtraMinimumTerm', 'int', 100, '10', 'contrat'),
+			array('ittab_kuendigungsfrist', 'WerkbankExtraNoticePeriod', 'varchar', 101, '128', 'contrat'),
+		);
+		foreach ($fields as $field) {
+			$result = $extrafields->addExtraField($field[0], $field[1], $field[2], $field[3], $field[4], $field[5], 0, 0, '', '', 1, '', '1', '', '', '', 'ittabelanderpdf@ittabelanderpdf', 'isModEnabled("ittabelanderpdf")');
+			if ($result < 0) {
+				$this->error = $extrafields->error;
+				return -1;
+			}
+		}
+
 		$sql = array();
 		foreach (self::MODEL_TYPES as $type) {
 			$sql[] = "DELETE FROM ".MAIN_DB_PREFIX."document_model WHERE nom = 'werkbank' AND type = '".$this->db->escape($type)."' AND entity = ".((int) $GLOBALS['conf']->entity);

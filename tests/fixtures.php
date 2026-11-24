@@ -128,10 +128,15 @@ function rt_pay($db, $admin, $invoice, $amount, $accountId, $date)
 if ($stage === 'base') {
 	rt_const($db, 'MAIN_LANG_DEFAULT', 'de_DE');
 	rt_const($db, 'MAIN_MONNAIE', 'EUR');
-	rt_modules(array('modSociete', 'modPropale', 'modFacture', 'modBanque', 'modProduct', 'modService', 'modITTabelanderPDF'));
+	rt_modules(array('modSociete', 'modPropale', 'modFacture', 'modBanque', 'modProduct', 'modService', 'modStock',
+		'modCommande', 'modExpedition', 'modFicheinter', 'modContrat', 'modFournisseur', 'modSupplierProposal', 'modReception',
+		'modITTabelanderPDF'));
 	// Werkbank as the default, as the owner sets it after activation.
-	rt_const($db, 'PROPALE_ADDON_PDF', 'werkbank');
-	rt_const($db, 'FACTURE_ADDON_PDF', 'werkbank');
+	foreach (array('PROPALE_ADDON_PDF', 'FACTURE_ADDON_PDF', 'COMMANDE_ADDON_PDF', 'EXPEDITION_ADDON_PDF', 'FICHEINTER_ADDON_PDF',
+		'CONTRACT_ADDON_PDF', 'SUPPLIER_PROPOSAL_ADDON_PDF', 'COMMANDE_SUPPLIER_ADDON_PDF', 'RECEPTION_ADDON_PDF') as $const) {
+		rt_const($db, $const, 'werkbank');
+	}
+	rt_const($db, 'STOCK_ALLOW_NEGATIVE_TRANSFER', '1');
 	echo json_encode(array('base' => 'ok')), "\n";
 	exit(0);
 }
@@ -331,6 +336,184 @@ if ($stage === 'setup') {
 	$draft = rt_invoice($db, $admin, $firm->id, array('ref_client' => 'Notebook-Reinigung'), array(array($p['std'], 1, 0, 'Lüfter gereinigt, Wärmeleitpaste erneuert.')), false);
 	$docs['entwurf-rechnung'] = array('facture', $draft->id);
 
+	// ---------------------------------------------------------------- phase 2
+	require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/fichinter/class/fichinter.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/contrat/class/contrat.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/supplier_proposal/class/supplier_proposal.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.commande.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/reception/class/reception.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.commande.dispatch.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/product/stock/class/entrepot.class.php';
+
+	$warehouse = new Entrepot($db);
+	$warehouse->label = 'Werkstatt';
+	$warehouse->ref = 'Werkstatt';
+	$warehouse->statut = 1;
+	if ($warehouse->create($admin) <= 0) {
+		rt_fail('warehouse: '.$warehouse->error);
+	}
+
+	// (10) Order confirmation from proposal 1, with a delivery date.
+	$order = new Commande($db);
+	$order->socid = $firm->id;
+	$order->date = rt_day('2026-11-25');
+	$order->delivery_date = rt_day('2026-12-02');
+	$order->ref_client = 'PC-Reparatur nach Überspannung';
+	$order->cond_reglement_id = $term14;
+	$order->mode_reglement_id = $vir;
+	if ($order->create($admin) <= 0) {
+		rt_fail('order: '.$order->error.' '.implode(',', (array) $order->errors));
+	}
+	foreach (array(array($p['ssd'], 1), array($p['mat'], 1), array($p['win'], 1), array($p['daten'], 1)) as $line) {
+		if ($order->addline($line[0]->description, $line[0]->price, $line[1], 0, 0, 0, $line[0]->id, 0, 0, 0, 'HT', 0, '', '', $line[0]->type, -1, 0, 0, null, 0, '', array(), $line[0]->fk_unit) <= 0) {
+			rt_fail('order line: '.$order->error);
+		}
+	}
+	$order->add_object_linked('propal', $proposalOne->id);
+	$order->add_contact($contact->id, 'SHIPPING', 'external');
+	if ($order->valid($admin) <= 0) {
+		rt_fail('validate order: '.$order->error.' '.implode(',', (array) $order->errors));
+	}
+	$order->fetch($order->id);
+	$docs['auftrag-1'] = array('commande', $order->id);
+
+	// (11) Delivery note for the SSD of that order.
+	$shipment = new Expedition($db);
+	$shipment->socid = $firm->id;
+	$shipment->origin = 'commande';
+	$shipment->origin_type = 'commande';
+	$shipment->origin_id = $order->id;
+	$shipment->date_delivery = rt_day('2026-12-02');
+	$shipment->date_shipping = rt_day('2026-12-01');
+	$shipment->shipping_method_id = (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."c_shipment_mode WHERE code = 'COLSUI'");
+	$shipment->tracking_number = '1Z999AA10123456784';
+	$shipment->ref_customer = $order->ref_client;
+	foreach ($order->lines as $orderLine) {
+		if ((int) $orderLine->product_type === 0) {
+			$shipment->addline($warehouse->id, $orderLine->id, 1);
+		}
+	}
+	if ($shipment->create($admin) <= 0) {
+		rt_fail('shipment: '.$shipment->error.' '.implode(',', (array) $shipment->errors));
+	}
+	if ($shipment->valid($admin) <= 0) {
+		rt_fail('validate shipment: '.$shipment->error.' '.implode(',', (array) $shipment->errors));
+	}
+	$docs['lieferschein-1'] = array('shipping', $shipment->id);
+
+	// (12) Contract with minimum term and notice period, mixed billing intervals.
+	$contract = new Contrat($db);
+	$contract->socid = $firm->id;
+	$contract->date_contrat = rt_day('2026-11-24');
+	$contract->commercial_signature_id = $admin->id;
+	$contract->commercial_suivi_id = $admin->id;
+	$contract->ref_customer = 'IT-Betreuung und Hosting';
+	$contract->note_public = 'Laufende Betreuung des Büros und Hosting der Website. Verrechnet wird über wiederkehrende Rechnungen.';
+	$contract->array_options = array('options_ittab_mindestlaufzeit' => 12, 'options_ittab_kuendigungsfrist' => '1 Monat zum Monatsende');
+	if ($contract->create($admin) <= 0) {
+		rt_fail('contract: '.$contract->error.' '.implode(',', (array) $contract->errors));
+	}
+	$contract->addline($p['wartung']->description, 89.00, 1, 0, 0, 0, $p['wartung']->id, 0, rt_day('2027-01-01'), rt_day('2027-12-31'), 'HT', 0, 0, null, 0, array(), $p['wartung']->fk_unit);
+	$contract->addline($p['hosting']->description, 120.00, 1, 0, 0, 0, $p['hosting']->id, 0, rt_day('2027-01-01'), '', 'HT', 0, 0, null, 0, array(), $p['hosting']->fk_unit);
+	if ($contract->validate($admin) <= 0) {
+		rt_fail('validate contract: '.$contract->error);
+	}
+	$docs['vertrag-1-gemischt'] = array('contrat', $contract->id);
+
+	// (13) Contract with one monthly service and no term fields (they must stay out).
+	$contract2 = new Contrat($db);
+	$contract2->socid = $private->id;
+	$contract2->date_contrat = rt_day('2026-11-24');
+	$contract2->commercial_signature_id = $admin->id;
+	$contract2->commercial_suivi_id = $admin->id;
+	if ($contract2->create($admin) <= 0) {
+		rt_fail('contract: '.$contract2->error);
+	}
+	$contract2->addline($p['wartung']->description, 49.00, 1, 0, 0, 0, $p['wartung']->id, 0, rt_day('2026-12-01'), '', 'HT', 0, 0, null, 0, array(), $p['wartung']->fk_unit);
+	$contract2->validate($admin);
+	$docs['vertrag-2-monatlich'] = array('contrat', $contract2->id);
+
+	// (14) Work report for the contract: two visits with durations.
+	$inter = new Fichinter($db);
+	$inter->socid = $firm->id;
+	$inter->fk_contrat = $contract->id;
+	$inter->description = 'Drucker im Empfang druckt nicht mehr, dazu Kontrolle der Datensicherung.';
+	if ($inter->create($admin) <= 0) {
+		rt_fail('intervention: '.$inter->error.' '.implode(',', (array) $inter->errors));
+	}
+	$inter->addline($admin, $inter->id, "Fehlersuche Drucker\nTreiber neu installiert, Netzwerkfreigabe korrigiert, Testdruck aus allen Arbeitsplätzen.", dol_mktime(9, 0, 0, 11, 26, 2026), 5400);
+	$inter->addline($admin, $inter->id, 'Kontrolle Datensicherung, Rücksicherung einer Testdatei', dol_mktime(14, 30, 0, 11, 26, 2026), 1800);
+	$inter->fetch($inter->id);
+	if ($inter->setValid($admin) <= 0) {
+		rt_fail('validate intervention: '.$inter->error);
+	}
+	$docs['arbeitsbericht-1'] = array('fichinter', $inter->id);
+
+	// Supplier for the purchase side.
+	$supplier = new Societe($db);
+	$supplier->name = 'Hardware Großhandel GmbH';
+	$supplier->fournisseur = 1;
+	$supplier->code_fournisseur = 'SU2611-00001';
+	$supplier->address = 'Industriestraße 4';
+	$supplier->zip = '1230';
+	$supplier->town = 'Wien';
+	$supplier->country_id = 41;
+	if ($supplier->create($admin) <= 0) {
+		rt_fail('supplier: '.$supplier->error);
+	}
+
+	// (15) Price request.
+	$request = new SupplierProposal($db);
+	$request->socid = $supplier->id;
+	$request->delivery_date = rt_day('2026-12-05');
+	$request->note_public = 'Für ein Kundenprojekt: bitte Preis und Lieferzeit, gern auch eine gleichwertige Alternative.';
+	if ($request->create($admin) <= 0) {
+		rt_fail('price request: '.$request->error.' '.implode(',', (array) $request->errors));
+	}
+	$request->addline($p['mat']->label, 0, 8, 0, 0, 0, $p['mat']->id, 0, 'HT', 0, 0, 0, -1, 0, 0, 0, 0, '', array(), 'MZ-V9P1T0BW', $p['mat']->fk_unit);
+	$request->addline('Netzwerk-Switch 24 Port, managed', 0, 1, 0, 0, 0, 0, 0, 'HT', 0, 0, 0);
+	$request->valid($admin);
+	$docs['preisanfrage-1'] = array('supplier_proposal', $request->id);
+
+	// (16) Purchase order with the supplier's reference.
+	$purchase = new CommandeFournisseur($db);
+	$purchase->socid = $supplier->id;
+	$purchase->ref_supplier = 'AB-77812';
+	$purchase->delivery_date = rt_day('2026-12-03');
+	$purchase->cond_reglement_id = $term14;
+	$purchase->mode_reglement_id = $vir;
+	if ($purchase->create($admin) <= 0) {
+		rt_fail('purchase order: '.$purchase->error.' '.implode(',', (array) $purchase->errors));
+	}
+	if ($purchase->addline($p['mat']->label, 98.50, 8, 0, 0, 0, $p['mat']->id, 0, 'MZ-V9P1T0BW', 0, 'HT', 0, 0, 0, 0, null, null, array(), $p['mat']->fk_unit) <= 0) {
+		rt_fail('purchase line: '.$purchase->error);
+	}
+	if ($purchase->valid($admin) <= 0) {
+		rt_fail('validate purchase order: '.$purchase->error);
+	}
+	$purchase->approve($admin);
+	$purchase->fetch($purchase->id);
+	$docs['bestellung-1'] = array('order_supplier', $purchase->id);
+
+	// (17) Goods receipt for that order.
+	$reception = new Reception($db);
+	$reception->socid = $supplier->id;
+	$reception->origin = 'order_supplier';
+	$reception->origin_type = 'order_supplier';
+	$reception->origin_id = $purchase->id;
+	$reception->date_reception = rt_day('2026-12-03');
+	$reception->ref_supplier = 'LS-55120';
+	foreach ($purchase->lines as $purchaseLine) {
+		$reception->addline($warehouse->id, $purchaseLine->id, 8, array(), 'Karton unbeschädigt');
+	}
+	if ($reception->create($admin) <= 0) {
+		rt_fail('reception: '.$reception->error.' '.implode(',', (array) $reception->errors));
+	}
+	$reception->valid($admin);
+	$docs['wareneingang-1'] = array('reception', $reception->id);
+
 	$db->commit();
 	file_put_contents(RT_STATE, json_encode($docs));
 	echo json_encode(array('documents' => array_keys($docs))), "\n";
@@ -341,14 +524,26 @@ if ($stage === 'render') {
 	$only = $argv[2] ?? '';
 	$docs = json_decode((string) file_get_contents(RT_STATE), true);
 	dol_mkdir(RT_OUT);
-	$classes = array('propal' => 'Propal', 'facture' => 'Facture');
+	$classes = array(
+		'propal' => array('Propal', '/comm/propal/class/propal.class.php', 'propal'),
+		'facture' => array('Facture', '/compta/facture/class/facture.class.php', 'facture'),
+		'commande' => array('Commande', '/commande/class/commande.class.php', 'commande'),
+		'shipping' => array('Expedition', '/expedition/class/expedition.class.php', 'expedition'),
+		'fichinter' => array('Fichinter', '/fichinter/class/fichinter.class.php', 'fichinter'),
+		'contrat' => array('Contrat', '/contrat/class/contrat.class.php', 'contrat'),
+		'supplier_proposal' => array('SupplierProposal', '/supplier_proposal/class/supplier_proposal.class.php', 'supplierproposal'),
+		'order_supplier' => array('CommandeFournisseur', '/fourn/class/fournisseur.commande.class.php', 'supplierorder'),
+		'reception' => array('Reception', '/reception/class/reception.class.php', 'reception'),
+	);
+	require_once dol_buildpath('/ittabelanderpdf/class/werkbankbuilder.class.php', 0);
 	$done = array();
 	foreach ($docs as $name => $entry) {
 		list($element, $id) = $entry;
 		if ($only !== '' && strpos($name, $only) === false) {
 			continue;
 		}
-		$class = $classes[$element];
+		list($class, $file, $builderFile) = $classes[$element];
+		require_once DOL_DOCUMENT_ROOT.$file;
 		$object = new $class($db);
 		$object->fetch($id);
 		$object->fetch_thirdparty();
@@ -356,7 +551,12 @@ if ($stage === 'render') {
 			rt_fail($name.': '.$object->error.' '.implode(',', (array) $object->errors));
 		}
 		$ref = dol_sanitizeFileName($object->ref);
-		$source = $object->last_main_doc ? DOL_DATA_ROOT.'/'.$object->last_main_doc : '';
+		// Where the builder writes, so every type is found the same way.
+		require_once dol_buildpath('/ittabelanderpdf/class/werkbankbuilder.'.$builderFile.'.class.php', 0);
+		$builderClass = 'WerkbankBuilder'.array('propal' => 'Propal', 'facture' => 'Facture', 'commande' => 'Commande', 'expedition' => 'Expedition',
+			'fichinter' => 'Fichinter', 'contrat' => 'Contrat', 'supplierproposal' => 'SupplierProposal', 'supplierorder' => 'SupplierOrder', 'reception' => 'Reception')[$builderFile];
+		$builder = new $builderClass($db, $object, $langs);
+		$source = $builder->outputFile();
 		if (!is_file($source)) {
 			rt_fail($name.': no PDF at '.$source);
 		}

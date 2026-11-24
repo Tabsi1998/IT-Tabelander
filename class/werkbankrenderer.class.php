@@ -278,9 +278,14 @@ class WerkbankRenderer
 		// Info block: label left, value right.
 		$y = 50.0;
 		foreach ($doc['info'] as $row) {
-			$this->caption(125, $y + 1.0, 40, $row[0]);
+			// The value starts where its label ends, so long values keep clear of it.
+			$this->font('itmichroma', '', 5.6, self::MUTED, 1.3, 0.28);
+			$labelWidth = min(48.0, $this->pdf->GetStringWidth(dol_strtoupper($row[0])) + 1.0);
+			$labelBottom = $this->caption(125, $y + 1.0, $labelWidth + 0.5, $row[0]);
+			$valueX = 125.0 + $labelWidth + 3.0;
 			$this->font('itsanssb', '', 9.5, self::INK, 1.3);
-			$y = $this->text(150, $y, self::RIGHT - 150, $row[1], 'R') + 1.6;
+			$valueBottom = $this->text($valueX, $y, self::RIGHT - $valueX, $row[1], 'R');
+			$y = max($labelBottom, $valueBottom) + 1.6;
 		}
 	}
 
@@ -600,11 +605,15 @@ class WerkbankRenderer
 		if (!empty($doc['totals'])) {
 			$right = $this->drawTotals($y, $doc['totals']);
 		}
-		if (isset($doc['signatures']['left'])) {
-			$left = $this->drawSignature(self::LEFT, $left + ($left > $y ? 6.0 : 10.0), $doc['signatures']['left'], false);
-		}
-		if (isset($doc['signatures']['right'])) {
-			$right = $this->drawSignature(self::RIGHT - 75.0, $right + ($right > $y ? 6.0 : 10.0), $doc['signatures']['right'], true);
+		// Two signatures share one line below both columns; a single
+		// customer signature tucks in under the totals.
+		$signatures = $doc['signatures'];
+		if (isset($signatures['left']) && isset($signatures['right'])) {
+			$line = max($left, $right) + 12.0;
+			$left = $this->drawSignature(self::LEFT, $line, $signatures['left'], false);
+			$right = $this->drawSignature(self::RIGHT - 75.0, $line, $signatures['right'], true);
+		} elseif (isset($signatures['right'])) {
+			$right = $this->drawSignature(self::RIGHT - 75.0, $right + ($right > $y ? 6.0 : 10.0), $signatures['right'], true);
 		}
 		return max($left, $right);
 	}
@@ -628,13 +637,15 @@ class WerkbankRenderer
 		if (!empty($totals['rows'])) {
 			$y += 1.2;
 		}
-		$box = 11.6;
-		$this->pdf->RoundedRect($x, $y, 90.0, $box, 0.8, '1111', 'F', array(), self::INK);
-		$this->caption($x + 4, $y + 4.6, 50, $totals['grand_label'], 'L', self::CAP_ON_INK);
-		$this->font('itsora', 'B', 15, self::WHITE, 1.1, -0.05);
-		$this->text($x + 30, $y + 2.6, 56, $totals['grand'], 'R');
-		$this->pdf->setFontSpacing(0);
-		$y += $box;
+		if ($totals['grand'] !== null) {
+			$box = 11.6;
+			$this->pdf->RoundedRect($x, $y, 90.0, $box, 0.8, '1111', 'F', array(), self::INK);
+			$this->caption($x + 4, $y + 4.6, 50, $totals['grand_label'], 'L', self::CAP_ON_INK);
+			$this->font('itsora', 'B', 15, self::WHITE, 1.1, -0.05);
+			$this->text($x + 30, $y + 2.6, 56, $totals['grand'], 'R');
+			$this->pdf->setFontSpacing(0);
+			$y += $box;
+		}
 		if ($totals['notice'] !== '') {
 			$this->font('itsans', '', 7.3, self::MUTED, 1.35);
 			$y = $this->text($x, $y + 1.8, 90.0, $totals['notice'], 'R');
