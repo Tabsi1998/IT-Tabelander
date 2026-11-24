@@ -132,8 +132,7 @@ export async function mockAdmin(page, state = adminState()) {
       return json(route, state.settings);
     }
     if (path === "/admin/settings/smtp-trust" && method === "DELETE") {
-      const { smtp_pinned_sha256: _pin, smtp_pinned_sha256_text: _text, smtp_pinned_subject: _subject, ...rest } = state.settings;
-      state.settings = rest;
+      state.settings = Object.fromEntries(Object.entries(state.settings).filter(([key]) => !key.startsWith("smtp_pinned")));
       return json(route, state.settings);
     }
     if (path === "/admin/media") return json(route, { id: nextId("m"), url: "/assets/img/services/service-overview-640.webp" });
