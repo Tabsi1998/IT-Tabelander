@@ -60,7 +60,9 @@ if ($stage === 'base') {
     rt_modules(array('modSociete', 'modTicket', 'modApi', 'modPropale', 'modFacture', 'modAgenda',
         'modCategorie', 'modKnowledgeManagement',
         // All documents of a customer in the customer area (#100).
-        'modCommande', 'modExpedition', 'modFicheinter', 'modContrat'));
+        'modCommande', 'modExpedition', 'modFicheinter', 'modContrat',
+        // The billing interval of a running service is the service's duration (#101).
+        'modProduct', 'modService'));
     // Company data and opening hours as the owner keeps them in the setup (#74).
     rt_const($db, 'MAIN_INFO_SOCIETE_ADDRESS', 'Werkstattweg 1');
     rt_const($db, 'MAIN_INFO_SOCIETE_ZIP', '6020');
@@ -87,6 +89,16 @@ if ($stage === 'base') {
     if ($extrafields->addExtraField('kundenbereich_gesperrt', 'Kundenbereich gesperrt', 'boolean', 100, '', 'societe',
         0, 0, '', '', 1, '', '1') <= 0) {
         rt_fail('extra field kundenbereich_gesperrt: '.$extrafields->error);
+    }
+    // Minimum term and notice period of a contract, as the module
+    // "IT-Tabelander PDF" creates them in production (#101).
+    if ($extrafields->addExtraField('ittab_mindestlaufzeit', 'Mindestlaufzeit (Monate)', 'int', 100, '10', 'contrat',
+        0, 0, '', '', 1, '', '1') <= 0) {
+        rt_fail('extra field ittab_mindestlaufzeit: '.$extrafields->error);
+    }
+    if ($extrafields->addExtraField('ittab_kuendigungsfrist', 'Kündigungsfrist', 'varchar', 101, '128', 'contrat',
+        0, 0, '', '', 1, '', '1') <= 0) {
+        rt_fail('extra field ittab_kuendigungsfrist: '.$extrafields->error);
     }
     rt_const($db, 'API_PRODUCTION_MODE', '0');
     // What the owner sets in Dolibarr (README, "Dolibarr einmalig vorbereiten"):
@@ -120,6 +132,8 @@ if ($stage === 'base') {
         array('propale', 'creer'),
         // Order confirmations, delivery notes, work reports, contracts (#100): read only.
         array('commande', 'lire'), array('expedition', 'lire'), array('ficheinter', 'lire'), array('contrat', 'lire'),
+        // The billing interval of running services (#101): the service's duration.
+        array('produit', 'lire'),
     ));
     // The scenarios read what the website created through an administrator.
     $adminKey = bin2hex(random_bytes(20));

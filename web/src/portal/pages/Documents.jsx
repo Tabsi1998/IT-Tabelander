@@ -167,14 +167,28 @@ function Content({ art, item }) {
     );
   }
   return (
-    <Table label="Leistungen" head={[["Leistung"], ["Betrag", true]]}
-      rows={item.lines.map((line) => [[<>
-        <Position key="p" line={line} />
-        <span key="z" className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
-          {[line.start && `ab ${day(line.start)}`, line.end && `bis ${day(line.end)}`].filter(Boolean).join(" ")}
-          {line.state && <Badge tone={GOOD.has(line.state) ? "good" : "plain"}>{line.state}</Badge>}
-        </span>
-      </>], [money(line.total), true]])} />
+    <>
+      <Terms item={item} />
+      <Table label="Leistungen" head={[["Leistung"], ["Betrag", true]]}
+        rows={item.lines.map((line) => [[<>
+          <Position key="p" line={line} />
+          <span key="z" className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
+            {[line.start && `ab ${day(line.start)}`, line.end && `bis ${day(line.end)}`].filter(Boolean).join(" ")}
+            {line.state && <Badge tone={GOOD.has(line.state) ? "good" : "plain"}>{line.state}</Badge>}
+          </span>
+        </>], [<>{money(line.total)}{line.interval && <span key="i" className="block text-sm text-muted">{line.interval}</span>}</>, true]])} />
+    </>
+  );
+}
+
+/** Minimum term and notice period, as the owner set them in Dolibarr (#101); nothing if empty. */
+export function Terms({ item }) {
+  if (!item.minimum_months && !item.notice) return null;
+  return (
+    <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[15px]">
+      {item.minimum_months && <><dt className="text-muted">Mindestlaufzeit</dt><dd className="m-0">{item.minimum_months === 1 ? "1 Monat" : `${item.minimum_months} Monate`}</dd></>}
+      {item.notice && <><dt className="text-muted">Kündigungsfrist</dt><dd className="m-0 break-words">{item.notice}</dd></>}
+    </dl>
   );
 }
 

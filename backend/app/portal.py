@@ -318,7 +318,7 @@ def _hours(seconds) -> float:
     return round(_int(seconds) / 3600, 2)
 
 
-def _details(kind: str, raw: dict) -> dict:
+def _details(kind: str, raw: dict, intervals: dict[int, str] | None = None) -> dict:
     """What the detail page of each kind shows, from a whitelist."""
     from .site_data import plain_text
 
@@ -338,9 +338,80 @@ def _details(kind: str, raw: dict) -> dict:
                 "hours": _hours(raw.get("duration", raw.get("duree")))}
     lines = [{**line, "state": CONTRACT_LINE_STATES.get(_status(raw_line), ""),
               "start": _first_time(raw_line, ("date_start_real", "date_start")),
-              "end": _first_time(raw_line, ("date_end_real", "date_end"))}
+              "end": _first_time(raw_line, ("date_end_real", "date_end")),
+              "interval": (intervals or {}).get(_int(raw_line.get("fk_product")))}
              for line, raw_line in zip(_lines(raw), raw.get("lines") or [])]
-    return {"lines": lines}
+    return {"lines": lines, **_contract_terms(raw)}
+
+
+# ------------------------------------------------- running services (#101)
+
+# Extra fields of contracts from the Dolibarr module "IT-Tabelander PDF".
+MINIMUM_TERM_FIELD = "options_ittab_mindestlaufzeit"
+NOTICE_FIELD = "options_ittab_kuendigungsfrist"
+LINE_RUNNING = 4
+INTERVAL_WORDS = {"h": ("stündlich", "Stunden"), "d": ("täglich", "Tage"), "w": ("wöchentlich", "Wochen"),
+                  "m": ("monatlich", "Monate"), "y": ("jährlich", "Jahre")}
+INTERVAL_NAMES = {(3, "m"): "vierteljährlich", (6, "m"): "halbjährlich", (12, "m"): "jährlich"}
+
+
+def interval_text(value, unit) -> str | None:
+    """The billing interval from a service's duration in Dolibarr ("1" "m" ->
+    "monatlich"), as the module IT-Tabelander PDF prints it; None if unknown."""
+    try:
+        count = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    unit = str(unit or "").strip().lower()
+    if count <= 0 or unit not in INTERVAL_WORDS:
+        return None
+    if (count, unit) in INTERVAL_NAMES:
+        return INTERVAL_NAMES[(count, unit)]
+    once, many = INTERVAL_WORDS[unit]
+    return once if count == 1 else f"alle {count} {many}"
+
+
+def _contract_terms(raw: dict) -> dict:
+    """Minimum term and notice period as the owner typed them; empty stays empty."""
+    options = raw.get("array_options") or {}
+    months = _int(options.get(MINIMUM_TERM_FIELD))
+    notice = " ".join(str(options.get(NOTICE_FIELD) or "").split())
+    return {"minimum_months": months if months > 0 else None, "notice": notice or None}
+
+
+async def _intervals(client: httpx.AsyncClient, cfg: dict, contracts: list[dict]) -> dict[int, str]:
+    """The billing interval per service product. Without the right to read
+    products, or without a duration on the product, there is none - nothing
+    is guessed."""
+    found = {}
+    products = {_int(line.get("fk_product")) for raw in contracts for line in raw.get("lines") or []} - {0}
+    for product_id in sorted(products):
+        response = await client.get(f"{cfg['base']}/api/index.php/products/{product_id}", headers=dolibarr._headers(cfg))
+        if response.status_code != 200:
+            continue
+        product = response.json() or {}
+        text = interval_text(product.get("duration_value"), product.get("duration_unit"))
+        if text:
+            found[product_id] = text
+    return found
+
+
+def _services(contracts: list[dict], intervals: dict[int, str]) -> list[dict]:
+    """Running service lines of released contracts: what runs, since when,
+    until when, how often it is billed and what it costs."""
+    items = []
+    for raw in contracts:
+        terms = _contract_terms(raw)
+        for line, raw_line in zip(_lines(raw), raw.get("lines") or []):
+            if _status(raw_line) != LINE_RUNNING:
+                continue
+            items.append({
+                "contract_id": _int(raw.get("id")), "contract_ref": raw.get("ref"), **line,
+                "interval": intervals.get(_int(raw_line.get("fk_product"))),
+                "start": _first_time(raw_line, ("date_start_real", "date_start")),
+                "end": _first_time(raw_line, ("date_end",)), **terms, "has_pdf": bool(raw.get("last_main_doc")),
+            })
+    return items
 
 
 async def _optional_list(client: httpx.AsyncClient, cfg: dict, path: str, params: dict) -> list:
@@ -375,7 +446,10 @@ async def overview(session: dict) -> dict:
         others = {kind: await _optional_list(client, cfg, kind, {"thirdparty_ids": joined, "sortfield": "t.rowid",
                                                                  "sortorder": "DESC", "limit": 100})
                   for kind in DOCUMENT_KINDS}
-    allowed = {str(value) for value in ids}
+        allowed = {str(value) for value in ids}
+        # Running services (#101): released contracts of this customer only.
+        contracts = [item for item in others["contracts"] if _socid(item) in allowed and _status(item) == 1]
+        services = _services(contracts, await _intervals(client, cfg, contracts))
     # Dolibarr filtered already; checking again costs nothing and keeps customers apart for sure.
     tickets = [item for item in tickets if str(item.get("fk_soc") or item.get("socid")) in allowed]
     proposals = [item for item in proposals if str(item.get("socid") or item.get("fk_soc")) in allowed
@@ -394,7 +468,7 @@ async def overview(session: dict) -> dict:
             "invoices_open": sum(1 for item in bills if item["open"]),
             "repairs_running": sum(1 for item in ticket_items if item["open"]),
         },
-        "tickets": ticket_items, "offers": offers, "invoices": bills,
+        "tickets": ticket_items, "offers": offers, "invoices": bills, "services": services,
         **{kind: [_document(kind, item) for item in items if _socid(item) in allowed and _status(item) != 0]
            for kind, items in others.items()},
     }
@@ -478,10 +552,11 @@ async def document_detail(session: dict, kind: str, object_id: int) -> dict:
     cfg = await _config()
     async with httpx.AsyncClient(timeout=max(cfg["timeout"], 20)) as client:
         raw = await _owned(client, cfg, kind, object_id, session)
+        intervals = await _intervals(client, cfg, [raw]) if kind == "contracts" else {}
         original = _pdf_file(kind, raw)
         # Without last_main_doc only asking for the file tells whether there is one.
         has_pdf = bool(original) and (bool(raw.get("last_main_doc")) or bool(await _download(client, cfg, kind, original)))
-    return {**_document(kind, raw), "has_pdf": has_pdf, **_details(kind, raw)}
+    return {**_document(kind, raw), "has_pdf": has_pdf, **_details(kind, raw, intervals)}
 
 
 def _pdf_file(kind: str, raw: dict) -> str | None:
