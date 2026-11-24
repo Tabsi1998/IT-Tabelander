@@ -92,11 +92,12 @@ class WerkbankMailData
 	}
 
 	/**
-	 * The company logo for e-mails: the logo of the company setup, scaled to
-	 * 440 px wide (shown at 220 px), as a data: image. Dolibarr's CMailFile
-	 * turns data: images into inline attachments (cid:) before sending
-	 * (MAIN_MAIL_ADD_INLINE_IMAGES_IF_DATA, on by default), so mail clients
-	 * that block data: URIs still show it. Without a usable logo: the word mark.
+	 * The company logo for e-mails as a hosted image (<img src="https://...">).
+	 * Inline images (data: -> cid:) are unreliable with Dolibarr's SMTPS
+	 * library on mobile clients (broken image + extra attachment), so the mail
+	 * links the image instead: ITTABPDF_MAIL_LOGO_URL if set, otherwise the
+	 * public thumbnail of the company logo (viewimage.php?modulepart=mycompany,
+	 * readable without login). Without a usable logo: the word mark.
 	 *
 	 * @return string HTML
 	 */
@@ -109,34 +110,32 @@ class WerkbankMailData
 		}
 		$name = (string) $mysoc->name;
 		$html = $name === 'IT-Tabelander' ? '<span style="color:#FE5A23;">IT</span>&#8209;TABELANDER' : dol_escape_htmltag(dol_strtoupper($name));
-		$file = empty($mysoc->logo) ? '' : $conf->mycompany->dir_output.'/logos/'.$mysoc->logo;
-		if ($file === '' || !is_readable($file) || !function_exists('imagecreatefromstring')) {
-			return $html;
-		}
-		$cacheDir = DOL_DATA_ROOT.'/ittabelanderpdf';
-		$cache = $cacheDir.'/mail-logo-'.md5($file.'|'.filemtime($file)).'.png';
-		if (!is_readable($cache)) {
-			$source = @imagecreatefromstring((string) file_get_contents($file));
-			if (!$source) {
+
+		$url = trim(getDolGlobalString('ITTABPDF_MAIL_LOGO_URL'));
+		$file = '';
+		if ($url === '') {
+			if (empty($mysoc->logo_small) || !defined('DOL_MAIN_URL_ROOT') || !preg_match('#^https?://#', DOL_MAIN_URL_ROOT)) {
 				return $html;
 			}
-			$width = imagesx($source);
-			$height = imagesy($source);
-			$target = min(440, $width);
-			$scaled = imagecreatetruecolor($target, (int) round($height * $target / $width));
-			imagealphablending($scaled, false);
-			imagesavealpha($scaled, true);
-			imagefill($scaled, 0, 0, imagecolorallocatealpha($scaled, 0, 0, 0, 127));
-			imagecopyresampled($scaled, $source, 0, 0, 0, 0, imagesx($scaled), imagesy($scaled), $width, $height);
-			dol_mkdir($cacheDir);
-			if (!imagepng($scaled, $cache, 9)) {
+			$file = $conf->mycompany->dir_output.'/logos/thumbs/'.$mysoc->logo_small;
+			if (!is_readable($file)) {
 				return $html;
 			}
+			$url = rtrim(DOL_MAIN_URL_ROOT, '/').'/viewimage.php?modulepart=mycompany&file='.rawurlencode('logos/thumbs/'.$mysoc->logo_small);
 		}
-		$size = getimagesize($cache);
-		$shown = (int) ceil($size[0] / 2);
-		$html = '<img src="data:image/png;base64,'.base64_encode((string) file_get_contents($cache)).'" width="'.$shown.'"'
-			.' alt="'.dol_escape_htmltag($name).'" style="display:block;border:0;height:auto;max-width:'.$shown.'px;">';
+
+		// Display size: half the pixel width (sharp on high-density screens), at most 240 px.
+		$shown = 220;
+		$shownHeight = 0;
+		if ($file !== '') {
+			$size = @getimagesize($file);
+			if (is_array($size) && $size[0] > 0) {
+				$shown = (int) min(240, max(120, ceil($size[0] / 2)));
+				$shownHeight = (int) round($size[1] * $shown / $size[0]);
+			}
+		}
+		$html = '<img src="'.dol_escape_htmltag($url).'" width="'.$shown.'"'.($shownHeight > 0 ? ' height="'.$shownHeight.'"' : '')
+			.' alt="'.dol_escape_htmltag($name).'" style="display:block;border:0;outline:none;text-decoration:none;width:'.$shown.'px;max-width:100%;height:auto;">';
 		return $html;
 	}
 
