@@ -5,7 +5,7 @@ import { Consent, Field, FormError, Honeypot, explain } from "./fields.jsx";
 /** Short questions, appointments, anything that is no repair (#49). The
  *  message becomes a Dolibarr ticket without a new customer record (#42). */
 export default function MessageForm() {
-  const [form, setForm] = useState({ name: "", email: "", phone: "", message: "", honeypot: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", topic: "", message: "", honeypot: "" });
   const [consent, setConsent] = useState(false);
   const [id] = useState(() => requestId("kontakt"));
   const [state, setState] = useState({ sending: false, error: "", done: null });
@@ -41,6 +41,9 @@ export default function MessageForm() {
         <Field label="E-Mail" type="email" autoComplete="email" required value={form.email} onChange={set("email")} />
       </div>
       <Field label="Telefon" hint="(optional)" type="tel" autoComplete="tel" maxLength={40} value={form.phone} onChange={set("phone")} />
+      {/* The ticket subject in Dolibarr; empty, the first words of the message stand in (#107). */}
+      <Field label="Worum geht es?" hint="(optional)" placeholder="z. B. Termin, Drucker, Frage zur Rechnung" maxLength={80}
+        value={form.topic} onChange={set("topic")} />
       <Field label="Nachricht" as="textarea" rows={5} required minLength={10} maxLength={5000} value={form.message} onChange={set("message")} />
       <Honeypot value={form.honeypot} onChange={(value) => setForm((current) => ({ ...current, honeypot: value }))} />
       <Consent checked={consent} onChange={setConsent}>

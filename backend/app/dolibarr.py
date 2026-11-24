@@ -541,10 +541,29 @@ def device_text(inquiry: dict) -> str:
     return " ".join(part for part in (device, maker, model) if part)[:160]
 
 
+TOPIC_LENGTH = 60
+
+
+def topic_text(inquiry: dict) -> str:
+    """What an inquiry without a device is about (#107): the customer's own
+    "Worum geht es?", else the first words of the message - one line, cut at
+    a word with "…"."""
+    own = " ".join(str(inquiry.get("topic") or "").split())
+    if own:
+        return own
+    text = " ".join(str(inquiry.get("description") or "").split())
+    if len(text) <= TOPIC_LENGTH:
+        return text
+    cut = text[: TOPIC_LENGTH + 1].rsplit(" ", 1)[0] if " " in text[: TOPIC_LENGTH + 1] else text[:TOPIC_LENGTH]
+    return cut.rstrip(" ,.;:!?-–") + "…"
+
+
 def inquiry_subject(inquiry: dict) -> str:
+    """The ticket subject: "Reparatur: Notebook Lenovo (ANF-…)", or without a
+    device "Kontaktnachricht: <what it is about> (ANF-…)"."""
     kind = REQUEST_TYPE_LABELS.get(inquiry.get("request_type"), "Website-Anfrage")
-    device = device_text(inquiry)
-    suffix = f": {device}" if device else ""
+    about = device_text(inquiry) or topic_text(inquiry)
+    suffix = f": {about}" if about else ""
     reference = str(inquiry.get("ref") or "").strip()
     return f"{kind}{suffix} ({reference})" if reference else f"{kind}{suffix}"
 

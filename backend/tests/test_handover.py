@@ -252,6 +252,34 @@ def test_contact_ticket_text_names_the_callback():
         "Kontaktnachricht (ANF-12345678)"
 
 
+def test_a_contact_ticket_says_what_it_is_about():
+    """#107: the customer's own subject, else the first words of the message on one line."""
+    message = {"request_type": "contact", "ref": "ANF-12345678",
+               "description": "Hallo,\nmein Drucker im Büro druckt seit dem Update nur noch leere Seiten aus."}
+    subject = dolibarr.inquiry_subject(message)
+    assert subject == "Kontaktnachricht: Hallo, mein Drucker im Büro druckt seit dem Update nur noch… (ANF-12345678)"
+    about = subject.removeprefix("Kontaktnachricht: ").removesuffix(" (ANF-12345678)")
+    assert len(about) <= dolibarr.TOPIC_LENGTH + 1 and "\n" not in about
+    assert dolibarr.inquiry_subject({**message, "topic": "  Drucker   druckt leer "}) == \
+        "Kontaktnachricht: Drucker druckt leer (ANF-12345678)"
+    assert dolibarr.inquiry_subject({**message, "description": "Kurze Frage zum Termin"}) == \
+        "Kontaktnachricht: Kurze Frage zum Termin (ANF-12345678)"
+    # One long word is cut hard.
+    assert dolibarr.topic_text({"description": "x" * 100}) == "x" * dolibarr.TOPIC_LENGTH + "…"
+    # The label still drops the reference.
+    assert dolibarr.subject_without_ref(subject, "ANF-12345678").endswith("nur noch…")
+    # The customer's words leave the website with the rest after the hand-over.
+    assert "topic" in handover.PERSONAL_FIELDS
+
+
+def test_a_subject_longer_than_allowed_is_refused():
+    base = {"request_id": "browser-12345678", "name": "Eva", "email": "eva@example.com",
+            "message": "Eine Frage zum Termin.", "consent": True}
+    assert ContactInput.model_validate({**base, "topic": "  Termin  "}).topic == "Termin"
+    with pytest.raises(ValidationError):
+        ContactInput.model_validate({**base, "topic": "x" * 81})
+
+
 # -------------------------------------------------------------------- mail
 
 def test_mail_without_settings_says_what_is_missing(monkeypatch):
