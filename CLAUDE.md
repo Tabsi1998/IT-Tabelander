@@ -80,9 +80,9 @@ module's own `dev_dolibarr.py` 18051/18151.
   `legal_texts.py` + `legal_drafts/`, `portal.py` (customer area),
   `review_invites.py`, `mailer.py`, `website.py` (pages, redirects, SEO head,
   404), `routers/`.
-- `dolibarr/ittabelanderpdf/`: the Dolibarr module (below).
 - `web/`: one Vite app - website (prerendered), admin `src/admin/`, customer
   area `src/portal/` (lazy chunks, empty shells from `scripts/prerender.mjs`).
+- `dolibarr/ittabelanderpdf/`: the Dolibarr module (below).
 - Customer data lives only in Dolibarr; the website never changes an existing
   third party. Public output goes through field whitelists.
 - The Content-Security-Policy is enforced everywhere; a Vitest test keeps the
