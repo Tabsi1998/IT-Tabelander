@@ -55,6 +55,17 @@ $values = array(
 $choices = array('propal' => 'propal_send', 'invoice' => 'facture_send', 'deposit' => 'facture_send', 'creditnote' => 'facture_send', 'paid' => 'facture_send');
 
 $action = GETPOST('action', 'aZ09');
+// Only templates with module = ittabelanderpdf, after the confirmation below.
+if ($action === 'confirm_update_templates' && GETPOST('confirm', 'alpha') === 'yes') {
+	$result = WerkbankMailTemplates::upgrade($db, (int) $conf->entity, true);
+	if ($result === -1) {
+		setEventMessages($db->lasterror(), null, 'errors');
+	} else {
+		setEventMessages($langs->trans('WerkbankTemplatesUpdated', $result['updated'], $result['current']), null, 'mesgs');
+	}
+	header('Location: '.$_SERVER['PHP_SELF']);
+	exit;
+}
 if ($action === 'save') {
 	$error = 0;
 	foreach (array_keys($texts) as $const) {
@@ -107,6 +118,10 @@ function ittabpdf_template_select($db, $name, $type, $value)
 }
 
 llxHeader('', $langs->trans('WerkbankSetup'));
+if ($action === 'update_templates') {
+	$form = new Form($db);
+	print $form->formconfirm($_SERVER['PHP_SELF'], $langs->trans('WerkbankTemplatesUpdate'), $langs->trans('WerkbankTemplatesUpdateConfirm'), 'confirm_update_templates', '', 0, 1);
+}
 $linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.$langs->trans('BackToModuleList').'</a>';
 print load_fiche_titre($langs->trans('WerkbankSetup'), $linkback, 'title_setup');
 
@@ -148,6 +163,19 @@ print '</table></div>';
 print '<div class="opacitymedium">'.$langs->trans('WerkbankSetupAutoHelp').'</div>';
 print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans('Save').'"></div>';
 print '</form>';
+
+// State of the module's e-mail templates and the button to update them.
+$state = WerkbankMailTemplates::upgrade($db, (int) $conf->entity, false, true);
+print '<br>'.load_fiche_titre($langs->trans('WerkbankTemplatesTitle'), '', '');
+print '<div class="opacitymedium">';
+if (is_array($state)) {
+	print $langs->trans('WerkbankTemplatesState', $state['current'], $state['edited']);
+	if ($state['updated'] > 0) {
+		print ' '.$langs->trans('WerkbankTemplatesAutoUpdated', $state['updated']);
+	}
+}
+print '</div><br>';
+print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?action=update_templates&token='.newToken().'">'.$langs->trans('WerkbankTemplatesUpdate').'</a>';
 
 llxFooter();
 $db->close();

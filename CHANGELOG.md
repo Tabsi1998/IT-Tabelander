@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.2] - 2026-11-24
+
+- E-mails always light like the PDF: full HTML document with `color-scheme: light only`, white surfaces set as `bgcolor` and style, explicit text colours, no grey page and no dark footer block any more; the sheet is framed by a thin line.
+- Logo from the new public endpoint `public/maillogo.php`: the company logo as an opaque PNG on white (max. 480 px, shown at 240 px, cached), so forced dark modes cannot make it disappear. `ITTABPDF_MAIL_LOGO_URL` still overrides.
+- New footer: hairline and four grey lines (company and manager, address, e-mail and web, phone); no register numbers in e-mails. The phone number is its own neutral `tel:` link, the address does not get auto-linked.
+- Mobile: 24 px side padding, 2 px bar on the facts box, shorter button text ("Im Kundenbereich ansehen"), the phone number does not wrap.
+- Closing lines: "Mit freundlichen Grüßen" (Sie and neutral), "Liebe Grüße" (Du).
+- Setup page: "Modul-Vorlagen auf aktuellen Stand bringen" (with confirmation) overwrites only the module's own templates. On activation, module templates that still hold the text of 1.0.0/1.0.1 are renewed automatically; edited ones stay.
+- Rollout texts for Mahnwesen and tickets in the same light design.
+
 ## [1.0.1] - 2026-11-24
 
 - E-mail logo is now a linked image (public company logo thumbnail via `viewimage.php?modulepart=mycompany`, or `ITTABPDF_MAIL_LOGO_URL`) instead of an inline data:/cid: image. With the SMTPS send mode the inline image showed as broken plus an extra attachment on mobile clients.

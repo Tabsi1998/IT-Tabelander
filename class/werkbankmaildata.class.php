@@ -92,51 +92,132 @@ class WerkbankMailData
 	}
 
 	/**
-	 * The company logo for e-mails as a hosted image (<img src="https://...">).
-	 * Inline images (data: -> cid:) are unreliable with Dolibarr's SMTPS
-	 * library on mobile clients (broken image + extra attachment), so the mail
-	 * links the image instead: ITTABPDF_MAIL_LOGO_URL if set, otherwise the
-	 * public thumbnail of the company logo (viewimage.php?modulepart=mycompany,
-	 * readable without login). Without a usable logo: the word mark.
+	 * The company logo for e-mails as a hosted image on white: ITTABPDF_MAIL_LOGO_URL
+	 * if set, otherwise the module's public endpoint public/maillogo.php, which
+	 * serves the logo of the company setup as an opaque PNG on white (images
+	 * are not inverted by forced dark modes). Inline images (data: -> cid:)
+	 * broke with Dolibarr's SMTPS library on mobile clients (1.0.1). Without a
+	 * usable logo: the word mark.
 	 *
 	 * @return string HTML
 	 */
 	public static function logoHtml()
 	{
-		global $conf, $mysoc;
+		global $mysoc;
 		static $html = null;
 		if ($html !== null) {
 			return $html;
 		}
 		$name = (string) $mysoc->name;
 		$html = $name === 'IT-Tabelander' ? '<span style="color:#FE5A23;">IT</span>&#8209;TABELANDER' : dol_escape_htmltag(dol_strtoupper($name));
-
 		$url = trim(getDolGlobalString('ITTABPDF_MAIL_LOGO_URL'));
-		$file = '';
-		if ($url === '') {
-			if (empty($mysoc->logo_small) || !defined('DOL_MAIN_URL_ROOT') || !preg_match('#^https?://#', DOL_MAIN_URL_ROOT)) {
-				return $html;
-			}
-			$file = $conf->mycompany->dir_output.'/logos/thumbs/'.$mysoc->logo_small;
-			if (!is_readable($file)) {
-				return $html;
-			}
-			$url = rtrim(DOL_MAIN_URL_ROOT, '/').'/viewimage.php?modulepart=mycompany&file='.rawurlencode('logos/thumbs/'.$mysoc->logo_small);
-		}
-
-		// Display size: half the pixel width (sharp on high-density screens), at most 240 px.
-		$shown = 220;
+		$shown = 240;
 		$shownHeight = 0;
-		if ($file !== '') {
-			$size = @getimagesize($file);
-			if (is_array($size) && $size[0] > 0) {
-				$shown = (int) min(240, max(120, ceil($size[0] / 2)));
-				$shownHeight = (int) round($size[1] * $shown / $size[0]);
+		if ($url === '') {
+			$file = self::logoFile();
+			$root = dol_buildpath('/ittabelanderpdf/public/maillogo.php', 2);
+			if ($file === '' || !preg_match('#^https?://#', $root)) {
+				return $html;
 			}
+			$size = @getimagesize($file);
+			$shown = (int) ceil($size[0] / 2);
+			$shownHeight = (int) ceil($size[1] / 2);
+			// The version changes with the logo, so caches load the new one.
+			$url = $root.'?v='.substr(md5_file($file), 0, 8);
 		}
 		$html = '<img src="'.dol_escape_htmltag($url).'" width="'.$shown.'"'.($shownHeight > 0 ? ' height="'.$shownHeight.'"' : '')
-			.' alt="'.dol_escape_htmltag($name).'" style="display:block;border:0;outline:none;text-decoration:none;width:'.$shown.'px;max-width:100%;height:auto;">';
+			.' alt="'.dol_escape_htmltag($name).'" style="display:block;border:0;outline:none;text-decoration:none;width:'.$shown.'px;max-width:100%;height:auto;background:#ffffff;">';
 		return $html;
+	}
+
+	/**
+	 * The logo of the company setup as an opaque PNG on white, at most 480 px
+	 * wide including 16 px of white around it (shown at half size). Built once
+	 * per logo file and kept in the documents folder.
+	 *
+	 * @return string Path of the PNG, '' without a usable logo
+	 */
+	public static function logoFile()
+	{
+		global $conf, $mysoc;
+		$candidates = array();
+		if (!empty($mysoc->logo)) {
+			$candidates[] = $conf->mycompany->dir_output.'/logos/'.$mysoc->logo;
+		}
+		if (!empty($mysoc->logo_small)) {
+			$candidates[] = $conf->mycompany->dir_output.'/logos/thumbs/'.$mysoc->logo_small;
+		}
+		$source = '';
+		foreach ($candidates as $candidate) {
+			if (is_readable($candidate) && is_file($candidate)) {
+				$source = $candidate;
+				break;
+			}
+		}
+		if ($source === '' || !function_exists('imagecreatefromstring')) {
+			return '';
+		}
+		$dir = DOL_DATA_ROOT.'/ittabelanderpdf';
+		$cache = $dir.'/maillogo-'.md5($source.'|'.filemtime($source).'|2').'.png';
+		if (is_readable($cache)) {
+			return $cache;
+		}
+		$image = @imagecreatefromstring((string) file_get_contents($source));
+		if (!$image) {
+			return '';
+		}
+		$pad = 16;
+		$width = imagesx($image);
+		$height = imagesy($image);
+		$inner = min(480 - 2 * $pad, $width);
+		$innerHeight = (int) round($height * $inner / $width);
+		$canvas = imagecreatetruecolor($inner + 2 * $pad, $innerHeight + 2 * $pad);
+		imagefill($canvas, 0, 0, imagecolorallocate($canvas, 255, 255, 255));
+		imagealphablending($canvas, true);
+		imagecopyresampled($canvas, $image, $pad, $pad, 0, 0, $inner, $innerHeight, $width, $height);
+		dol_mkdir($dir);
+		return imagepng($canvas, $cache, 9) ? $cache : '';
+	}
+
+	/**
+	 * A phone number as its own tel: link in a neutral colour, so mail apps
+	 * do not turn it into a blue underlined link of their own.
+	 *
+	 * @param string $phone Phone number as stored
+	 * @return string HTML, '' without a number
+	 */
+	public static function phoneLink($phone)
+	{
+		$phone = trim((string) $phone);
+		if ($phone === '') {
+			return '';
+		}
+		$dial = preg_replace('/[^\d+]/', '', $phone);
+		return '<a href="tel:'.dol_escape_htmltag($dial).'" style="color:#4A5B6E;text-decoration:none;white-space:nowrap;">'.dol_escape_htmltag(WerkbankBuilder::phone($phone)).'</a>';
+	}
+
+	/**
+	 * Keeps mail apps from detecting an address: an invisible joiner after
+	 * each number group.
+	 *
+	 * @param string $html Escaped text
+	 * @return string
+	 */
+	public static function noAutoLink($html)
+	{
+		return (string) preg_replace('/(\d+)/', '$1&zwnj;', $html);
+	}
+
+	/**
+	 * The light facts box around table rows: 2 px orange line on the left.
+	 *
+	 * @param string $rows Table rows
+	 * @return string
+	 */
+	public static function box($rows)
+	{
+		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F7F9FB" style="max-width:600px;background:#F7F9FB;border-left:2px solid #FE5A23;margin:4px 0 16px 0;">'
+			.'<tr><td bgcolor="#F7F9FB" style="padding:10px 16px;background:#F7F9FB;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'.$rows.'</table></td></tr></table>';
 	}
 
 	/**
@@ -288,8 +369,7 @@ class WerkbankMailData
 					.'<td align="right" style="'.self::VALUE.'font-size:20px;">'.dol_escape_htmltag(self::money($amount[1], $langs)).'</td></tr>';
 			}
 		}
-		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F7F9FB;border-left:3px solid #FE5A23;">'
-			.'<tr><td style="padding:10px 18px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'.$html.'</table></td></tr></table>';
+		return self::box($html);
 	}
 
 	/**

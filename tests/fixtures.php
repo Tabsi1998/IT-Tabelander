@@ -633,6 +633,35 @@ if ($stage === 'mails') {
 	$check('extra field ittab_du', (bool) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."extrafields WHERE name = 'ittab_du' AND elementtype = 'societe'"));
 	$check('cron job registered', (bool) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."cronjob WHERE objectname = 'WerkbankMailQueue' AND methodename = 'runCron' AND frequency = 5 AND unitfrequency = 60"));
 
+	// Templates of 1.0.0/1.0.1 as production has them: two untouched, one edited
+	// by the owner, plus an own template of the owner that must never change.
+	require_once __DIR__.'/templates_1_0_1.php';
+	$old = function ($key, $form) {
+		$definition = WerkbankMailTemplatesV101::definitions()[$key];
+		$topic = ($key === 'shipping' && $form === 'du') ? 'Deine Lieferung: Lieferschein __REF__' : $definition[2];
+		return array($topic, WerkbankMailTemplatesV101::html($form === 'du' ? $definition[4] : $definition[3], $form, $key));
+	};
+	$setTemplate = function ($label, $topic, $content) use ($db) {
+		rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."c_email_templates SET topic = '".$db->escape($topic)."', content = '".$db->escape($content)."'"
+			." WHERE module = 'ittabelanderpdf' AND label = '".$db->escape($label)."'");
+	};
+	list($topic, $content) = $old('propal', 'sie');
+	$setTemplate('Angebot (Sie)', $topic, $content);
+	list($topic, $content) = $old('invoice', 'du');
+	$setTemplate('Rechnung (Du)', $topic, $content);
+	list($topic, $content) = $old('contract', 'sie');
+	$setTemplate('Vertrag (Sie)', $topic, $content.'<p>Eigener Zusatz</p>');
+	if (!rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."c_email_templates WHERE label = 'Angebot senden'")) {
+		rt_exec($db, "INSERT INTO ".MAIN_DB_PREFIX."c_email_templates (entity, module, type_template, label, active, topic, content) VALUES (1, NULL, 'propal_send', 'Angebot senden', 0, 'Angebot', 'Eigener Text')");
+	}
+	$result = WerkbankMailTemplates::upgrade($db, (int) $conf->entity);
+	$check('upgrade renews untouched 1.0.1 templates', is_array($result) && $result['updated'] === 2 && $result['edited'] === 1, json_encode($result));
+	$check('upgrade keeps the edited template', strpos((string) rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND label = 'Vertrag (Sie)'"), 'Eigener Zusatz') !== false);
+	$result = WerkbankMailTemplates::upgrade($db, (int) $conf->entity, true);
+	$check('forced upgrade replaces the edited one', is_array($result) && $result['updated'] === 1 && $result['current'] === 22, json_encode($result));
+	$check('own templates stay untouched', rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE label = 'Angebot senden'") === 'Eigener Text');
+	$check('no "Viele Grüße" in any module template', !rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND content LIKE '%Viele Grüße%'"));
+
 	// 1. Every template, Sie and Du, through the module's own send path.
 	$firm = new Societe($db);
 	$firm->fetch(0, 'Musterfirma GmbH');
@@ -676,7 +705,7 @@ if ($stage === 'mails') {
 	$off = $vars();
 	$check('portal off: no button', $off['__ITTAB_KUNDENBEREICH_BLOCK__'] === '');
 	$check('portal off: reply sentence', strpos($off['__ITTAB_ANNAHME_SATZ__'], 'antworten Sie einfach auf diese E-Mail') !== false && strpos($off['__ITTAB_ANNAHME_SATZ_DU__'], 'antworte einfach auf diese Mail') !== false);
-	$check('logo as data image', strpos($off['__ITTAB_LOGO__'], 'src="data:image/png;base64,') !== false);
+	$check('logo from the public endpoint', strpos($off['__ITTAB_LOGO__'], '/custom/ittabelanderpdf/public/maillogo.php?v=') !== false && strpos($off['__ITTAB_LOGO__'], 'width="240"') !== false, $off['__ITTAB_LOGO__']);
 	rt_const($db, 'ITTABPDF_PORTAL_ENABLED', '1');
 	$conf->global->ITTABPDF_PORTAL_ENABLED = '1';
 	$on = $vars();
@@ -871,7 +900,8 @@ if ($stage === 'rollout') {
 		$body .= $T::paragraph('Mit freundlichen Grüßen<br><strong style="color:#1B3348;">'.dol_escape_htmltag($mysoc->managers).'</strong><br>{COMPANY_NAME}');
 		// Mahnwesen runs its texts through complete_substitutions_array, so the
 		// logo variable of this module works there (FormMail::setSubstitFromObject).
-		$html = '<div style="max-width:600px;">'.$body.'</div>'.$end.'<div style="max-width:600px;margin-top:8px;">'.$T::headerBlock(true).$footer.'</div>';
+		$html = '<div style="max-width:600px;background:#ffffff;color:#3B4D63;">'.$body.'</div>'.$end
+			.'<div style="max-width:600px;margin-top:8px;background:#ffffff;">'.$T::headerBlock('__ITTAB_LOGO__').$footer.'</div>';
 		file_put_contents($out.'/mahnwesen/'.$name.'.html', $html."\n");
 		file_put_contents($out.'/mahnwesen/'.$name.'.betreff.txt', $subject."\n");
 		// Sent with sample values, substituted as the plugin does it.
@@ -900,15 +930,26 @@ if ($stage === 'rollout') {
 
 	// Tickets. New ticket from the public form: MAIL_NEW + ticket infos + SIGNATURE.
 	// Reply: INTRO + "<br><br>" + message (template ticket_send) + "<br>" + SIGNATURE.
+	// Dolibarr replaces no variables in TICKET_MESSAGE_MAIL_NEW, so the logo is
+	// the module's public endpoint on the production address, written out.
+	$production = 'https://erp.tabelander.co.at/custom/ittabelanderpdf/public/maillogo.php';
+	$local = dol_buildpath('/ittabelanderpdf/public/maillogo.php', 2);
+	$logoFile = WerkbankMailData::logoFile();
+	$logoSize = $logoFile !== '' ? getimagesize($logoFile) : array(480, 110);
+	$logo = '<img src="'.$production.'" width="'.((int) ceil($logoSize[0] / 2)).'" height="'.((int) ceil($logoSize[1] / 2)).'" alt="'.dol_escape_htmltag($mysoc->name).'"'
+		.' style="display:block;border:0;outline:none;text-decoration:none;width:'.((int) ceil($logoSize[0] / 2)).'px;max-width:100%;height:auto;background:#ffffff;">';
+	$div = '<div style="max-width:600px;background:#ffffff;color:#3B4D63;">';
 	$texts = array(
-		'neues-ticket' => $T::headerBlock().'<div style="max-width:600px;">'.$T::paragraph('Guten Tag,')
+		'neues-ticket' => $T::headerBlock($logo).$div.$T::paragraph('Guten Tag,')
 			.$T::paragraph('danke für Ihre Anfrage. Sie ist bei mir angekommen, ich sehe sie mir an und melde mich bei Ihnen.')
 			.$T::paragraph('Den aktuellen Stand finden Sie jederzeit über den Link unten.').'</div>',
-		'einleitung' => $T::headerBlock().'<div style="max-width:600px;">'.$T::paragraph('Guten Tag,').'</div>',
-		'signatur' => '<div style="max-width:600px;">'.$T::paragraph('Viele Grüße<br><strong style="color:#1B3348;">'.dol_escape_htmltag($mysoc->managers).'</strong><br>'.dol_escape_htmltag($mysoc->name)).'</div>'.$footer,
+		'einleitung' => $T::headerBlock($logo).$div.$T::paragraph('Guten Tag,').'</div>',
+		'signatur' => $div.$T::paragraph('Mit freundlichen Grüßen<br><strong style="color:#1B3348;">'.dol_escape_htmltag($mysoc->managers).'</strong><br>'.dol_escape_htmltag($mysoc->name)).'</div>'.$footer,
 	);
 	foreach ($texts as $name => $html) {
 		file_put_contents($out.'/ticket/'.$name.'.html', $html."\n");
+		// In the test the image comes from this Dolibarr.
+		$texts[$name] = str_replace($production, $local, $html);
 	}
 	$langs->load('ticket');
 	$newTicket = $texts['neues-ticket'].'<br><br>'.$langs->transnoentities('TicketNewEmailBodyInfosTicket').'<br>'

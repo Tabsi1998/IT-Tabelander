@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '1.0.1';
+		$this->version = '1.0.2';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -154,6 +154,13 @@ class modITTabelanderPDF extends DolibarrModules
 		}
 		dol_include_once('/ittabelanderpdf/class/werkbankmailtemplates.class.php');
 		if (WerkbankMailTemplates::install($this->db, (int) $GLOBALS['conf']->entity) < 0) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		// Templates still holding an earlier default text get the current one;
+		// edited ones stay, the setup page offers to replace them.
+		$upgrade = WerkbankMailTemplates::upgrade($this->db, (int) $GLOBALS['conf']->entity);
+		if ($upgrade === -1) {
 			$this->error = $this->db->lasterror();
 			return -1;
 		}

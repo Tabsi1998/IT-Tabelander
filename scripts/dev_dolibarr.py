@@ -223,8 +223,15 @@ def ui() -> None:
         checks.append({"page": name, "ok": not missing, "missing": missing})
         (STATE / f"ui-{name}.html").write_text(html, encoding="utf-8")
 
+    # The e-mail logo must load without a session (mail clients have none).
+    with urllib.request.urlopen(f"{URL}/custom/ittabelanderpdf/public/maillogo.php", timeout=30) as answer:
+        data = answer.read()
+        width, height = int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+        checks.append({"page": "maillogo without login", "ok": answer.status == 200 and answer.headers.get("Content-Type") == "image/png"
+                       and data[1:4] == b"PNG" and width <= 480 and "max-age" in (answer.headers.get("Cache-Control") or ""),
+                       "missing": [f"{answer.status} {answer.headers.get('Content-Type')} {width}x{height} {answer.headers.get('Cache-Control')}"]})
     look("queue", "/custom/ittabelanderpdf/queue.php", ["Automatischer Versand", "Gesendet"])
-    look("setup", "/custom/ittabelanderpdf/admin/setup.php", ["ITTABPDF_AUTOSEND_DELAY", "Angebot (Sie)"])
+    look("setup", "/custom/ittabelanderpdf/admin/setup.php", ["ITTABPDF_AUTOSEND_DELAY", "Angebot (Sie)", "action=update_templates"])
     if state.get("planned_propal"):
         card = f"/comm/propal/card.php?id={state['planned_propal']}"
         look("propal-card", card, ["Automatischer Versand geplant um", "ittabpdf_cancel"])

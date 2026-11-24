@@ -9,7 +9,7 @@ Reihenfolge für die Umstellung der Produktion (Dolibarr 23.0.3) auf Werkbank-PD
 
 ## 1. Modul installieren und aktivieren
 
-1. **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**: `module_ittabelanderpdf-1.0.0.zip` hochladen.
+1. **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**: `module_ittabelanderpdf-1.0.2.zip` hochladen.
 2. In der Modulliste **IT-Tabelander PDF** einschalten.
    Danach gibt es: Vorlage `werkbank` bei allen neun Belegarten, die Zusatzfelder „Anrede per Du“ (Kunden/Lieferanten), „Mindestlaufzeit (Monate)“ und „Kündigungsfrist“ (Verträge), 23 E-Mail-Vorlagen, den geplanten Job „IT-Tabelander PDF: automatic e-mails“ und **Rechnungen → Automatischer Versand**. Der automatische Versand ist noch **aus**.
 
@@ -94,6 +94,14 @@ Unter **Einstellungen → Geplante Jobs** prüfen, dass „IT-Tabelander PDF: au
 4. In der Mail prüfen: Werkbank-Look, Anrede, Betrag, PDF im Anhang, BCC an office@. In der Ereignisliste des Angebots steht der Versand.
 5. Dasselbe mit einer Rechnung und einer Zahlung (Zahlungsbestätigung).
 6. Testbelege danach selbst bereinigen.
+
+## Update auf 1.0.2 (helle Mails)
+
+1. `module_ittabelanderpdf-1.0.2.zip` wie oben über „Externes Modul bereitstellen“ hochladen.
+2. Das Modul in der Modulliste einmal **aus- und wieder einschalten** (Einstellungen bleiben). Dabei bekommen alle Modul-Vorlagen, die noch den Text von 1.0.0/1.0.1 haben, den neuen Stand. Von Hand geänderte Modul-Vorlagen bleiben; die Einstellungsseite zeigt, wie viele das sind. Mit **„Modul-Vorlagen auf aktuellen Stand bringen“** (mit Rückfrage) werden auch diese ersetzt. Eigene Vorlagen und die anderer Module fasst der Knopf nicht an.
+3. In einem privaten Browserfenster `https://erp.tabelander.co.at/custom/ittabelanderpdf/public/maillogo.php` öffnen: Es muss das Logo auf Weiß kommen, ohne Anmeldung. Wird Dolibarr später von außen gesperrt, braucht dieses eine Bild weiter eine öffentliche Adresse; sonst `ITTABPDF_MAIL_LOGO_URL` auf ein PNG auf der Website setzen.
+4. Mahnwesen-Vorlagen (`docs/rollout/mahnwesen/`) und Ticket-Texte (`docs/rollout/ticket/`) wie in Schritt 5 und 6 neu einfügen. Die Ticket-Texte zeigen auf `https://erp.tabelander.co.at/custom/ittabelanderpdf/public/maillogo.php` (fest eingetragen, weil Dolibarr dort keine Variablen ersetzt).
+5. Testmail an office@ (Schritt 10), am Handy auch im dunklen Modus ansehen.
 
 ## Rückweg
 
