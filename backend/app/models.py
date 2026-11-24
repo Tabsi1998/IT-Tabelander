@@ -142,6 +142,9 @@ class RepairContact(BaseModel):
         return self
 
 
+TOPIC_MAX = 80
+
+
 class InquiryInput(BaseModel):
     request_type: Literal[
         "repair", "pc_build", "pc_upgrade", "controller_custom", "consulting", "other"
@@ -155,6 +158,8 @@ class InquiryInput(BaseModel):
     desired_services: List[str] = Field(default_factory=list, max_length=20)
     budget: Optional[str] = Field(default="", max_length=120)
     timeframe: Optional[str] = Field(default="", max_length=120)
+    # "Worum geht es?" for an inquiry without a device; the ticket subject (#107).
+    topic: Optional[str] = Field(default="", max_length=TOPIC_MAX)
     description: str = Field(min_length=10, max_length=10000)
     attachment_ids: List[str] = Field(default_factory=list, max_length=5)
     contact: RepairContact
@@ -172,7 +177,7 @@ class InquiryInput(BaseModel):
 
     @field_validator(
         "source", "device_type", "manufacturer", "model", "budget", "timeframe",
-        "description", "honeypot", "request_id", mode="before",
+        "topic", "description", "honeypot", "request_id", mode="before",
     )
     @classmethod
     def strip_inquiry_text(cls, value):
@@ -210,12 +215,14 @@ class ContactInput(BaseModel):
     name: str = Field(min_length=2, max_length=128)
     email: EmailStr
     phone: Optional[str] = Field(default="", max_length=40)
+    # "Worum geht es?" for an inquiry without a device; the ticket subject (#107).
+    topic: Optional[str] = Field(default="", max_length=TOPIC_MAX)
     message: str = Field(min_length=10, max_length=5000)
     consent: bool
     honeypot: Optional[str] = Field(default="", max_length=500)
     callback_at: Optional[AwareDatetime] = None
 
-    @field_validator("request_id", "name", "phone", "message", "honeypot", mode="before")
+    @field_validator("request_id", "name", "phone", "topic", "message", "honeypot", mode="before")
     @classmethod
     def strip_text(cls, value):
         return value.strip() if isinstance(value, str) else value

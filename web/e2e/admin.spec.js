@@ -61,6 +61,37 @@ test("a session that ended says so and returns to the same page (#57)", async ({
   await expect(page.getByRole("heading", { level: 1, name: "Technik" })).toBeVisible();
 });
 
+const MAIL_CERTIFICATE = {
+  sha256: "3f".repeat(32), sha256_text: Array(32).fill("3F").join(":"), subject: "mail.tabelander.lan", issuer: "mail.tabelander.lan",
+  not_before: "2026-01-10T00:00:00+00:00", not_after: "2027-01-10T00:00:00+00:00", self_signed: true,
+};
+
+test("trust the mail server's own certificate by its fingerprint (#109)", async ({ page }) => {
+  const state = await mockAdmin(page, adminState({ mailCertificate: MAIL_CERTIFICATE }));
+  await page.goto("/admin/technik");
+  await page.getByRole("button", { name: "Test-Mail senden" }).click();
+  await expect(page.getByRole("alert")).toContainText("dem die Website nicht vertraut");
+  const offered = page.getByRole("region", { name: "Zertifikat des Mailservers" });
+  await expect(offered.getByText(MAIL_CERTIFICATE.sha256_text)).toBeVisible();
+  await expect(offered.getByText("mail.tabelander.lan (selbst signiert)")).toBeVisible();
+  await expect(offered.getByText("10.1.2026 bis 10.1.2027")).toBeVisible();
+
+  await offered.getByRole("button", { name: "Diesem Zertifikat vertrauen" }).click();
+  await offered.getByRole("button", { name: "Abbrechen" }).click();
+  expect(state.sent.filter((item) => item.path === "/admin/settings/smtp-trust")).toEqual([]);
+  await offered.getByRole("button", { name: "Diesem Zertifikat vertrauen" }).click();
+  await offered.getByRole("button", { name: "Ja, vertrauen" }).click();
+  await expect(page.getByText("Die Website vertraut dem Zertifikat des Mailservers mit diesem Fingerabdruck:")).toBeVisible();
+  expect(state.sent.find((item) => item.path === "/admin/settings/smtp-trust").body).toEqual({ sha256: MAIL_CERTIFICATE.sha256 });
+
+  await page.getByRole("button", { name: "Test-Mail senden" }).click();
+  await expect(page.getByText("Test-Mail an chef@example.at gesendet.")).toBeVisible();
+  await page.getByRole("button", { name: "Vertrauen entfernen" }).click();
+  await expect(page.getByText("Vertrauen entfernt.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Vertrauen entfernen" })).toHaveCount(0);
+  await expectNoSidewaysScroll(page);
+});
+
 test("a validation error reads as a sentence (#57)", async ({ page }) => {
   await mockAdmin(page);
   await page.goto("/admin/technik");

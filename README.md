@@ -147,6 +147,9 @@ dann läuft die App wie früher als Hintergrundprozess ohne Autostart.
   (Content-Security-Policy) erlaubt nur Dateien vom eigenen Server. Google
   Analytics gibt es auf der neuen Seite nicht mehr – ohne Tracking braucht sie
   auch kein Cookie-Banner.
+- Der Mailversand prüft das Zertifikat des Mailservers streng; ein selbst
+  signiertes Zertifikat gilt nur, wenn ein Super-Admin genau seinem
+  Fingerabdruck vertraut hat (siehe „E-Mail-Versand der Website einrichten“).
 
 `update.sh` lädt ausschließlich Fast-Forward-Updates und merkt sich vorher den
 laufenden Stand. Dependencies und ein neuer Frontend-Build werden vor dem
@@ -237,6 +240,31 @@ verschickt Dolibarr.
 4. **Speichern**, dann **Test-Mail senden**. Kommt sie an, passt alles; sonst
    steht dort in Worten, was nicht stimmt (z. B. Passwort abgelehnt).
 
+**Eigener Mailserver mit selbst signiertem Zertifikat** (z. B. Mailcow im
+Heimnetz): Die Website prüft das Zertifikat sonst streng wie ein Mailprogramm
+und lehnt es ab. Dann zeigt **Test-Mail senden** den **SHA-256-Fingerabdruck**
+des Zertifikats, für wen und von wem es ausgestellt ist und wie lange es gilt.
+
+1. Fingerabdruck auf dem Mailserver nachsehen und vergleichen, z. B.
+   `openssl s_client -connect 192.168.2.106:587 -starttls smtp </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256`
+   (bei SSL/TLS auf Port 465 ohne `-starttls smtp`).
+2. Stimmt er, als Super-Admin **Diesem Zertifikat vertrauen** → **Ja,
+   vertrauen**. Gespeichert wird nur der Fingerabdruck, und nur, wenn der
+   Mailserver genau dieses Zertifikat in dem Moment noch zeigt.
+3. **Test-Mail senden** noch einmal – jetzt geht sie hinaus.
+
+Ab dann prüft die Website statt Zertifizierungsstelle und Name genau diesen
+Fingerabdruck, direkt nach dem Verbindungsaufbau und **vor** der Anmeldung.
+Zeigt der Server ein anderes Zertifikat (erneuert oder ein fremder Server),
+geht nichts hinaus und kein Passwort wird übertragen; unter **Technik** steht
+dann eine Warnung mit dem neuen Fingerabdruck. Nach einer Erneuerung des
+Zertifikats also neu vergleichen und neu vertrauen. **Vertrauen entfernen**
+schaltet zurück auf die strenge Prüfung; ein anderer Mailserver, Port oder eine
+andere Verschlüsselung entfernt das Vertrauen von selbst.
+
+„Keine“ Verschlüsselung geht weiterhin, ist aber nicht empfohlen: Passwort und
+Mails gehen dann lesbar durchs Netz.
+
 ## Anfrageformular und Dolibarr
 
 Alle Kundenanliegen laufen zentral über `/anfrage`. Dort stehen Reparatur,
@@ -297,11 +325,19 @@ Anfragenummer, Ticket-Bezug und Zeitpunkte – damit dieselbe Anfrage nicht
 zweimal übergeben wird. Kundendaten stehen danach nur noch in Dolibarr.
 
 **Kontaktformular** (`/api/contact`, die Seite dazu kommt mit der neuen
-Website): Name, E-Mail, optional Telefon und Nachricht werden ein Ticket in
-Dolibarr. Ein neuer Absender wird dabei **kein** Interessent; schreibt ein
+Website): Name, E-Mail, optional Telefon, optional „Worum geht es?“ und
+Nachricht werden ein Ticket in Dolibarr. Ein neuer Absender wird dabei **kein** Interessent; schreibt ein
 bekannter Kunde, hängt das Ticket an ihm (ohne ihn zu ändern). Für eine eigene
 Themengruppe „Kontakt“ in Dolibarr deren Code (z. B. `KONTAKT`) unter
 `/admin/dolibarr` unter **Themengruppen je Anfrageart** bei **Kontaktnachricht** eintragen.
+
+**Ticket-Betreff:** Anfragen mit Gerät heißen wie bisher nach dem Gerät
+(„Reparatur: Notebook Lenovo ThinkPad T14 (ANF-…)“). Ohne Gerät – Kontaktnachricht,
+PC-Neubau, Beratung – steht dort, worum es geht: das Feld **„Worum geht es?“**
+(optional, höchstens 80 Zeichen) oder, wenn es leer ist, die ersten Worte der
+Nachricht in einer Zeile, nach etwa 60 Zeichen an einer Wortgrenze mit „…“
+gekürzt, z. B. „Kontaktnachricht: Habt ihr am Samstag geöffnet? (ANF-…)“. Das
+Etikett zeigt denselben Betreff ohne die Nummer.
 
 **Rückruf-Wunsch**: Wer im Formular eine Wunschzeit angibt (Telefonnummer
 Pflicht, frühestens in 10 Minuten, höchstens 60 Tage voraus), bekommt in
