@@ -4,8 +4,8 @@
 The ZIP holds one folder, ittabelanderpdf/, with everything Dolibarr needs and nothing a
 developer uses: no tests, scripts, CI files or developer documents. Entries are
 sorted, dated 1980-01-01 and stored uncompressed, so the same source gives the
-same SHA-256 on every machine - that is how the release workflow on GitHub
-proves the published package was built from the tagged commit.
+same SHA-256 on every machine - so a rebuild from the tagged commit proves
+the published package (GitHub release dolibarr-vX.Y.Z of IT-Tabelander).
 
 The file name carries only x.y.z, even for a beta: Dolibarr's "Deploy an
 external module" accepts nothing else (htdocs/admin/modules.php). The beta
@@ -16,6 +16,7 @@ Usage:
     python scripts/build_release.py --source DIR       from another folder (a snapshot, a git archive)
     python scripts/build_release.py --out dist         where the ZIP and its .sha256 go (default dist)
     python scripts/build_release.py --verify ZIP       check an existing package, build nothing
+    python scripts/build_release.py --notes X.Y.Z      the CHANGELOG section of X.Y.Z (release notes)
 
 Standard library only.
 """
@@ -99,15 +100,23 @@ def tracked_files(source: Path) -> list[Path] | None:
     """Files Git tracks in a working copy, or None when source is not one.
 
     In a working copy only tracked files may reach the package: an earlier
-    build's output, a log or a scratch file would otherwise ship. A snapshot or
-    a git archive has no .git and consists of committed files already.
+    build's output, a log or a scratch file would otherwise ship. The module
+    lives in dolibarr/ittabelanderpdf/ of the IT-Tabelander repository: Git
+    finds the working copy from source upwards, and git ls-files lists only
+    what lies below source, relative to it. A snapshot or a git archive outside
+    any working copy, or in an ignored folder of one, holds committed files
+    only already.
     """
-    if not (source / ".git").exists() or not shutil.which("git"):
+    if not shutil.which("git"):
         return None
-    completed = subprocess.run(["git", "ls-files", "-z", "--cached"], cwd=str(source), capture_output=True)
+    inside = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"], cwd=str(source), capture_output=True)
+    if inside.returncode != 0 or inside.stdout.strip() != b"true":
+        return None
+    completed = subprocess.run(["git", "ls-files", "-z", "--cached", "--", "."], cwd=str(source), capture_output=True)
     if completed.returncode != 0:
         raise BuildError("git ls-files failed: " + completed.stderr.decode("utf-8", "replace").strip())
-    return [source / name for name in completed.stdout.decode("utf-8").split("\0") if name]
+    names = [name for name in completed.stdout.decode("utf-8").split("\0") if name]
+    return [source / name for name in names] or None
 
 
 def package_files(source: Path, output: Path | None = None) -> list[str]:
@@ -203,13 +212,27 @@ def verify(archive: Path, source: Path | None = None) -> list[str]:
     return problems
 
 
+def release_notes(source: Path, version: str) -> str:
+    """The CHANGELOG section of one version, for the GitHub release."""
+    text = (source / "CHANGELOG.md").read_text(encoding="utf-8")
+    found = re.search(rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## \[|\Z)", text, re.S | re.M)
+    if not found or not found.group(1).strip():
+        raise BuildError(f"CHANGELOG.md has no section for {version}")
+    return found.group(1).strip() + "\n"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--source", type=Path, default=ROOT, help="module source folder (default: this repository)")
+    parser.add_argument("--source", type=Path, default=ROOT, help="module source folder (default: the module folder)")
     parser.add_argument("--out", type=Path, default=ROOT / "dist", help="output folder (default: dist)")
     parser.add_argument("--verify", type=Path, help="verify this ZIP against --source instead of building")
+    parser.add_argument("--notes", metavar="VERSION", help="print the CHANGELOG section of VERSION, build nothing")
     arguments = parser.parse_args(argv)
     try:
+        if arguments.notes:
+            sys.stdout.reconfigure(encoding="utf-8")
+            sys.stdout.write(release_notes(arguments.source, arguments.notes))
+            return 0
         if arguments.verify:
             problems = verify(arguments.verify, arguments.source)
             if problems:
