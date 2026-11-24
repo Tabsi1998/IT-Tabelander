@@ -750,3 +750,9 @@ logs/                Backend-Log (ignoriert)
 
 Secrets, `backend/.env`, `deploy.config.local`, venv, `node_modules`, Builds,
 Logs und PID-Dateien werden nicht committed.
+
+## Lizenz
+
+Alle Rechte vorbehalten. Das Repository ist öffentlich einsehbar, darf aber ohne schriftliche
+Zustimmung von IT-Tabelander weder genutzt noch kopiert, betrieben oder für KI-Training verwendet
+werden. Details in [`LICENSE`](LICENSE).

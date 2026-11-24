@@ -7,7 +7,8 @@ alone closes nothing).
 
 ## Local checks are the gate
 
-There is no GitHub workflow (private repository); GitHub only sends
+There is no GitHub workflow (the repository is public but all rights reserved,
+see `LICENSE`; no CI by choice); GitHub only sends
 Dependabot alerts. Before every push:
 
 ```bash
