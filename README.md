@@ -295,11 +295,19 @@ Anfragenummer, Ticket-Bezug und Zeitpunkte – damit dieselbe Anfrage nicht
 zweimal übergeben wird. Kundendaten stehen danach nur noch in Dolibarr.
 
 **Kontaktformular** (`/api/contact`, die Seite dazu kommt mit der neuen
-Website): Name, E-Mail, optional Telefon und Nachricht werden ein Ticket in
-Dolibarr. Ein neuer Absender wird dabei **kein** Interessent; schreibt ein
+Website): Name, E-Mail, optional Telefon, optional „Worum geht es?“ und
+Nachricht werden ein Ticket in Dolibarr. Ein neuer Absender wird dabei **kein** Interessent; schreibt ein
 bekannter Kunde, hängt das Ticket an ihm (ohne ihn zu ändern). Für eine eigene
 Themengruppe „Kontakt“ in Dolibarr deren Code (z. B. `KONTAKT`) unter
 `/admin/dolibarr` unter **Themengruppen je Anfrageart** bei **Kontaktnachricht** eintragen.
+
+**Ticket-Betreff:** Anfragen mit Gerät heißen wie bisher nach dem Gerät
+(„Reparatur: Notebook Lenovo ThinkPad T14 (ANF-…)“). Ohne Gerät – Kontaktnachricht,
+PC-Neubau, Beratung – steht dort, worum es geht: das Feld **„Worum geht es?“**
+(optional, höchstens 80 Zeichen) oder, wenn es leer ist, die ersten Worte der
+Nachricht in einer Zeile, nach etwa 60 Zeichen an einer Wortgrenze mit „…“
+gekürzt, z. B. „Kontaktnachricht: Habt ihr am Samstag geöffnet? (ANF-…)“. Das
+Etikett zeigt denselben Betreff ohne die Nummer.
 
 **Rückruf-Wunsch**: Wer im Formular eine Wunschzeit angibt (Telefonnummer
 Pflicht, frühestens in 10 Minuten, höchstens 60 Tage voraus), bekommt in
