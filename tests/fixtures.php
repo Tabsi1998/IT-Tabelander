@@ -1024,8 +1024,12 @@ if ($stage === 'rollout') {
 	$mail = new CMailFile('['.$mysoc->name.'] '.$langs->transnoentities('TicketNewEmailSubject', 'TS2611-0001', 'abc123'), 'max@mustermann.example', 'IT-Tabelander <office@tabelander.co.at>', $newTicket, array(), array(), array(), '', '', 0, 1);
 	$sent['ticket new'] = $mail->sendfile() ? 'ok' : 'FAILED '.$mail->error;
 	$template = $db->fetch_object($db->query("SELECT topic, content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND type_template = 'ticket_send'"));
-	$middle = strtr((string) $template->content, array('__TICKET_SUBJECT__' => 'Notebook startet nicht', '&nbsp;' => 'das Netzteil war defekt, ein neues ist bestellt und kommt am Donnerstag. Danach ist das Notebook am selben Tag fertig.'));
-	$reply = $texts['einleitung'].'<br><br>'.$middle.'<br><br>'.'<br>'.$texts['signatur'];
+	// Since 1.0.6 the template carries closing and signature (__USER_SIGNATURE__);
+	// TICKET_MESSAGE_MAIL_SIGNATURE stays empty.
+	$middle = strtr((string) $template->content, array('__TICKET_SUBJECT__' => 'Notebook startet nicht',
+		"\u{00A0}" => 'das Netzteil war defekt, ein neues ist bestellt und kommt am Donnerstag. Danach ist das Notebook am selben Tag fertig.',
+		'__USER_SIGNATURE__' => $div.'<strong style="color:#1B3348;">'.dol_escape_htmltag($mysoc->managers).'</strong><br>'.dol_escape_htmltag($mysoc->name).'</div>'.$footer));
+	$reply = $texts['einleitung'].'<br><br>'.$middle;
 	$mail = new CMailFile('['.$mysoc->name.' - Ticket TS2611-0001] Notebook startet nicht', 'max@mustermann.example', 'IT-Tabelander <office@tabelander.co.at>', $reply, array(), array(), array(), '', '', 0, 1);
 	$sent['ticket reply'] = $mail->sendfile() ? 'ok' : 'FAILED '.$mail->error;
 

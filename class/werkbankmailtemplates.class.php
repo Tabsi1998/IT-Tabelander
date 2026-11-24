@@ -97,10 +97,11 @@ class WerkbankMailTemplates
 				array('&nbsp;'),
 				array('&nbsp;'),
 				0),
-			// Only the middle of a ticket reply: Dolibarr puts TICKET_MESSAGE_MAIL_INTRO
-			// before and TICKET_MESSAGE_MAIL_SIGNATURE after it (docs/rollout/ticket/).
+			// A ticket reply: Dolibarr puts TICKET_MESSAGE_MAIL_INTRO ("Guten Tag,")
+			// before it; closing and signature (__USER_SIGNATURE__) are part of the
+			// template, TICKET_MESSAGE_MAIL_SIGNATURE stays empty (docs/rollout/ticket/).
 			'ticket' => array('ticket_send', 'Ticket-Antwort', '[__MYCOMPANY_NAME__ - Ticket __REF__] __TICKET_SUBJECT__',
-				array('zu Ihrer Anfrage „__TICKET_SUBJECT__“:', '&nbsp;'),
+				array('zu Ihrer Anfrage „__TICKET_SUBJECT__“:', "\u{00A0}"),
 				null,
 				0),
 			'supplier_proposal' => array('supplier_proposal_send', 'Preisanfrage', 'Preisanfrage __REF__ von __MYCOMPANY_NAME__',
@@ -156,7 +157,7 @@ class WerkbankMailTemplates
 		'Vertrag (Du)' => array('e033242fb7aa2c54561c796319ce1a89', '30a5dac241d93407a4ca906eb70fb49d', 'a6d0569ef0ec9cee8032b3ce1598982e'),
 		'Nachricht (Sie)' => array('bb8d44cc5d8cb1bcec6122f97e931f6b', 'ba29ff846bd2289d38591d21af1cd028', 'fc78ed7dab76930fe92ad497c1be2a31'),
 		'Nachricht (Du)' => array('72e9fc6264c480b439fb9e646aad93d7', 'fcf5e22c8672d8974a8389e8bb72c4c1', '8934af8c870b8fb2d58301138db43721'),
-		'Ticket-Antwort' => array('94ac499d4537e47f28b8fe68d4f9cea2', '94ac499d4537e47f28b8fe68d4f9cea2'),
+		'Ticket-Antwort' => array('94ac499d4537e47f28b8fe68d4f9cea2', '5f242533ce3713418b9e8b092caef823'),
 		'Preisanfrage' => array('89f601ecf0f9a750bf43c91fa70d8cb6', '5a577b89b3ba20582cad6027a58ea294', 'f0276b6caf46f39182484550914d80e5'),
 		'Bestellung' => array('9b600d84b9ae6c691e1d255f66ed8314', '2afdfa1b31c555e7edf380abfadf5053', 'e6e3b35c40870d6712bc8da195c371f0'),
 	);
@@ -181,11 +182,14 @@ class WerkbankMailTemplates
 	{
 		$p = self::P;
 		if ($key === 'ticket') {
+			// The ticket editor shows this text as written; its font comes from the
+			// mail around it, so the paragraphs carry spacing and colour only.
+			$t = 'margin:0 0 16px 0;line-height:1.6;color:'.self::BODY.';';
 			$body = '';
 			foreach ($paragraphs as $paragraph) {
-				$body .= '<p style="'.$p.'">'.$paragraph.'</p>';
+				$body .= '<p style="'.$t.'">'.$paragraph.'</p>';
 			}
-			return $body;
+			return $body.'<p style="'.$t.'">Mit freundlichen Grüßen</p>__USER_SIGNATURE__';
 		}
 		$greeting = $form === 'du' ? '__ITTAB_HALLO__' : ($form === 'sie' ? '__ITTAB_GUTENTAG__' : 'Guten Tag,');
 		$body = '<p style="'.$p.'">'.$greeting.'</p>';

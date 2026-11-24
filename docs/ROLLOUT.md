@@ -59,6 +59,8 @@ Dateien: `docs/rollout/ticket/`. Dolibarr setzt Ticket-Mails aus Teilen zusammen
 
 Deshalb enthält die Einleitung Wortmarke und Anrede, die Signatur Gruß und Fuß, und die neue Vorlage **„Ticket-Antwort“** (Typ `ticket_send`, aus dem Modul) nur den Mittelteil. So erscheint nichts doppelt.
 
+**Stand ab 1.0.6:** Die Eingangsbestätigung für neue Tickets schickt das Modul selbst (eigener Trigger, `TICKET_MESSAGE_MAIL_NEW` wird dafür nicht mehr verwendet). Die Vorlage „Ticket-Antwort“ endet mit „Mit freundlichen Grüßen“ und `__USER_SIGNATURE__` (Signatur des Benutzers mit Logo), `TICKET_MESSAGE_MAIL_SIGNATURE` bleibt leer.
+
 | Einstellung | Wo | Datei |
 | --- | --- | --- |
 | `TICKET_MESSAGE_MAIL_NEW` | Einstellungen → Module → Tickets → Öffentliche Oberfläche | `neues-ticket.html` |

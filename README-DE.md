@@ -2,7 +2,7 @@
 
 Belege im Werkbank-Design von IT-Tabelander, mit den echten Markenschriften, dazu passende E-Mail-Vorlagen und ein verzögerter, abbrechbarer automatischer Versand.
 
-Modulnummer **756230** · Version 1.0.5 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
+Modulnummer **756230** · Version 1.0.6 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
 
 ![Entwurf](docs/entwurf/mockup.png)
 
@@ -26,13 +26,13 @@ Für alle gilt: Kopf mit Logo und Kontakt, Falzmarken, Anschrift nach DIN 5008 (
 
 Ist die Firma nicht umsatzsteuerpflichtig (Firmeneinstellung „Umsatzsteuer: nein“), steht unter dem Gesamtbetrag der Kleinunternehmer-Hinweis aus den Moduleinstellungen. Ist sie es, zeigt der Summenblock Netto, USt je Satz und Brutto.
 
-**E-Mail-Vorlagen** (Einstellungen → E-Mail-Vorlagen, Modul „ittabelanderpdf“): Angebot, Rechnung, Anzahlungsrechnung, Gutschrift, Zahlungsbestätigung, Auftragsbestätigung, Lieferung, Arbeitsbericht, Vertrag und eine allgemeine Nachricht, jeweils als „(Sie)“ und „(Du)“; Preisanfrage und Bestellung an Lieferanten neutral; „Ticket-Antwort“ (nur der Mittelteil, Einleitung und Signatur kommen aus den Ticket-Einstellungen). Vorhandene Vorlagen werden nie überschrieben. Werkbank-Fassungen der Mahnwesen- und Ticket-Texte für die Produktion liegen in `docs/rollout/`, die Schritte in `docs/ROLLOUT.md`.
+**E-Mail-Vorlagen** (Einstellungen → E-Mail-Vorlagen, Modul „ittabelanderpdf“): Angebot, Rechnung, Anzahlungsrechnung, Gutschrift, Zahlungsbestätigung, Auftragsbestätigung, Lieferung, Arbeitsbericht, Vertrag und eine allgemeine Nachricht, jeweils als „(Sie)“ und „(Du)“; Preisanfrage und Bestellung an Lieferanten neutral; „Ticket-Antwort“ (Text mit Gruß und Benutzer-Signatur `__USER_SIGNATURE__`, die Einleitung kommt aus den Ticket-Einstellungen). **Eingangsbestätigung für neue Tickets:** Statt Dolibarrs eingebautem Text schickt das Modul eine eigene Bestätigung im selben Aufbau wie Angebot und Rechnung (Logo, Anrede nach Du/Sie, Anfrage in der Box, Link zum Stand, Gruß, Fußzeile, hell und dunkel). Schlägt der Versand fehl, geht Dolibarrs eigene Bestätigung raus. Abschalten: Konstante `ITTABPDF_TICKET_CONFIRM` = 0. Vorhandene Vorlagen werden nie überschrieben. Werkbank-Fassungen der Mahnwesen- und Ticket-Texte für die Produktion liegen in `docs/rollout/`, die Schritte in `docs/ROLLOUT.md`.
 
 **Automatischer Versand** für: Angebot freigegeben (mit PDF), Rechnung freigegeben (mit PDF; Gutschrift und Anzahlungsrechnung mit eigener Vorlage), Rechnung vollständig bezahlt (Zahlungsbestätigung ohne Anhang). Der Versand geht erst nach einer Verzögerung (Standard 5 Minuten) hinaus und lässt sich bis dahin auf der Karte des Belegs abbrechen.
 
 ## Installation
 
-1. `module_ittabelanderpdf-1.0.5.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
+1. `module_ittabelanderpdf-1.0.6.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
 2. In der Modulliste **IT-Tabelander PDF** aktivieren. Dabei passiert:
    - die Vorlage `werkbank` wird für alle neun Belegarten eingeschaltet (noch nicht als Standard),
    - Zusatzfelder: Kunde/Lieferant „Anrede per Du“ (`ittab_du`), Vertrag „Mindestlaufzeit (Monate)“ (`ittab_mindestlaufzeit`) und „Kündigungsfrist“ (`ittab_kuendigungsfrist`),

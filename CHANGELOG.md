@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.6] - 2026-11-24
+
+- Own confirmation for a new ticket (trigger `ITTabPdfTicketConfirm`, runs before Dolibarr's ticket trigger): the sheet of the automatic send with logo, greeting by Du/Sie of the third party, the request (number, subject, text) in the facts box, link to the public ticket page, closing and footer, light and dark. Dolibarr's built-in text ("please do not reply", every extra field as a line, no signature) is no longer sent. If sending fails, Dolibarr's own confirmation goes out as before. Switch `ITTABPDF_TICKET_CONFIRM` (default on).
+- Template "Ticket-Antwort" now ends with "Mit freundlichen Grüßen" and `__USER_SIGNATURE__`; `TICKET_MESSAGE_MAIL_SIGNATURE` stays empty. The 1.0.5 default is renewed on activation, edited ones stay.
+
 ## [1.0.5] - 2026-11-24
 
 - On activation, create the category link tables for proposals, interventions and supplier proposals from Dolibarr's own SQL files when the Categories module is on. Dolibarr 23 only creates them for invoices and orders; without them the proposal card fails with "Table llx_categorie_propal doesn't exist".
