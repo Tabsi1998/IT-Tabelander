@@ -24,4 +24,5 @@ The `mails` step fails when one of its checks fails (see `docs/beispiele/mails/u
 - Builders must not depend on libraries the card page happens to load (cron context): require them (e.g. `functions2.lib.php`).
 - `__ITTAB_FAKTEN__` and friends are built only in mode `formemail`; PDF substitutions must stay cheap and must not recurse into a builder.
 - Mahnwesen prints its e-mail text into the dunning letter up to `<!--MAHNWESEN_PDF_END-->`.
+- E-mail templates: no `<style>` (Dolibarr's waf.inc.php answers 403 to "<style" in any form, so the template could not be saved or sent by hand), no classes (restricthtml drops them), no layout tables. Dark mode exists only in `WerkbankMailTemplates::wrapDocument()` for the automatic send and finds elements by their inline colours.
 - Bash heredocs on Windows mangle `\n` inside Python/PHP strings: write such edits with the Edit tool.

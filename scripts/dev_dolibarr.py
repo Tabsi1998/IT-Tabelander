@@ -160,7 +160,8 @@ def mails() -> None:
     docker("cp", f"{WEB}:/tmp/ittpdf-out/angebot-1-kundenbereich-an.pdf", str(EXAMPLES / "angebot-1-kundenbereich-an.pdf"))
     MAILS.mkdir(parents=True, exist_ok=True)
     for old in MAILS.glob("*"):
-        old.unlink()
+        if old.is_file():
+            old.unlink()
     summary = []
     messages = sorted(mailpit("messages?limit=200").get("messages", []), key=lambda entry: entry["Created"])
     for number, item in enumerate(messages, 1):
@@ -230,6 +231,22 @@ def ui() -> None:
         checks.append({"page": "maillogo without login", "ok": answer.status == 200 and answer.headers.get("Content-Type") == "image/png"
                        and data[1:4] == b"PNG" and width <= 480 and "max-age" in (answer.headers.get("Cache-Control") or ""),
                        "missing": [f"{answer.status} {answer.headers.get('Content-Type')} {width}x{height} {answer.headers.get('Cache-Control')}"]})
+    with urllib.request.urlopen(f"{URL}/custom/ittabelanderpdf/public/maillogo.php?variant=dark", timeout=30) as answer:
+        data = answer.read()
+        checks.append({"page": "dark maillogo without login", "ok": answer.status == 200 and data[1:4] == b"PNG"
+                       and int.from_bytes(data[16:20], "big") <= 480, "missing": [f"{answer.status} {len(data)} bytes"]})
+    # Dolibarr's WAF checks every POST: the texts must pass it, or nobody can save them.
+    samples = [ROOT / "docs" / "rollout" / "mahnwesen" / "mahnung-1.html", ROOT / "docs" / "rollout" / "ticket" / "signatur.html",
+               next(MAILS.glob("*von-hand*angebot*.html"), None) or next(MAILS.glob("*von-hand*.html"))]
+    for sample in samples:
+        page = opener.open(f"{URL}/custom/ittabelanderpdf/admin/setup.php", timeout=30).read().decode("utf-8", "replace")
+        token = re.search(r'name="token" value="([^"]+)"', page).group(1)
+        body = urllib.parse.urlencode({"token": token, "action": "none", "content": sample.read_text(encoding="utf-8")}).encode()
+        try:
+            status = opener.open(f"{URL}/custom/ittabelanderpdf/admin/setup.php", data=body, timeout=30).status
+        except urllib.error.HTTPError as error:
+            status = error.code
+        checks.append({"page": f"POST {sample.name} passes the WAF", "ok": status == 200, "missing": [str(status)]})
     look("queue", "/custom/ittabelanderpdf/queue.php", ["Automatischer Versand", "Gesendet"])
     look("setup", "/custom/ittabelanderpdf/admin/setup.php", ["ITTABPDF_AUTOSEND_DELAY", "Angebot (Sie)", "action=update_templates"])
     if state.get("planned_propal"):

@@ -2,7 +2,7 @@
 
 Belege im Werkbank-Design von IT-Tabelander, mit den echten Markenschriften, dazu passende E-Mail-Vorlagen und ein verzögerter, abbrechbarer automatischer Versand.
 
-Modulnummer **756230** · Version 1.0.2 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
+Modulnummer **756230** · Version 1.0.3 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
 
 ![Entwurf](docs/entwurf/mockup.png)
 
@@ -32,7 +32,7 @@ Ist die Firma nicht umsatzsteuerpflichtig (Firmeneinstellung „Umsatzsteuer: ne
 
 ## Installation
 
-1. `module_ittabelanderpdf-1.0.2.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
+1. `module_ittabelanderpdf-1.0.3.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
 2. In der Modulliste **IT-Tabelander PDF** aktivieren. Dabei passiert:
    - die Vorlage `werkbank` wird für alle neun Belegarten eingeschaltet (noch nicht als Standard),
    - Zusatzfelder: Kunde/Lieferant „Anrede per Du“ (`ittab_du`), Vertrag „Mindestlaufzeit (Monate)“ (`ittab_mindestlaufzeit`) und „Kündigungsfrist“ (`ittab_kuendigungsfrist`),
@@ -90,6 +90,8 @@ Zusätzlich zu Dolibarrs eigenen Variablen (`__REF__`, `__MYCOMPANY_NAME__`, …
 | `__ITTAB_ANNAHME_SATZ__`, `__ITTAB_ANNAHME_SATZ_DU__` | Satz zur Annahme des Angebots (Sie/Du): mit Kundenbereich „online im Kundenbereich annehmen oder antworten“, ohne „einfach auf diese E-Mail antworten“ |
 | `__ITTAB_LOGO__` | Firmenlogo als verlinktes Bild auf Weiß: `public/maillogo.php` des Moduls liefert das Logo der Firmeneinstellungen als undurchsichtiges PNG auf weißem Grund (ohne Anmeldung, zwischengespeichert), oder die Adresse aus `ITTABPDF_MAIL_LOGO_URL`. Ohne Logo: Wortmarke als Text |
 | `__ITTAB_TELEFON_LINK__` | Telefonnummer als eigener `tel:`-Link in neutraler Farbe |
+
+**Hell und dunkel.** Die Vorlagen enthalten nur Blöcke mit Inline-Stilen, kein `<style>` und keine Tabellen: Dolibarrs WAF lehnt `<style` in jedem Formular ab (Speichern der Vorlage und händischer Versand), und der Bereinigungsfilter `restricthtml` entfernt Klassen. Diese helle Fassung gilt für jeden Versandweg und bleibt auch dann sauber, wenn ein Mail-Programm sie selbst abdunkelt (das Logo ist ein undurchsichtiges weißes Schild). Nur der automatische Versand legt um den Text ein ganzes Dokument mit `color-scheme`, `@media (prefers-color-scheme: dark)` und den Outlook-Selektoren `[data-ogsc]`/`[data-ogsb]`: Hintergrund #0D1823, Kasten #14263A, Texte #EEF2F6/#C5D0DC/#A9B8CA, Linie #2C4763, dazu das helle Logo für dunkle Flächen (`ITTABPDF_MAIL_LOGO_DARK`, Pfad im DMS; `public/maillogo.php?variant=dark`). Die dunklen Regeln finden die Elemente über ihre Inline-Farben, deshalb wirken sie auch auf Text, der später direkt in der Vorlage geändert wird.
 | `__ITTAB_INHABER__`, `__ITTAB_TELEFON__`, `__ITTAB_ADRESSE__`, `__ITTAB_WEB__`, `__ITTAB_RECHTLICHES__` | Firmendaten für Gruß und Fuß |
 
 Das Logo wird verlinkt, nicht eingebettet. Eingebettete Bilder (`data:` → `cid:`) zeigt Dolibarrs SMTPS-Versand auf Handy-Mailprogrammen als kaputtes Bild plus zusätzlichen Anhang (24.11.2026 in Produktion gesehen). Voraussetzung: Dolibarr ist von außen erreichbar. Wird es gesperrt (Website-Issue #67), `ITTABPDF_MAIL_LOGO_URL` (Einstellungen → Erweiterte Einstellungen) auf eine öffentliche Adresse setzen, z. B. ein PNG auf it.tabelander.co.at. Die Mails sind immer hell wie das PDF (`color-scheme: light only`, weiße Flächen und Textfarben fest im HTML); Programme mit erzwungenem Dunkelmodus können Flächen trotzdem umfärben, das Logo bleibt aber ein Bild auf Weiß und damit lesbar.

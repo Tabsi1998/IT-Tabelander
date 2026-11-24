@@ -27,10 +27,11 @@ function ittabelanderpdf_completesubstitutionarray(&$substitutionarray, $langs, 
 	require_once dol_buildpath('/ittabelanderpdf/class/werkbankmaildata.class.php', 0);
 
 	$substitutionarray['__ITTAB_INHABER__'] = (string) $mysoc->managers;
-	$substitutionarray['__ITTAB_LOGO__'] = WerkbankMailData::logoHtml();
+	// Light logo alone for hand-sent mails, light and dark for the automatic send.
+	$substitutionarray['__ITTAB_LOGO__'] = WerkbankMailData::logoHtml(is_array($parameters) && !empty($parameters['ittab_auto']));
 	$substitutionarray['__ITTAB_TELEFON__'] = WerkbankBuilder::phone(!empty($mysoc->phone_mobile) ? $mysoc->phone_mobile : $mysoc->phone);
 	$substitutionarray['__ITTAB_WEB__'] = WerkbankBuilder::bareUrl((string) $mysoc->url);
-	$substitutionarray['__ITTAB_ADRESSE__'] = WerkbankMailData::noAutoLink(dol_escape_htmltag(trim(str_replace("\n", ', ', trim((string) $mysoc->address)).', '.trim($mysoc->zip.' '.$mysoc->town), ', ')));
+	$substitutionarray['__ITTAB_ADRESSE__'] = dol_escape_htmltag(trim(str_replace("\n", ', ', trim((string) $mysoc->address)).', '.trim($mysoc->zip.' '.$mysoc->town), ', '));
 	$substitutionarray['__ITTAB_TELEFON_LINK__'] = WerkbankMailData::phoneLink(!empty($mysoc->phone_mobile) ? $mysoc->phone_mobile : $mysoc->phone);
 	$legal = array_filter(array((string) $mysoc->idprof4, (string) $mysoc->idprof6, !empty($mysoc->idprof2) ? 'Gerichtsstand '.$mysoc->idprof2 : ''), 'strlen');
 	$substitutionarray['__ITTAB_RECHTLICHES__'] = $legal ? '<br>'.dol_escape_htmltag(implode(' · ', $legal)) : '';

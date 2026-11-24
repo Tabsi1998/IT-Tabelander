@@ -95,6 +95,14 @@ Unter **Einstellungen → Geplante Jobs** prüfen, dass „IT-Tabelander PDF: au
 5. Dasselbe mit einer Rechnung und einer Zahlung (Zahlungsbestätigung).
 6. Testbelege danach selbst bereinigen.
 
+## Update auf 1.0.3 (Mails hell und dunkel)
+
+1. `module_ittabelanderpdf-1.0.3.zip` über „Externes Modul bereitstellen“ hochladen, Modul einmal aus- und einschalten. Unveränderte Modul-Vorlagen (Stand 1.0.0 bis 1.0.2) bekommen dabei den neuen Text; von Hand geänderte bleiben, bis du sie mit „Modul-Vorlagen auf aktuellen Stand bringen“ ersetzt.
+2. Das Logo für den Dunkelmodus liegt im DMS unter `IT-Tabelander/Bilder/Logo/IT-Tabelander Banner Hell Transparent.png` (Einstellung `ITTABPDF_MAIL_LOGO_DARK`). Prüfen im privaten Fenster: `https://erp.tabelander.co.at/custom/ittabelanderpdf/public/maillogo.php?variant=dark`.
+3. Mahnwesen-Vorlagen und Ticket-Texte aus `docs/rollout/` neu einfügen.
+4. Was wo ankommt: Der automatische Versand schickt ein ganzes Dokument mit hellem und dunklem Design (Mail-Programme mit Dunkelmodus zeigen die dunkle Fassung mit hellem Logo). Händisch versendete Mails, Mahnwesen und Tickets tragen nur Inline-Stile: Sie sind immer die helle Fassung, die Programme mit erzwungenem Dunkelmodus selbst umfärben; das Logo bleibt dann ein weißes Schild.
+5. Ab jetzt kann der HTML-Text direkt in den Vorlagen (Einstellungen → E-Mails → E-Mail-Vorlagen) angepasst und über office@ getestet werden. Grenzen: kein `<style>` (Dolibarr blockt das beim Speichern mit 403), keine Klassen (werden beim Speichern entfernt), Stile nur inline. Die dunkle Fassung findet die Elemente über ihre Inline-Farben (#3B4D63 Text, #1B3348 Dunkelblau, #4A5B6E Grau, #F7F9FB Kasten, #D6DEE7 Linie, #ffffff Fläche); neue Elemente in diesen Farben werden automatisch mit umgefärbt.
+
 ## Update auf 1.0.2 (helle Mails)
 
 1. `module_ittabelanderpdf-1.0.2.zip` wie oben über „Externes Modul bereitstellen“ hochladen.

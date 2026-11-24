@@ -11,8 +11,9 @@
 
 /**
  * Public, read-only: the company logo for e-mails, an opaque PNG on white
- * (see WerkbankMailData::logoFile()). No login, no parameters but the
- * entity; it serves this one image and nothing else.
+ * (see WerkbankMailData::logoFile()), or with variant=dark the dark-mode logo.
+ * No login, no parameters but the entity and the variant; it serves these
+ * images and nothing else.
  */
 
 if (!defined('NOLOGIN')) {
@@ -59,7 +60,7 @@ if (!$res) {
 $file = '';
 if (isModEnabled('ittabelanderpdf')) {
 	dol_include_once('/ittabelanderpdf/class/werkbankmaildata.class.php');
-	$file = WerkbankMailData::logoFile();
+	$file = WerkbankMailData::logoFile(isset($_GET['variant']) && $_GET['variant'] === 'dark' ? 'dark' : 'light');
 }
 if ($file === '') {
 	http_response_code(404);

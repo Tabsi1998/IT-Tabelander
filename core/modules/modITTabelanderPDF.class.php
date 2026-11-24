@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '1.0.2';
+		$this->version = '1.0.3';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -81,6 +81,7 @@ class modITTabelanderPDF extends DolibarrModules
 			6 => array('ITTABPDF_PORTAL_URL', 'chaine', 'https://it.tabelander.co.at/kundenbereich', 'Customer area of the website', 0, 'current', 0),
 			// The website's customer area is not live yet: off until the owner switches it on.
 			7 => array('ITTABPDF_PORTAL_ENABLED', 'yesno', '0', 'Customer area of the website is live', 0, 'current', 0),
+			9 => array('ITTABPDF_MAIL_LOGO_DARK', 'chaine', 'IT-Tabelander/Bilder/Logo/IT-Tabelander Banner Hell Transparent.png', 'Logo for dark mode e-mails, path below documents/ecm', 0, 'current', 0),
 			8 => array('ITTABPDF_ACCEPT_TEXT_NOPORTAL', 'chaine', 'Bitte kurz per E-Mail an __MYCOMPANY_EMAIL__ bestätigen. Gearbeitet wird erst nach Zusage.', 'How a customer accepts a proposal without the customer area (Werkbank PDF)', 0, 'current', 0),
 		);
 

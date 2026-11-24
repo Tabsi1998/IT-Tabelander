@@ -334,9 +334,11 @@ class WerkbankMailQueue
 		$substitutions = getCommonSubstitutionArray($langs, 0, null, $object);
 		$substitutions['__SENDEREMAIL_SIGNATURE__'] = $user->signature;
 		$substitutions['__EMAIL__'] = $to;
-		complete_substitutions_array($substitutions, $langs, $object, array('mode' => 'formemail'));
+		complete_substitutions_array($substitutions, $langs, $object, array('mode' => 'formemail', 'ittab_auto' => 1));
 		$subject = make_substitutions((string) $template->topic, $substitutions);
-		$message = make_substitutions((string) $template->content, $substitutions);
+		// Only this path sends a full document with <style> (light and dark);
+		// templates and hand-sent mails carry inline styles only.
+		$message = WerkbankMailTemplates::wrapDocument(make_substitutions((string) $template->content, $substitutions));
 
 		$fromAddress = getDolGlobalString('MAIN_MAIL_EMAIL_FROM', (string) $mysoc->email);
 		$from = dol_string_nospecial((string) $mysoc->name, ' ', array(',')).' <'.$fromAddress.'>';

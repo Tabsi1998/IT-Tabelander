@@ -30,7 +30,7 @@ class WerkbankMailTemplates
 	const BRAND = '#FE5A23';
 	const LINE = '#D6DEE7';
 	const FONT = "Arial, Helvetica, sans-serif";
-	const P = 'margin:0 0 14px 0;font-family:Arial, Helvetica, sans-serif;font-size:15px;line-height:1.55;color:#3B4D63;';
+	const P = 'margin:0 0 16px 0;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;';
 
 	/**
 	 * Every template: key => array(type_template, label, topic, paragraphs Sie, paragraphs Du, attach PDF).
@@ -132,50 +132,45 @@ class WerkbankMailTemplates
 
 	/**
 	 * Hashes (md5 of topic, newline, content) of the module's earlier default
-	 * templates. A template that still has one of them was never changed by
+	 * templates (1.0.0, 1.0.1, 1.0.2). A template that still has one of them was never changed by
 	 * the owner and may be brought up to date without asking (upgrade()).
 	 */
 	const PREVIOUS = array(
-		'Angebot (Sie)' => array('2c854085ac0c32e001fa3de2828a9f53', '080d2b7005a417b657cbf8a3b7ed9c53'),
-		'Angebot (Du)' => array('76c569235b26af58fdf5a94805b7f187', '3a93504d5ccd3930bdf2140da5506d62'),
-		'Rechnung (Sie)' => array('447e59a45bcb1fa86d7d2e1b2e4317fd', '110e2ad76098a8080043c2c1411cf236'),
-		'Rechnung (Du)' => array('3827562f6fff6e2365ec0eeede22fe92', '0c525f787cc1f34a25c125923117c191'),
-		'Anzahlungsrechnung (Sie)' => array('cddea59d502c24ed4a04f7ee97a875d4', 'e36a8afeaa5187cc07ea20af3521af1d'),
-		'Anzahlungsrechnung (Du)' => array('0fd4640a53d3f471fc644dd2b5a9a836', '3b2dbeec83d74774dad6bd1fee837833'),
-		'Gutschrift (Sie)' => array('275f9ce09a59526e7ac4d16048404b05', '9c6b547285856a7fb5e4f3f1bcfc4e85'),
-		'Gutschrift (Du)' => array('549cca1e45fed1517bc2f8adfd5457a6', 'c004c69efd41e9d41adc1fe270540f8e'),
-		'Zahlungsbestätigung (Sie)' => array('f7dfceafbfd9aa1d7a7d26b4fd62f0a3', '6e391eae803713c30899b8c04b638979'),
-		'Zahlungsbestätigung (Du)' => array('83cc70d6bc7085a06621bea78236781f', '861453fedfd4b9f345f620a272f5510f'),
-		'Auftragsbestätigung (Sie)' => array('02735101ddc5dc45e100d570ae55ffac', '1539c48b08dc02efd14c95249a770152'),
-		'Auftragsbestätigung (Du)' => array('aa5952774046351fd92d6656d88191c8', '1f55ed93f2f22ca31cf1d894481883a3'),
-		'Lieferung (Sie)' => array('14e66c44aa976fa08db82f7580fc70c7', '5ae7833283f5bc38d8fd74d4b109ec5e'),
-		'Lieferung (Du)' => array('40504c48ccc61838084f944dea3fcdc7', '8593ea8c34801216ce9f045ebd2099f6'),
-		'Arbeitsbericht (Sie)' => array('f7b3ebc9d27cd2ca3b45ca78493ad06b', '84dfaafd5a91896801a934d0cd15ae2e'),
-		'Arbeitsbericht (Du)' => array('b342bf7edfdd9323ec56a3b3770eaed5', '6ffbc72cbb66c2a4077cd7cba11aeb17'),
-		'Vertrag (Sie)' => array('913c7e628356699e1a72f5cccf4ba035', '83ed5c7baf59bb1f67f2aeff53aa3452'),
-		'Vertrag (Du)' => array('e033242fb7aa2c54561c796319ce1a89', '30a5dac241d93407a4ca906eb70fb49d'),
-		'Nachricht (Sie)' => array('bb8d44cc5d8cb1bcec6122f97e931f6b', 'ba29ff846bd2289d38591d21af1cd028'),
-		'Nachricht (Du)' => array('72e9fc6264c480b439fb9e646aad93d7', 'fcf5e22c8672d8974a8389e8bb72c4c1'),
-		'Ticket-Antwort' => array('94ac499d4537e47f28b8fe68d4f9cea2'),
-		'Preisanfrage' => array('89f601ecf0f9a750bf43c91fa70d8cb6', '5a577b89b3ba20582cad6027a58ea294'),
-		'Bestellung' => array('9b600d84b9ae6c691e1d255f66ed8314', '2afdfa1b31c555e7edf380abfadf5053'),
+		'Angebot (Sie)' => array('2c854085ac0c32e001fa3de2828a9f53', '080d2b7005a417b657cbf8a3b7ed9c53', '686a4e515523035d24f656957af888cc'),
+		'Angebot (Du)' => array('76c569235b26af58fdf5a94805b7f187', '3a93504d5ccd3930bdf2140da5506d62', '3c9473892d7ea61f6fae23f636634035'),
+		'Rechnung (Sie)' => array('447e59a45bcb1fa86d7d2e1b2e4317fd', '110e2ad76098a8080043c2c1411cf236', 'd37d5990d0bce4a20b855fe3f674e1e4'),
+		'Rechnung (Du)' => array('3827562f6fff6e2365ec0eeede22fe92', '0c525f787cc1f34a25c125923117c191', 'f5d5279631ce5b7dac7f3db1ef881ecb'),
+		'Anzahlungsrechnung (Sie)' => array('cddea59d502c24ed4a04f7ee97a875d4', 'e36a8afeaa5187cc07ea20af3521af1d', '3b2f3f94d062a6beee48c8806e4284b0'),
+		'Anzahlungsrechnung (Du)' => array('0fd4640a53d3f471fc644dd2b5a9a836', '3b2dbeec83d74774dad6bd1fee837833', 'ba479e50ab76a84c5998c962ba3bd5a4'),
+		'Gutschrift (Sie)' => array('275f9ce09a59526e7ac4d16048404b05', '9c6b547285856a7fb5e4f3f1bcfc4e85', '96a31e23d39e2352522f00279f41dea5'),
+		'Gutschrift (Du)' => array('549cca1e45fed1517bc2f8adfd5457a6', 'c004c69efd41e9d41adc1fe270540f8e', 'c3bd33952ea057c8a20243b0ac8ea098'),
+		'Zahlungsbestätigung (Sie)' => array('f7dfceafbfd9aa1d7a7d26b4fd62f0a3', '6e391eae803713c30899b8c04b638979', 'eaf6a3eabd9d3a7eb3c671ad52940084'),
+		'Zahlungsbestätigung (Du)' => array('83cc70d6bc7085a06621bea78236781f', '861453fedfd4b9f345f620a272f5510f', 'a260d86feb58ca5f72ca42f9af72a30e'),
+		'Auftragsbestätigung (Sie)' => array('02735101ddc5dc45e100d570ae55ffac', '1539c48b08dc02efd14c95249a770152', 'f01c0245583a92d47cdfe445df7c7ef8'),
+		'Auftragsbestätigung (Du)' => array('aa5952774046351fd92d6656d88191c8', '1f55ed93f2f22ca31cf1d894481883a3', '58700b677a4a70afcb39e7c5b1971c63'),
+		'Lieferung (Sie)' => array('14e66c44aa976fa08db82f7580fc70c7', '5ae7833283f5bc38d8fd74d4b109ec5e', '8f4940f4dd4346e4bb0691026463b1cf'),
+		'Lieferung (Du)' => array('40504c48ccc61838084f944dea3fcdc7', '8593ea8c34801216ce9f045ebd2099f6', 'f3c4c588dcf15474e710e2fd6e306594'),
+		'Arbeitsbericht (Sie)' => array('f7b3ebc9d27cd2ca3b45ca78493ad06b', '84dfaafd5a91896801a934d0cd15ae2e', 'd37a84498669f01b2f9c5c6e1449f66a'),
+		'Arbeitsbericht (Du)' => array('b342bf7edfdd9323ec56a3b3770eaed5', '6ffbc72cbb66c2a4077cd7cba11aeb17', '243d7c055dc86575b0fbc2a63f14b88a'),
+		'Vertrag (Sie)' => array('913c7e628356699e1a72f5cccf4ba035', '83ed5c7baf59bb1f67f2aeff53aa3452', '087b9c296330f5ee19bc45abe1820d9a'),
+		'Vertrag (Du)' => array('e033242fb7aa2c54561c796319ce1a89', '30a5dac241d93407a4ca906eb70fb49d', 'a6d0569ef0ec9cee8032b3ce1598982e'),
+		'Nachricht (Sie)' => array('bb8d44cc5d8cb1bcec6122f97e931f6b', 'ba29ff846bd2289d38591d21af1cd028', 'fc78ed7dab76930fe92ad497c1be2a31'),
+		'Nachricht (Du)' => array('72e9fc6264c480b439fb9e646aad93d7', 'fcf5e22c8672d8974a8389e8bb72c4c1', '8934af8c870b8fb2d58301138db43721'),
+		'Ticket-Antwort' => array('94ac499d4537e47f28b8fe68d4f9cea2', '94ac499d4537e47f28b8fe68d4f9cea2'),
+		'Preisanfrage' => array('89f601ecf0f9a750bf43c91fa70d8cb6', '5a577b89b3ba20582cad6027a58ea294', 'f0276b6caf46f39182484550914d80e5'),
+		'Bestellung' => array('9b600d84b9ae6c691e1d255f66ed8314', '2afdfa1b31c555e7edf380abfadf5053', 'e6e3b35c40870d6712bc8da195c371f0'),
 	);
 
 	/**
-	 * Head of every full template: light only. Mail clients that honour
-	 * color-scheme keep the paper look; the rest still gets white surfaces and
-	 * explicit text colours inline. Apple's data detectors stay neutral.
-	 */
-	const HEAD = '<html lang="de"><head><meta charset="utf-8">'
-		.'<meta name="viewport" content="width=device-width, initial-scale=1">'
-		.'<meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light">'
-		.'<style>:root{color-scheme:light only;supported-color-schemes:light;}'
-		.'body{margin:0;padding:0;background:#ffffff;}'
-		.'a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important;font-size:inherit!important;font-family:inherit!important;font-weight:inherit!important;line-height:inherit!important;}'
-		.'u + .ittab-body a{color:inherit;text-decoration:none;}</style></head>';
-
-	/**
-	 * The HTML of one template: a full document, white like the PDF.
+	 * The HTML of one template, as stored in llx_c_email_templates.
+	 *
+	 * Only <div>, <p>, <span>, <a>, <strong> and <br> with inline styles: no
+	 * <style> (Dolibarr's WAF refuses "<style" in every form, so the template
+	 * could not be saved or sent by hand), no layout tables (editors and
+	 * webmail clients drew frames around their cells), no classes (the
+	 * restricthtml sanitizer drops them). The light look stands on its own,
+	 * also when a mail app darkens it by force; the dark design is added only
+	 * by the automatic send (wrapDocument()).
 	 *
 	 * @param string[] $paragraphs Body paragraphs
 	 * @param string   $form       'sie', 'du' or '' (neutral: "Guten Tag,")
@@ -197,60 +192,78 @@ class WerkbankMailTemplates
 		foreach ($paragraphs as $paragraph) {
 			$body .= '<p style="'.$p.'">'.$paragraph.'</p>';
 		}
-		$extra = '';
+		if ($key !== 'thirdparty') {
+			$body .= '__ITTAB_FAKTEN__';
+		}
 		if ($key === 'propal') {
 			// Button or nothing, depending on ITTABPDF_PORTAL_ENABLED.
-			$extra .= '__ITTAB_KUNDENBEREICH_BLOCK__';
+			$body .= '__ITTAB_KUNDENBEREICH_BLOCK__';
 		}
 		if ($key === 'invoice' || $key === 'deposit') {
-			$extra .= '__ITTAB_UEBERWEISUNG__';
+			$body .= '__ITTAB_UEBERWEISUNG__';
 		}
 		if ($key === 'shipping') {
-			$extra .= '__ITTAB_SENDUNG__';
+			$body .= '__ITTAB_SENDUNG__';
 		}
-		$facts = $key === 'thirdparty' ? '' : '__ITTAB_FAKTEN__';
-		$reach = $form === 'du' ? 'Bei Fragen erreichst du mich unter __ITTAB_TELEFON_LINK__ oder per Antwort auf diese Mail.' : 'Bei Fragen erreichen Sie mich unter __ITTAB_TELEFON_LINK__ oder per Antwort auf diese E-Mail.';
-		if ($key === 'thirdparty') {
-			$reach = '';
+		if ($key !== 'thirdparty') {
+			$body .= '<p style="'.$p.'">'.($form === 'du'
+				? 'Bei Fragen erreichst du mich unter __ITTAB_TELEFON_LINK__ oder per Antwort auf diese Mail.'
+				: 'Bei Fragen erreichen Sie mich unter __ITTAB_TELEFON_LINK__ oder per Antwort auf diese E-Mail.').'</p>';
 		}
-		$cell = 'background:#ffffff;';
+		$body .= self::closing($form === 'du' ? 'Liebe Grüße' : 'Mit freundlichen Grüßen', '__ITTAB_INHABER__', '__MYCOMPANY_NAME__');
 
-		return self::HEAD
-			.'<body class="ittab-body" bgcolor="#ffffff" style="margin:0;padding:0;background:#ffffff;color:'.self::BODY.';">'
-			.'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background:#ffffff;">'
-			.'<tr><td align="center" bgcolor="#ffffff" style="padding:16px 8px;'.$cell.'">'
-			// The sheet: white, framed by a thin line, at most 600 px.
-			.'<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:600px;background:#ffffff;border:1px solid '.self::LINE.';border-radius:4px;">'
-			.'<tr><td bgcolor="#ffffff" style="padding:20px 24px 14px 16px;'.$cell.'font-family:'.self::FONT.';font-size:21px;font-weight:bold;letter-spacing:1px;color:'.self::INK.';">__ITTAB_LOGO__</td></tr>'
-			.'<tr><td bgcolor="#ffffff" style="padding:0 24px;'.$cell.'">'.self::rule().'</td></tr>'
-			.'<tr><td bgcolor="#ffffff" style="padding:24px 24px 4px 24px;'.$cell.'">'.$body.'</td></tr>'
-			.($facts !== '' ? '<tr><td bgcolor="#ffffff" style="padding:0 24px 4px 24px;'.$cell.'">'.$facts.'</td></tr>' : '')
-			.($extra !== '' ? '<tr><td bgcolor="#ffffff" style="padding:0 24px;'.$cell.'">'.$extra.'</td></tr>' : '')
-			.'<tr><td bgcolor="#ffffff" style="padding:12px 24px 20px 24px;'.$cell.'">'
-			.($reach !== '' ? '<p style="'.$p.'">'.$reach.'</p>' : '')
-			.'<p style="'.$p.'margin-bottom:0;">'.($form === 'du' ? 'Liebe Grüße' : 'Mit freundlichen Grüßen').'<br><strong style="color:'.self::INK.';">__ITTAB_INHABER__</strong><br>__MYCOMPANY_NAME__</p></td></tr>'
-			.'<tr><td bgcolor="#ffffff" style="padding:0 24px 22px 24px;'.$cell.'">'.self::footerLines(
-				'__MYCOMPANY_NAME__', '__ITTAB_INHABER__', '__ITTAB_ADRESSE__', '__MYCOMPANY_EMAIL__', '__MYCOMPANY_URL__', '__ITTAB_WEB__', '__ITTAB_TELEFON_LINK__'
-			).'</td></tr>'
-			.'</table></td></tr></table></body></html>';
+		return self::sheet('__ITTAB_LOGO__', $body, self::footerLines(
+			'__MYCOMPANY_NAME__', '__ITTAB_INHABER__', '__ITTAB_ADRESSE__', '__MYCOMPANY_EMAIL__', '__MYCOMPANY_URL__', '__ITTAB_WEB__', '__ITTAB_TELEFON_LINK__'
+		));
 	}
 
 	/**
-	 * The brand rule: 2 px, orange start, ink after.
+	 * The sheet: white, 560 px at most, logo, the short orange line, the
+	 * text, then the footer. Shared by the templates and the rollout texts.
+	 *
+	 * @param string $logo   Logo HTML or variable
+	 * @param string $body   Text
+	 * @param string $footer Footer (footerLines())
+	 * @return string
+	 */
+	public static function sheet($logo, $body, $footer)
+	{
+		return '<div style="max-width:560px;margin:0 auto;padding:12px 20px 28px 20px;background:#ffffff;font-family:'.self::FONT.';font-size:16px;line-height:1.6;color:'.self::BODY.';">'
+			.'<div style="margin:0 0 18px 0;">'.$logo.'</div>'
+			.self::accent()
+			.$body
+			.$footer
+			.'</div>';
+	}
+
+	/**
+	 * The short orange line below the logo: a border, not a filled cell, so
+	 * no client can make it taller; height 0 keeps its placeholder invisible.
 	 *
 	 * @return string
 	 */
-	public static function rule()
+	public static function accent()
 	{
-		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
-			.'<td width="56" height="2" bgcolor="'.self::BRAND.'" style="font-size:0;line-height:0;height:2px;background:'.self::BRAND.';">&nbsp;</td>'
-			.'<td height="2" bgcolor="'.self::INK.'" style="font-size:0;line-height:0;height:2px;background:'.self::INK.';">&nbsp;</td></tr></table>';
+		return '<div style="width:56px;height:0;max-height:0;overflow:hidden;border-top:2px solid '.self::BRAND.';margin:0 0 28px 0;font-size:1px;line-height:1px;">&nbsp;</div>';
 	}
 
 	/**
-	 * The footer: a hairline, then four short grey lines. No register numbers
-	 * (those stay on the PDF), the phone number as its own neutral tel: link.
-	 * Arguments are HTML (variables or escaped values).
+	 * Closing line, name in ink, company.
+	 *
+	 * @param string $words   "Mit freundlichen Grüßen" / "Liebe Grüße"
+	 * @param string $name    Name (HTML)
+	 * @param string $company Company (HTML)
+	 * @return string
+	 */
+	public static function closing($words, $name, $company)
+	{
+		return '<p style="'.self::P.'margin:24px 0 0 0;">'.$words.'<br><strong style="color:'.self::INK.';">'.$name.'</strong><br>'.$company.'</p>';
+	}
+
+	/**
+	 * The footer: one fine divider, then four short grey lines. No register
+	 * numbers (those stay on the PDF), the phone number as its own neutral
+	 * tel: link. Arguments are HTML (variables or escaped values).
 	 *
 	 * @param string $name    Company name
 	 * @param string $manager Manager
@@ -264,13 +277,59 @@ class WerkbankMailTemplates
 	public static function footerLines($name, $manager, $address, $email, $url, $web, $phone)
 	{
 		$link = 'color:'.self::MUTED.';text-decoration:none;';
-		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background:#ffffff;"><tr>'
-			.'<td bgcolor="#ffffff" style="border-top:1px solid '.self::LINE.';padding-top:12px;background:#ffffff;font-family:'.self::FONT.';font-size:12px;line-height:1.6;color:'.self::MUTED.';">'
+		return '<div style="margin:32px 0 0 0;padding:16px 0 0 0;border-top:1px solid '.self::LINE.';font-family:'.self::FONT.';font-size:13px;line-height:1.7;color:'.self::MUTED.';">'
 			.'<strong style="color:'.self::INK.';">'.$name.'</strong> · '.$manager.'<br>'
 			.$address.'<br>'
 			.'<a href="mailto:'.$email.'" style="'.$link.'">'.$email.'</a> · <a href="'.$url.'" style="'.$link.'">'.$web.'</a><br>'
 			.$phone
-			.'</td></tr></table>';
+			.'</div>';
+	}
+
+	/**
+	 * The full document the automatic send puts around a template: light and
+	 * dark. Dark rules find their elements by the inline colours of the light
+	 * version (attribute selectors), because the template itself carries no
+	 * classes; only the logo pair has classes (it comes from a variable).
+	 *
+	 * @param string $content Template after substitution
+	 * @return string
+	 */
+	public static function wrapDocument($content)
+	{
+		if (preg_match('/^\s*<html/i', $content)) {
+			return $content;
+		}
+		$dark = array(
+			'body, .ittab-page, [style*="background:#ffffff" i]' => 'background:#0D1823 !important;background-color:#0D1823 !important;',
+			'[style*="3b4d63" i]' => 'color:#C5D0DC !important;',
+			'[style*="color:#1b3348" i]' => 'color:#EEF2F6 !important;',
+			'[style*="color:#4a5b6e" i]' => 'color:#A9B8CA !important;',
+			'[style*="f7f9fb" i]' => 'background:#14263A !important;background-color:#14263A !important;',
+			'[style*="d6dee7" i]' => 'border-color:#2C4763 !important;',
+			'.ittab-logo-light' => 'display:none !important;',
+			'.ittab-logo-dark' => 'display:block !important;max-height:none !important;overflow:visible !important;width:auto !important;',
+		);
+		$media = '';
+		$outlook = '';
+		foreach ($dark as $selector => $rule) {
+			$media .= $selector.'{'.$rule.'}';
+			// Outlook.com / Outlook apps mark their forced dark mode with data-ogsc/ogsb.
+			if (strpos($selector, 'logo') === false) {
+				foreach (explode(',', $selector) as $part) {
+					$outlook .= '[data-ogsc] '.trim($part).',[data-ogsb] '.trim($part).'{'.$rule.'}';
+				}
+			}
+		}
+		return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
+			.'<meta name="viewport" content="width=device-width, initial-scale=1">'
+			.'<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">'
+			.'<style>:root{color-scheme:light dark;supported-color-schemes:light dark;}'
+			.'body{margin:0;padding:0;-webkit-text-size-adjust:100%;}'
+			.'a[x-apple-data-detectors]{color:inherit !important;text-decoration:none !important;font-size:inherit !important;font-family:inherit !important;font-weight:inherit !important;line-height:inherit !important;}'
+			.'@media (prefers-color-scheme: dark){'.$media.'}'
+			.$outlook
+			.'</style></head>'
+			.'<body class="ittab-page" style="margin:0;padding:0;background:#ffffff;">'.$content.'</body></html>';
 	}
 
 	/**
@@ -400,35 +459,31 @@ class WerkbankMailTemplates
 	}
 
 	/**
-	 * The orange button to the document in the customer area.
+	 * The orange button to the document in the customer area, full width.
 	 *
 	 * @param string $url Link
 	 * @return string
 	 */
 	public static function portalButton($url)
 	{
-		return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 18px 0;"><tr>'
-			.'<td bgcolor="'.self::BRAND.'" style="border-radius:3px;background:'.self::BRAND.';"><a href="'.dol_escape_htmltag($url).'" style="display:inline-block;padding:12px 20px;font-family:'.self::FONT.';font-size:15px;font-weight:bold;line-height:1.2;color:#ffffff;text-decoration:none;">'
-			.'Im Kundenbereich ansehen</a></td></tr></table>';
+		return '<div style="margin:4px 0 24px 0;"><a href="'.dol_escape_htmltag($url).'" style="display:block;padding:14px 20px;border-radius:4px;background:'.self::BRAND.';color:#fff;font-family:'.self::FONT.';font-size:16px;font-weight:bold;line-height:1.3;text-align:center;text-decoration:none;">'
+			.'Im Kundenbereich ansehen</a></div>';
 	}
 
 	// ------------------------------------------------------------ rollout pieces
-	// Self-contained blocks for texts that Dolibarr or another module puts
-	// together from parts (ticket intro/signature, Mahnwesen letters): every
-	// block closes its own tags, so the parts can stand next to anything.
+	// For texts that Dolibarr or another module puts together from parts
+	// (ticket intro/signature, Mahnwesen letters): every piece closes its own
+	// tags, inline styles only, so the parts can stand next to anything.
 
 	/**
-	 * Logo and brand rule on white, at most 600 px wide.
+	 * Logo and the short orange line, for a text that starts a mail.
 	 *
 	 * @param string $logo Logo HTML or a variable (__ITTAB_LOGO__)
 	 * @return string
 	 */
 	public static function headerBlock($logo)
 	{
-		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;background:#ffffff;">'
-			.'<tr><td bgcolor="#ffffff" style="padding:4px 0 12px 0;background:#ffffff;font-family:'.self::FONT.';font-size:21px;font-weight:bold;letter-spacing:1px;color:'.self::INK.';">'.$logo.'</td></tr>'
-			.'<tr><td bgcolor="#ffffff" style="background:#ffffff;">'.self::rule().'</td></tr>'
-			.'<tr><td bgcolor="#ffffff" style="font-size:0;line-height:0;height:20px;background:#ffffff;">&nbsp;</td></tr></table>';
+		return '<div style="max-width:560px;background:#ffffff;"><div style="margin:0 0 18px 0;">'.$logo.'</div>'.self::accent().'</div>';
 	}
 
 	/**
@@ -445,10 +500,10 @@ class WerkbankMailTemplates
 		};
 		$address = trim(str_replace("\n", ', ', trim((string) $company->address)).', '.trim($company->zip.' '.$company->town), ', ');
 		$phone = !empty($company->phone_mobile) ? $company->phone_mobile : $company->phone;
-		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:600px;margin-top:18px;background:#ffffff;"><tr><td bgcolor="#ffffff" style="background:#ffffff;">'
-			.self::footerLines($e($company->name), $e($company->managers), WerkbankMailData::noAutoLink($e($address)), $e($company->email), $e($company->url),
+		return '<div style="max-width:560px;background:#ffffff;">'
+			.self::footerLines($e($company->name), $e($company->managers), $e($address), $e($company->email), $e($company->url),
 				$e(WerkbankBuilder::bareUrl((string) $company->url)), WerkbankMailData::phoneLink($phone))
-			.'</td></tr></table>';
+			.'</div>';
 	}
 
 	/**
@@ -463,8 +518,8 @@ class WerkbankMailTemplates
 	}
 
 	/**
-	 * The facts box of the templates with fixed rows (label => value HTML);
-	 * a row whose label starts with "!" shows its value large.
+	 * The facts box with fixed rows (label => value HTML); a row whose label
+	 * starts with "!" shows its value large.
 	 *
 	 * @param array<string,string> $rows Rows
 	 * @return string
@@ -473,9 +528,7 @@ class WerkbankMailTemplates
 	{
 		$html = '';
 		foreach ($rows as $label => $value) {
-			$big = strpos($label, '!') === 0;
-			$html .= '<tr><td style="'.WerkbankMailData::LABEL.'">'.dol_escape_htmltag(ltrim($label, '!')).'</td>'
-				.'<td align="right" style="'.WerkbankMailData::VALUE.($big ? 'font-size:20px;' : '').'">'.$value.'</td></tr>';
+			$html .= WerkbankMailData::factRow(dol_escape_htmltag(ltrim($label, '!')), $value, strpos($label, '!') === 0);
 		}
 		return WerkbankMailData::box($html);
 	}

@@ -602,6 +602,14 @@ function rt_load($db, $element, $id)
 	return $object;
 }
 
+/** The dark-mode logo where production keeps it (DMS), from the website's brand files. */
+function rt_dark_logo()
+{
+	$target = DOL_DATA_ROOT.'/ecm/IT-Tabelander/Bilder/Logo';
+	dol_mkdir($target);
+	copy(__DIR__.'/logo-dark.png', $target.'/IT-Tabelander Banner Hell Transparent.png');
+}
+
 /** The queue row of a document and event. */
 function rt_queue($db, $element, $id, $event)
 {
@@ -617,6 +625,7 @@ function rt_due($db, $element, $id)
 }
 
 if ($stage === 'mails') {
+	rt_dark_logo();
 	dol_include_once('/ittabelanderpdf/class/werkbankmailqueue.class.php');
 	require_once DOL_DOCUMENT_ROOT.'/comm/propal/class/propal.class.php';
 	require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
@@ -660,6 +669,25 @@ if ($stage === 'mails') {
 	$result = WerkbankMailTemplates::upgrade($db, (int) $conf->entity, true);
 	$check('forced upgrade replaces the edited one', is_array($result) && $result['updated'] === 1 && $result['current'] === 22, json_encode($result));
 	$check('own templates stay untouched', rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE label = 'Angebot senden'") === 'Eigener Text');
+	if (!function_exists('testSqlAndScriptInject')) {
+		require_once DOL_DOCUMENT_ROOT.'/waf.inc.php';
+	}
+	$blocked = array();
+	$resql = $db->query("SELECT label, content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf'");
+	while ($obj = $db->fetch_object($resql)) {
+		if (testSqlAndScriptInject($obj->content, 0) || stripos($obj->content, '<style') !== false || stripos($obj->content, '<table') !== false) {
+			$blocked[] = $obj->label;
+		}
+		// What Dolibarr keeps when the template is saved in the admin page (restricthtml).
+		$plain = function ($html) {
+			// The sanitiser adds line breaks after <br> and blocks: compare without whitespace.
+			return preg_replace('/\s+/u', '', html_entity_decode(strip_tags($html), ENT_QUOTES, 'UTF-8'));
+		};
+		if ($plain(dol_htmlwithnojs($obj->content, 1, 'restricthtml')) !== $plain($obj->content)) {
+			$blocked[] = $obj->label.' (text changes when saved)';
+		}
+	}
+	$check('templates pass the WAF, no <style>, no <table>, survive restricthtml', !$blocked, implode(', ', $blocked));
 	$check('no "Viele Grüße" in any module template', !rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND content LIKE '%Viele Grüße%'"));
 
 	// 1. Every template, Sie and Du, through the module's own send path.
@@ -692,6 +720,21 @@ if ($stage === 'mails') {
 			$result = $queue->send($object, $key, $admin, (bool) $sample[2], '', $form);
 			$check('template '.$key.' '.$form, $result['ok'], $result['error']);
 		}
+	}
+
+	// 1a. Hand-sent: what card_presend + actions_sendmails do with a template.
+	$manual = array(array('propal', $docs['angebot-1-wie-entwurf'][1], 'propal', 'sie'), array('facture', $docs['rechnung-2-teilzahlung'][1], 'invoice', 'du'));
+	foreach ($manual as $case) {
+		$object = rt_load($db, $case[0], $case[1]);
+		$template = $db->fetch_object($db->query("SELECT topic, content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE rowid = ".WerkbankMailTemplates::find($db, $case[2], $case[3], $conf->entity)));
+		$substitutions = getCommonSubstitutionArray($langs, 0, null, $object);
+		complete_substitutions_array($substitutions, $langs, $object, array('mode' => 'formemail'));
+		$message = make_substitutions($template->content, $substitutions);
+		$check('hand-sent '.$case[2].' '.$case[3].': form POST passes the WAF', !testSqlAndScriptInject($message, 0));
+		$message = dol_htmlwithnojs($message, 1, 'restricthtml');
+		$check('hand-sent '.$case[2].' '.$case[3].': light logo only', strpos($message, 'variant=dark') === false && strpos($message, 'maillogo.php') !== false);
+		$mail = new CMailFile('[von Hand] '.make_substitutions($template->topic, $substitutions), 'test-manuell@example.test', 'IT-Tabelander <office@tabelander.co.at>', $message, array(), array(), array(), '', '', 0, 1);
+		$check('hand-sent '.$case[2].' '.$case[3].': sent', $mail->sendfile(), $mail->error);
 	}
 
 	// 1b. Customer area switch: off (default) above, now on for the proposal
@@ -888,6 +931,7 @@ if ($stage === 'rollout') {
 		'{DUNNING_TOTAL}' => '111,50 €', '{FEE_PARAGRAPH}' => 'Für diese Mahnung fallen Mahnspesen von 10,00 € an.', '{INTEREST_PARAGRAPH}' => '',
 		'{PAYMENT_PARAGRAPH}' => '', '{COMPANY_NAME}' => $mysoc->name);
 	$sent = array();
+	rt_dark_logo();
 	foreach ($letters as $name => $letter) {
 		list($subject, $rows, $paragraphs) = $letter;
 		$body = $T::paragraph('Guten Tag,');
@@ -897,12 +941,22 @@ if ($stage === 'rollout') {
 				$body .= $T::factsBox($rows);
 			}
 		}
-		$body .= $T::paragraph('Mit freundlichen Grüßen<br><strong style="color:#1B3348;">'.dol_escape_htmltag($mysoc->managers).'</strong><br>{COMPANY_NAME}');
+		$body .= $T::closing('Mit freundlichen Grüßen', dol_escape_htmltag($mysoc->managers), '{COMPANY_NAME}');
 		// Mahnwesen runs its texts through complete_substitutions_array, so the
 		// logo variable of this module works there (FormMail::setSubstitFromObject).
-		$html = '<div style="max-width:600px;background:#ffffff;color:#3B4D63;">'.$body.'</div>'.$end
-			.'<div style="max-width:600px;margin-top:8px;background:#ffffff;">'.$T::headerBlock('__ITTAB_LOGO__').$footer.'</div>';
+		// Mahnwesen prints everything before the marker into the letter, so logo
+		// and footer come after it (e-mail only). __ITTAB_LOGO__ works there
+		// because Mahnwesen runs FormMail::setSubstitFromObject (light logo:
+		// Mahnwesen sends without a style sheet).
+		$html = '<div style="max-width:560px;margin:0 auto;padding:12px 20px 0 20px;background:#ffffff;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;">'.$body.'</div>'.$end
+			.'<div style="max-width:560px;margin:0 auto;padding:28px 20px 28px 20px;background:#ffffff;">__ITTAB_LOGO__'.$footer.'</div>';
 		file_put_contents($out.'/mahnwesen/'.$name.'.html', $html."\n");
+		if (!function_exists('testSqlAndScriptInject')) {
+			require_once DOL_DOCUMENT_ROOT.'/waf.inc.php';
+		}
+		if (testSqlAndScriptInject($html, 0)) {
+			$sent['mahnwesen '.$name.' WAF'] = 'FAILED';
+		}
 		file_put_contents($out.'/mahnwesen/'.$name.'.betreff.txt', $subject."\n");
 		// Sent with sample values, substituted as the plugin does it.
 		$substitutions = getCommonSubstitutionArray($langs, 0, null, null);
@@ -934,20 +988,32 @@ if ($stage === 'rollout') {
 	// the module's public endpoint on the production address, written out.
 	$production = 'https://erp.tabelander.co.at/custom/ittabelanderpdf/public/maillogo.php';
 	$local = dol_buildpath('/ittabelanderpdf/public/maillogo.php', 2);
-	$logoFile = WerkbankMailData::logoFile();
-	$logoSize = $logoFile !== '' ? getimagesize($logoFile) : array(480, 110);
-	$logo = '<img src="'.$production.'" width="'.((int) ceil($logoSize[0] / 2)).'" height="'.((int) ceil($logoSize[1] / 2)).'" alt="'.dol_escape_htmltag($mysoc->name).'"'
-		.' style="display:block;border:0;outline:none;text-decoration:none;width:'.((int) ceil($logoSize[0] / 2)).'px;max-width:100%;height:auto;background:#ffffff;">';
-	$div = '<div style="max-width:600px;background:#ffffff;color:#3B4D63;">';
+	$image = function ($variant) use ($production, $mysoc) {
+		$file = WerkbankMailData::logoFile($variant);
+		$size = $file !== '' ? getimagesize($file) : array(480, 110);
+		$url = $production.($variant === 'dark' ? '?variant=dark' : '');
+		return '<img src="'.$url.'" width="'.((int) ceil($size[0] / 2)).'" height="'.((int) ceil($size[1] / 2)).'" alt="'.dol_escape_htmltag($mysoc->name).'"'
+			.' style="display:block;border:0;outline:none;text-decoration:none;width:'.((int) ceil($size[0] / 2)).'px;max-width:100%;height:auto;">';
+	};
+	// Both logos, as asked: the dark one stays hidden (inline display:none);
+	// ticket mails carry no style sheet that could show it.
+	$logo = $image('light').'<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">'.$image('dark').'</div>';
+	$div = '<div style="max-width:560px;background:#ffffff;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;">';
 	$texts = array(
 		'neues-ticket' => $T::headerBlock($logo).$div.$T::paragraph('Guten Tag,')
 			.$T::paragraph('danke für Ihre Anfrage. Sie ist bei mir angekommen, ich sehe sie mir an und melde mich bei Ihnen.')
 			.$T::paragraph('Den aktuellen Stand finden Sie jederzeit über den Link unten.').'</div>',
 		'einleitung' => $T::headerBlock($logo).$div.$T::paragraph('Guten Tag,').'</div>',
-		'signatur' => $div.$T::paragraph('Mit freundlichen Grüßen<br><strong style="color:#1B3348;">'.dol_escape_htmltag($mysoc->managers).'</strong><br>'.dol_escape_htmltag($mysoc->name)).'</div>'.$footer,
+		'signatur' => $div.$T::closing('Mit freundlichen Grüßen', dol_escape_htmltag($mysoc->managers), dol_escape_htmltag($mysoc->name)).'</div>'.$footer,
 	);
 	foreach ($texts as $name => $html) {
 		file_put_contents($out.'/ticket/'.$name.'.html', $html."\n");
+		if (!function_exists('testSqlAndScriptInject')) {
+			require_once DOL_DOCUMENT_ROOT.'/waf.inc.php';
+		}
+		if (testSqlAndScriptInject($html, 0)) {
+			$sent['ticket '.$name.' WAF'] = 'FAILED';
+		}
 		// In the test the image comes from this Dolibarr.
 		$texts[$name] = str_replace($production, $local, $html);
 	}

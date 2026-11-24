@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.3] - 2026-11-24
+
+- E-mail templates without `<style>` and without layout tables: only blocks with inline styles. Dolibarr's WAF refuses `<style` in every form (templates could not be saved, hand-sent mails not sent), and editors drew frames around table cells.
+- Two designs: light like the PDF (all paths) and a deliberate dark design (website dark colours, light logo) that only the automatic send adds as a full document with `@media (prefers-color-scheme: dark)` and Outlook's `[data-ogsc]`/`[data-ogsb]`. Hand-sent mails stay light and carry the light logo alone.
+- Dark logo: `public/maillogo.php?variant=dark` from `ITTABPDF_MAIL_LOGO_DARK` (DMS path, default `IT-Tabelander/Bilder/Logo/IT-Tabelander Banner Hell Transparent.png`); without it the light logo on white.
+- Mobile pass: 16 px text, 560 px column, full-width facts box (label left, value right) and button, the orange line as a 2 px border, one fine divider above a calm footer; no outer frame, no section borders, no invisible joiners in the address.
+- Module templates still holding the 1.0.0-1.0.2 text are renewed on activation; Mahnwesen and ticket rollout texts in the same design.
+
 ## [1.0.2] - 2026-11-24
 
 - E-mails always light like the PDF: full HTML document with `color-scheme: light only`, white surfaces set as `bgcolor` and style, explicit text colours, no grey page and no dark footer block any more; the sheet is framed by a thin line.

@@ -17,9 +17,9 @@ require_once __DIR__.'/werkbankbuilder.class.php';
  */
 class WerkbankMailData
 {
-	const LABEL = 'padding:5px 0;font-family:Arial, Helvetica, sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#4A5B6E;';
-	const VALUE = 'padding:5px 0;font-family:Arial, Helvetica, sans-serif;font-size:15px;font-weight:bold;color:#1B3348;';
-	const TEXT = 'margin:0 0 10px 0;font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:1.55;color:#3B4D63;';
+	const LABEL = 'font-family:Arial, Helvetica, sans-serif;font-size:12px;line-height:26px;letter-spacing:1px;text-transform:uppercase;color:#4A5B6E;';
+	const VALUE = 'float:right;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:26px;font-weight:bold;color:#1B3348;';
+	const TEXT = 'margin:0 0 16px 0;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;';
 
 	/**
 	 * The person a document is addressed to: its contact of the usual type,
@@ -92,60 +92,101 @@ class WerkbankMailData
 	}
 
 	/**
-	 * The company logo for e-mails as a hosted image on white: ITTABPDF_MAIL_LOGO_URL
-	 * if set, otherwise the module's public endpoint public/maillogo.php, which
-	 * serves the logo of the company setup as an opaque PNG on white (images
-	 * are not inverted by forced dark modes). Inline images (data: -> cid:)
-	 * broke with Dolibarr's SMTPS library on mobile clients (1.0.1). Without a
-	 * usable logo: the word mark.
+	 * The company logo for e-mails as hosted images from public/maillogo.php
+	 * (or ITTABPDF_MAIL_LOGO_URL): the light logo, an opaque PNG on white with
+	 * an even margin, so a mail app that darkens the mail by force shows it as
+	 * a white badge. The automatic send adds the dark logo, hidden inline and
+	 * shown only by the dark-mode style of wrapDocument(); hand-sent mails
+	 * carry no style, so they get the light logo alone. Without a usable
+	 * logo: the word mark.
 	 *
+	 * @param bool $auto For the automatic send (light and dark logo)
 	 * @return string HTML
 	 */
-	public static function logoHtml()
+	public static function logoHtml($auto = false)
 	{
 		global $mysoc;
-		static $html = null;
-		if ($html !== null) {
-			return $html;
+		static $cache = array();
+		$key = $auto ? 'auto' : 'manual';
+		if (isset($cache[$key])) {
+			return $cache[$key];
 		}
 		$name = (string) $mysoc->name;
-		$html = $name === 'IT-Tabelander' ? '<span style="color:#FE5A23;">IT</span>&#8209;TABELANDER' : dol_escape_htmltag(dol_strtoupper($name));
-		$url = trim(getDolGlobalString('ITTABPDF_MAIL_LOGO_URL'));
+		$wordmark = $name === 'IT-Tabelander' ? '<span style="color:#FE5A23;">IT</span>&#8209;TABELANDER' : dol_escape_htmltag(dol_strtoupper($name));
+		$wordmark = '<span style="font-family:Arial, Helvetica, sans-serif;font-size:21px;font-weight:bold;letter-spacing:1px;color:#1B3348;">'.$wordmark.'</span>';
+		$light = self::logoImage('light');
+		if ($light === '') {
+			return $cache[$key] = $wordmark;
+		}
+		if (!$auto) {
+			return $cache[$key] = $light;
+		}
+		$dark = self::logoImage('dark');
+		return $cache[$key] = '<div class="ittab-logo-light">'.$light.'</div>'
+			.'<div class="ittab-logo-dark" style="display:none;max-height:0;overflow:hidden;mso-hide:all;">'.$dark.'</div>';
+	}
+
+	/**
+	 * One logo as <img>, '' when there is none.
+	 *
+	 * @param string $variant 'light' or 'dark'
+	 * @return string
+	 */
+	private static function logoImage($variant)
+	{
+		global $mysoc;
+		$url = trim(getDolGlobalString($variant === 'dark' ? 'ITTABPDF_MAIL_LOGO_DARK_URL' : 'ITTABPDF_MAIL_LOGO_URL'));
 		$shown = 240;
 		$shownHeight = 0;
 		if ($url === '') {
-			$file = self::logoFile();
+			$file = self::logoFile($variant);
 			$root = dol_buildpath('/ittabelanderpdf/public/maillogo.php', 2);
 			if ($file === '' || !preg_match('#^https?://#', $root)) {
-				return $html;
+				return '';
 			}
 			$size = @getimagesize($file);
 			$shown = (int) ceil($size[0] / 2);
 			$shownHeight = (int) ceil($size[1] / 2);
 			// The version changes with the logo, so caches load the new one.
-			$url = $root.'?v='.substr(md5_file($file), 0, 8);
+			$url = $root.'?'.($variant === 'dark' ? 'variant=dark&' : '').'v='.substr(md5_file($file), 0, 8);
 		}
-		$html = '<img src="'.dol_escape_htmltag($url).'" width="'.$shown.'"'.($shownHeight > 0 ? ' height="'.$shownHeight.'"' : '')
-			.' alt="'.dol_escape_htmltag($name).'" style="display:block;border:0;outline:none;text-decoration:none;width:'.$shown.'px;max-width:100%;height:auto;background:#ffffff;">';
-		return $html;
+		return '<img src="'.dol_escape_htmltag($url).'" width="'.$shown.'"'.($shownHeight > 0 ? ' height="'.$shownHeight.'"' : '')
+			.' alt="'.dol_escape_htmltag((string) $mysoc->name).'" style="display:block;border:0;outline:none;text-decoration:none;width:'.$shown.'px;max-width:100%;height:auto;">';
 	}
 
 	/**
-	 * The logo of the company setup as an opaque PNG on white, at most 480 px
-	 * wide including 16 px of white around it (shown at half size). Built once
-	 * per logo file and kept in the documents folder.
+	 * A logo as PNG for e-mails, at most 480 px wide including 16 px of margin
+	 * (shown at half size), built once per source file and kept in the
+	 * documents folder.
+	 * - light: the logo of the company setup, opaque on white;
+	 * - dark: ITTABPDF_MAIL_LOGO_DARK (path below DOL_DATA_ROOT/ecm, default
+	 *   "IT-Tabelander/Bilder/Logo/IT-Tabelander Banner Hell Transparent.png"),
+	 *   opaque on the dark page colour #0D1823. Without that file the dark
+	 *   variant is the light logo on white.
 	 *
+	 * @param string $variant 'light' or 'dark'
 	 * @return string Path of the PNG, '' without a usable logo
 	 */
-	public static function logoFile()
+	public static function logoFile($variant = 'light')
 	{
 		global $conf, $mysoc;
 		$candidates = array();
-		if (!empty($mysoc->logo)) {
-			$candidates[] = $conf->mycompany->dir_output.'/logos/'.$mysoc->logo;
+		$background = array(255, 255, 255);
+		if ($variant === 'dark') {
+			$relative = getDolGlobalString('ITTABPDF_MAIL_LOGO_DARK', 'IT-Tabelander/Bilder/Logo/IT-Tabelander Banner Hell Transparent.png');
+			$file = DOL_DATA_ROOT.'/ecm/'.ltrim($relative, '/');
+			if (strpos($relative, '..') === false && is_readable($file) && is_file($file)) {
+				$candidates[] = $file;
+				$background = array(13, 24, 35);
+			}
 		}
-		if (!empty($mysoc->logo_small)) {
-			$candidates[] = $conf->mycompany->dir_output.'/logos/thumbs/'.$mysoc->logo_small;
+		if (!$candidates) {
+			if (!empty($mysoc->logo)) {
+				$candidates[] = $conf->mycompany->dir_output.'/logos/'.$mysoc->logo;
+			}
+			if (!empty($mysoc->logo_small)) {
+				$candidates[] = $conf->mycompany->dir_output.'/logos/thumbs/'.$mysoc->logo_small;
+			}
 		}
 		$source = '';
 		foreach ($candidates as $candidate) {
@@ -158,7 +199,7 @@ class WerkbankMailData
 			return '';
 		}
 		$dir = DOL_DATA_ROOT.'/ittabelanderpdf';
-		$cache = $dir.'/maillogo-'.md5($source.'|'.filemtime($source).'|2').'.png';
+		$cache = $dir.'/maillogo-'.md5($source.'|'.filemtime($source).'|'.implode(',', $background).'|3').'.png';
 		if (is_readable($cache)) {
 			return $cache;
 		}
@@ -172,7 +213,7 @@ class WerkbankMailData
 		$inner = min(480 - 2 * $pad, $width);
 		$innerHeight = (int) round($height * $inner / $width);
 		$canvas = imagecreatetruecolor($inner + 2 * $pad, $innerHeight + 2 * $pad);
-		imagefill($canvas, 0, 0, imagecolorallocate($canvas, 255, 255, 255));
+		imagefill($canvas, 0, 0, imagecolorallocate($canvas, $background[0], $background[1], $background[2]));
 		imagealphablending($canvas, true);
 		imagecopyresampled($canvas, $image, $pad, $pad, 0, 0, $inner, $innerHeight, $width, $height);
 		dol_mkdir($dir);
@@ -196,28 +237,32 @@ class WerkbankMailData
 		return '<a href="tel:'.dol_escape_htmltag($dial).'" style="color:#4A5B6E;text-decoration:none;white-space:nowrap;">'.dol_escape_htmltag(WerkbankBuilder::phone($phone)).'</a>';
 	}
 
-	/**
-	 * Keeps mail apps from detecting an address: an invisible joiner after
-	 * each number group.
-	 *
-	 * @param string $html Escaped text
-	 * @return string
-	 */
-	public static function noAutoLink($html)
-	{
-		return (string) preg_replace('/(\d+)/', '$1&zwnj;', $html);
-	}
 
 	/**
-	 * The light facts box around table rows: 2 px orange line on the left.
+	 * The facts box: a light tint and a 2 px orange line on the left, no
+	 * frame. Plain blocks, no table.
 	 *
-	 * @param string $rows Table rows
+	 * @param string $rows Rows from factRow()
 	 * @return string
 	 */
 	public static function box($rows)
 	{
-		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F7F9FB" style="max-width:600px;background:#F7F9FB;border-left:2px solid #FE5A23;margin:4px 0 16px 0;">'
-			.'<tr><td bgcolor="#F7F9FB" style="padding:10px 16px;background:#F7F9FB;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'.$rows.'</table></td></tr></table>';
+		return '<div style="margin:8px 0 24px 0;padding:12px 16px;background:#F7F9FB;border-left:2px solid #FE5A23;">'.$rows.'</div>';
+	}
+
+	/**
+	 * One row of the facts box: label left, value right (floated).
+	 *
+	 * @param string $label Label (HTML)
+	 * @param string $value Value (HTML)
+	 * @param bool   $big   Show the value large (amounts)
+	 * @return string
+	 */
+	public static function factRow($label, $value, $big = false)
+	{
+		return '<div style="overflow:hidden;padding:2px 0;">'
+			.'<span style="'.self::VALUE.($big ? 'font-size:22px;' : '').'">'.$value.'</span>'
+			.'<span style="'.self::LABEL.'">'.$label.'</span></div>';
 	}
 
 	/**
@@ -362,11 +407,9 @@ class WerkbankMailData
 		}
 		$html = '';
 		foreach ($rows as $index => $row) {
-			$html .= '<tr><td style="'.self::LABEL.'">'.dol_escape_htmltag($langs->transnoentities($row[0])).'</td>'
-				.'<td align="right" style="'.self::VALUE.'">'.dol_escape_htmltag((string) $row[1]).'</td></tr>';
+			$html .= self::factRow(dol_escape_htmltag($langs->transnoentities($row[0])), dol_escape_htmltag((string) $row[1]));
 			if ($index === 0 && $amount !== null) {
-				$html .= '<tr><td style="'.self::LABEL.'">'.dol_escape_htmltag($langs->transnoentities($amount[0])).'</td>'
-					.'<td align="right" style="'.self::VALUE.'font-size:20px;">'.dol_escape_htmltag(self::money($amount[1], $langs)).'</td></tr>';
+				$html .= self::factRow(dol_escape_htmltag($langs->transnoentities($amount[0])), dol_escape_htmltag(self::money($amount[1], $langs)), true);
 			}
 		}
 		return self::box($html);
@@ -406,7 +449,7 @@ class WerkbankMailData
 		foreach ($lines as $line) {
 			$html .= dol_escape_htmltag($line).'<br>';
 		}
-		return '<p style="'.self::LABEL.'margin:0 0 4px 0;padding:0;">'.dol_escape_htmltag($langs->transnoentities('WerkbankTransfer')).'</p>'
+		return '<p style="margin:0 0 2px 0;'.self::LABEL.'">'.dol_escape_htmltag($langs->transnoentities('WerkbankTransfer')).'</p>'
 			.'<p style="'.self::TEXT.'">'.$html.'</p>';
 	}
 
@@ -430,7 +473,7 @@ class WerkbankMailData
 		} elseif (preg_match('#^https?://#', trim((string) $object->tracking_url))) {
 			$url = trim((string) $object->tracking_url);
 		}
-		$value = $url !== '' ? '<a href="'.dol_escape_htmltag($url).'" style="color:#FE5A23;">'.$number.'</a>' : $number;
+		$value = $url !== '' ? '<a href="'.dol_escape_htmltag($url).'" style="color:#FE5A23;font-weight:bold;">'.$number.'</a>' : $number;
 		return '<p style="'.self::TEXT.'">'.dol_escape_htmltag($langs->transnoentities('WerkbankTracking')).': '.$value.'</p>';
 	}
 }
