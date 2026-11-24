@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '1.0.4';
+		$this->version = '1.0.5';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -147,6 +147,19 @@ class modITTabelanderPDF extends DolibarrModules
 			if ($result < 0) {
 				$this->error = $extrafields->error;
 				return -1;
+			}
+		}
+
+		// Dolibarr 23: enabling Categories creates the category link tables only for
+		// invoices and orders (modCategorie::init). On installs that never ran the
+		// full migration, proposal/intervention/supplier-proposal cards then fail
+		// with "Table llx_categorie_propal doesn't exist" (seen 24.11.2026). Load
+		// Dolibarr's own table files for them; run_sql skips tables that exist.
+		if (isModEnabled('categorie')) {
+			foreach (array('propal' => 'propal', 'fichinter' => 'ficheinter', 'supplier_proposal' => 'supplier_proposal') as $suffix => $module) {
+				if (isModEnabled($module)) {
+					$this->_load_tables('/install/mysql/', $suffix);
+				}
 			}
 		}
 

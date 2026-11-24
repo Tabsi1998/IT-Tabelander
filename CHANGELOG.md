@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.5] - 2026-11-24
+
+- On activation, create the category link tables for proposals, interventions and supplier proposals from Dolibarr's own SQL files when the Categories module is on. Dolibarr 23 only creates them for invoices and orders; without them the proposal card fails with "Table llx_categorie_propal doesn't exist".
+
 ## [1.0.4] - 2026-11-24
 
 - Dark mode of automatically sent e-mails: every tag gets a class from its inline colours before wrapping (`classFromColours`), the dark stylesheet uses these classes. Samsung Mail switched the background and the logo but ignored the attribute selectors, so the text stayed dark on dark. Attribute selectors without the CSS4 ` i` flag stay as a fallback.
