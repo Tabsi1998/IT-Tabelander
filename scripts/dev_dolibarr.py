@@ -11,8 +11,9 @@ production ERP.
     python scripts/dev_dolibarr.py fixtures   company, bank account, customers, documents
     python scripts/dev_dolibarr.py pdf [name] render the examples (or those matching name) into docs/beispiele/
     python scripts/dev_dolibarr.py mails      e-mail scenarios, then Mailpit's messages into docs/beispiele/mails/
+    python scripts/dev_dolibarr.py rollout    Mahnwesen and ticket texts into docs/rollout/, sent to Mailpit
     python scripts/dev_dolibarr.py ui         log in and check the card banner and the queue page
-    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, ui
+    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui
     python scripts/dev_dolibarr.py down       remove containers, volumes and network
 
 Standard library only. Passwords are new on every start; the local test
@@ -177,6 +178,30 @@ def mails() -> None:
     print(f"{len(summary)} messages -> {MAILS.relative_to(ROOT)}")
 
 
+def rollout() -> None:
+    """Texts for production outside this module, into docs/rollout/, and their mails."""
+    result = php("rollout")
+    target = ROOT / "docs" / "rollout"
+    target.mkdir(parents=True, exist_ok=True)
+    docker("cp", f"{WEB}:/tmp/ittpdf-rollout/.", str(target))
+    docker("cp", f"{WEB}:/tmp/ittpdf-out/mahnwesen-brieftext-simulation.pdf", str(EXAMPLES / "mahnwesen-brieftext-simulation.pdf"))
+    MAILS.mkdir(parents=True, exist_ok=True)
+    for old in MAILS.glob("rollout-*"):
+        old.unlink()
+    wanted = ("Zahlungserinnerung", "Mahnung", "Ticket", "TS2611")
+    messages = sorted(mailpit("messages?limit=200").get("messages", []), key=lambda entry: entry["Created"])
+    number = 0
+    for item in messages:
+        if not any(word in item["Subject"] for word in wanted):
+            continue
+        number += 1
+        detail = mailpit(f"message/{item['ID']}")
+        slug = f"rollout-{number:02d}-" + re.sub(r"[^a-z0-9]+", "-", detail["Subject"].lower()).strip("-")[:70]
+        (MAILS / f"{slug}.html").write_text(detail.get("HTML") or "", encoding="utf-8")
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    print(f"{number} rollout messages -> {MAILS.relative_to(ROOT)}")
+
+
 def ui() -> None:
     """Log in as the local test administrator and look at the pages a person uses."""
     state = json.loads((STATE / "ui.json").read_text(encoding="utf-8")) if (STATE / "ui.json").exists() else {}
@@ -213,14 +238,14 @@ def ui() -> None:
 
 
 def main() -> int:
-    steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "ui": ui, "down": down}
+    steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "ui"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui"):
                 steps[name]()
         elif step in steps:
             steps[step]()

@@ -11,6 +11,7 @@
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 
@@ -426,7 +427,8 @@ abstract class WerkbankBuilder
 	protected function currency()
 	{
 		global $conf;
-		return !empty($this->object->multicurrency_code) ? $this->object->multicurrency_code : $conf->currency;
+		// All amounts are printed in the company currency (no foreign currency columns).
+		return $conf->currency;
 	}
 
 	// ------------------------------------------------------------ lines

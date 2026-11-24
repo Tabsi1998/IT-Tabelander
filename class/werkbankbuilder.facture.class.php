@@ -138,10 +138,9 @@ class WerkbankBuilderFacture extends WerkbankBuilder
 	{
 		$object = $this->object;
 		$langs = $this->langs;
-		$multi = (isModEnabled('multicurrency') && $object->multicurrency_tx != 1) ? 1 : 0;
-		$total = (float) ($multi ? $object->multicurrency_total_ttc : $object->total_ttc);
-		$paid = (float) $object->getSommePaiement($multi) + (float) $object->getSumDepositsUsed($multi);
-		$credits = (float) $object->getSumCreditNotesUsed($multi);
+		$total = (float) $object->total_ttc;
+		$paid = (float) $object->getSommePaiement() + (float) $object->getSumDepositsUsed();
+		$credits = (float) $object->getSumCreditNotesUsed();
 		$open = (float) price2num($total - $paid - $credits, 'MT');
 		if (!empty($object->paye)) {
 			$open = 0.0;

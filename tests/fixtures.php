@@ -629,7 +629,7 @@ if ($stage === 'mails') {
 
 	// Installation: templates, extra field, cron job.
 	$templates = (int) rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf'");
-	$check('templates installed (22)', $templates === 22, (string) $templates);
+	$check('templates installed (23)', $templates === 23, (string) $templates);
 	$check('extra field ittab_du', (bool) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."extrafields WHERE name = 'ittab_du' AND elementtype = 'societe'"));
 	$check('cron job registered', (bool) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."cronjob WHERE objectname = 'WerkbankMailQueue' AND methodename = 'runCron' AND frequency = 5 AND unitfrequency = 60"));
 
@@ -776,6 +776,148 @@ if ($stage === 'mails') {
 	});
 	echo json_encode(array('checks' => $checks, 'failed' => count($failed), 'planned_propal' => (int) $planned->id)), "\n";
 	exit($failed ? 4 : 0);
+}
+
+if ($stage === 'rollout') {
+	// Texts for production that live outside this module: the Mahnwesen
+	// templates (same {PLACEHOLDERS} as the plugin's defaults) and the three
+	// ticket texts. Written to /tmp/ittpdf-rollout, sent to Mailpit the way
+	// the plugin and Dolibarr put them together.
+	dol_include_once('/ittabelanderpdf/class/werkbankmailtemplates.class.php');
+	require_once DOL_DOCUMENT_ROOT.'/core/class/CMailFile.class.php';
+	$out = '/tmp/ittpdf-rollout';
+	dol_mkdir($out.'/mahnwesen');
+	dol_mkdir($out.'/ticket');
+	$T = 'WerkbankMailTemplates';
+	// The ticket_send template is new in this version: install what is missing.
+	$T::install($db, (int) $conf->entity);
+	$footer = $T::footerBlock($mysoc);
+	$end = '<!--MAHNWESEN_PDF_END-->';
+
+	// Mahnwesen: the PDF letter prints everything before the end marker, so the
+	// word mark and the navy footer come after it (e-mail only).
+	$facts = array(
+		'Rechnung' => '{INVOICE_REF}',
+		'Rechnungsdatum' => '{INVOICE_DATE}',
+		'Fällig seit' => '{DUE_DATE}',
+	);
+	$letters = array(
+		'zahlungserinnerung' => array('Zahlungserinnerung zur Rechnung {INVOICE_REF}', $facts + array('!Offen' => '{OPEN_AMOUNT}'), array(
+			'die Rechnung <strong>{INVOICE_REF}</strong> vom {INVOICE_DATE} war am {DUE_DATE} fällig. Laut meinen Unterlagen sind davon noch <strong>{OPEN_AMOUNT}</strong> offen.',
+			'Vielleicht ist sie im Alltag untergegangen. Bitte prüfen Sie das kurz und überweisen Sie den offenen Betrag. Falls Sie schon bezahlt haben, ist diese Nachricht damit erledigt. {INTEREST_PARAGRAPH}',
+			'{PAYMENT_PARAGRAPH}',
+		)),
+		'mahnung-1' => array('1. Mahnung zur Rechnung {INVOICE_REF}', $facts + array('Offen' => '{OPEN_AMOUNT}', '!Zu zahlen' => '{DUNNING_TOTAL}'), array(
+			'für die Rechnung <strong>{INVOICE_REF}</strong> ist bisher keine vollständige Zahlung eingegangen. Offen sind <strong>{OPEN_AMOUNT}</strong>, fällig war die Rechnung am {DUE_DATE}.',
+			'{FEE_PARAGRAPH} {INTEREST_PARAGRAPH}',
+			'{PAYMENT_PARAGRAPH}',
+			'Bitte überweisen Sie den Gesamtbetrag von <strong>{DUNNING_TOTAL}</strong> in den nächsten Tagen. Wenn die Zahlung inzwischen erfolgt ist, betrachten Sie dieses Schreiben bitte als gegenstandslos.',
+		)),
+		'mahnung-2' => array('2. Mahnung zur Rechnung {INVOICE_REF}', $facts + array('Offen' => '{OPEN_AMOUNT}', '!Zu zahlen' => '{DUNNING_TOTAL}'), array(
+			'trotz meiner Erinnerung ist die Rechnung <strong>{INVOICE_REF}</strong> weiterhin offen: <strong>{OPEN_AMOUNT}</strong>, fällig seit {DUE_DATE}.',
+			'{FEE_PARAGRAPH} {INTEREST_PARAGRAPH}',
+			'{PAYMENT_PARAGRAPH}',
+			'Bitte überweisen Sie den Gesamtbetrag von <strong>{DUNNING_TOTAL}</strong> jetzt ohne weitere Verzögerung.',
+		)),
+		'mahnung-3' => array('3. Mahnung zur Rechnung {INVOICE_REF}', $facts + array('Offen' => '{OPEN_AMOUNT}', '!Zu zahlen' => '{DUNNING_TOTAL}'), array(
+			'das ist die dritte Mahnung zur Rechnung <strong>{INVOICE_REF}</strong>. Der offene Betrag von <strong>{OPEN_AMOUNT}</strong> ist seit {DUE_DATE} fällig.',
+			'{FEE_PARAGRAPH} {INTEREST_PARAGRAPH}',
+			'{PAYMENT_PARAGRAPH}',
+			'Bitte zahlen Sie den Gesamtbetrag von <strong>{DUNNING_TOTAL}</strong> umgehend. Wenn es etwas zu klären gibt, melden Sie sich bitte gleich bei mir.',
+		)),
+	);
+	$sample = array('{INVOICE_REF}' => 'IN2611-0002', '{INVOICE_DATE}' => '24.11.2026', '{DUE_DATE}' => '24.12.2026', '{OPEN_AMOUNT}' => '101,50 €',
+		'{DUNNING_TOTAL}' => '111,50 €', '{FEE_PARAGRAPH}' => 'Für diese Mahnung fallen Mahnspesen von 10,00 € an.', '{INTEREST_PARAGRAPH}' => '',
+		'{PAYMENT_PARAGRAPH}' => '', '{COMPANY_NAME}' => $mysoc->name);
+	$sent = array();
+	foreach ($letters as $name => $letter) {
+		list($subject, $rows, $paragraphs) = $letter;
+		$body = $T::paragraph('Guten Tag,');
+		foreach ($paragraphs as $index => $paragraph) {
+			$body .= $T::paragraph($paragraph);
+			if ($index === 0) {
+				$body .= $T::factsBox($rows);
+			}
+		}
+		$body .= $T::paragraph('Mit freundlichen Grüßen<br><strong style="color:#1B3348;">'.dol_escape_htmltag($mysoc->managers).'</strong><br>{COMPANY_NAME}');
+		$html = '<div style="max-width:600px;">'.$body.'</div>'.$end.'<div style="max-width:600px;margin-top:8px;">'.$T::headerBlock().$footer.'</div>';
+		file_put_contents($out.'/mahnwesen/'.$name.'.html', $html."\n");
+		file_put_contents($out.'/mahnwesen/'.$name.'.betreff.txt', $subject."\n");
+		// Sent with sample values, as the plugin replaces its placeholders.
+		$mail = new CMailFile(strtr($subject, $sample), 'max@mustermann.example', 'IT-Tabelander <office@tabelander.co.at>', strtr($html, $sample), array(), array(), array(), '', '', 0, 1);
+		$sent['mahnwesen '.$name] = $mail->sendfile() ? 'ok' : 'FAILED '.$mail->error;
+	}
+
+	// The letter body as the plugin prints it: everything before the marker,
+	// images removed, into a Dolibarr PDF with the default font.
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/pdf.lib.php';
+	$pdf = pdf_getInstance();
+	$pdf->setPrintHeader(false);
+	$pdf->setPrintFooter(false);
+	$pdf->SetMargins(10, 10, 10);
+	$pdf->AddPage();
+	$pdf->SetFont(pdf_getPDFFont($langs), '', 9);
+	$letterBody = strtr((string) file_get_contents($out.'/mahnwesen/mahnung-1.html'), $sample);
+	$letterBody = substr($letterBody, 0, stripos($letterBody, $end));
+	$letterBody = preg_replace('~<img\b[^>]*>~is', '', $letterBody);
+	$pdf->SetY(90);
+	$pdf->writeHTML('<div style="font-size:9pt; line-height:1.20;">'.$letterBody.'</div>', true, false, true, false, '');
+	dol_mkdir(RT_OUT);
+	$pdf->Output(RT_OUT.'/mahnwesen-brieftext-simulation.pdf', 'F');
+
+	// Tickets. New ticket from the public form: MAIL_NEW + ticket infos + SIGNATURE.
+	// Reply: INTRO + "<br><br>" + message (template ticket_send) + "<br>" + SIGNATURE.
+	$texts = array(
+		'neues-ticket' => $T::headerBlock().'<div style="max-width:600px;">'.$T::paragraph('Guten Tag,')
+			.$T::paragraph('danke für Ihre Anfrage. Sie ist bei mir angekommen, ich sehe sie mir an und melde mich bei Ihnen.')
+			.$T::paragraph('Den aktuellen Stand finden Sie jederzeit über den Link unten.').'</div>',
+		'einleitung' => $T::headerBlock().'<div style="max-width:600px;">'.$T::paragraph('Guten Tag,').'</div>',
+		'signatur' => '<div style="max-width:600px;">'.$T::paragraph('Viele Grüße<br><strong style="color:#1B3348;">'.dol_escape_htmltag($mysoc->managers).'</strong><br>'.dol_escape_htmltag($mysoc->name)).'</div>'.$footer,
+	);
+	foreach ($texts as $name => $html) {
+		file_put_contents($out.'/ticket/'.$name.'.html', $html."\n");
+	}
+	$langs->load('ticket');
+	$newTicket = $texts['neues-ticket'].'<br><br>'.$langs->transnoentities('TicketNewEmailBodyInfosTicket').'<br>'
+		.$langs->transnoentities('TicketNewEmailBodyInfosTrackId', '<a href="#">TS2611-0001</a>').'<br>'
+		.$langs->transnoentities('TicketNewEmailBodyInfosTrackUrl').'<br><br>'.$texts['signatur'];
+	$mail = new CMailFile('['.$mysoc->name.'] '.$langs->transnoentities('TicketNewEmailSubject', 'TS2611-0001', 'abc123'), 'max@mustermann.example', 'IT-Tabelander <office@tabelander.co.at>', $newTicket, array(), array(), array(), '', '', 0, 1);
+	$sent['ticket new'] = $mail->sendfile() ? 'ok' : 'FAILED '.$mail->error;
+	$template = $db->fetch_object($db->query("SELECT topic, content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND type_template = 'ticket_send'"));
+	$middle = strtr((string) $template->content, array('__TICKET_SUBJECT__' => 'Notebook startet nicht', '&nbsp;' => 'das Netzteil war defekt, ein neues ist bestellt und kommt am Donnerstag. Danach ist das Notebook am selben Tag fertig.'));
+	$reply = $texts['einleitung'].'<br><br>'.$middle.'<br><br>'.'<br>'.$texts['signatur'];
+	$mail = new CMailFile('['.$mysoc->name.' - Ticket TS2611-0001] Notebook startet nicht', 'max@mustermann.example', 'IT-Tabelander <office@tabelander.co.at>', $reply, array(), array(), array(), '', '', 0, 1);
+	$sent['ticket reply'] = $mail->sendfile() ? 'ok' : 'FAILED '.$mail->error;
+
+	echo json_encode(array('rollout' => $sent, 'ticket_template' => (bool) $template)), "\n";
+	exit(in_array(false, array_map(function ($value) {
+		return $value === 'ok';
+	}, $sent), true) ? 5 : 0);
+}
+
+if ($stage === 'vat') {
+	// The same invoice layout for a company that charges VAT (only in this
+	// process: the setup stays a small business).
+	$firm = new Societe($db);
+	$firm->fetch(0, 'Musterfirma GmbH');
+	$mysoc->tva_assuj = 1;
+	$inv = new Facture($db);
+	$inv->socid = $firm->id;
+	$inv->type = Facture::TYPE_STANDARD;
+	$inv->date = rt_day('2026-11-24');
+	$inv->create($admin);
+	$inv->addline('Notebook-Reparatur, Displaytausch', 120.00, 1, 20, 0, 0, 0, 0, '', '', 0, 0, 0, 'HT', 0, 1);
+	$inv->addline('Fachbuch „Netzwerke für Einsteiger“', 30.00, 1, 10, 0, 0, 0, 0, '', '', 0, 0, 0, 'HT', 0, 0);
+	$inv->validate($admin);
+	$inv->fetch($inv->id);
+	$inv->fetch_thirdparty();
+	if ($inv->generateDocument('werkbank', $langs) <= 0) {
+		rt_fail('vat invoice: '.$inv->error);
+	}
+	dol_mkdir(RT_OUT);
+	copy(DOL_DATA_ROOT.'/'.$inv->last_main_doc, RT_OUT.'/test-ust-pflichtig.pdf');
+	echo json_encode(array('vat' => $inv->ref, 'ht' => $inv->total_ht, 'tva' => $inv->total_tva, 'ttc' => $inv->total_ttc)), "\n";
+	exit(0);
 }
 
 if ($stage === 'const') {

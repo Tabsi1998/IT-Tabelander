@@ -9,6 +9,8 @@
  * (at your option) any later version.
  */
 
+require_once __DIR__.'/werkbankmaildata.class.php';
+
 /**
  * The e-mail templates in the Werkbank look, installed into
  * llx_c_email_templates on activation.
@@ -27,6 +29,7 @@ class WerkbankMailTemplates
 	const BRAND = '#FE5A23';
 	const PAGE = '#F3F5F8';
 	const FONT = "Arial, Helvetica, sans-serif";
+	const P = 'margin:0 0 14px 0;font-family:Arial, Helvetica, sans-serif;font-size:15px;line-height:1.55;color:#3B4D63;';
 
 	/**
 	 * Every template: key => array(type_template, label, topic, paragraphs Sie, paragraphs Du, attach PDF).
@@ -93,6 +96,12 @@ class WerkbankMailTemplates
 				array('&nbsp;'),
 				array('&nbsp;'),
 				0),
+			// Only the middle of a ticket reply: Dolibarr puts TICKET_MESSAGE_MAIL_INTRO
+			// before and TICKET_MESSAGE_MAIL_SIGNATURE after it (docs/rollout/ticket/).
+			'ticket' => array('ticket_send', 'Ticket-Antwort', '[__MYCOMPANY_NAME__ - Ticket __REF__] __TICKET_SUBJECT__',
+				array('zu Ihrer Anfrage „__TICKET_SUBJECT__“:', '&nbsp;'),
+				null,
+				0),
 			'supplier_proposal' => array('supplier_proposal_send', 'Preisanfrage', 'Preisanfrage __REF__ von __MYCOMPANY_NAME__',
 				array('anbei meine Preisanfrage __REF__.',
 					'Bitte schicken Sie mir Preis und Lieferzeit je Position, gern auch eine gleichwertige Alternative.'),
@@ -130,7 +139,14 @@ class WerkbankMailTemplates
 	 */
 	public static function html(array $paragraphs, $form, $key)
 	{
-		$p = 'margin:0 0 14px 0;font-family:'.self::FONT.';font-size:15px;line-height:1.55;color:'.self::BODY.';';
+		$p = self::P;
+		if ($key === 'ticket') {
+			$body = '';
+			foreach ($paragraphs as $paragraph) {
+				$body .= '<p style="'.$p.'">'.$paragraph.'</p>';
+			}
+			return $body;
+		}
 		$greeting = $form === 'du' ? '__ITTAB_HALLO__' : ($form === 'sie' ? '__ITTAB_GUTENTAG__' : 'Guten Tag,');
 		$body = '<p style="'.$p.'">'.$greeting.'</p>';
 		foreach ($paragraphs as $paragraph) {
@@ -241,5 +257,80 @@ class WerkbankMailTemplates
 		$resql = $db->query($sql);
 		$obj = $resql ? $db->fetch_object($resql) : null;
 		return $obj ? (int) $obj->rowid : 0;
+	}
+
+	// ------------------------------------------------------------ rollout pieces
+	// Self-contained blocks for texts that Dolibarr or another module puts
+	// together from parts (ticket intro/signature, Mahnwesen letters): every
+	// block closes its own tags, so the parts can stand next to anything.
+
+	/**
+	 * Word mark and brand rule, at most 600 px wide.
+	 *
+	 * @return string
+	 */
+	public static function headerBlock()
+	{
+		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;"><tr>'
+			.'<td style="padding:8px 0 12px 0;font-family:'.self::FONT.';font-size:21px;font-weight:bold;letter-spacing:1px;color:'.self::INK.';">'
+			.'<span style="color:'.self::BRAND.';">IT</span>&#8209;TABELANDER</td></tr>'
+			.'<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
+			.'<td width="60" height="3" bgcolor="'.self::BRAND.'" style="font-size:0;line-height:0;">&nbsp;</td>'
+			.'<td height="3" bgcolor="'.self::INK.'" style="font-size:0;line-height:0;">&nbsp;</td></tr></table></td></tr>'
+			.'<tr><td style="font-size:0;line-height:0;height:20px;">&nbsp;</td></tr></table>';
+	}
+
+	/**
+	 * The navy footer with the company data written out (no variables).
+	 *
+	 * @param Societe $company Company
+	 * @return string
+	 */
+	public static function footerBlock($company)
+	{
+		$address = trim(str_replace("\n", ', ', trim((string) $company->address)).', '.trim($company->zip.' '.$company->town), ', ');
+		$phone = WerkbankBuilder::phone(!empty($company->phone_mobile) ? $company->phone_mobile : $company->phone);
+		$web = WerkbankBuilder::bareUrl((string) $company->url);
+		$legal = array_filter(array((string) $company->idprof4, (string) $company->idprof6, !empty($company->idprof2) ? 'Gerichtsstand '.$company->idprof2 : ''), 'strlen');
+		$e = function ($text) {
+			return dol_escape_htmltag((string) $text);
+		};
+		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin-top:18px;"><tr>'
+			.'<td bgcolor="'.self::INK.'" style="padding:16px 24px;border-radius:4px;font-family:'.self::FONT.';font-size:12px;line-height:1.6;color:#C5D0DC;">'
+			.'<strong style="color:#ffffff;">'.$e($company->name).'</strong> · '.$e($address).'<br>'
+			.'<a href="mailto:'.$e($company->email).'" style="color:#C5D0DC;text-decoration:none;">'.$e($company->email).'</a> · '.$e($phone)
+			.' · <a href="'.$e($company->url).'" style="color:#C5D0DC;text-decoration:none;">'.$e($web).'</a>'
+			.($legal ? '<br>'.$e(implode(' · ', $legal)) : '')
+			.'</td></tr></table>';
+	}
+
+	/**
+	 * A text paragraph in the template style.
+	 *
+	 * @param string $html Inner HTML
+	 * @return string
+	 */
+	public static function paragraph($html)
+	{
+		return '<p style="'.self::P.'">'.$html.'</p>';
+	}
+
+	/**
+	 * The facts box of the templates with fixed rows (label => value HTML);
+	 * a row whose label starts with "!" shows its value large.
+	 *
+	 * @param array<string,string> $rows Rows
+	 * @return string
+	 */
+	public static function factsBox(array $rows)
+	{
+		$html = '';
+		foreach ($rows as $label => $value) {
+			$big = strpos($label, '!') === 0;
+			$html .= '<tr><td style="'.WerkbankMailData::LABEL.'">'.dol_escape_htmltag(ltrim($label, '!')).'</td>'
+				.'<td align="right" style="'.WerkbankMailData::VALUE.($big ? 'font-size:20px;' : '').'">'.$value.'</td></tr>';
+		}
+		return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F7F9FB" style="max-width:600px;background:#F7F9FB;border-left:3px solid '.self::BRAND.';margin:4px 0 16px 0;">'
+			.'<tr><td style="padding:10px 18px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'.$html.'</table></td></tr></table>';
 	}
 }
