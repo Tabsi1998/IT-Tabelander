@@ -1,0 +1,1 @@
+Zahlungserinnerung zur Rechnung {INVOICE_REF}
