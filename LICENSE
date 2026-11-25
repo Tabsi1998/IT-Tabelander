@@ -26,6 +26,12 @@ Ausgenommen sind:
   Teil dieses Repositorys und stehen unter ihren eigenen Lizenzen.
 - Namen, Marken und Logos Dritter (zum Beispiel Dolibarr, Google, Hersteller von Hardware und Konsolen).
   Sie gehören ihren jeweiligen Inhabern und werden mit dieser Datei nicht freigegeben.
+- Der Ordner `dolibarr/` mit dem Dolibarr-Modul „IT-Tabelander PDF“ (`dolibarr/ittabelanderpdf/`).
+  Dolibarr-Module sind abgeleitete Werke von Dolibarr; alles in diesem Ordner steht deshalb unter der
+  GNU General Public License, Version 3 oder jeder späteren Version (GPL-3.0-or-later), die Schriften in
+  `dolibarr/ittabelanderpdf/fonts/` unter der SIL Open Font License 1.1. Die Lizenztexte liegen im Modul
+  (`dolibarr/ittabelanderpdf/LICENSE`, `dolibarr/ittabelanderpdf/fonts/LICENSE-*.txt`). Name und Logo von
+  IT-Tabelander sind davon nicht umfasst.
 
 -------------------------------------------------------------------------------------------------------------------
 
@@ -37,4 +43,7 @@ repository, nor use it for text and data mining such as training AI models (rese
 Austrian Copyright Act and Art. 4(3) of Directive (EU) 2019/790). Public visibility on GitHub only allows viewing
 and forking on GitHub under GitHub's Terms of Service and grants no further rights. Third-party components keep
 their own licences (packages and fonts installed via npm or pip). Names, logos and trademarks of third parties
-belong to their owners and are not licensed here.
+belong to their owners and are not licensed here. Exception: everything in the folder dolibarr/ (the Dolibarr
+module "IT-Tabelander PDF", a derivative work of Dolibarr) is licensed under GPL-3.0-or-later, its fonts under
+the SIL Open Font License 1.1; the licence texts are in dolibarr/ittabelanderpdf/. The IT-Tabelander name and
+logo are not licensed by this.

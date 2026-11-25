@@ -783,11 +783,39 @@ mit `IT_TABELANDER_RUN_INTEGRATION=1`, einer lokalen URL und einer `DB_NAME`, di
 `test` enthält. Dabei wird ein eigener temporärer Test-Admin verwendet; echte
 Admin-Zugangsdaten und Produktionsdaten werden nicht benutzt.
 
+## Dolibarr-Modul IT-Tabelander PDF
+
+In [`dolibarr/ittabelanderpdf/`](dolibarr/ittabelanderpdf/) liegt das
+Dolibarr-Modul `ittabelanderpdf` (seit 1.0.7 hier, mit seinem Git-Verlauf):
+PDF-Vorlage „werkbank“ für Angebote, Rechnungen, Aufträge, Lieferscheine,
+Arbeitsberichte, Verträge und Lieferantenbelege, E-Mail-Vorlagen im selben
+Design, verzögerter automatischer Versand und eigene Ticket-Bestätigungen.
+Beschreibung, Installation und Einstellungen:
+[`dolibarr/ittabelanderpdf/README-DE.md`](dolibarr/ittabelanderpdf/README-DE.md),
+Schritte für die Produktion: [`docs/ROLLOUT.md`](dolibarr/ittabelanderpdf/docs/ROLLOUT.md).
+
+Installiert wird es in Dolibarr über **Einstellungen → Module → Externes Modul
+bereitstellen** mit dem ZIP aus dem GitHub-Release `dolibarr-v<version>`
+(daneben die `.sha256`). Lokal:
+
+```bash
+python scripts/local_check.py --only dolibarr-modul   # die Prüfung (aus dem Repo-Wurzelordner)
+
+cd dolibarr/ittabelanderpdf
+python scripts/build_release.py       # dist/module_ittabelanderpdf-x.y.z.zip + .sha256
+python scripts/dev_dolibarr.py all    # Wegwerf-Dolibarr 23.0.3 mit Testdaten, PDFs und Mails
+python scripts/dev_dolibarr.py down
+```
+
+Ins ZIP kommt nur, was Git kennt: neue Moduldateien vor dem Bauen mit `git add`
+aufnehmen.
+
 ## Dateien und Laufzeitdaten
 
 ```text
 backend/             FastAPI, MongoDB-Zugriff und Tests
 web/                 Website und Admin (Vite, React 19, Tailwind) mit Tests
+dolibarr/            Dolibarr-Modul ittabelanderpdf (eigene Lizenz GPL-3.0-or-later)
 deploy.config        interner Host/Port und Startparameter
 deploy.config.local  optionale serverlokale Overrides (ignoriert)
 start.sh             Bootstrap, Build, Start und Healthchecks
@@ -805,3 +833,8 @@ Logs und PID-Dateien werden nicht committed.
 Alle Rechte vorbehalten. Das Repository ist öffentlich einsehbar, darf aber ohne schriftliche
 Zustimmung von IT-Tabelander weder genutzt noch kopiert, betrieben oder für KI-Training verwendet
 werden. Details in [`LICENSE`](LICENSE).
+
+Ausgenommen ist der Ordner `dolibarr/`: Dolibarr-Module sind abgeleitete Werke von Dolibarr und
+stehen deshalb unter der **GNU General Public License 3.0 oder später** (GPL-3.0-or-later), die
+Schriften im Modul (`dolibarr/ittabelanderpdf/fonts/`) unter der **SIL Open Font License 1.1**.
+Der Lizenztext liegt im Modul: [`dolibarr/ittabelanderpdf/LICENSE`](dolibarr/ittabelanderpdf/LICENSE).

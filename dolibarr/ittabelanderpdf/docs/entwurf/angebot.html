@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Werkbank-Beleg Entwurf</title>
+<style>
+@font-face{font-family:"Sora";font-weight:600;src:url(fonts/sora-latin-600-normal.woff2)}
+@font-face{font-family:"Sora";font-weight:700;src:url(fonts/sora-latin-700-normal.woff2)}
+@font-face{font-family:"Source Sans 3";font-weight:400;src:url(fonts/source-sans-3-latin-400-normal.woff2)}
+@font-face{font-family:"Source Sans 3";font-weight:600;src:url(fonts/source-sans-3-latin-600-normal.woff2)}
+@font-face{font-family:"Source Sans 3";font-weight:700;src:url(fonts/source-sans-3-latin-700-normal.woff2)}
+@font-face{font-family:"Michroma";font-weight:400;src:url(fonts/michroma-latin-400-normal.woff2)}
+:root{--ink:#1B3348;--body:#3B4D63;--muted:#4A5B6E;--brand:#FE5A23;--accent:#FE8122;--line:#D6DEE7;--soft:#E3E8EF;--subtle:#F7F9FB;--page:#F3F5F8}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#C9D3DF;font-family:"Source Sans 3",sans-serif;color:var(--body);font-size:9.5pt;line-height:1.4;padding:10mm 0;display:flex;flex-direction:column;align-items:center;gap:10mm;font-variant-numeric:tabular-nums}
+.sheet{width:210mm;height:297mm;background:#fff;position:relative;box-shadow:0 2mm 8mm rgba(8,19,32,.25);overflow:hidden}
+.cap{font-family:"Michroma",sans-serif;font-size:5.6pt;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+/* Falz- und Lochmarken DIN 5008 */
+.mark{position:absolute;left:0;width:4mm;border-top:.25pt solid #9AA8B8}
+.m1{top:105mm}.m2{top:210mm}.m3{top:148.5mm;width:6mm}
+/* Kopf */
+.head{position:absolute;top:12mm;left:20mm;right:15mm;display:flex;justify-content:space-between;align-items:flex-start}
+.logo{height:12mm}
+.headr{text-align:right;font-size:8pt;line-height:1.45;color:var(--muted)}
+.headr b{color:var(--ink);font-weight:600}
+.rule{position:absolute;top:30mm;left:20mm;right:15mm;height:.6mm;background:var(--ink)}
+.rule::after{content:"";position:absolute;left:0;top:0;width:28mm;height:100%;background:var(--brand)}
+/* Anschrift */
+.addr{position:absolute;top:45mm;left:20mm;width:85mm;height:45mm}
+.sender{font-size:6.5pt;color:var(--muted);border-bottom:.25pt solid var(--line);padding-bottom:1mm;margin-bottom:3mm}
+.addr p{font-size:10.5pt;line-height:1.35;color:var(--ink)}
+.addr p b{font-weight:600}
+/* Infoblock */
+.info{position:absolute;top:50mm;left:125mm;right:15mm;display:grid;grid-template-columns:auto 1fr;column-gap:4mm;row-gap:1.6mm;align-items:baseline}
+.info .cap{white-space:nowrap}
+.info span:not(.cap){text-align:right;color:var(--ink);font-weight:600;font-size:9.5pt}
+/* Fliessbereich */
+.flow{position:absolute;top:98mm;left:20mm;right:15mm;bottom:26mm}
+.title h1{font-family:"Sora",sans-serif;font-weight:700;font-size:20pt;letter-spacing:-.02em;color:var(--ink);line-height:1.1}
+.title h1 em{font-style:normal;color:var(--brand)}
+.title p{margin-top:2.5mm;max-width:150mm;font-size:9.5pt}
+table{width:100%;border-collapse:collapse;margin-top:8mm}
+th{font-family:"Michroma",sans-serif;font-weight:400;font-size:5.6pt;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:left;padding:0 0 2mm;border-bottom:.6pt solid var(--ink)}
+td{padding:2.4mm 0;border-bottom:.25pt solid var(--line);vertical-align:top}
+.n{text-align:right;white-space:nowrap}
+td.pos,th.pos{width:9mm}
+td.pos{color:var(--muted);font-size:8pt;padding-top:2.7mm}
+.qty{width:20mm}.ep{width:24mm}td.sum{width:26mm;color:var(--ink);font-weight:600}th.sum{width:26mm}
+td .ref{font-family:"Michroma",sans-serif;font-size:5.4pt;letter-spacing:.1em;color:var(--brand);display:block;margin-bottom:.6mm}
+td .lbl{font-weight:600;color:var(--ink);font-size:9.8pt;display:block}
+td .desc{display:block;font-size:8.3pt;color:var(--muted);margin-top:.5mm;padding-right:6mm;line-height:1.35}
+td .u{color:var(--muted);font-size:8pt;margin-left:1mm}
+.bottom{display:flex;justify-content:space-between;gap:10mm;margin-top:7mm;break-inside:avoid}
+.terms{width:75mm;font-size:8.3pt}
+.terms .cap{display:block;margin-bottom:1mm}
+.terms p+.cap{margin-top:3mm}
+.total{width:90mm}
+.total .grand{background:var(--ink);color:#fff;padding:3mm 4mm;display:flex;justify-content:space-between;align-items:baseline;border-radius:.8mm}
+.total .grand .cap{color:#C5D0DC}
+.total .grand b{font-family:"Sora",sans-serif;font-size:15pt;font-weight:700;letter-spacing:-.01em}
+.total .ust{font-size:7.3pt;color:var(--muted);margin-top:1.8mm;text-align:right}
+/* Fuß */
+.foot{position:absolute;bottom:9mm;left:20mm;right:15mm;border-top:.25pt solid var(--line);padding-top:2.5mm;display:grid;grid-template-columns:1.1fr 1fr 1.2fr auto;gap:5mm;font-size:6.6pt;line-height:1.45;color:var(--muted)}
+.foot b{color:var(--ink);font-weight:600}
+.foot .pg{text-align:right;white-space:nowrap}
+/* Rechnung: QR */
+.qr{display:flex;gap:4mm;align-items:center;margin-top:3mm}
+.qr svg{width:22mm;height:22mm;flex:none}
+.qr p{font-size:7.6pt}
+.sign{position:absolute;left:20mm;right:15mm;top:273mm;display:none}
+.label{position:absolute;top:4mm;right:15mm}
+</style>
+</head>
+<body>
+
+<!-- ===================== ANGEBOT ===================== -->
+<section class="sheet">
+  <i class="mark m1"></i><i class="mark m3"></i><i class="mark m2"></i>
+  <div class="head">
+    <img class="logo" src="banner-on-light.webp" alt="IT-Tabelander">
+    <div class="headr"><b>Fabian Tabelander</b><br>+43 676 6039945<br>office@tabelander.co.at<br>it.tabelander.co.at</div>
+  </div>
+  <div class="rule"></div>
+
+  <div class="addr">
+    <div class="sender">IT-Tabelander · Spridrichstraße 17 · 6410 Telfs</div>
+    <p><b>Musterfirma GmbH</b><br>z. H. Maria Muster<br>Hauptstraße 12<br>6020 Innsbruck</p>
+  </div>
+
+  <div class="info">
+    <span class="cap">Angebot Nr.</span><span>AN202611-0007</span>
+    <span class="cap">Datum</span><span>24.11.2026</span>
+    <span class="cap">Gültig bis</span><span>08.12.2026</span>
+    <span class="cap">Kundennr.</span><span>CU2611-00006</span>
+  </div>
+
+  <div class="flow">
+  <div class="title">
+    <h1>Angebot<em>.</em> PC-Reparatur nach Überspannung</h1>
+    <p>Bei der Überprüfung wurde ein Überspannungsschaden festgestellt. Die folgenden Arbeiten bringen das System wieder in einen sauberen, getesteten Zustand.</p>
+  </div>
+
+  <table>
+    <thead><tr><th class="pos">Pos.</th><th>Leistung</th><th class="n qty">Menge</th><th class="n ep">Einzelpreis</th><th class="n sum">Gesamt</th></tr></thead>
+    <tbody>
+      <tr><td class="pos">1</td><td><span class="ref">DL-HW-SSD</span><span class="lbl">SSD-Upgrade inkl. Systemumzug</span><span class="desc">Einbau der neuen SSD und Umzug des bestehenden Systems mit allen Programmen und Daten. SSD wird separat verrechnet.</span></td><td class="n qty">1<span class="u">Stk</span></td><td class="n ep">49,90</td><td class="n sum">49,90</td></tr>
+      <tr><td class="pos">2</td><td><span class="ref">MATERIAL</span><span class="lbl">Samsung SSD 990 PRO, 1 TB NVMe</span><span class="desc">Modell MZ-V9P1T0BW, PCIe 4.0</span></td><td class="n qty">1<span class="u">Stk</span></td><td class="n ep">124,90</td><td class="n sum">124,90</td></tr>
+      <tr><td class="pos">3</td><td><span class="ref">DL-PC-WIN</span><span class="lbl">Windows-Neuinstallation inkl. Treiber und Updates</span><span class="desc">Neuinstallation, aktuelle Treiber und Updates, Grundeinrichtung (Benutzerkonto, Browser, Sicherheit). Windows-Lizenz nicht enthalten.</span></td><td class="n qty">1<span class="u">Stk</span></td><td class="n ep">69,90</td><td class="n sum">69,90</td></tr>
+      <tr><td class="pos">4</td><td><span class="ref">DL-PC-DATEN</span><span class="lbl">Datenübernahme vom Altgerät</span><span class="desc">Sicherung und Übertragung der persönlichen Daten auf das neu installierte System.</span></td><td class="n qty">1<span class="u">Stk</span></td><td class="n ep">49,90</td><td class="n sum">49,90</td></tr>
+      <tr><td class="pos">5</td><td><span class="ref">DL-STD-WERK</span><span class="lbl">Werkstattstunde (Hardware, Controller)</span><span class="desc">Arbeitszeit, die nicht in einer Pauschale enthalten ist.</span></td><td class="n qty">0,5<span class="u">h</span></td><td class="n ep">45,00</td><td class="n sum">22,50</td></tr>
+      <tr><td class="pos">6</td><td><span class="ref">DL-ANFAHRT-KM</span><span class="lbl">Kilometergeld je weiterem km</span></td><td class="n qty">14<span class="u">km</span></td><td class="n ep">0,50</td><td class="n sum">7,00</td></tr>
+    </tbody>
+  </table>
+
+  <div class="bottom">
+  <div class="terms">
+    <span class="cap">Zahlung</span>
+    <p>30 Tage nach Rechnungsdatum per Überweisung.</p>
+    <span class="cap">Annehmen</span>
+    <p>Online im Kundenbereich auf it.tabelander.co.at oder per E-Mail. Gearbeitet wird erst nach Zusage.</p>
+  </div>
+
+  <div class="total">
+    <div class="grand"><span class="cap">Gesamt EUR</span><b>324,10</b></div>
+    <div class="ust">Umsatzsteuerbefreit – Kleinunternehmer gem. § 6 Abs. 1 Z 27 UStG</div>
+  </div>
+  </div>
+  </div>
+
+  <div class="foot">
+    <div><b>IT-Tabelander</b><br>Fabian Tabelander<br>Spridrichstraße 17, 6410 Telfs</div>
+    <div>office@tabelander.co.at<br>+43 676 6039945<br>it.tabelander.co.at</div>
+    <div>GISA-Zahl 39417879 · GLN 9110039041378<br>Gerichtsstand Innsbruck<br>IBAN LT93 3250 0006 0881 0165 · BIC REVOLT21</div>
+    <div class="pg">Seite 1 / 1</div>
+  </div>
+</section>
+
+<!-- ===================== RECHNUNG (unterer Teil) ===================== -->
+<section class="sheet">
+  <i class="mark m1"></i><i class="mark m3"></i><i class="mark m2"></i>
+  <div class="head">
+    <img class="logo" src="banner-on-light.webp" alt="IT-Tabelander">
+    <div class="headr"><b>Fabian Tabelander</b><br>+43 676 6039945<br>office@tabelander.co.at<br>it.tabelander.co.at</div>
+  </div>
+  <div class="rule"></div>
+  <div class="addr">
+    <div class="sender">IT-Tabelander · Spridrichstraße 17 · 6410 Telfs</div>
+    <p><b>Max Mustermann</b><br>Untermarktstraße 5<br>6410 Telfs</p>
+  </div>
+  <div class="info">
+    <span class="cap">Rechnung Nr.</span><span>RE2026-00012</span>
+    <span class="cap">Datum</span><span>24.11.2026</span>
+    <span class="cap">Fällig am</span><span>24.12.2026</span>
+    <span class="cap">Kundennr.</span><span>CU2611-00007</span>
+    <span class="cap">Zu Angebot</span><span>AN202611-0007</span>
+  </div>
+  <div class="flow">
+  <div class="title">
+    <h1>Rechnung<em>.</em></h1>
+    <p>Vielen Dank für den Auftrag. Bitte den Betrag unter Angabe der Rechnungsnummer überweisen.</p>
+  </div>
+  <table>
+    <thead><tr><th class="pos">Pos.</th><th>Leistung</th><th class="n qty">Menge</th><th class="n ep">Einzelpreis</th><th class="n sum">Gesamt</th></tr></thead>
+    <tbody>
+      <tr><td class="pos">1</td><td><span class="ref">DL-PS5-AKKU</span><span class="lbl">Akkuwechsel PS5 Controller inkl. Funktionstest</span><span class="desc">Austausch des Controller-Akkus inkl. Öffnen, Zusammenbau, Lade- und Funktionstest.</span></td><td class="n qty">1<span class="u">Stk</span></td><td class="n ep">24,90</td><td class="n sum">24,90</td></tr>
+      <tr><td class="pos">2</td><td><span class="ref">MAT-PS5-AKKU-2600</span><span class="lbl">Akku-Upgrade PS5 DualSense – 2600 mAh</span></td><td class="n qty">1<span class="u">Stk</span></td><td class="n ep">29,90</td><td class="n sum">29,90</td></tr>
+      <tr><td class="pos">3</td><td><span class="ref">DL-VERSAND</span><span class="lbl">Rückversand innerhalb Österreichs</span></td><td class="n qty">1<span class="u">Stk</span></td><td class="n ep">7,90</td><td class="n sum">7,90</td></tr>
+    </tbody>
+  </table>
+  <div class="bottom">
+  <div class="terms">
+    <span class="cap">Überweisung</span>
+    <p>Fabian Tabelander<br>IBAN LT93 3250 0006 0881 0165 · BIC REVOLT21<br>Verwendungszweck: RE2026-00012</p>
+    <div class="qr">
+      <svg viewBox="0 0 29 29" shape-rendering="crispEdges" aria-label="QR-Code Platzhalter"><rect width="29" height="29" fill="#fff"/><g fill="#1B3348"><path d="M0 0h7v7H0zM22 0h7v7h-7zM0 22h7v7H0z"/><path fill="#fff" d="M1 1h5v5H1zM23 1h5v5h-5zM1 23h5v5H1z"/><path d="M2 2h3v3H2zM24 2h3v3h-3zM2 24h3v3H2zM9 1h2v2H9zM12 3h3v1h-3zM9 8h4v2H9zM15 9h2v3h-2zM19 11h3v2h-3zM8 14h2v4H8zM12 13h1v5h-1zM16 15h4v1h-4zM22 15h2v4h-2zM25 14h3v2h-3zM14 19h3v3h-3zM10 22h2v4h-2zM18 22h4v2h-4zM23 24h2v4h-2zM26 21h2v2h-2zM13 25h3v2h-3zM19 26h2v2h-2zM2 10h3v2H2zM4 14h2v3H4zM1 18h4v1H1z"/></g></svg>
+      <p>Mit der Banking-App scannen: Betrag, IBAN und Verwendungszweck sind schon ausgefüllt.</p>
+    </div>
+  </div>
+  <div class="total">
+    <div class="grand"><span class="cap">Zu zahlen EUR</span><b>62,70</b></div>
+    <div class="ust">Umsatzsteuerbefreit – Kleinunternehmer gem. § 6 Abs. 1 Z 27 UStG</div>
+  </div>
+  </div>
+  </div>
+  <div class="foot">
+    <div><b>IT-Tabelander</b><br>Fabian Tabelander<br>Spridrichstraße 17, 6410 Telfs</div>
+    <div>office@tabelander.co.at<br>+43 676 6039945<br>it.tabelander.co.at</div>
+    <div>GISA-Zahl 39417879 · GLN 9110039041378<br>Gerichtsstand Innsbruck<br>IBAN LT93 3250 0006 0881 0165 · BIC REVOLT21</div>
+    <div class="pg">Seite 1 / 1</div>
+  </div>
+</section>
+</body>
+</html>

@@ -1,0 +1,10 @@
+/dist/
+/.local-testing/
+/.idea/
+/.vscode/
+*.log
+*.tmp
+__pycache__/
+
+# Machine-local notes for Claude Code (project knowledge lives in the vault)
+/CLAUDE.local.md

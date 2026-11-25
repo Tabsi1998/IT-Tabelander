@@ -21,6 +21,12 @@ Groups:
                  Mailpit: inquiries, photos on the ticket, confirmation mails,
                  status, existing customers left unchanged, company data,
                  legal texts and FAQ from the knowledge base
+    dolibarr-modul  the Dolibarr module in dolibarr/ittabelanderpdf/ (#113): PHP
+                 lint and the release ZIP always; when something under dolibarr/
+                 changed against origin/main (always with --only dolibarr-modul)
+                 also the module from its ZIP in a Dolibarr 23.0.3 of its own:
+                 PHP lint in the image, fixtures, every PDF, the e-mail
+                 scenarios, rollout texts, the pages and the WAF, ticket mails
     web          the website and its admin (web/, #44, #57): a frozen install, ESLint, Vitest, the
                  prerendered build, and Playwright in 390, 768, 1280 and 1440 px
                  with an answered API, the site's security policy, an axe
@@ -72,8 +78,8 @@ LOGS = STATE / "logs"
 BASELINE = ROOT / "scripts" / "ci-baseline.json"
 WINDOWS = platform.system() == "Windows"
 
-GROUPS = ("repository", "backend", "integration", "dolibarr", "web", "extra", "deploy")
-DEFAULT_GROUPS = ("repository", "backend", "integration", "dolibarr", "web")
+GROUPS = ("repository", "backend", "integration", "dolibarr", "dolibarr-modul", "web", "extra", "deploy")
+DEFAULT_GROUPS = ("repository", "backend", "integration", "dolibarr", "dolibarr-modul", "web")
 
 BACKEND = ROOT / "backend"
 WEB = ROOT / "web"
@@ -888,6 +894,7 @@ def main(argv: list | None = None) -> int:
 
     context = build_context(record=arguments.record)
     context.cache["deploy-forced"] = bool(arguments.only and "deploy" in groups)
+    context.cache["module-forced"] = bool(arguments.only and "dolibarr-modul" in groups)
     print(f"{ROOT.name}: {', '.join(group for group in GROUPS if group in groups)}", flush=True)
     if context.dropped:
         print("Withheld from every step (names only): " + ", ".join(context.dropped), flush=True)
@@ -1388,6 +1395,164 @@ def dolibarr_steps() -> list:
     ]
 
 
+# ----------------------------------------------------------- dolibarr-modul
+
+# The Dolibarr module ittabelanderpdf (#113) in dolibarr/ittabelanderpdf/. Its
+# own scripts/dev_dolibarr.py drives a disposable Dolibarr 23.0.3 (the image of
+# the dolibarr group, own containers and ports); the check points its examples
+# into .local-testing so committed files under docs/ never change.
+MODULE_DIR = ROOT / "dolibarr" / "ittabelanderpdf"
+MODULE_STATE = STATE / "dolibarr-modul"
+MODULE_PREFIX = "it-tabelander-modul"
+MODULE_PORT = 18033
+MODULE_MAIL_PORT = 18133
+MODULE_WATCHED = ("dolibarr/",)
+WINGET_PHP = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WinGet" / "Packages"
+
+
+def module_php(context: Context) -> str:
+    """PHP for the lint: on PATH, else the one winget installs."""
+    found = tool(context, "php")
+    if found:
+        return found
+    for candidate in sorted(WINGET_PHP.glob("PHP.PHP.*/php.exe"), reverse=True):
+        return str(candidate)
+    raise StepSkipped("PHP is not installed. winget install PHP.PHP.8.4")
+
+
+def module_lint(context: Context) -> str:
+    php = module_php(context)
+    files = [name for name in tracked(context, "dolibarr", new=True) if name.endswith(".php")]
+    if not files:
+        raise StepSkipped("no PHP files under dolibarr/")
+    broken = []
+    for name in files:
+        completed = context.run(php, "-l", ROOT / name, check=False, timeout=60)
+        if completed.returncode != 0:
+            broken.append(f"{name}: {tail(completed, 3)}")
+    if broken:
+        raise StepFailed("these PHP files do not parse:\n  " + "\n  ".join(broken))
+    version = context.run(php, "-r", "echo PHP_VERSION;", check=False, timeout=60).stdout.strip()
+    return f"{len(files)} files parse with PHP {version}"
+
+
+def module_package(context: Context) -> str:
+    """The release ZIP, built and verified exactly as for a release.
+
+    build_release.py packs only what Git tracks. A new module file that is not
+    added yet would be missing from the ZIP without a word, so it fails here.
+    """
+    binary = git(context)
+    new = [name for name in context.run(binary, "ls-files", "-z", "--others", "--exclude-standard", "--",
+                                        "dolibarr/").stdout.split("\0") if name]
+    if new:
+        raise StepFailed("new files under dolibarr/ are not added to Git, so the ZIP would lack them "
+                         "(git add them or ignore them):\n  " + "\n  ".join(new[:20]))
+    out = MODULE_STATE / "dist"
+    shutil.rmtree(out, ignore_errors=True)
+    completed = context.run(sys.executable, MODULE_DIR / "scripts" / "build_release.py", "--out", out,
+                            cwd=MODULE_DIR, check=False, timeout=300)
+    context.log("dolibarr-modul-package", completed.stdout + completed.stderr)
+    if completed.returncode != 0:
+        raise StepFailed("the module package did not build:\n" + tail(completed))
+    lines = completed.stdout.splitlines()
+    return f"{Path(lines[0]).name}, {lines[1] if len(lines) > 1 else ''}"
+
+
+def module_needed(context: Context) -> str:
+    """The Dolibarr run (about ten minutes) only when something under dolibarr/ changed."""
+    if context.cache.get("module-forced"):
+        return "requested with --only dolibarr-modul"
+    binary = git(context)
+    pending = sorted(line[3:] for line in context.run(binary, "status", "--porcelain").stdout.splitlines()
+                     if line[3:].startswith(MODULE_WATCHED))
+    if pending:
+        return "uncommitted: " + ", ".join(pending[:6])
+    base = context.run(binary, "merge-base", "HEAD", "origin/main", check=False)
+    if base.returncode != 0:
+        return "no origin/main to compare with, so the module runs"
+    changed = context.run(binary, "diff", "--name-only", base.stdout.strip(), "HEAD").stdout.splitlines()
+    relevant = sorted(name for name in changed if name.startswith(MODULE_WATCHED))
+    if not relevant:
+        raise StepSkipped("nothing under dolibarr/ changed against origin/main; "
+                          "--only dolibarr-modul runs it anyway")
+    return f"{len(relevant)} changed, e.g. " + ", ".join(relevant[:4])
+
+
+def module_env() -> dict:
+    return {"ITTABPDF_PREFIX": MODULE_PREFIX, "ITTABPDF_PORT": str(MODULE_PORT),
+            "ITTABPDF_MAIL_PORT": str(MODULE_MAIL_PORT), "ITTABPDF_OUT": str(MODULE_STATE / "out")}
+
+
+def module_dev(context: Context, stage: str, timeout: int = 900) -> str:
+    """One stage of the module's dev_dolibarr.py; its last line is the result."""
+    completed = context.run(sys.executable, MODULE_DIR / "scripts" / "dev_dolibarr.py", stage, cwd=MODULE_DIR,
+                            env=module_env(), check=False, timeout=timeout)
+    path = context.log(f"dolibarr-modul-{stage}", completed.stdout + completed.stderr)
+    if completed.returncode != 0:
+        raise StepFailed(f"dev_dolibarr.py {stage} failed. Full output: {path}\n" + tail(completed, 30))
+    # The stages print JSON; a closing bracket is no result, so those lines are left out.
+    lines = [line.strip() for line in completed.stdout.splitlines() if line.strip(" \t[]{},")]
+    return lines[-1] if lines else f"{stage} passed"
+
+
+def module_stack(context: Context) -> str:
+    docker(context)
+    for port in (MODULE_PORT, MODULE_MAIL_PORT):
+        if port_open(port):
+            raise StepSkipped(f"port {port} is taken by something else; stop it and run again")
+    context.cache["module-stack"] = True
+    return module_dev(context, "up", timeout=2700)
+
+
+def module_stage(stage: str, timeout: int = 900) -> Callable:
+    def action(context: Context) -> str:
+        return module_dev(context, stage, timeout)
+    return action
+
+
+def module_lint_runtime(context: Context) -> str:
+    """The installed module parses with the PHP of the Dolibarr image (8.2), not only with a newer one."""
+    completed = context.run(docker(context), "exec", f"{MODULE_PREFIX}-web", "sh", "-c",
+                            "find /var/www/html/custom/ittabelanderpdf -name '*.php' -print0 "
+                            "| xargs -0 -n 1 php -l >/dev/null && php -r 'echo PHP_VERSION;'",
+                            check=False, timeout=300)
+    if completed.returncode != 0:
+        raise StepFailed("the installed module does not parse in the container:\n" + tail(completed))
+    return f"every file parses with PHP {completed.stdout.strip()}"
+
+
+def module_down(context: Context) -> None:
+    """dev_dolibarr.py down: containers with their anonymous volumes, and the network."""
+    if context.cache.pop("module-stack", False):
+        subprocess.run([sys.executable, str(MODULE_DIR / "scripts" / "dev_dolibarr.py"), "down"], cwd=str(MODULE_DIR),
+                       env={**context.env, **module_env()}, capture_output=True, text=True, timeout=300)
+
+
+def module_steps() -> list:
+    group = "dolibarr-modul"
+    return [
+        Step(group, "lint", "Every PHP file of the module parses", module_lint),
+        Step(group, "package", "The release ZIP builds and verifies", module_package),
+        Step(group, "needed", "Something under dolibarr/ changed", module_needed),
+        Step(group, "stack", "Dolibarr 23.0.3 with MariaDB and Mailpit for the module", module_stack,
+             ("needed", "package")),
+        Step(group, "install", "The module from its ZIP, unpacked into custom/", module_stage("install"),
+             ("stack",)),
+        Step(group, "lint-runtime", "The installed module parses with the image's PHP", module_lint_runtime,
+             ("install",)),
+        Step(group, "fixtures", "Company, bank account, customers and documents", module_stage("fixtures"),
+             ("install",)),
+        Step(group, "pdf", "Every Werkbank PDF renders", module_stage("pdf", 1800), ("fixtures",)),
+        Step(group, "mails", "The e-mail scenarios and their checks", module_stage("mails", 1800), ("fixtures",)),
+        Step(group, "rollout", "Mahnwesen and ticket texts for production", module_stage("rollout"),
+             ("mails",)),
+        Step(group, "ui", "Card banner, queue page, logo endpoint and the WAF", module_stage("ui"), ("rollout",)),
+        Step(group, "tickets", "Own ticket confirmation and owner notice", module_stage("tickets"),
+             ("fixtures",)),
+    ]
+
+
 # --------------------------------------------------------------------- extra
 
 def test_inventory(context: Context) -> str:
@@ -1565,7 +1730,7 @@ def deploy_steps() -> list:
 
 def plan(groups: set) -> list:
     builders = {"repository": repository_steps, "backend": backend_steps,
-                "integration": integration_steps, "dolibarr": dolibarr_steps,
+                "integration": integration_steps, "dolibarr": dolibarr_steps, "dolibarr-modul": module_steps,
                 "web": web_steps, "extra": extra_steps, "deploy": deploy_steps}
     steps: list = []
     if "dolibarr" in groups and "integration" not in groups:
@@ -1590,6 +1755,7 @@ def build_context(record: bool = False) -> Context:
 
 def tear_down(context: Context) -> None:
     stop_everything(context)
+    module_down(context)
     binary = shutil.which("docker", path=context.env.get("PATH"))
     for network in context.cache.pop("docker-networks", []):
         if binary:
