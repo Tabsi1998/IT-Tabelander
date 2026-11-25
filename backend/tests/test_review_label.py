@@ -56,15 +56,15 @@ def _check(monkeypatch, ticket, *, db=None, mail_error=None, inquiry=None):
             raise ticket
         return ticket
 
-    async def send(to, subject, text):
+    async def send(to, subject, text, html=None):
         if mail_error:
             raise mail_error
-        sent.append((to, subject, text))
+        sent.append((to, subject, text, html))
 
     monkeypatch.setattr(dolibarr, "fetch_ticket_status", fetch)
     monkeypatch.setattr(mailer, "send_mail", send)
     outcome = asyncio.run(review_invites._check_one(
-        db, inquiry or _inquiry(), NOW, site_base="https://it.example.at", sender_name="IT-Tabelander"))
+        db, inquiry or _inquiry(), NOW, site_base="https://it.example.at"))
     return outcome, db, sent
 
 
@@ -77,11 +77,13 @@ def _closed(email="kunde@example.com"):
 def test_a_closed_ticket_gets_one_mail_to_the_address_in_the_ticket(monkeypatch):
     outcome, db, sent = _check(monkeypatch, _closed())
     assert outcome == "sent"
-    [(to, subject, text)] = sent
+    [(to, subject, text, html)] = sent
     assert to == "kunde@example.com"
     assert subject == "Kurze Bitte zu deiner Anfrage ANF-7K3M9Q2X"
     assert "Reparatur" in text and "einzige Mail" in text and "60 Tage" in text
     token = re.search(r"https://it\.example\.at/bewertung#([A-Za-z0-9_-]{40,})", text).group(1)
+    assert f'href="https://it.example.at/bewertung#{token}"' in html and "Bewertung schreiben</a>" in html
+    assert "Liebe Grüße" in text and "Liebe Grüße" in html and "Viele Grüße" not in text + html
     # Only the hash is stored; the link exists in the mail alone.
     [(_, invite)] = [call for call in db.review_invites.calls if call[0] == "insert"]
     assert invite["token_hash"] == review_invites.token_hash(token) and token not in str(invite)

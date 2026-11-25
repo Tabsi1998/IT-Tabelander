@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 
 from pymongo import ReturnDocument
 
-from . import dolibarr, mailer
+from . import dolibarr, mail_layout, mailer
 from .db import get_db, now_utc
 
 logger = logging.getLogger("it-tabelander.review-invites")
@@ -39,27 +39,20 @@ def review_link(site_base: str, token: str) -> str:
     return f"{site_base.rstrip('/')}/bewertung#{token}"
 
 
-def mail_text(*, ref: str, kind: str, link: str, sender_name: str, site_base: str) -> tuple[str, str]:
+def mail_text(*, ref: str, kind: str, link: str, site_base: str) -> tuple[str, str, str]:
+    """Subject, plain text and HTML of the review request (#114)."""
     subject = f"Kurze Bitte zu deiner Anfrage {ref}"
-    text = f"""Hallo,
-
-deine Anfrage {ref} ({kind}) ist abgeschlossen. Danke für dein Vertrauen!
-
-Bei der Anfrage hast du Ja gesagt, dass ich dich danach um eine kurze
-Bewertung bitten darf. Wenn du magst, schreib mir in zwei Minuten, wie es war:
-
-{link}
-
-Der Link gilt 60 Tage und für eine Bewertung. Sie erscheint erst auf der
-Website, wenn ich sie freigegeben habe - mit dem Namen, den du dort angibst.
-
-Das ist die einzige Mail dazu, es kommt keine Erinnerung.
-
-Viele Grüße
-{sender_name}
-{site_base}
-"""
-    return subject, text
+    text, body = mail_layout.render([
+        mail_layout.paragraph("Hallo,"),
+        mail_layout.paragraph(f"deine Anfrage {ref} ({kind}) ist abgeschlossen. Danke für dein Vertrauen!"),
+        mail_layout.paragraph("Bei der Anfrage hast du Ja gesagt, dass ich dich danach um eine kurze Bewertung bitten "
+                              "darf. Wenn du magst, schreib mir in zwei Minuten, wie es war:"),
+        mail_layout.button("Bewertung schreiben", link),
+        mail_layout.paragraph("Der Link gilt 60 Tage und für eine Bewertung. Sie erscheint erst auf der Website, wenn "
+                              "ich sie freigegeben habe – mit dem Namen, den du dort angibst."),
+        mail_layout.paragraph("Das ist die einzige Mail dazu, es kommt keine Erinnerung."),
+    ], site_base=site_base)
+    return subject, text, body
 
 
 def _due(now: datetime, *, force: bool) -> dict:
@@ -84,7 +77,7 @@ async def _stop(db, doc: dict, reason: str) -> str:
     return "stopped"
 
 
-async def _check_one(db, doc: dict, now: datetime, *, site_base: str, sender_name: str) -> str:
+async def _check_one(db, doc: dict, now: datetime, *, site_base: str) -> str:
     ticket_id = (doc.get("dolibarr") or {}).get("ticket_id")
     if not ticket_id:
         return await _stop(db, doc, "Zu dieser Anfrage gibt es kein Ticket.")
@@ -124,10 +117,10 @@ async def _check_one(db, doc: dict, now: datetime, *, site_base: str, sender_nam
     }
     await db.review_invites.insert_one(invite)
     kind = dolibarr.REQUEST_TYPE_LABELS.get(invite["request_type"], "Anfrage")
-    subject, text = mail_text(ref=str(doc.get("ref") or ""), kind=kind, link=review_link(site_base, token),
-                              sender_name=sender_name, site_base=site_base)
+    subject, text, body = mail_text(ref=str(doc.get("ref") or ""), kind=kind, link=review_link(site_base, token),
+                                    site_base=site_base)
     try:
-        await mailer.send_mail(email, subject, text)
+        await mailer.send_mail(email, subject, text, html=body)
     except (mailer.MailNotConfigured, mailer.MailError) as exc:
         await db.review_invites.delete_one({"_id": invite["_id"]})
         await db.repair_requests.update_one(
@@ -162,8 +155,7 @@ async def run(*, force: bool = False, limit: int = 20, now: datetime | None = No
         if not doc:
             break
         result["checked"] += 1
-        outcome = await _check_one(db, doc, now, site_base=cfg["site_base"],
-                                   sender_name=mail.get("sender_name") or "IT-Tabelander")
+        outcome = await _check_one(db, doc, now, site_base=cfg["site_base"])
         if outcome in ("sent", "stopped", "failed"):
             result[outcome] += 1
         if outcome == "away":

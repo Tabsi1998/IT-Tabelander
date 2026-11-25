@@ -678,7 +678,10 @@ def portal_session(email: str) -> requests.Session:
     while len(link_mails_to(email)) <= before and time.time() < deadline:
         time.sleep(1)
     newest = link_mails_to(email)[0]
-    token = re.search(r"/kundenbereich/anmelden#([A-Za-z0-9_-]{40,})", mail_text(newest)).group(1)
+    text = mail_text(newest)
+    # #114: HTML with the module's logo and the Du closing, plus the text part.
+    assert "maillogo.php" in text and "Liebe Grüße" in text and "Viele Grüße" not in text
+    token = re.search(r"/kundenbereich/anmelden#([A-Za-z0-9_-]{40,})", text).group(1)
     opened = session.post(f"{BASE_URL}/api/portal/session", json={"token": token}, timeout=60)
     assert opened.status_code == 200, opened.text
     return session

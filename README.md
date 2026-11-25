@@ -227,10 +227,19 @@ Schreibfeld.
 
 ### E-Mail-Versand der Website einrichten
 
-Die Website schickt selbst nur zwei Arten von Mails: die Warnung an dich, wenn
-eine Anfrage nicht in Dolibarr ankommt, und die eine Bewertungsbitte nach einem
-geschlossenen Ticket (nur mit dem Ja des Kunden). Bestätigungen an Kunden
-verschickt Dolibarr.
+Die Website schickt selbst nur wenige Mails: die Warnung an dich, wenn eine
+Anfrage nicht in Dolibarr ankommt, die eine Bewertungsbitte nach einem
+geschlossenen Ticket (nur mit dem Ja des Kunden) und aus dem Kundenbereich den
+Anmelde-Link und die Bestätigung eines angenommenen Angebots. Bestätigungen zu
+Anfragen verschickt Dolibarr.
+
+Die Mails an Kunden kommen als HTML mit Text-Alternative im selben Aussehen wie
+die Mails des Dolibarr-Moduls IT-Tabelander PDF: weißes Blatt, Logo (vom
+Modul-Endpunkt `maillogo.php` auf erp.tabelander.co.at, hell und dunkel),
+orange Linie, Knopf zum Link, „Liebe Grüße“ mit Name und Firma, Fußzeile mit
+Adresse, E-Mail, Web und Telefon; im Dunkelmodus des Mailprogramms dunkel.
+Fußzeile und Grußformel stehen in `backend/app/mail_layout.py`. Warnungen an
+dich bleiben reiner Text.
 
 1. `/admin/technik` öffnen, Block **E-Mail-Versand der Website**.
 2. Mailserver, Port und Verschlüsselung deines Mail-Anbieters eintragen (meist
