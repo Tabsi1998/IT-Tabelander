@@ -146,6 +146,19 @@ test("every document under Belege, filtered by kind (#100)", async ({ page }) =>
   await expectNoSidewaysScroll(page);
 });
 
+test("the overview shows the running services with their terms (#101)", async ({ page }) => {
+  await signedIn(page);
+  const services = page.getByRole("region", { name: "Laufende Leistungen" });
+  const service = services.getByRole("link", { name: /Wartung Büro-PCs/ });
+  await expect(service).toContainText("monatlich");
+  await expect(service).toContainText("45,00");
+  await expect(service).toContainText("Mindestlaufzeit 12 Monate · Kündigungsfrist 3 Monate zum Quartalsende");
+  await service.click();
+  await expect(page).toHaveURL(/\/kundenbereich\/belege\/vertraege\/81$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Vertrag CT2609-0001" })).toBeVisible();
+  await expectNoSidewaysScroll(page);
+});
+
 test("a work report and a contract show what was done and what runs (#100)", async ({ page }) => {
   await signedIn(page, "/kundenbereich/belege/arbeitsberichte/71");
   await expect(page.getByRole("heading", { level: 1, name: "Arbeitsbericht FI2609-0003" })).toBeVisible();
@@ -155,6 +168,8 @@ test("a work report and a contract show what was done and what runs (#100)", asy
 
   await page.goto("/kundenbereich/belege/vertraege/81");
   await expect(page.getByRole("heading", { level: 1, name: "Vertrag CT2609-0001" })).toBeVisible();
+  await expect(page.getByText("Mindestlaufzeit")).toBeVisible();
+  await expect(page.getByText("3 Monate zum Quartalsende")).toBeVisible();
   await expect(page.getByRole("cell", { name: /Wartung Büro-PCs/ })).toContainText("läuft");
   await expect(page.getByText("Für diesen Beleg gibt es noch kein PDF.")).toBeVisible();
 
@@ -173,6 +188,7 @@ for (const scheme of ["light", "dark"]) {
     ["belege", "/kundenbereich/belege", "Belege", true],
     ["auftrag", "/kundenbereich/belege/auftraege/51", "Auftragsbestätigung CO2609-0004", true],
     ["arbeitsbericht", "/kundenbereich/belege/arbeitsberichte/71", "Arbeitsbericht FI2609-0003", true],
+    ["vertrag", "/kundenbereich/belege/vertraege/81", "Vertrag CT2609-0001", true],
   ]) {
     test(`customer area ${name} is accessible in ${scheme === "light" ? "hell" : "dunkel"} (#63)`, async ({ page }, testInfo) => {
       await page.emulateMedia({ colorScheme: scheme });

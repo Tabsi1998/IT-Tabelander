@@ -42,9 +42,14 @@ const INTERVENTION = {
 };
 const CONTRACT = {
   kind: "contracts", id: 81, ref: "CT2609-0001", status: 1, state: "aktiv", date: "2026-09-01T08:00:00+00:00",
-  total: null, has_pdf: false,
+  total: null, has_pdf: false, minimum_months: 12, notice: "3 Monate zum Quartalsende",
   lines: [{ text: "Wartung Büro-PCs", details: "monatlich, 3 Geräte", qty: "1", total: "45.00000000", state: "läuft",
-    start: "2026-09-01T00:00:00+00:00", end: "2027-08-31T00:00:00+00:00" }],
+    start: "2026-09-01T00:00:00+00:00", end: "2027-08-31T00:00:00+00:00", interval: "monatlich" }],
+};
+const SERVICE = {
+  contract_id: 81, contract_ref: "CT2609-0001", text: "Wartung Büro-PCs", details: "monatlich, 3 Geräte", qty: "1",
+  total: "45.00000000", interval: "monatlich", start: "2026-09-01T00:00:00+00:00", end: "2027-08-31T00:00:00+00:00",
+  minimum_months: 12, notice: "3 Monate zum Quartalsende", has_pdf: false,
 };
 const CREDIT_NOTE = { id: 44, ref: "AV2609-0001", status: 1, state: "bezahlt", open: false, credit_note: true,
   date: "2026-09-21T08:00:00+00:00", due: null, total: "-20.00000000", remain: "0", has_pdf: true };
@@ -67,6 +72,7 @@ export function portalState(overrides = {}) {
         valid_until: null, total: "140.00000000", has_pdf: true }],
       invoices: [{ ...INVOICE }, { id: 33, ref: "FA2608-0009", status: 2, state: "bezahlt", open: false, credit_note: false,
         date: "2026-08-30T08:00:00+00:00", due: null, total: "140.00000000", remain: "0", has_pdf: true }, { ...CREDIT_NOTE }],
+      services: [{ ...SERVICE }],
       orders: [{ ...ORDER }], shipments: [{ ...SHIPMENT }], interventions: [{ ...INTERVENTION }], contracts: [{ ...CONTRACT }],
     },
     documents: { "orders/51": ORDER, "shipments/61": SHIPMENT, "interventions/71": INTERVENTION, "contracts/81": CONTRACT },

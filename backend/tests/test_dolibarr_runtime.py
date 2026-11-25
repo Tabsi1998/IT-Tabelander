@@ -955,3 +955,71 @@ class TestAllDocuments:
                 assert requests.get(path, timeout=60).status_code == 401, path
         for path in ("documents/users/1", "documents/proposals/1/pdf", "documents/invoices/1/pdf"):
             assert e.get(f"{BASE_URL}/api/portal/{path}", timeout=60).status_code == 404, path
+
+
+# ---------------------------------------------------------------- running services (#101)
+
+def hosting_contract(socid: int, tag: str, name: str, *, terms: bool) -> dict:
+    """A released contract with a running monthly hosting service and its PDF."""
+    product = int(dolibarr_post("products", {"ref": f"HOST-{name}-{tag}", "label": f"Webhosting {name}", "type": 1,
+                                             "price": 10, "tva_tx": 20, "status": 1, "status_buy": 0,
+                                             "duration_value": 1, "duration_unit": "m"}))
+    body = {"socid": socid, "date_contrat": int(time.time()), "commercial_signature_id": 1, "commercial_suivi_id": 1}
+    if terms:
+        body["array_options"] = {"options_ittab_mindestlaufzeit": 12,
+                                 "options_ittab_kuendigungsfrist": "3 Monate zum Quartalsende"}
+    contract = int(dolibarr_post("contracts", body))
+    dolibarr_post(f"contracts/{contract}/lines", {"desc": f"Webhosting {name}", "fk_product": product, "qty": 1,
+                                                  "subprice": 10, "tva_tx": 20, "date_start": int(time.time()),
+                                                  "date_end": int(time.time()) + 365 * 24 * 3600})
+    dolibarr_post(f"contracts/{contract}/validate", {"notrigger": 0})
+    line = dolibarr_get(f"contracts/{contract}")["lines"][0]
+    response = requests.put(f"{DOLIBARR}/api/index.php/contracts/{contract}/lines/{line['id']}/activate",
+                            headers={"DOLAPIKEY": ADMIN_KEY, "Accept": "application/json"},
+                            # Activating sets the planned end anew; without it the end is gone.
+                            json={"datestart": int(time.time()), "dateend": int(time.time()) + 365 * 24 * 3600},
+                            timeout=30)
+    assert response.status_code == 200, response.text
+    found = dolibarr_get(f"contracts/{contract}")
+    build_pdf("contract", found["ref"], "strato")
+    return dolibarr_get(f"contracts/{contract}")
+
+
+@pytest.fixture(scope="class")
+def services_world(admin_client):
+    """Customer G with a hosting contract (minimum term, notice), customer H with its own."""
+    use_mailpit_for_website_mail(admin_client)
+    switched = admin_client.put(f"{BASE_URL}/api/admin/settings", json={"portal_enabled": True}, timeout=30)
+    assert switched.status_code == 200, switched.text
+    tag = uuid.uuid4().hex[:8]
+    world = {"tag": tag}
+    for key, terms in (("g", True), ("h", False)):
+        world[key] = f"leistungen-{key}-{tag}@example.com"
+        world[f"{key}_id"] = new_customer(f"Leistungen {key.upper()} {tag}", world[key])
+        world[f"{key}_contract"] = hosting_contract(world[f"{key}_id"], tag, key.upper(), terms=terms)
+    world["g_session"] = portal_session(world["g"])
+    return world
+
+
+class TestRunningServices:
+    def test_the_customer_sees_the_service_with_term_notice_interval_and_pdf(self, services_world):
+        """#101: what runs, since when, how often it is billed, minimum term, notice period, PDF."""
+        world = services_world
+        g, contract = world["g_session"], world["g_contract"]
+        services = g.get(f"{BASE_URL}/api/portal/overview", timeout=60).json()["services"]
+        assert [item["text"] for item in services] == ["Webhosting G"], services
+        service = services[0]
+        assert service["contract_ref"] == contract["ref"] and service["interval"] == "monatlich"
+        assert service["minimum_months"] == 12 and service["notice"] == "3 Monate zum Quartalsende"
+        assert service["start"] and service["end"] and float(service["total"]) == 12.0 and service["has_pdf"] is True
+        detail = g.get(f"{BASE_URL}/api/portal/documents/contracts/{contract['id']}", timeout=60).json()
+        assert detail["minimum_months"] == 12 and detail["lines"][0]["interval"] == "monatlich"
+        pdf = g.get(f"{BASE_URL}/api/portal/documents/contracts/{contract['id']}/pdf", timeout=60)
+        assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+
+    def test_a_foreign_customer_sees_nothing_of_it(self, services_world):
+        world = services_world
+        g, foreign = world["g_session"], world["h_contract"]
+        assert foreign["ref"] not in json.dumps(g.get(f"{BASE_URL}/api/portal/overview", timeout=60).json())
+        for suffix in ("", "/pdf"):
+            assert g.get(f"{BASE_URL}/api/portal/documents/contracts/{foreign['id']}{suffix}", timeout=60).status_code == 404

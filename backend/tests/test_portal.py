@@ -572,3 +572,73 @@ def test_a_delivery_note_pdf_is_found_under_its_standard_name(monkeypatch):
 def test_a_credit_note_is_marked_in_the_invoices():
     item = portal._invoice({"id": "45", "ref": "AV1", "type": "2", "status": "1", "paye": "0", "total_ttc": "-20"})
     assert item["credit_note"] is True and item["open"] is False
+
+
+# ------------------------------------------------------------ running services (#101)
+
+def _contract(contract_id, socid, *, status="1", lines=(), options=None, last_main_doc=""):
+    return {"id": str(contract_id), "ref": f"CT{contract_id}", "socid": str(socid), "status": status,
+            "date_contrat": 1790000000, "last_main_doc": last_main_doc, "array_options": options or {},
+            "note_private": "intern", "lines": list(lines)}
+
+
+def _service_line(label, *, status="4", product="5", total="30", **extra):
+    return {"product_label": label, "desc": "", "qty": "1", "total_ttc": total, "status": status, "fk_product": product,
+            "date_start": 1790000000, "date_start_real": 1790100000, "date_end": 1821536000, "pa_ht": "1", **extra}
+
+
+def test_running_services_come_from_released_contracts_of_this_customer(monkeypatch):
+    calls = _with_dolibarr(monkeypatch, _documents_handler(
+        lists={"contracts": [
+            _contract(81, 7, options={"options_ittab_mindestlaufzeit": "12", "options_ittab_kuendigungsfrist": "3 Monate zum Quartalsende"},
+                      last_main_doc="contract/CT81/CT81.pdf",
+                      lines=[_service_line("Webhosting"), _service_line("Altes Postfach", status="5"),
+                             _service_line("Noch nicht aktiv", status="0"), _service_line("Wartung", product="6", total="120")]),
+            _contract(82, 7, status="0", lines=[_service_line("Entwurf")]),
+            _contract(83, 8, lines=[_service_line("Fremd")]),
+            _contract(84, 7, status="2", lines=[_service_line("Beendeter Vertrag")]),
+        ]},
+        objects={"products/5": {"id": "5", "duration_value": "1", "duration_unit": "m", "cost_price": "2"},
+                 "products/6": {"id": "6", "duration_value": "12", "duration_unit": "m"}}))
+    data = asyncio.run(portal.overview(_session(7)))
+    services = data["services"]
+    assert [item["text"] for item in services] == ["Webhosting", "Wartung"]
+    assert services[0] == {"contract_id": 81, "contract_ref": "CT81", "text": "Webhosting", "details": "", "qty": "1",
+                           "total": "30", "interval": "monatlich", "start": dolibarr._iso_time(1790100000),
+                           "end": dolibarr._iso_time(1821536000), "minimum_months": 12,
+                           "notice": "3 Monate zum Quartalsende", "has_pdf": True}
+    assert services[1]["interval"] == "jährlich"
+    assert "intern" not in json.dumps(data) and "cost_price" not in json.dumps(data)
+    # Each product is asked for once, and every list names this customer only.
+    assert sum(1 for call in calls if call.url.path.endswith("/products/5")) == 1
+    for call in calls:
+        query = parse_qs(urlparse(str(call.url)).query)
+        if "/products/" not in call.url.path:
+            assert query.get("socid", query.get("thirdparty_ids")) == ["7"], call.url
+
+
+def test_without_the_product_right_the_interval_is_left_out_not_guessed(monkeypatch):
+    _with_dolibarr(monkeypatch, _documents_handler(
+        lists={"contracts": [_contract(81, 7, lines=[_service_line("Webhosting")])]}, refused=("products/5",)))
+    [service] = asyncio.run(portal.overview(_session(7)))["services"]
+    assert service["interval"] is None and service["minimum_months"] is None and service["notice"] is None
+
+
+@pytest.mark.parametrize(("value", "unit", "text"), [
+    ("1", "m", "monatlich"), ("3", "m", "vierteljährlich"), ("6", "m", "halbjährlich"), ("12", "m", "jährlich"),
+    ("1", "y", "jährlich"), ("2", "y", "alle 2 Jahre"), ("2", "w", "alle 2 Wochen"), ("1", "d", "täglich"),
+    ("", "m", None), ("1", "", None), ("0", "m", None), ("1", "x", None),
+])
+def test_the_billing_interval_in_words(value, unit, text):
+    assert portal.interval_text(value, unit) == text
+
+
+def test_the_contract_page_shows_terms_and_intervals(monkeypatch):
+    _with_dolibarr(monkeypatch, _documents_handler(objects={
+        "contracts/81": _contract(81, 7, options={"options_ittab_mindestlaufzeit": "24"},
+                                  lines=[_service_line("Webhosting")]),
+        "products/5": {"id": "5", "duration_value": "1", "duration_unit": "y"},
+    }))
+    contract = asyncio.run(portal.document_detail(_session(7), "contracts", 81))
+    assert contract["minimum_months"] == 24 and contract["notice"] is None
+    assert contract["lines"][0]["interval"] == "jährlich"

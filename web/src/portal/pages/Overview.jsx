@@ -4,6 +4,42 @@ import { day, money } from "../api.js";
 import { usePortal } from "../PortalApp.jsx";
 import { Loading, Problem } from "./parts.jsx";
 
+/** Hosting, maintenance and the like that run under a contract (#101). */
+function Services({ services }) {
+  if (!services?.length) return null;
+  return (
+    <section aria-labelledby="leistungen" className="flex flex-col gap-3">
+      <h2 id="leistungen" className="m-0 text-[22px] font-bold md:text-2xl">Laufende Leistungen</h2>
+      <ul className="m-0 flex list-none flex-col gap-3 p-0">
+        {services.map((item, index) => (
+          <li key={`${item.contract_id}-${index}`}>
+            <Link to={`/kundenbereich/belege/vertraege/${item.contract_id}`}
+              className="card flex flex-wrap items-start justify-between gap-x-4 gap-y-2 p-5 no-underline hover:border-ink">
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <b className="break-words font-display text-lg">{item.text}</b>
+                <span className="text-sm text-muted">
+                  {[item.start && `seit ${day(item.start)}`, item.end && `geplant bis ${day(item.end)}`, `Vertrag ${item.contract_ref}`]
+                    .filter(Boolean).join(" · ")}
+                </span>
+                {(item.minimum_months || item.notice) && (
+                  <span className="text-sm text-muted">
+                    {[item.minimum_months && `Mindestlaufzeit ${item.minimum_months === 1 ? "1 Monat" : `${item.minimum_months} Monate`}`,
+                      item.notice && `Kündigungsfrist ${item.notice}`].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+              </span>
+              <span className="flex flex-col items-end">
+                <b>{money(item.total)}</b>
+                {item.interval && <span className="text-sm text-muted">{item.interval}</span>}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Tile({ label, value, to, strong }) {
   return (
     <Link to={to} className="card flex flex-col gap-1 p-5 no-underline hover:border-ink">
@@ -67,6 +103,7 @@ export default function Overview() {
           ))}
         </div>
       )}
+      <Services services={data.services} />
     </>
   );
 }

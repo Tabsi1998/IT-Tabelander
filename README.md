@@ -393,7 +393,10 @@ Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie
    - Kundenaufträge, Lieferungen, Serviceaufträge und Verträge: jeweils nur
      **lesen** (Auftragsbestätigungen, Lieferscheine, Arbeitsberichte und
      Verträge im Kundenbereich). Fehlt eines dieser Rechte, bleibt die Belegart
-     leer und im Log der Website steht eine Warnung.
+     leer und im Log der Website steht eine Warnung,
+   - Produkte: **lesen** (Abrechnungsintervall der laufenden Leistungen aus der
+     Dauer der Leistung, z. B. „1 Monat“ = monatlich). Ohne dieses Recht fehlt
+     nur das Intervall.
    Im Benutzer einen API-Schlüssel erzeugen. **Keine** Admin-Rechte.
    Nur vorübergehend zusätzlich „Wissensmanagement: Artikel anlegen/ändern“ –
    für die Entwürfe der Rechtstexte und den einmaligen Umzug der alten FAQ –,
@@ -559,6 +562,16 @@ und Rechnungsnummer als Verwendungszweck – zum Kopieren und als QR-Code, den
 dafür trägst du unter **Technik → Kundenbereich** ein (dasselbe Konto wie auf
 den Rechnungen aus Dolibarr): Sie aus Dolibarr zu lesen, bräuchte ein Recht,
 das auch alle Kontobewegungen zeigt. Die IBAN wird beim Speichern geprüft.
+
+**Laufende Leistungen:** Die Übersicht zeigt jede laufende (aktivierte)
+Leistung aus freigegebenen Verträgen: Bezeichnung, seit wann, geplantes Ende,
+Preis, Abrechnungsintervall (aus der Dauer der Leistung in Dolibarr) und – wenn
+im Vertrag ausgefüllt – **Mindestlaufzeit** und **Kündigungsfrist** aus den
+Zusatzfeldern des Moduls „IT-Tabelander PDF“ (`ittab_mindestlaufzeit`,
+`ittab_kuendigungsfrist`). Leere Felder bleiben weg. Ein Klick führt zum
+Vertrag mit PDF. Die nächste Abrechnung zeigt die Website nicht: Die
+Schnittstelle von Dolibarr verbindet Rechnungsvorlagen nicht verlässlich mit
+dem Vertrag, und raten soll die Seite nicht.
 
 **Belege:** Der Kunde sieht nur freigegebene Belege, nie Entwürfe. Das PDF
 ist das, das Dolibarr zuletzt erzeugt hat (mit dem Modul „IT-Tabelander PDF“
