@@ -42,6 +42,8 @@ export default function Footer({ onHome = true }) {
             {legal("impressum", "Impressum")}
             {legal("datenschutz", "Datenschutz")}
             {legal("nutzungsbedingungen", "Nutzungsbedingungen")}
+            {/* Easy to find, as § 13a FAGG asks (#142). */}
+            <Link to="/rechtliches/widerruf#vertrag-widerrufen" className="flex min-h-[44px] items-center text-on-navy-muted no-underline md:min-h-0">Vertrag widerrufen</Link>
           </nav>
         </div>
         <div className="flex flex-col gap-1 border-t border-navy-line pt-5 text-sm text-on-navy-muted md:flex-row md:justify-between">

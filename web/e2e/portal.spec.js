@@ -89,6 +89,9 @@ test("accept an offer: withdrawal right first, a button that says it costs money
   expect(state.sent.find((item) => item.path === "/offers/31/answer").body)
     .toEqual({ accept: true, name: "Max Muster", start_now: true, reason: "" });
   await expect(page.getByRole("button", { name: "Angebot kostenpflichtig annehmen" })).toHaveCount(0);
+  // Withdrawing online, without another sign-in (§ 13a FAGG, #142).
+  await expect(page.getByRole("region", { name: "Rücktritt" }).getByRole("link", { name: "Vertrag widerrufen" }))
+    .toHaveAttribute("href", "/rechtliches/widerruf?vertrag=PR2609-0007#vertrag-widerrufen");
 });
 
 test("decline an offer with a reason (#65)", async ({ page }) => {

@@ -588,6 +588,30 @@ Datei neu hochladen.
 bzw. `/etc/logrotate.d/nginx`; diese Frist gehört in die
 Datenschutzerklärung.
 
+### Vertrag online widerrufen (§ 13a FAGG)
+
+Seit 1. Oktober 2026 braucht jeder online geschlossene Verbrauchervertrag eine
+Rücktrittsfunktion. Die Website hat sie auf `/rechtliches/widerruf` (Kurzlink
+`/widerruf`, im Fuß jeder Seite „Vertrag widerrufen“), **ohne Anmeldung**:
+
+1. Knopf **„Vertrag widerrufen“** öffnet das Formular: Name, E-Mail für die
+   Bestätigung, Nummer des Vertrags (Angebot, Auftrag oder Rechnung), ganz oder
+   nur ein Teil.
+2. Knopf **„Widerruf bestätigen“** schickt es ab.
+3. Der Kunde bekommt sofort die **Eingangsbestätigung per E-Mail** mit seiner
+   Erklärung, Datum und Uhrzeit des Eingangs und einer Nummer `WR-…`.
+4. Die Adresse unter **Warnungen an** bekommt einen Hinweis.
+5. Gibt es in Dolibarr ein Angebot mit dieser Nummer, bekommt es eine
+   **private Notiz** (der Status bleibt; ob der Widerruf gilt, entscheidest du).
+   Dafür reicht das schon nötige Recht „Angebote: anlegen/ändern“.
+
+Die Bestätigungsmail nach einer Online-Annahme und das angenommene Angebot im
+Kundenbereich verlinken das Formular mit der Nummer schon eingetragen. Pro
+Adresse gehen fünf Widerrufe in der Stunde. Die Website behält danach nur
+Nummer, Zeitpunkte und was hinausging; Name, E-Mail und Vertrag löscht sie,
+sobald der Hinweis an dich draußen ist. Geht die Bestätigung nicht hinaus,
+steht das im Hinweis: dann bestätigst du selbst per E-Mail (Pflicht).
+
 ### Kundenbereich
 
 Unter `/kundenbereich` sehen Kunden ihre Anfragen und Reparaturen, ihre

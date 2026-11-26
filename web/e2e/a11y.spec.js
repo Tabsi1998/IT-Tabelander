@@ -13,6 +13,7 @@ const PAGES = [
   ["startseite", "/", "IT-Technik, die"],
   ["rechtliches", "/rechtliches/impressum", "Rechtliches"],
   ["rechtliches-agb", "/rechtliches/agb-unternehmer", "Rechtliches"],
+  ["rechtliches-widerruf", "/rechtliches/widerruf", "Rechtliches"],
   ["nicht-gefunden", "/gibt-es-nicht", "Diese Seite gibt es nicht."],
   ["bewertung", `/bewertung#${REVIEW_LINK}`, "Wie war’s?"],
 ];
