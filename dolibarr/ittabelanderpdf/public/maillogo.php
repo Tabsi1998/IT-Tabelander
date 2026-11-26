@@ -10,7 +10,7 @@
  */
 
 /**
- * Public, read-only: the company logo for e-mails, an opaque PNG on white
+ * Public, read-only: the company logo for e-mails, a transparent PNG
  * (see WerkbankMailData::logoFile()), or with variant=dark the dark-mode logo.
  * No login, no parameters but the entity and the variant; it serves these
  * images and nothing else.
