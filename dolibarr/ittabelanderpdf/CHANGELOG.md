@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Mail logo (`public/maillogo.php`, light and dark) keeps the transparency of its source instead of a white or dark badge (#179).
+
 ## [1.9.0] - 2026-11-26
 
 - New mail layout for every module mail (templates Sie/Du, automatic send, ticket confirmation and owner notice, signed copies, documents, rollout texts for Mahnwesen and tickets): no logo and no orange line on top any more (CKEditor turned the line into an empty block); the mail starts with the greeting and ends in the style of the owner's signature: closing words, name and company, a rule (`<hr />`), the logo at 180 px, address, e-mail, web and phone, all from the company data and variables.
