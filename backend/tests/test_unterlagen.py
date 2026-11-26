@@ -14,7 +14,7 @@ sys.modules[_spec.name] = imp  # dataclasses look the module up there
 _spec.loader.exec_module(imp)
 
 PUBLIC = {"agb-unternehmer", "widerruf"}
-INTERNAL = {"leistungsbeschreibung-hosting-wartung", "leistungsbeschreibung-hosting-wartung-privat",
+INTERNAL = {"leistungsbeschreibung-betreuung-wartung", "leistungsbeschreibung-betreuung-wartung-privat",
             "auftragsverarbeitung", "fernwartung-einverstaendnis",
             "geraeteannahme-bausteine", "qs-checklisten", "firmendatenblatt", "preisliste"}
 
