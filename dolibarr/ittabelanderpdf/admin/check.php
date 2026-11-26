@@ -60,7 +60,7 @@ foreach ($items as $item) {
 	print '<tr class="oddeven" id="check-'.dol_escape_htmltag($item['key']).'"><td>'.dol_escape_htmltag($item['title']).'</td>';
 	print '<td class="center">'.dolGetStatus($langs->trans($states[$item['state']][0]), '', '', $states[$item['state']][1], 5).'</td>';
 	print '<td class="small">'.$item['detail'].'</td>';
-	print '<td class="right nowraponall">'.($item['link'] !== '' ? '<a href="'.dol_escape_htmltag($item['link']).'">'.img_picto('', 'fa-external-link-alt', 'class="paddingright"').$langs->trans('WerkbankCheckGo').'</a>' : '').'</td></tr>';
+	print '<td class="right nowraponall">'.($item['link'] !== '' ? '<a href="'.dol_escape_htmltag($item['link']).'">'.img_picto('', 'fa-external-link-alt', 'class="paddingright"').$langs->trans($item['state'] === 'ok' ? 'WerkbankHelpGo' : 'WerkbankCheckGo').'</a>' : '').'</td></tr>';
 }
 print '</table></div>';
 

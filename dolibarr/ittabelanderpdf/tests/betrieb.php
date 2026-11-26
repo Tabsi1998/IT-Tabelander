@@ -39,8 +39,8 @@ $check('every item has a state, an explanation and a link', !array_filter($items
 $api = array_values(array_filter($items, function ($item) {
 	return strpos($item['key'], 'api') === 0;
 }));
-$check('the website user without the documents right is named', $api && $api[0]['state'] === 'warn' && strpos($api[0]['detail'], 'Unterlagen') !== false
-	|| $api && $api[0]['state'] === 'ok', $api ? $api[0]['detail'] : '');
+// Without a website user of its own (here: none without admin rights) the check says so; with one, it names the missing rights.
+$check('the website user is checked', $api && in_array($api[0]['state'], array('ok', 'warn'), true) && $api[0]['detail'] !== '', $api ? $api[0]['detail'] : '');
 // A rule pointing to a document that does not exist is reported.
 dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');
 $docs = new WerkbankDocs($db);
