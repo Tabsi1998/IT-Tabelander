@@ -66,7 +66,19 @@ class WerkbankMailData
 	 */
 	public static function greetings($object)
 	{
-		$contact = self::contact($object);
+		$thirdparty = ($object instanceof Societe) ? $object : (isset($object->thirdparty) && is_object($object->thirdparty) ? $object->thirdparty : null);
+		return self::greetingsFor(self::contact($object), $thirdparty);
+	}
+
+	/**
+	 * Greetings (Du, Sie) for a contact, else for the third party.
+	 *
+	 * @param Contact|null $contact    Contact or null
+	 * @param Societe|null $thirdparty Third party or null
+	 * @return string[]                array(Du, Sie)
+	 */
+	public static function greetingsFor($contact, $thirdparty)
+	{
 		if ($contact) {
 			$first = trim((string) $contact->firstname);
 			$last = trim((string) $contact->lastname);
@@ -81,7 +93,6 @@ class WerkbankMailData
 			}
 			return array($du, $sie === 'Guten Tag ,' ? 'Guten Tag,' : $sie);
 		}
-		$thirdparty = ($object instanceof Societe) ? $object : (isset($object->thirdparty) && is_object($object->thirdparty) ? $object->thirdparty : null);
 		// A private person without a contact: "Max Mustermann" is the person.
 		if ($thirdparty && ((string) $thirdparty->typent_code === 'TE_PRIVATE' || (int) $thirdparty->typent_id === 8)) {
 			$name = trim((string) $thirdparty->name);

@@ -65,7 +65,7 @@ foreach ($docs as $doc) {
 	print '<tr class="oddeven">';
 	print '<td><a href="'.$card.'?id='.((int) $doc->rowid).'">'.img_picto('', 'pdf', 'class="pictofixedwidth"').dol_escape_htmltag($doc->title).'</a></td>';
 	print '<td>'.$pdf.'</td>';
-	print '<td>'.$langs->trans('WerkbankDocKind_'.$doc->kind).'</td>';
+	print '<td>'.$langs->trans('WerkbankDocKind_'.$doc->kind).(!(int) $doc->sendable && $doc->kind !== 'customer' ? ' <span class="badge badge-status0">'.$langs->trans('WerkbankDocNotSendable').'</span>' : '').'</td>';
 	print '<td class="center">'.((int) $doc->public ? img_picto($langs->trans('Yes'), 'globe') : '').'</td>';
 	print '<td class="center nowraponall">'.((int) $doc->version > 0 ? 'v'.((int) $doc->version).' · '.dol_print_date($db->jdate($doc->date_release), 'day') : '–').'</td>';
 	print '<td class="center">'.dolGetStatus($langs->trans($state[0]), $langs->trans($state[0]), '', $state[1], 5).'</td>';

@@ -105,7 +105,7 @@ class WerkbankDocMail
 			} elseif ($count === 1) {
 				$intro = $du ? 'anbei bekommst du diese Unterlage als PDF:' : 'anbei erhalten Sie diese Unterlage als PDF:';
 			} else {
-				$intro = $du ? 'anbei bekommst du diese Unterlagen als PDF:' : 'anbei erhalten Sie diese Unterlagen als PDF:';
+				$intro = $du ? 'anbei bekommst du folgende Unterlagen als PDF:' : 'anbei erhalten Sie folgende Unterlagen als PDF:';
 			}
 			$todo = array(
 				'accept' => $du ? 'bitte lies sie durch und bestätige sie kurz mit einer Antwort auf diese Mail.' : 'bitte lesen Sie sie durch und bestätigen Sie sie kurz mit einer Antwort auf diese E-Mail.',

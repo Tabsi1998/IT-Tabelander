@@ -266,6 +266,9 @@ class ActionsIttabelanderpdf
 		$items = WerkbankDocMail::items($this->db, $socid, $paths);
 		$object->substit = array_merge(is_array($object->substit) ? $object->substit : array(), WerkbankDocMail::fromItems($items));
 		$retext = $this->chooseTemplate($object, $socid, $items);
+		$this->chooseRecipient($object);
+		$this->greetRecipient($object);
+		$this->dropNoFileError();
 
 		$inside = true;
 		$html = $object->get_form($parameters['addfileaction'], $parameters['removefileaction']);
@@ -281,6 +284,115 @@ class ActionsIttabelanderpdf
 		$subject = preg_match('#<input[^>]*name="subject"[^>]*value="([^"]*)"#', $html, $match) ? html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '';
 		$this->resprints = substr($html, 0, $at).$this->unterlagenChoice($unterlagen, $socid, $parameters['addfileaction'], $notes, $retext, WerkbankDocMail::fingerprint($message), $subject).substr($html, $at);
 		return 1;
+	}
+
+	/**
+	 * Preselect one recipient when Dolibarr would select none (it does only
+	 * when there is exactly one): the contact of the document (proposal,
+	 * contract: customer contact), else the third party's main contact for
+	 * documents, else the third party's own address. Never several.
+	 *
+	 * @param FormMail $formmail Form
+	 * @return void
+	 */
+	private function chooseRecipient($formmail)
+	{
+		if (GETPOSTISSET('receiver') || GETPOST('action', 'aZ09') !== 'presend' || !is_array($formmail->withto) || count($formmail->withto) < 2) {
+			return;
+		}
+		$keys = array_map('strval', array_keys($formmail->withto));
+		$card = isset($GLOBALS['object']) && is_object($GLOBALS['object']) ? $GLOBALS['object'] : null;
+		$want = '';
+		dol_include_once('/ittabelanderpdf/class/werkbankmaildata.class.php');
+		$contact = $card ? WerkbankMailData::contact($card) : null;
+		if ($contact && !empty($contact->email) && in_array((string) $contact->id, $keys, true)) {
+			$want = (string) $contact->id;
+		}
+		$socid = $this->formSocid();
+		if ($want === '' && $socid > 0) {
+			// A contact with a role at the third party (Dolibarr: contact roles of the company), the first one.
+			$resql = $this->db->query("SELECT sc.fk_socpeople FROM ".MAIN_DB_PREFIX."societe_contacts AS sc INNER JOIN ".MAIN_DB_PREFIX."socpeople AS p ON p.rowid = sc.fk_socpeople"
+				." WHERE sc.fk_soc = ".((int) $socid)." AND p.email <> '' AND p.statut = 1 ORDER BY sc.rowid");
+			while ($resql && ($row = $this->db->fetch_object($resql))) {
+				if (in_array((string) $row->fk_socpeople, $keys, true)) {
+					$want = (string) $row->fk_socpeople;
+					break;
+				}
+			}
+		}
+		if ($want === '' && in_array('thirdparty', $keys, true)) {
+			$want = 'thirdparty';
+		}
+		if ($want !== '') {
+			$_POST['receiver'] = array($want);
+		}
+	}
+
+	/**
+	 * The greeting of the module's templates for the chosen recipient: a
+	 * contact by name ("Guten Tag Frau Muster," / "Hallo Maria,"), the
+	 * third party's address like the third party.
+	 *
+	 * @param FormMail $formmail Form
+	 * @return void
+	 */
+	private function greetRecipient($formmail)
+	{
+		$chosen = GETPOST('receiver', 'array');
+		if (count($chosen) !== 1) {
+			return;
+		}
+		dol_include_once('/ittabelanderpdf/class/werkbankmaildata.class.php');
+		require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
+		$key = (string) reset($chosen);
+		$contact = null;
+		if (ctype_digit($key)) {
+			$contact = new Contact($this->db);
+			if ($contact->fetch((int) $key) <= 0) {
+				$contact = null;
+			}
+		}
+		$card = isset($GLOBALS['object']) && is_object($GLOBALS['object']) ? $GLOBALS['object'] : null;
+		$thirdparty = null;
+		if ($card) {
+			if ($card->element === 'societe') {
+				$thirdparty = $card;
+			} elseif (method_exists($card, 'fetch_thirdparty')) {
+				if (empty($card->thirdparty)) {
+					$card->fetch_thirdparty();
+				}
+				$thirdparty = $card->thirdparty;
+			}
+		}
+		list($du, $sie) = WerkbankMailData::greetingsFor($contact, $thirdparty);
+		$formmail->substit['__ITTAB_HALLO__'] = $du;
+		$formmail->substit['__ITTAB_GUTENTAG__'] = $sie;
+	}
+
+	/**
+	 * Pressing "Beilegen" (or a reload for a new recipient) without a file
+	 * makes Dolibarr say a file is required; for the module's choice that
+	 * is no error.
+	 *
+	 * @return void
+	 */
+	private function dropNoFileError()
+	{
+		global $langs;
+		$names = isset($_FILES['addedfile']['name']) ? (array) $_FILES['addedfile']['name'] : array();
+		if (!GETPOST('addfile', 'alpha') || array_filter($names, 'strlen')) {
+			return;
+		}
+		$langs->load('errors');
+		$text = $langs->trans('ErrorFieldRequired', $langs->transnoentities('File'));
+		if (!empty($_SESSION['dol_events']['errors'])) {
+			$_SESSION['dol_events']['errors'] = array_values(array_filter((array) $_SESSION['dol_events']['errors'], function ($message) use ($text) {
+				return $message !== $text;
+			}));
+			if (!$_SESSION['dol_events']['errors']) {
+				unset($_SESSION['dol_events']['errors']);
+			}
+		}
 	}
 
 	/**
@@ -313,7 +425,16 @@ class ActionsIttabelanderpdf
 	private function chooseTemplate($formmail, $socid, array $items)
 	{
 		global $conf;
+		$edited = GETPOSTISSET('message') && GETPOST('ittabpdf_msghash', 'aZ09') !== ''
+			&& WerkbankDocMail::fingerprint(GETPOST('message', 'restricthtml')) !== GETPOST('ittabpdf_msghash', 'aZ09');
 		if (!isset($formmail->param['models']) || $formmail->param['models'] !== 'thirdparty' || $socid <= 0) {
+			// Other forms: a text nobody changed is built again (new recipient, other documents).
+			if (GETPOSTISSET('ittabpdf_msghash') && !$edited && !GETPOST('modelselected', 'alpha')) {
+				unset($_POST['message'], $_GET['message'], $_REQUEST['message']);
+				if (GETPOST('subject', 'restricthtml') === GETPOST('ittabpdf_subject', 'restricthtml')) {
+					unset($_POST['subject'], $_GET['subject'], $_REQUEST['subject']);
+				}
+			}
 			return '';
 		}
 		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
@@ -603,18 +724,25 @@ class ActionsIttabelanderpdf
 		}
 		$groups = array(array('ittabpdf_gen', $templates, 'WerkbankDocsMailGroupGenerate'), array('ittabpdf_made', $made, 'WerkbankDocsMailGroupMade'),
 			array('ittabpdf_unterlagen', $files, 'WerkbankDocsMailGroupGeneral'));
-		$any = false;
+		$rows = '';
 		foreach ($groups as $group) {
 			if (!$group[1]) {
 				continue;
 			}
-			$any = true;
-			$out .= '<div class="paddingbottom"><span class="opacitymedium">'.$langs->trans($group[2]).'</span> '
-				.$form->multiselectarray($group[0], $group[1], array(), 0, 0, 'minwidth300 maxwidth500', 0, 0, '', '', $langs->transnoentitiesnoconv('WerkbankDocsChoose')).'</div>';
+			$rows .= '<tr><td class="nowraponall paddingright tdtop ittabpdf-unterlagen-label">'.$langs->trans($group[2]).'</td><td>'
+				.$form->multiselectarray($group[0], $group[1], array(), 0, 0, 'minwidth300 maxwidth500 widthcentpercentminusx', 0, '100%', '', '', $langs->transnoentitiesnoconv('WerkbankDocsChoose')).'</td></tr>';
 		}
-		if ($any) {
-			$out .= '<input type="submit" class="button smallpaddingimp" name="'.dol_escape_htmltag($addfileaction).'" value="'.dol_escape_htmltag($langs->trans('WerkbankDocsAttachButton')).'">';
+		if ($rows !== '') {
+			$out .= '<table class="nobordernopadding ittabpdf-unterlagen-table">'.$rows
+				.'<tr><td></td><td><input type="submit" class="button smallpaddingimp" name="'.dol_escape_htmltag($addfileaction).'" value="'.dol_escape_htmltag($langs->trans('WerkbankDocsAttachButton')).'"></td></tr></table>';
 		}
+		// Another recipient: the greeting follows while nobody changed the text (reload like "Beilegen").
+		$out .= '<script>jQuery(function ($) {'
+			.' var changed = false;'
+			.' $("textarea[name=message]").on("input", function () { changed = true; });'
+			.' if (window.CKEDITOR && CKEDITOR.instances.message) { CKEDITOR.instances.message.on("change", function () { changed = true; }); }'
+			.' $("#receiver").on("change", function () { if (!changed) { $("#'.dol_escape_js($addfileaction).'").trigger("click"); } });'
+			.'});</script>';
 		if ($retext === 'edited') {
 			$out .= '<div class="info">'.$langs->trans('WerkbankDocsMailEdited')
 				.' <label><input type="checkbox" name="ittabpdf_retext" value="1"> '.$langs->trans('WerkbankDocsMailRetext').'</label></div>';

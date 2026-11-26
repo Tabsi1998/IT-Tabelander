@@ -929,10 +929,11 @@ def gen() -> None:
     base = "/custom/ittabelanderpdf"
     tab = f"{base}/docs.php?socid={result['firm']}"
     status, html = get(tab)
-    check("tab offers Erzeugen for the customer template", status == 200 and f"action=generateform&amp;rule={result['rule']}" in html)
+    check("tab offers Erzeugen for the customer template", status == 200 and f"action=generateform&rule={result['rule']}" in unescape(html))
     status, html = get(f"{tab}&action=generateform&rule={result['rule']}")
     token = re.search(r'name="token" value="([^"]+)"><input type="hidden" name="action" value="generate">', html)
     check("form shows contract, contact and the fields, prefilled from last time", status == 200 and bool(token) and 'name="contract"' in html
+          and ">Vertrag<" in unescape(html)
           and 'name="field_ansprech" class="minwidth300" value="Maria Muster"' in html and 'name="field_datenkategorien[]"' in html)
     fields = [("token", token.group(1) if token else ""), ("action", "generate"), ("rule", str(result["rule"])), ("contract", str(result["contract"])),
               ("field_datenkategorien[]", "Kundendaten"), ("field_datenkategorien_more", "Fotos; Gesundheitsdaten")]
@@ -1119,7 +1120,7 @@ def versand() -> None:
     status, html, _ = get(tab)
     token = re.search(r'name="token" value="([^"]+)"><input type="hidden" name="action" value="addmanual">', html)
     status, html, url = post(tab, [("token", token.group(1) if token else ""), ("action", "addmanual"), ("slug", "agb-unternehmer"), ("doaction", ""), ("required", "1")])
-    check("tab: a document added by hand is a line with its badge and a remove button", status == 200 and "von Hand hinzugefügt" in unescape(html) and 'value="removemanual"' in html)
+    check("tab: a document added by hand is a line with its badge and a remove button", status == 200 and "von Hand hinzugefügt" in unescape(html) and "action=removemanual" in unescape(html))
     for name, path in (("contract", f"/contrat/card.php?id={result['contract']}"), ("proposal", f"/comm/propal/card.php?id={result['propal']}")):
         status, html, _ = get(path)
         found = re.search(r'href="([^"]*docs\.php\?socid=\d+&(?:amp;)?action=pickdoc&(?:amp;)?(?:contract|propal)=\d+[^"]*)"', html)
@@ -1134,6 +1135,22 @@ def versand() -> None:
     status, html, url = post(f"/custom/ittabelanderpdf/unterlage_card.php?id={result['template']}", [("token", token.group(1) if token else ""),
                                                                                                   ("action", "forcustomer"), ("socid", str(firm))])
     check("…and on to the customer's tab with the document chosen", "docs.php" in url and "slug=gen-test-vereinbarung" in url, url)
+    # 8. 1.8.1: recipient, greeting of the chosen contact, no "file required", layout, history, choices.
+    status, html, _ = get(f"{card}&action=presend&mode=init&ittabpdf_preselect=agb-unternehmer.pdf")
+    receiver = re.search(r'<select[^>]*name="receiver\[\]".*?</select>', html, re.S)
+    selected = re.findall(r'<option value="([^"]*)"[^>]*selected', receiver.group(0)) if receiver else []
+    check("one recipient is preselected (the third party), never several", len(selected) == 1, str(selected))
+    fields = [entry for entry in fields_of(html) if entry[0] != "receiver[]"]
+    status, html, _ = post(card, fields + [("addfile", "Beilegen"), ("receiver[]", str(result["contact"]))])
+    check("the chosen contact is greeted by name", "Guten Tag Frau Muster," in body(html), body(html)[:300])
+    check("attaching without a file shows no error", "ist erforderlich" not in unescape(html) and "erforderlich" not in "".join(re.findall(r'jnotify\("([^"]*)', html)))
+    check("the choices are a table, labels left", "ittabpdf-unterlagen-table" in html and html.count("ittabpdf-unterlagen-label") >= 2)
+    status, html, _ = get(f"/custom/ittabelanderpdf/docs.php?socid={firm}")
+    history = html.split("ittabdocs-history", 1)[1] if "ittabdocs-history" in html else ""
+    check("the history names documents by their title", "AGB für Unternehmer" in unescape(history) and ">agb-unternehmer<" not in history)
+    pick = html.split('value="addmanual"', 1)[1] if 'value="addmanual"' in html else ""
+    check("\"Weitere Unterlage\" offers only what may be sent", "preisliste-intern-test" not in pick and "agb-unternehmer" in pick)
+    check("the line keeps one main action and a menu", "ittabdocs-more-" in html and "Weitere Aktionen" in unescape(html))
     # 8. The setup offers only what may be sent.
     status, html, _ = get("/custom/ittabelanderpdf/admin/setup.php")
     block = html.split("ITTABPDF_DOCS_", 1)[1] if "ITTABPDF_DOCS_" in html else ""

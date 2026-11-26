@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.1] - 2026-11-26
+
+- Mail forms: one recipient is preselected when Dolibarr selects none (it does only with exactly one): the contact of the document (proposal, contract: customer contact), else a contact with a role at the third party, else the third party's address. Never several.
+- The greeting of the module's templates follows the chosen recipient ("Guten Tag Frau Muster," / "Hallo Maria,"); changing the recipient builds the text again while nobody changed it. Unchanged texts are built again in every mail form on reload, not only on third parties.
+- "Beilegen" without a file no longer shows Dolibarr's "file required" error.
+- Several documents: "anbei erhalten Sie folgende Unterlagen als PDF:" (Du likewise).
+- "Angehängte Dateien": the three choices one below the other, label left, field right, same width.
+- Tab "Unterlagen": one main action per line (generate, continue or start signing, send), the rest in Dolibarr's "Weitere Aktionen" menu, so the page no longer scrolls sideways. History names documents by title. "Weitere Unterlage" offers only documents that may be sent. Kinds read "Rechtstext", "Unterlage (auf Anfrage)", "Vorlage je Kunde"; "nicht versendbar" is a mark of its own. "Vertrag"/"Angebot" translated in the generate form.
+
 ## [1.8.0] - 2026-11-26
 
 - Any released document can be added to one customer by hand ("Weitere Unterlage" at the bottom of the tab "Unterlagen"): a line of its own with the same states, removable again (history stays). A template per customer goes on to its form right away. Also from contracts and proposals (button "Unterlage erzeugen"; the generated PDF is filed with the customer, the contract and the proposal) and from the card of a template per customer ("Für Kunden erzeugen …" with the customer choice). Technically a rule for one customer (`fk_soc`, `update_1.8.0.sql`); the setup lists only the general rules.
