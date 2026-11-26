@@ -1,6 +1,19 @@
 # Changelog
 
-## [2.0.0] - unreleased
+## [2.0.1] - 2026-11-27
+
+Fixes from going through 2.0.0 in production (#190).
+
+- Agenda: the timeline of a third party ("Ereignisse/Agenda", with event types shown) named the type by its code ("AC_ITTAB_DOC - Unterlage erzeugt: …"). Dolibarr leaves every automatic event type that names a module out of its list: the type "Unterlage" has no module any more (corrected on activation) and a translation (`ActionAC_ITTAB_DOC`).
+- Agenda: the Stand in an event's title is always TT.MM.JJJJ; events written through the REST API or the cron job had "(Stand 11/26/2026)". Titles of 2.0.0 with the US date are corrected once on activation. The Stand in the list of "Unterlagen zusenden" likewise.
+- E-mails with documents ("Unterlagen zusenden", "Alle fehlenden zusenden", "Erinnerung Unterlagen", Sie/Du): with the customer area switched on and a customer the website lets in (active customer or prospect, not "Kundenbereich gesperrt"), the list asks first to confirm or sign in the customer area, with the button "Im Kundenbereich erledigen" to `/kundenbereich/unterlagen`; a reply or a scan stay as the other way. Otherwise as before. The templates are unchanged (the text comes from `__ITTAB_UNTERLAGEN_LISTE__`), edited ones get it too.
+- System check, mail logo: no false alarm when the server does not reach its own public address (hairpin NAT). The logo file is checked here; a failed call of the public address is only a hint to open the link once in a private window.
+- System check, website user: only the website's API user is checked, not every user with an API key (a maintenance user was listed as "Website-Benutzer"). New choice "Website-Benutzer" below the checks (`ITTABPDF_WEBSITE_USER`); "selbst finden" takes the only API user without admin rights, with several the only one with the right "Unterlagen und Rechtstexte lesen", else it asks to choose.
+- System check: missing rights with umlauts ("Geschäftspartner lesen") no longer show as HTML entities.
+- Widget "Offen": the customer by name (code and full name as tooltip) instead of "CU2611-00005 - …", customer above the document in one column, cut with a tooltip: nothing scrolls sideways in half a column or on a phone.
+- The older widget "Fehlende Unterlagen (IT-Tabelander PDF)" is removed ("Offen" shows the same and more); on activation it is taken off every start page.
+
+## [2.0.0] - 2026-11-26
 
 ### Operation and help (#180)
 

@@ -2,7 +2,7 @@
 
 Belege im Werkbank-Design von IT-Tabelander, mit den echten Markenschriften, dazu passende E-Mail-Vorlagen und ein verzögerter, abbrechbarer automatischer Versand.
 
-Modulnummer **756230** · Version 2.0.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
+Modulnummer **756230** · Version 2.0.1 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
 
 ![Entwurf](docs/entwurf/mockup.png)
 
@@ -12,7 +12,7 @@ Modulnummer **756230** · Version 2.0.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2
 - **Agenda:** Erzeugen, Unterschreiben, Hochladen, Abhaken, Erinnerungen, abgeschlossene Prüfprotokolle und Geräteannahmen stehen als Ereignis „Unterlage“ beim Kunden und beim Beleg.
 - **Nachfassen:** Widget **Offen** auf der Startseite; automatische **Erinnerung** für verschickte, unbeantwortete Pflicht-Unterlagen (einschaltbar).
 - **Mails:** Fakten-Box und Knöpfe überstehen Dolibarrs Editor; händisch und automatisch versendete Mails sehen gleich aus.
-- **Einstellungen:** Reiter **Texte außerhalb des Moduls** (Mahnwesen-Vorlagen und Ticket-Einleitung per Knopf, mit Vorschau und Sicherung), **Systemcheck** (Rechte, Cron, Logo, Vorlagen, Regeln, Preisliste, E-Mail-Sammler, CAPTCHA) und **Hilfe**.
+- **Einstellungen:** Reiter **Texte außerhalb des Moduls** (Mahnwesen-Vorlagen und Ticket-Einleitung per Knopf, mit Vorschau und Sicherung), **Systemcheck** (Rechte des Website-Benutzers – wählbar, falls es mehrere API-Benutzer gibt –, Cron, Logo, Vorlagen, Regeln, Preisliste, E-Mail-Sammler, CAPTCHA; ob das Mail-Logo von außen kommt, lässt sich vom Server selbst oft nicht prüfen und ist dann nur ein Hinweis) und **Hilfe**.
 
 ## Was das Modul kann
 
@@ -103,7 +103,7 @@ Unternehmensunterlagen und Rechtstexte sind ein eigener Bereich des Moduls (Men�
 - **Kundenbereich der Website (2.0.0):** Der Kunde sieht dieselben Unterlagen mit ihrem Zustand, lädt sie als PDF (die unterschriebene Fassung, sonst die für ihn erzeugte, sonst die allgemeine – nie eine leere Vorlage je Kunde), **bestätigt** AGB und Nutzungsbedingungen mit Namen und Haken und **unterschreibt** AVV und Fernwartung am Bildschirm. Eine Bestätigung ist sofort erledigt („im Kundenbereich“, Nachweis mit Name, E-Mail, IP und Stand im Verlauf und in der Agenda). Bei einer Unterschrift steht die Unterlage danach auf **Unterschrift läuft** (auch im Widget „Offen“): Die Gegenzeichnung machst du im Reiter mit **Weiter unterschreiben**, dann ist sie erledigt und der Kunde bekommt im Kundenbereich das unterschriebene PDF. REST-API für den Website-Benutzer (Recht **Unterlagen und Rechtstexte lesen**, sonst keines): `GET /ittabelanderpdf/kunden/<socid>/unterlagen`, `GET …/unterlagen/<name>/pdf`, `POST …/unterlagen/<name>/bestaetigen` (`name`, `email`, `ip`, `version` = der Stand, den der Kunde gesehen hat), `POST …/unterlagen/<name>/unterschreiben` (dazu `png` als Base64 ohne `data:` und ohne `=`, wegen der WAF). Das Modul prüft selbst, dass die Unterlage zu diesem Kunden gehört und gerade zu bestätigen bzw. zu unterschreiben ist; eine inzwischen neue Fassung lehnt es ab.
 - **Automatisch:** Geht eine Unterlage per Mail hinaus („Unterlagen beilegen“ oder Standard-Anhang), steht sie auf „Verschickt“. Wird das Angebot, mit dem sie ging oder an dessen PDF sie hängt, angenommen – auch im Kundenbereich der Website –, ist sie erledigt („im Kundenbereich“). Unterschrift am Gerät und Upload haken sie ebenfalls ab.
 - **Regeln** (Einstellungen → IT-Tabelander PDF → Reiter **Unterlagen je Kunde**): je Regel Bezeichnung, Unterlage (Dateiname), was der Kunde tut (akzeptieren, unterschreiben – dann unterschreiben beide –, Empfang bestätigen), Bedingungen, die alle gelten müssen und einzeln leer bleiben dürfen: **Kunde** (egal / Firmen / Privatpersonen) UND **Vertrag mit** Produkt-Referenz (z. B. `DL-WART*`) UND **Kategorie** des Kunden; Pflicht/optional, „Neue Fassung neu bestätigen“ (ändert sich der Artikel, gilt eine ältere Bestätigung nicht mehr). Mitgeliefert: AGB Unternehmer (Firmen), Nutzungsbedingungen (Privat), AVV und Leistungsbeschreibung IT-Betreuung und Wartung (Vertrag mit `DL-WART*`; ab 1.8.2, vorher Hosting/Wartung – beim Aktivieren ziehen Regeln und Standard-Anhänge auf die neuen Unterlagen um, sobald es sie gibt), Einverständnis Fernwartung (Kunden-Kategorie „Fernwartung“; ohne diese Kategorie ist die Regel aus, bis sie in den Einstellungen gewählt ist).
-- **Damit nichts vergessen wird:** Hinweis „2 Unterlagen fehlen: …“ mit Knopf auf Kunden-, Angebots-, Vertrags- und Serviceauftragskarte (abschaltbar); Startseiten-Widget **„Fehlende Unterlagen“** (Kunden mit offenen Pflicht-Unterlagen); beim Aktivieren einer Vertragsleistung, deren Produkt eine fehlende Pflicht-Unterlage verlangt, eine Warnung oder – einstellbar – eine Sperre.
+- **Damit nichts vergessen wird:** Hinweis „2 Unterlagen fehlen: …“ mit Knopf auf Kunden-, Angebots-, Vertrags- und Serviceauftragskarte (abschaltbar); Startseiten-Widget **„Offen“** (fehlende Pflicht-Unterlagen, Mails ohne Antwort, angefangene Unterschriften, offene QS; ersetzt seit 2.0.1 das Widget „Fehlende Unterlagen“); beim Aktivieren einer Vertragsleistung, deren Produkt eine fehlende Pflicht-Unterlage verlangt, eine Warnung oder – einstellbar – eine Sperre.
 
 ## Unterlagen für einen Kunden erzeugen (Platzhalter und Eingabefelder)
 
@@ -117,7 +117,7 @@ Unternehmensunterlagen und Rechtstexte sind ein eigener Bereich des Moduls (Men�
 
 ## Verlauf in der Agenda
 
-Was mit Unterlagen passiert (erzeugt, unterschrieben, hochgeladen, abgehakt, hinzugefügt, entfernt, zurückgesetzt, neue Fassung nötig), dazu abgeschlossene Prüfprotokolle und unterschriebene Geräteannahmen, steht als Ereignis „Unterlage“ in Dolibarrs Agenda: beim Geschäftspartner und beim Beleg (Vertrag, Angebot, Serviceauftrag, Ticket), im Reiter „Ereignisse/Agenda“. Den Mailversand trägt Dolibarr selbst ein. Abschaltbar unter Einstellungen → Unterlagen je Kunde → „Verlauf in der Agenda“. Beim Aktivieren wird der bisherige Verlauf einmal nachgetragen.
+Was mit Unterlagen passiert (erzeugt, unterschrieben, hochgeladen, abgehakt, hinzugefügt, entfernt, zurückgesetzt, neue Fassung nötig), dazu abgeschlossene Prüfprotokolle und unterschriebene Geräteannahmen, steht als Ereignis „Unterlage“ in Dolibarrs Agenda: beim Geschäftspartner und beim Beleg (Vertrag, Angebot, Serviceauftrag, Ticket), im Reiter „Ereignisse/Agenda“. Den Mailversand trägt Dolibarr selbst ein. Abschaltbar unter Einstellungen → Unterlagen je Kunde → „Verlauf in der Agenda“. Beim Aktivieren wird der bisherige Verlauf einmal nachgetragen. In der Zeitleiste des Geschäftspartners heißt der Typ „Unterlage“ (bis 2.0.0 stand dort mit „Typ der Ereignisse anzeigen“ der Code `AC_ITTAB_DOC`); das Datum im Titel ist immer TT.MM.JJJJ.
 
 ## Unterlagen senden und von Hand hinzufügen
 
@@ -180,6 +180,7 @@ Zusätzlich zu Dolibarrs eigenen Variablen (`__REF__`, `__MYCOMPANY_NAME__`, …
 | `__ITTAB_SENDUNG__` | Sendungsnummer mit Link (nur Lieferungen mit Sendungsnummer) |
 | `__ITTAB_KUNDENBEREICH_URL__` | Link auf den Beleg im Kundenbereich der Website (Angebot, Rechnung/Gutschrift, Auftrag, Lieferschein, Arbeitsbericht, Vertrag; sonst die Startseite) |
 | `__ITTAB_KUNDENBEREICH_BLOCK__` | Button „Im Kundenbereich ansehen“, leer solange „Kundenbereich der Website aktiv“ aus ist |
+| `__ITTAB_UNTERLAGEN_LISTE__`, `__ITTAB_UNTERLAGEN_LISTE_DU__` | Liste der beigelegten Unterlagen mit Stand und was zu tun ist; mit Kundenbereich (an, und der Kunde darf hinein) zuerst „im Kundenbereich bestätigen/unterschreiben“ mit Button „Im Kundenbereich erledigen“ auf `/kundenbereich/unterlagen`, danach Antwort bzw. Scan |
 | `__ITTAB_FRAGEN_SATZ__`, `__ITTAB_FRAGEN_SATZ_DU__` | Wie man fragt (Sie/Du): „einfach auf diese E-Mail antworten“, mit Kundenbereich zusätzlich „oder im Kundenbereich schreiben“. Kein Telefon-Satz; die Nummer steht nur in der Fußzeile |
 | `__ITTAB_ANNAHME_SATZ__`, `__ITTAB_ANNAHME_SATZ_DU__` | Satz zur Annahme des Angebots (Sie/Du): mit Kundenbereich „online im Kundenbereich annehmen oder antworten“, ohne „einfach auf diese E-Mail antworten“ |
 | `__ITTAB_LOGO__` | Firmenlogo als verlinktes Bild: `public/maillogo.php` des Moduls liefert das Logo der Firmeneinstellungen als transparentes PNG (ohne Anmeldung, zwischengespeichert), oder die Adresse aus `ITTABPDF_MAIL_LOGO_URL`. Ohne Logo: Wortmarke als Text |
