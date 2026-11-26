@@ -251,6 +251,12 @@ class WerkbankDoc
 				return -1;
 			}
 		}
+		// Customers who confirmed an older version of a renewing rule: "neue Fassung nötig".
+		if ($number > 1) {
+			require_once __DIR__.'/werkbankdocs.class.php';
+			$renew = new WerkbankDocs($this->db);
+			$renew->markOutdated((string) $doc->slug, dol_print_date($date, '%Y-%m-%d'), $user);
+		}
 		// A successor of a renamed document is there now: rules and settings follow (WerkbankDocs::RENAMED).
 		require_once __DIR__.'/werkbankdocs.class.php';
 		if (in_array($doc->slug, array_column(WerkbankDocs::RENAMED, 0), true)) {

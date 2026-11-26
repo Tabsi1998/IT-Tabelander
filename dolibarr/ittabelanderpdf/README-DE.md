@@ -106,6 +106,10 @@ Unternehmensunterlagen und Rechtstexte sind ein eigener Bereich des Moduls (Men�
 - **Dieselben Platzhalter** gelten in den Hinweisen des Geräteannahmescheins und des Prüfprotokolls.
 - **Import:** In `docs/unterlagen/` macht die Kopfzeile `Art: Vorlage je Kunde` eine Datei zur Vorlage je Kunde.
 
+## Verlauf in der Agenda
+
+Was mit Unterlagen passiert (erzeugt, unterschrieben, hochgeladen, abgehakt, hinzugefügt, entfernt, zurückgesetzt, neue Fassung nötig), dazu abgeschlossene Prüfprotokolle und unterschriebene Geräteannahmen, steht als Ereignis „Unterlage“ in Dolibarrs Agenda: beim Geschäftspartner und beim Beleg (Vertrag, Angebot, Serviceauftrag, Ticket), im Reiter „Ereignisse/Agenda“. Den Mailversand trägt Dolibarr selbst ein. Abschaltbar unter Einstellungen → Unterlagen je Kunde → „Verlauf in der Agenda“. Beim Aktivieren wird der bisherige Verlauf einmal nachgetragen.
+
 ## Unterlagen senden und von Hand hinzufügen
 
 - **Weitere Unterlage** (Reiter „Unterlagen“ unten): jede freigegebene Unterlage für diesen Kunden hinzufügen, auch ohne Regel – mit „was der Kunde tut“ und Pflicht ja/nein. Sie erscheint als eigene Zeile („von Hand hinzugefügt“) mit Status, Erzeugen, Senden, Unterschreiben, Hochladen, Abhaken und **Entfernen** (Verlauf bleibt). Dasselbe über **„Unterlage erzeugen“** auf Vertrag und Angebot (das PDF liegt dann auch dort) und **„Für Kunden erzeugen …“** auf der Karte einer Vorlage je Kunde.

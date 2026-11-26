@@ -210,8 +210,13 @@ class WerkbankDocs
 			$kind = (string) $documents[$slug]['kind'];
 			$action = isset($kinds[$kind]) ? $kinds[$kind] : 'handover';
 		}
-		return $this->saveRule(0, array('label' => $documents[$slug]['title'], 'slug' => $slug, 'action' => $action, 'customer_type' => '', 'products' => '',
+		$id = $this->saveRule(0, array('label' => $documents[$slug]['title'], 'slug' => $slug, 'action' => $action, 'customer_type' => '', 'products' => '',
 			'fk_category' => 0, 'required' => $required ? 1 : 0, 'renew' => 0, 'position' => 0, 'active' => 1, 'fk_soc' => (int) $soc->id));
+		if ($id > 0) {
+			global $user;
+			$this->record((int) $soc->id, $slug, 'added', 'hand', is_object($user) ? $user : null, array('fk_rule' => $id));
+		}
+		return $id;
 	}
 
 	/**
@@ -227,9 +232,18 @@ class WerkbankDocs
 		if ($socid <= 0) {
 			return 0;
 		}
+		$rule = $this->rule($id);
 		$ok = $this->db->query("DELETE FROM ".MAIN_DB_PREFIX."ittabpdf_docrule WHERE rowid = ".((int) $id)." AND fk_soc = ".((int) $socid)
 			." AND entity = ".((int) $conf->entity));
-		return $ok ? ($this->db->affected_rows(true) > 0 ? 1 : 0) : $this->fail();
+		if (!$ok) {
+			return $this->fail();
+		}
+		if ($this->db->affected_rows(true) <= 0) {
+			return 0;
+		}
+		global $user;
+		$this->record((int) $socid, (string) $rule->slug, 'removed', 'hand', is_object($user) ? $user : null);
+		return 1;
 	}
 
 	/**
@@ -545,7 +559,74 @@ class WerkbankDocs
 			." ".(!empty($extra['filename']) ? "'".$this->db->escape((string) $extra['filename'])."'" : "NULL").","
 			." ".(isset($extra['note']) && trim((string) $extra['note']) !== '' ? "'".$this->db->escape(trim((string) $extra['note']))."'" : "NULL").","
 			." ".(is_object($user) ? (int) $user->id : "NULL").")";
-		return $this->db->query($sql) ? (int) $this->db->last_insert_id(MAIN_DB_PREFIX.'ittabpdf_docevent') : $this->fail();
+		if (!$this->db->query($sql)) {
+			return $this->fail();
+		}
+		$id = (int) $this->db->last_insert_id(MAIN_DB_PREFIX.'ittabpdf_docevent');
+		$this->toAgenda($id, $user);
+		return $id;
+	}
+
+	/**
+	 * The history row as an event in Dolibarr's agenda (WerkbankAgenda).
+	 *
+	 * @param int       $id   Row
+	 * @param User|null $user Who
+	 * @return void
+	 */
+	private function toAgenda($id, $user)
+	{
+		require_once __DIR__.'/werkbankagenda.class.php';
+		if (WerkbankAgenda::enabled()) {
+			$agenda = new WerkbankAgenda($this->db);
+			$agenda->logDocEvent($this->event($id), is_object($user) ? $user : null);
+		}
+	}
+
+	/**
+	 * A new version of a document was released: every customer who had done
+	 * an older one under a rule that asks again gets "neue Fassung nötig" in
+	 * the history (and the agenda).
+	 *
+	 * @param string $slug  Document
+	 * @param string $stand New "Stand" (Y-m-d)
+	 * @param User   $user  Who released it
+	 * @return int          Customers marked
+	 */
+	public function markOutdated($slug, $stand, $user)
+	{
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		$marked = 0;
+		$rows = $this->rows("SELECT DISTINCT fk_soc FROM ".MAIN_DB_PREFIX."ittabpdf_docevent WHERE slug = '".$this->db->escape($slug)."'"
+			." AND state IN ('".implode("','", self::DONE)."')");
+		foreach ($rows as $row) {
+			$soc = new Societe($this->db);
+			if ($soc->fetch((int) $row->fk_soc) <= 0) {
+				continue;
+			}
+			foreach ($this->status($soc) as $entry) {
+				if ($entry['rule']->slug === $slug && $entry['state'] === 'outdated') {
+					if ($this->record((int) $soc->id, $slug, 'outdated', 'hand', $user, array('fk_rule' => (int) $entry['rule']->rowid, 'version' => $stand)) > 0) {
+						$marked++;
+					}
+					break;
+				}
+			}
+		}
+		return $marked;
+	}
+
+	/**
+	 * Open required documents of a customer, for the badge of the tab.
+	 *
+	 * @param int $socid Customer
+	 * @return int
+	 */
+	public function openCount($socid)
+	{
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		$soc = new Societe($this->db);
+		return $soc->fetch((int) $socid) > 0 ? count($this->missing($soc)) : 0;
 	}
 
 	/**
@@ -568,8 +649,13 @@ class WerkbankDocs
 	 */
 	public function markSigned($id, $filename)
 	{
-		return $this->db->query("UPDATE ".MAIN_DB_PREFIX."ittabpdf_docevent SET state = 'signed', date_event = '".$this->db->idate(dol_now())."',"
-			." filename = '".$this->db->escape($filename)."' WHERE rowid = ".((int) $id)." AND state = 'signing'") ? 1 : $this->fail();
+		global $user;
+		if (!$this->db->query("UPDATE ".MAIN_DB_PREFIX."ittabpdf_docevent SET state = 'signed', date_event = '".$this->db->idate(dol_now())."',"
+			." filename = '".$this->db->escape($filename)."' WHERE rowid = ".((int) $id)." AND state = 'signing'")) {
+			return $this->fail();
+		}
+		$this->toAgenda((int) $id, is_object($user) ? $user : null);
+		return 1;
 	}
 
 	/**

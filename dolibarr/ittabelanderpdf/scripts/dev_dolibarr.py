@@ -1161,7 +1161,7 @@ def versand() -> None:
     check("the history names documents by their title", "AGB für Unternehmer" in unescape(history) and ">agb-unternehmer<" not in history)
     pick = html.split('value="addmanual"', 1)[1] if 'value="addmanual"' in html else ""
     check("\"Weitere Unterlage\" offers only what may be sent", "preisliste-intern-test" not in pick and "agb-unternehmer" in pick)
-    check("the line keeps one main action and a menu", "dropdown-holder" in html and "Weitere Aktionen" in unescape(html))
+    check("the line keeps one main action and a menu", "ittabdocs-actions" in html and "dropdown" not in html.split("ittabdocs-list", 1)[-1].split("</table>", 1)[0])
     # 8. The setup offers only what may be sent.
     status, html, _ = get("/custom/ittabelanderpdf/admin/setup.php")
     block = html.split("ITTABPDF_DOCS_", 1)[1] if "ITTABPDF_DOCS_" in html else ""
@@ -1209,19 +1209,46 @@ def editor() -> None:
     print(f"{len(checks)} editor checks passed")
 
 
+def agenda() -> None:
+    """The history in Dolibarr's agenda (tests/agenda.php), then the agenda tabs and the counter of the tab."""
+    result = php("run", script="agenda.php")
+    checks = [dict(entry, page="php") for entry in result["checks"]]
+    opener = browser()
+
+    def get(path: str) -> str:
+        return unescape(opener.open(f"{URL}{path}", timeout=60).read().decode("utf-8", "replace"))
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
+
+    html = get(f"/societe/agenda.php?socid={result['firm']}")
+    check("third party agenda shows the document events", "Unterlage hinzugefügt" in html and "Unterlage abgehakt" in html)
+    html = get(f"/contrat/agenda.php?id={result['contract']}")
+    check("contract agenda shows the event of its document", "Unterlage abgehakt" in html)
+    html = get(f"/societe/card.php?socid={result['firm']}")
+    tab = re.search(r'id="ittabpdfdocs"[^>]*>(.*?)</a>', html, re.S) or re.search(r'Unterlagen<span class="badge[^"]*">(\d+)</span>', html)
+    check("the tab Unterlagen carries the number of open documents", bool(tab), html[html.find("ittabpdfdocs") - 200:html.find("ittabpdfdocs") + 300] if "ittabpdfdocs" in html else "")
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"agenda check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} agenda checks passed")
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "editor": editor, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "editor": editor, "agenda": agenda, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand", "editor"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand", "editor", "agenda"):
                 steps[name]()
         elif step in steps:
             steps[step]()

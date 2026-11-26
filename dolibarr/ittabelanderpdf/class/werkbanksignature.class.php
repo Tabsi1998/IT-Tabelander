@@ -340,6 +340,13 @@ class WerkbankSignature
 			$intake = new WerkbankIntake($this->db);
 			$path = $intake->write($loaded['object'], $signed);
 			$this->error = $intake->error;
+			// Signed by everyone: once in the agenda of the customer and the ticket.
+			if ($path !== '' && count(array_intersect(self::roles($kind, $loaded), array_keys($signed))) === count(self::roles($kind, $loaded))) {
+				global $user;
+				require_once __DIR__.'/werkbankagenda.class.php';
+				$agenda = new WerkbankAgenda($this->db);
+				$agenda->logIntake($loaded['object'], dol_now(), is_object($user) ? $user : null);
+			}
 		}
 		if ($path !== '') {
 			self::copyToThirdparty($path, $loaded['socid']);

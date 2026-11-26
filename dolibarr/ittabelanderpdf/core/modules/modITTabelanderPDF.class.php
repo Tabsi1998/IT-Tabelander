@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '1.9.0';
+		$this->version = '2.0.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -64,7 +64,7 @@ class modITTabelanderPDF extends DolibarrModules
 		// QS on interventions and from the third party (qs.php works on a phone too).
 		$this->tabs = array(
 			'intervention:+ittabpdfqs:WerkbankQsTab:ittabelanderpdf@ittabelanderpdf:$user->hasRight("ittabelanderpdf", "qs", "run"):/ittabelanderpdf/qs.php?fichinter=__ID__',
-			'thirdparty:+ittabpdfdocs:WerkbankDocsTab:ittabelanderpdf@ittabelanderpdf:$user->hasRight("societe", "lire"):/ittabelanderpdf/docs.php?socid=__ID__',
+			'thirdparty:+ittabpdfdocs:WerkbankDocsTab,WerkbankDocs,/ittabelanderpdf/class/werkbankdocs.class.php,openCount:ittabelanderpdf@ittabelanderpdf:$user->hasRight("societe", "lire"):/ittabelanderpdf/docs.php?socid=__ID__',
 			'thirdparty:+ittabpdfqs:WerkbankQsTab:ittabelanderpdf@ittabelanderpdf:$user->hasRight("ittabelanderpdf", "qs", "run") && isModEnabled("ficheinter"):/ittabelanderpdf/qs.php?socid=__ID__',
 		);
 
@@ -290,6 +290,12 @@ class modITTabelanderPDF extends DolibarrModules
 			if ($store->importKnowledge($GLOBALS['user']) < 0) {
 				dol_syslog('ittabelanderpdf: takeover of knowledge articles failed: '.$store->error, LOG_WARNING);
 			}
+		}
+		// The history in Dolibarr's agenda (2.0.0): the event type, and what happened so far, once.
+		dol_include_once('/ittabelanderpdf/class/werkbankagenda.class.php');
+		if (WerkbankAgenda::ensureType($this->db) > 0) {
+			$agenda = new WerkbankAgenda($this->db);
+			$agenda->backfill();
 		}
 		// A template per customer never lies blank in the folder (1.8.0).
 		$store->removeBlanks($GLOBALS['user']);
