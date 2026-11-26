@@ -1572,8 +1572,10 @@ def module_steps() -> list:
              module_stage("agenda", 1800), ("versand",)),
         Step(group, "erinnerung", "Open items widget and reminders for documents without reply",
              module_stage("erinnerung", 1800), ("agenda",)),
+        Step(group, "betrieb", "System check, help and texts outside the module",
+             module_stage("betrieb", 1800), ("erinnerung",)),
         Step(group, "kundenbereich", "Customer area documents over the REST API: list, PDF, confirm, sign",
-             module_stage("kundenbereich", 1800), ("erinnerung",)),
+             module_stage("kundenbereich", 1800), ("betrieb",)),
     ]
 
 

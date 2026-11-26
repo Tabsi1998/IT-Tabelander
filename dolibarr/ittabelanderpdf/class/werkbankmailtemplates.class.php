@@ -400,75 +400,9 @@ class WerkbankMailTemplates
 			$e(WerkbankBuilder::bareUrl((string) $company->url)), WerkbankMailData::phoneLink($phone));
 	}
 
-	/**
-	 * The sheet: white, 560 px at most, logo, the short orange line, the
-	 * text, then the footer. Kept for texts of earlier versions; new mails
-	 * use signature() and the frame of wrapDocument().
-	 *
-	 * @param string $logo   Logo HTML or variable
-	 * @param string $body   Text
-	 * @param string $footer Footer (footerLines())
-	 * @return string
-	 */
-	public static function sheet($logo, $body, $footer)
-	{
-		return '<div style="max-width:560px;margin:0 auto;padding:12px 20px 28px 20px;background:#ffffff;font-family:'.self::FONT.';font-size:16px;line-height:1.6;color:'.self::BODY.';">'
-			.'<div style="margin:0 0 18px 0;">'.$logo.'</div>'
-			.self::accent()
-			.$body
-			.$footer
-			.'</div>';
-	}
 
-	/**
-	 * The short orange line below the logo: a border, not a filled cell, so
-	 * no client can make it taller; height 0 keeps its placeholder invisible.
-	 *
-	 * @return string
-	 */
-	public static function accent()
-	{
-		return '<div style="width:56px;height:0;max-height:0;overflow:hidden;border-top:2px solid '.self::BRAND.';margin:0 0 28px 0;font-size:1px;line-height:1px;">&nbsp;</div>';
-	}
 
-	/**
-	 * Closing line, name in ink, company.
-	 *
-	 * @param string $words   "Mit freundlichen Grüßen" / "Liebe Grüße"
-	 * @param string $name    Name (HTML)
-	 * @param string $company Company (HTML)
-	 * @param int    $gap     Space above in px (the message has its writing line right before)
-	 * @return string
-	 */
-	public static function closing($words, $name, $company, $gap = 24)
-	{
-		return '<p style="'.self::P.'margin:'.((int) $gap).'px 0 0 0;">'.$words.'<br><strong style="color:'.self::INK.';">'.$name.'</strong><br>'.$company.'</p>';
-	}
 
-	/**
-	 * The footer: one fine divider, then four short grey lines. No register
-	 * numbers (those stay on the PDF), the phone number as its own neutral
-	 * tel: link. Arguments are HTML (variables or escaped values).
-	 *
-	 * @param string $name    Company name
-	 * @param string $manager Manager
-	 * @param string $address Street, ZIP and town
-	 * @param string $email   E-mail address
-	 * @param string $url     Web address (href)
-	 * @param string $web     Web address as shown
-	 * @param string $phone   Phone link
-	 * @return string
-	 */
-	public static function footerLines($name, $manager, $address, $email, $url, $web, $phone)
-	{
-		$link = 'color:'.self::MUTED.';text-decoration:none;';
-		return '<div style="margin:32px 0 0 0;padding:16px 0 0 0;border-top:1px solid '.self::LINE.';font-family:'.self::FONT.';font-size:13px;line-height:1.7;color:'.self::MUTED.';">'
-			.'<strong style="color:'.self::INK.';">'.$name.'</strong> · '.$manager.'<br>'
-			.$address.'<br>'
-			.'<a href="mailto:'.$email.'" style="'.$link.'">'.$email.'</a> · <a href="'.$url.'" style="'.$link.'">'.$web.'</a><br>'
-			.$phone
-			.'</div>';
-	}
 
 	/**
 	 * The full document the automatic send puts around a template: light and
@@ -735,37 +669,7 @@ class WerkbankMailTemplates
 	// (ticket intro/signature, Mahnwesen letters): every piece closes its own
 	// tags, inline styles only, so the parts can stand next to anything.
 
-	/**
-	 * Logo and the short orange line, for a text that starts a mail.
-	 *
-	 * @param string $logo Logo HTML or a variable (__ITTAB_LOGO__)
-	 * @return string
-	 */
-	public static function headerBlock($logo)
-	{
-		// 1.9.0: mails start with the greeting; the logo is part of the signature.
-		return '';
-	}
 
-	/**
-	 * The footer with the company data written out (no variables), for texts
-	 * that Dolibarr does not run through the module's variables.
-	 *
-	 * @param Societe $company Company
-	 * @return string
-	 */
-	public static function footerBlock($company)
-	{
-		$e = function ($text) {
-			return dol_escape_htmltag((string) $text);
-		};
-		$address = trim(str_replace("\n", ', ', trim((string) $company->address)).', '.trim($company->zip.' '.$company->town), ', ');
-		$phone = !empty($company->phone_mobile) ? $company->phone_mobile : $company->phone;
-		return '<div style="max-width:560px;background:#ffffff;">'
-			.self::footerLines($e($company->name), $e($company->managers), $e($address), $e($company->email), $e($company->url),
-				$e(WerkbankBuilder::bareUrl((string) $company->url)), WerkbankMailData::phoneLink($phone))
-			.'</div>';
-	}
 
 	/**
 	 * A text paragraph in the template style.

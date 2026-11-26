@@ -924,7 +924,9 @@ if ($stage === 'rollout') {
 	$T = 'WerkbankMailTemplates';
 	// The ticket_send template is new in this version: install what is missing.
 	$T::install($db, (int) $conf->entity);
-	$footer = $T::footerBlock($mysoc);
+	dol_include_once('/ittabelanderpdf/class/werkbankrollout.class.php');
+	// The texts come from the module (setup tab "Texte außerhalb des Moduls" writes the same ones).
+	$rollout = WerkbankRollout::mahnwesen($mysoc);
 	$end = '<!--MAHNWESEN_PDF_END-->';
 
 	// Mahnwesen: the PDF letter prints everything before the end marker, so the
@@ -985,8 +987,7 @@ if ($stage === 'rollout') {
 		$signature = $T::signatureFor('', $mysoc, '__ITTAB_LOGO__');
 		// The name stands in the letter already: from the rule on (logo and contact).
 		$signature = substr($signature, 0, strpos($signature, '<p ')).substr($signature, strpos($signature, '<hr '));
-		$html = '<div style="max-width:560px;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;">'.$body.'</div>'.$end
-			.'<div style="max-width:560px;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;margin:16px 0 0 0;">'.$signature.'</div>';
+		list($subject, $html) = $rollout[$name];
 		file_put_contents($out.'/mahnwesen/'.$name.'.html', $html."\n");
 		if (!function_exists('testSqlAndScriptInject')) {
 			require_once DOL_DOCUMENT_ROOT.'/waf.inc.php';
@@ -1040,7 +1041,7 @@ if ($stage === 'rollout') {
 		'neues-ticket' => $div.$T::paragraph('Guten Tag,')
 			.$T::paragraph('danke für Ihre Anfrage. Sie ist bei mir angekommen, ich sehe sie mir an und melde mich bei Ihnen.')
 			.$T::paragraph('Den aktuellen Stand finden Sie jederzeit über den Link unten.').'</div>',
-		'einleitung' => $div.$T::paragraph('Guten Tag,').'</div>',
+		'einleitung' => WerkbankRollout::ticketIntro(),
 		'signatur' => $div.$T::signatureFor('Mit freundlichen Grüßen', $mysoc, $image('light')).'</div>',
 	);
 	foreach ($texts as $name => $html) {
@@ -1065,7 +1066,7 @@ if ($stage === 'rollout') {
 	// TICKET_MESSAGE_MAIL_SIGNATURE stays empty.
 	$middle = strtr((string) $template->content, array('__TICKET_SUBJECT__' => 'Notebook startet nicht',
 		"\u{00A0}" => 'das Netzteil war defekt, ein neues ist bestellt und kommt am Donnerstag. Danach ist das Notebook am selben Tag fertig.',
-		'__USER_SIGNATURE__' => $div.'<strong style="color:#1B3348;">'.dol_escape_htmltag($mysoc->managers).'</strong><br>'.dol_escape_htmltag($mysoc->name).'</div>'.$footer));
+		'__USER_SIGNATURE__' => $T::signatureFor('', $mysoc, $image('light'))));
 	$reply = $texts['einleitung'].'<br><br>'.$middle;
 	$mail = new CMailFile('['.$mysoc->name.' - Ticket TS2611-0001] Notebook startet nicht', 'max@mustermann.example', 'IT-Tabelander <office@tabelander.co.at>', $reply, array(), array(), array(), '', '', 0, 1);
 	$sent['ticket reply'] = $mail->sendfile() ? 'ok' : 'FAILED '.$mail->error;

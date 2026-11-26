@@ -2,6 +2,13 @@
 
 ## [2.0.0] - unreleased
 
+### Operation and help (#180)
+
+- Setup tab "Texte außerhalb des Moduls": the Mahnwesen templates and the ticket introduction in the module's look, compared with what Dolibarr has, written there after confirmation; the old values go into a backup file first (Documents → ittabelanderpdf → rollout). `TICKET_MESSAGE_MAIL_SIGNATURE` is emptied (the reply template ends with the user's signature). Replaces copying from `docs/rollout/`.
+- Setup tab "Systemcheck": rights of the website's API user, the module's cron job, the mail logo reachable without sign-in, templates up to date, legal texts released and public, rules pointing to released documents that may be sent, price list categories, e-mail collector, CAPTCHA – each with its state, what it means and a link to fix it.
+- Tab "Hilfe": short guides (send, generate, sign, documents, rules, following up, QS, intake, price list, templates, system check) with links.
+- Clean-up: the old mail building blocks (sheet with logo on top, orange line, footer) are gone; English texts complete.
+
 ### Customer area (#187)
 
 - REST API for the website's customer area (right "Unterlagen lesen" only): `GET kunden/{socid}/unterlagen` lists the documents of the customer with state, Stand, whether to confirm or to sign and which file there is; `GET kunden/{socid}/unterlagen/{slug}/pdf` gives the signed file, else the one generated for the customer, else the general PDF, never a blank template per customer; only documents in the customer's own status rows, only files from the customer's own folder.
