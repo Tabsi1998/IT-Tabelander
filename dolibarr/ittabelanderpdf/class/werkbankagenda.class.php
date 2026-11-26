@@ -32,7 +32,7 @@ class WerkbankAgenda
 	/** States of company documents that become an event, with their verb. */
 	const STATES = array('generated' => 'WerkbankAgendaGenerated', 'sent' => 'WerkbankAgendaSent', 'signed' => 'WerkbankAgendaSigned',
 		'uploaded' => 'WerkbankAgendaUploaded', 'checked' => 'WerkbankAgendaChecked', 'added' => 'WerkbankAgendaAdded', 'removed' => 'WerkbankAgendaRemoved',
-		'revoked' => 'WerkbankAgendaRevoked', 'outdated' => 'WerkbankAgendaOutdated');
+		'revoked' => 'WerkbankAgendaRevoked', 'outdated' => 'WerkbankAgendaOutdated', 'reminded' => 'WerkbankAgendaReminded');
 
 	/** @var DoliDB */
 	private $db;

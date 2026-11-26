@@ -183,7 +183,11 @@ class WerkbankMailQueue
 				." WHERE rowid = ".((int) $row->rowid);
 			$this->db->query($sql);
 		}
-		$this->output = 'sent '.$counts['sent'].', cancelled '.$counts['cancelled'].', failed '.$counts['error'];
+		// Reminders for documents sent and not answered (ITTABPDF_REMIND).
+		require_once __DIR__.'/werkbankdocs.class.php';
+		$docs = new WerkbankDocs($this->db);
+		$reminded = $docs->remindDue($user);
+		$this->output = 'sent '.$counts['sent'].', cancelled '.$counts['cancelled'].', failed '.$counts['error'].', reminders '.$reminded;
 		return 0;
 	}
 
@@ -281,7 +285,7 @@ class WerkbankMailQueue
 	 * @param string       $to      Recipient confirmed by the user, instead of contact/third party
 	 * @return array{ok:bool,to:string,template:int,error:string}
 	 */
-	public function send($object, $key, $user, $withPdf, $trigger, $form = '', $files = null, $to = '')
+	public function send($object, $key, $user, $withPdf, $trigger, $form = '', $files = null, $to = '', array $extra = array())
 	{
 		global $conf, $langs, $mysoc;
 		$langs->loadLangs(array('main', 'mails', 'errors', 'ittabelanderpdf@ittabelanderpdf'));
@@ -360,6 +364,8 @@ class WerkbankMailQueue
 		$substitutions['__SENDEREMAIL_SIGNATURE__'] = $user->signature;
 		$substitutions['__EMAIL__'] = $to;
 		complete_substitutions_array($substitutions, $langs, $object, array('mode' => 'formemail', 'ittab_auto' => 1));
+		// Variables of the caller (the documents of a reminder).
+		$substitutions = array_merge($substitutions, $extra);
 		$subject = make_substitutions((string) $template->topic, $substitutions);
 		// Only this path sends a full document with <style> (light and dark);
 		// templates and hand-sent mails carry inline styles only.

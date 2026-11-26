@@ -64,6 +64,11 @@ if ($action === 'save_rules') {
 	$mode = GETPOST('ITTABPDF_DOCS_CONTRACT_CHECK', 'aZ09');
 	dolibarr_set_const($db, 'ITTABPDF_DOCS_CONTRACT_CHECK', in_array($mode, array('off', 'warn', 'block'), true) ? $mode : 'warn', 'chaine', 0, '', $conf->entity);
 	dolibarr_set_const($db, 'ITTABPDF_DOCS_BANNER', GETPOST('ITTABPDF_DOCS_BANNER') ? '1' : '0', 'chaine', 0, '', $conf->entity);
+	if (GETPOSTISSET('ittabpdf_remind_shown')) {
+		dolibarr_set_const($db, 'ITTABPDF_REMIND', GETPOST('ITTABPDF_REMIND') ? '1' : '0', 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'ITTABPDF_REMIND_DAYS', (string) max(1, GETPOSTINT('ITTABPDF_REMIND_DAYS')), 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'ITTABPDF_REMIND_MAX', (string) max(1, GETPOSTINT('ITTABPDF_REMIND_MAX')), 'chaine', 0, '', $conf->entity);
+	}
 	if (GETPOSTISSET('ittabpdf_agenda_shown')) {
 		dolibarr_set_const($db, 'ITTABPDF_AGENDA', GETPOST('ITTABPDF_AGENDA') ? '1' : '0', 'chaine', 0, '', $conf->entity);
 	}
@@ -156,6 +161,10 @@ print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('WerkbankDocsB
 print '<tr class="oddeven"><td>'.$langs->trans('WerkbankDocsContractCheck').'</td><td>'.Form::selectarray('ITTABPDF_DOCS_CONTRACT_CHECK', array(
 	'off' => $langs->trans('WerkbankDocsContractCheckOff'), 'warn' => $langs->trans('WerkbankDocsContractCheckWarn'), 'block' => $langs->trans('WerkbankDocsContractCheckBlock')),
 	getDolGlobalString('ITTABPDF_DOCS_CONTRACT_CHECK', 'warn')).'</td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('WerkbankRemindSetting').'</td><td><input type="hidden" name="ittabpdf_remind_shown" value="1">'
+	.'<input type="checkbox" name="ITTABPDF_REMIND" value="1"'.(getDolGlobalInt('ITTABPDF_REMIND') ? ' checked' : '').'> '
+	.$langs->trans('WerkbankRemindSettingHelp', '<input type="number" min="1" name="ITTABPDF_REMIND_DAYS" class="width50" value="'.WerkbankDocs::waitDays().'">',
+		'<input type="number" min="1" name="ITTABPDF_REMIND_MAX" class="width50" value="'.max(1, getDolGlobalInt('ITTABPDF_REMIND_MAX', 2)).'">').'</td></tr>';
 print '<tr class="oddeven"><td>'.$langs->trans('WerkbankAgendaSetting').'</td><td><input type="hidden" name="ittabpdf_agenda_shown" value="1">'
 	.'<input type="checkbox" name="ITTABPDF_AGENDA" value="1"'.(getDolGlobalInt('ITTABPDF_AGENDA', 1) ? ' checked' : '').'> '.$langs->trans('WerkbankAgendaSettingHelp').'</td></tr>';
 print '<tr class="oddeven"><td>'.$langs->trans('WerkbankVarsHours').'</td><td><input type="text" name="ITTABPDF_GESCHAEFTSZEITEN" class="minwidth300" value="'.dol_escape_htmltag(getDolGlobalString('ITTABPDF_GESCHAEFTSZEITEN')).'"'

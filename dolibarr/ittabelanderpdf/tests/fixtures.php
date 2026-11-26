@@ -638,7 +638,7 @@ if ($stage === 'mails') {
 
 	// Installation: templates, extra field, cron job.
 	$templates = (int) rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf'");
-	$check('templates installed (31)', $templates === 31, (string) $templates);
+	$check('templates installed (33)', $templates === 33, (string) $templates);
 	$check('extra field ittab_du', (bool) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."extrafields WHERE name = 'ittab_du' AND elementtype = 'societe'"));
 	$check('cron job registered', (bool) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."cronjob WHERE objectname = 'WerkbankMailQueue' AND methodename = 'runCron' AND frequency = 5 AND unitfrequency = 60"));
 
@@ -650,7 +650,7 @@ if ($stage === 'mails') {
 	$check('old labels with brackets are renamed', $renamed === 2 && !rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND label LIKE '%(%'"), (string) $renamed);
 	$check('renaming keeps the text of an edited template', strpos((string) rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND label = 'Nachricht · Du'"), 'Eigene Zeile') !== false);
 	$check('renaming twice changes nothing, nothing installed twice', WerkbankMailTemplates::renameLabels($db, (int) $conf->entity) === 0 && WerkbankMailTemplates::install($db, (int) $conf->entity) === 0
-		&& (int) rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf'") === 31);
+		&& (int) rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf'") === 33);
 	WerkbankMailTemplates::upgrade($db, (int) $conf->entity, true);
 
 	// Templates of 1.0.0/1.0.1 as production has them: two untouched, one edited
@@ -678,7 +678,7 @@ if ($stage === 'mails') {
 	$check('upgrade renews untouched 1.0.1 templates', is_array($result) && $result['updated'] === 2 && $result['edited'] === 1, json_encode($result));
 	$check('upgrade keeps the edited template', strpos((string) rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND label = 'Vertrag · Sie'"), 'Eigener Zusatz') !== false);
 	$result = WerkbankMailTemplates::upgrade($db, (int) $conf->entity, true);
-	$check('forced upgrade replaces the edited one', is_array($result) && $result['updated'] === 1 && $result['current'] === 30, json_encode($result));
+	$check('forced upgrade replaces the edited one', is_array($result) && $result['updated'] === 1 && $result['current'] === 32, json_encode($result));
 	$check('own templates stay untouched', rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE label = 'Angebot senden'") === 'Eigener Text');
 	if (!function_exists('testSqlAndScriptInject')) {
 		require_once DOL_DOCUMENT_ROOT.'/waf.inc.php';

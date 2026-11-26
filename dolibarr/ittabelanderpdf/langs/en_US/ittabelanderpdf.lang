@@ -667,3 +667,17 @@ WerkbankDocsActionGenerateShort = Generate
 WerkbankDocsActionGenerateAgainShort = Generate again
 WerkbankDocsActionContinueShort = Continue signing
 WerkbankDocsSendAllMissing = Send all missing
+
+# 2.0.0: open items, reminders
+WerkbankOpenBox = Open (documents, signatures, QS)
+WerkbankOpenBoxTitle = Open (%s)
+WerkbankOpenBoxNone = Nothing open.
+WerkbankOpenKind_missing = missing
+WerkbankOpenKind_waiting = no reply
+WerkbankOpenKind_signing = signature
+WerkbankOpenKind_qs = QS
+WerkbankOpenDays = for %s days
+WerkbankAgendaReminded = Reminder sent
+WerkbankRemindSetting = Reminder
+WerkbankRemindSettingHelp = Remind of required documents sent without reply after %s days, at most %s times (template "Erinnerung Unterlagen · Sie/Du", the PDF attached again). The days also count for "no reply" in the widget "Open".
+WerkbankDocsEvent_reminded = reminder sent

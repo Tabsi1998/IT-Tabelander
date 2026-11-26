@@ -1244,19 +1244,46 @@ def agenda() -> None:
     print(f"{len(checks)} agenda checks passed")
 
 
+def erinnerung() -> None:
+    """Open items and reminders (tests/remind.php), then the mail in Mailpit and the widget on the start page."""
+    urllib.request.urlopen(urllib.request.Request(f"{MAILPIT_URL}/api/v1/messages", method="DELETE"), timeout=30)
+    result = php("run", script="remind.php")
+    checks = [dict(entry, page="php") for entry in result["checks"]]
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
+
+    time.sleep(2)
+    sent = [mailpit(f"message/{item['ID']}") for item in mailpit("messages?limit=50").get("messages", [])]
+    reminder = [detail for detail in sent if detail["Subject"].startswith("Erinnerung:")]
+    files = [entry["FileName"] for detail in reminder for entry in detail.get("Attachments") or []]
+    text = re.sub(r"\s+", " ", unescape(reminder[0].get("HTML") or "")) if reminder else ""
+    check("one reminder with the document and the list", len(reminder) == 1 and "widerruf.pdf" in files and "Rückmeldung" in text and "<li" in text,
+          f"{[d['Subject'] for d in sent]} {files}")
+    opener = browser()
+    home = unescape(opener.open(f"{URL}/index.php?mainmenu=home", timeout=60).read().decode("utf-8", "replace"))
+    check("start page shows the widget Offen", "Offen (" in home)
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"erinnerung check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} reminder checks passed")
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "editor": editor, "agenda": agenda, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "editor": editor, "agenda": agenda, "erinnerung": erinnerung, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand", "editor", "agenda"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand", "editor", "agenda", "erinnerung"):
                 steps[name]()
         elif step in steps:
             steps[step]()

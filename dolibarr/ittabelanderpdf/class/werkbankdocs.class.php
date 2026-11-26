@@ -617,6 +617,141 @@ class WerkbankDocs
 	}
 
 	/**
+	 * Days a document may wait for an answer after sending (widget, reminders).
+	 *
+	 * @return int
+	 */
+	public static function waitDays()
+	{
+		return max(1, getDolGlobalInt('ITTABPDF_REMIND_DAYS', 7));
+	}
+
+	/**
+	 * What waits for someone, for the start page: required documents
+	 * missing, sent and not answered for longer than waitDays(), signatures
+	 * begun on the device, QS checklists not closed. Newest first per kind.
+	 *
+	 * @param int $max Items at most
+	 * @return array<int,array{kind:string,who:string,what:string,url:string,since:string}>
+	 */
+	public function openItems($max = 15)
+	{
+		global $langs, $conf;
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		$items = array();
+		$tab = dol_buildpath('/ittabelanderpdf/docs.php', 1).'?socid=';
+		$limit = dol_now() - self::waitDays() * 86400;
+		$customers = $this->rows("SELECT DISTINCT s.rowid FROM ".MAIN_DB_PREFIX."societe AS s WHERE s.client IN (1, 3) AND s.status = 1 AND s.entity IN (".getEntity('societe').")"
+			." ORDER BY s.nom");
+		foreach ($customers as $row) {
+			$soc = new Societe($this->db);
+			if ($soc->fetch((int) $row->rowid) <= 0) {
+				continue;
+			}
+			foreach ($this->status($soc) as $entry) {
+				$title = (string) $entry['title'];
+				if ($entry['state'] === 'sent' && $entry['sent'] && $this->db->jdate($entry['sent']->date_event) < $limit) {
+					$days = (int) floor((dol_now() - $this->db->jdate($entry['sent']->date_event)) / 86400);
+					$items[] = array('kind' => 'waiting', 'who' => $soc->getNomUrl(1), 'what' => $title, 'url' => $tab.((int) $soc->id).'#rule-'.((int) $entry['rule']->rowid),
+						'since' => $langs->trans('WerkbankOpenDays', $days));
+				} elseif ($entry['state'] === 'signing' && $entry['signing']) {
+					$items[] = array('kind' => 'signing', 'who' => $soc->getNomUrl(1), 'what' => $title,
+						'url' => dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=doc&id='.((int) $entry['signing']->rowid),
+						'since' => dol_print_date($this->db->jdate($entry['signing']->date_event), 'day'));
+				} elseif ((int) $entry['rule']->required && in_array($entry['state'], array('missing', 'outdated', 'generated'), true)) {
+					$items[] = array('kind' => 'missing', 'who' => $soc->getNomUrl(1), 'what' => $title, 'url' => $tab.((int) $soc->id).'#rule-'.((int) $entry['rule']->rowid),
+						'since' => '');
+				}
+			}
+		}
+		// QS checklists still open.
+		if (isModEnabled('ficheinter')) {
+			foreach ($this->rows("SELECT r.rowid, r.type_label, r.date_creation, f.ref, f.fk_soc, s.nom FROM ".MAIN_DB_PREFIX."ittabpdf_qs_run AS r"
+				." INNER JOIN ".MAIN_DB_PREFIX."fichinter AS f ON f.rowid = r.fk_fichinter LEFT JOIN ".MAIN_DB_PREFIX."societe AS s ON s.rowid = f.fk_soc"
+				." WHERE r.status = 0 AND f.entity IN (".getEntity('intervention').") ORDER BY r.date_creation") as $run) {
+				$items[] = array('kind' => 'qs', 'who' => dol_escape_htmltag((string) $run->nom), 'what' => $run->type_label.' · '.$run->ref,
+					'url' => dol_buildpath('/ittabelanderpdf/qs.php', 1).'?id='.((int) $run->rowid), 'since' => dol_print_date($this->db->jdate($run->date_creation), 'day'));
+			}
+		}
+		// The ones waiting longest and the signatures first.
+		$order = array('waiting' => 0, 'signing' => 1, 'qs' => 2, 'missing' => 3);
+		usort($items, function ($a, $b) use ($order) {
+			return $order[$a['kind']] <=> $order[$b['kind']];
+		});
+		return array_slice($items, 0, $max);
+	}
+
+	/**
+	 * Remind customers of required documents sent and not answered: after
+	 * waitDays() without signature or confirmation, at most
+	 * ITTABPDF_REMIND_MAX times (template "Erinnerung · Sie/Du", the document
+	 * attached again). Only with ITTABPDF_REMIND on; run by the cron job.
+	 *
+	 * @param User $user Cron user
+	 * @return int       Reminders sent
+	 */
+	public function remindDue($user)
+	{
+		if (!getDolGlobalInt('ITTABPDF_REMIND')) {
+			return 0;
+		}
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		require_once __DIR__.'/werkbankmailqueue.class.php';
+		require_once __DIR__.'/werkbankdocmail.class.php';
+		$limit = dol_now() - self::waitDays() * 86400;
+		$most = max(1, getDolGlobalInt('ITTABPDF_REMIND_MAX', 2));
+		$unterlagen = new WerkbankUnterlagen($this->db);
+		$queue = new WerkbankMailQueue($this->db);
+		$sent = 0;
+		foreach ($this->rows("SELECT DISTINCT fk_soc FROM ".MAIN_DB_PREFIX."ittabpdf_docevent WHERE state = 'sent'") as $row) {
+			$soc = new Societe($this->db);
+			if ($soc->fetch((int) $row->fk_soc) <= 0) {
+				continue;
+			}
+			$events = $this->events((int) $soc->id);
+			foreach ($this->status($soc) as $entry) {
+				if ($entry['state'] !== 'sent' || !(int) $entry['rule']->required || !$entry['sent'] || $this->db->jdate($entry['sent']->date_event) >= $limit) {
+					continue;
+				}
+				// Reminders since the document went out the first time in this round.
+				$reminded = 0;
+				foreach ($events as $event) {
+					if ($event->slug !== $entry['rule']->slug) {
+						continue;
+					}
+					if (!in_array($event->state, array('sent', 'reminded', 'generated'), true)) {
+						break;
+					}
+					$reminded += $event->state === 'reminded' ? 1 : 0;
+				}
+				if ($reminded >= $most) {
+					continue;
+				}
+				// The same file again: the one generated for the customer, else the general one.
+				$path = '';
+				if (!empty($entry['generated'])) {
+					$path = WerkbankSignature::thirdpartyDir((int) $soc->id).'/'.basename((string) $entry['generated']->filename);
+				} else {
+					$path = $unterlagen->path($entry['rule']->slug.'.pdf');
+				}
+				if ($path === '' || !is_readable($path)) {
+					continue;
+				}
+				$extra = WerkbankDocMail::substitutions($this->db, (int) $soc->id, array($path));
+				$result = $queue->send($soc, 'reminder', $user, false, 'COMPANY_SENTBYMAIL', '', array($path), '', $extra);
+				if ($result['ok']) {
+					$this->record((int) $soc->id, (string) $entry['rule']->slug, 'reminded', 'mail', $user, array('fk_rule' => (int) $entry['rule']->rowid,
+						'filename' => basename($path), 'note' => $result['to']));
+					$sent++;
+				} else {
+					dol_syslog('ittabelanderpdf: reminder to '.$soc->name.' failed: '.$result['error'], LOG_WARNING);
+				}
+			}
+		}
+		return $sent;
+	}
+
+	/**
 	 * Open required documents of a customer, for the badge of the tab.
 	 *
 	 * @param int $socid Customer

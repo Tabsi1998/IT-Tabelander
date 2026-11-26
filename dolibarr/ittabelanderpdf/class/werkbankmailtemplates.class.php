@@ -104,6 +104,13 @@ class WerkbankMailTemplates
 				array('anbei die Unterlage mit unseren Unterschriften als PDF, für Ihre Unterlagen. Sie müssen nichts weiter tun.'),
 				array('anbei die Unterlage mit unseren Unterschriften als PDF, für deine Unterlagen. Du musst nichts weiter tun.'),
 				1),
+			// Reminder of documents sent and not answered (cron, ITTABPDF_REMIND).
+			'reminder' => array('thirdparty', 'Erinnerung Unterlagen', 'Erinnerung: __ITTAB_UNTERLAGEN_BETREFF__',
+				array('vor einigen Tagen habe ich Ihnen eine Unterlage geschickt, zu der mir Ihre Rückmeldung noch fehlt. Hier noch einmal, im Anhang als PDF:',
+					'__ITTAB_UNTERLAGEN_LISTE__', '__ITTAB_UNTERLAGEN_SCHLUSS__'),
+				array('vor einigen Tagen habe ich dir eine Unterlage geschickt, zu der mir deine Rückmeldung noch fehlt. Hier noch einmal, im Anhang als PDF:',
+					'__ITTAB_UNTERLAGEN_LISTE_DU__', '__ITTAB_UNTERLAGEN_SCHLUSS_DU__'),
+				1),
 			// Company documents to the customer (tab "Unterlagen", "Unterlagen beilegen"):
 			// subject, opening, list with what to do and closing follow the attached files (WerkbankDocMail).
 			'docsend' => array('thirdparty', 'Unterlagen zusenden', '__ITTAB_UNTERLAGEN_BETREFF__',
@@ -297,7 +304,7 @@ class WerkbankMailTemplates
 				: '<p style="'.$p.'">'.($paragraph === '<br>' ? $paragraph : self::text($paragraph)).'</p>';
 		}
 		// A third party has no facts box (no number, no amount).
-		$plain = in_array($key, array('thirdparty', 'unterlage', 'docsend'), true);
+		$plain = in_array($key, array('thirdparty', 'unterlage', 'docsend', 'reminder'), true);
 		if (!$plain) {
 			$body .= '__ITTAB_FAKTEN__';
 		}
@@ -579,6 +586,9 @@ class WerkbankMailTemplates
 				$topicForm = ($key === 'shipping' && $form === 'du') ? 'Deine Lieferung: Lieferschein __REF__' : $topic;
 				if ($key === 'docsend' && $form === 'du') {
 					$topicForm = '__ITTAB_UNTERLAGEN_BETREFF_DU__';
+				}
+				if ($key === 'reminder' && $form === 'du') {
+					$topicForm = 'Erinnerung: __ITTAB_UNTERLAGEN_BETREFF_DU__';
 				}
 				$rows[self::label($key, $form)] = array($key, $form, $type, $topicForm, self::html($paragraphs, $form, $key), (int) $attach);
 			}
