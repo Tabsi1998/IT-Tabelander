@@ -132,6 +132,52 @@ abstract class WerkbankBuilder
 	}
 
 	/**
+	 * A sheet without address field and info block (company documents,
+	 * forms): head, title, content blocks, footer.
+	 *
+	 * @param string $title      Title (the point is added by the renderer)
+	 * @param string $shortTitle Name on follow-up pages
+	 * @return array<string,mixed>
+	 */
+	protected function sheet($title, $shortTitle)
+	{
+		$mysoc = $this->mysoc;
+		return array(
+			'layout' => 'sheet',
+			'title' => $title,
+			'subtitle' => '',
+			'meta' => '',
+			'short_title' => $shortTitle,
+			'pdf_title' => $title,
+			'pdf_subject' => $title,
+			'author' => (string) $mysoc->name,
+			'keywords' => $title,
+			'logo' => $this->logoPath(),
+			'company_name' => (string) $mysoc->name,
+			'head_lines' => $this->headLines(),
+			'sender_line' => '',
+			'recipient_name' => '',
+			'recipient_address' => '',
+			'info' => array(),
+			'intro' => '',
+			'blocks' => array(),
+			'desc_title' => '',
+			'columns' => array(),
+			'rows' => array(),
+			'left' => array(),
+			'qr' => null,
+			'totals' => null,
+			'freetext' => '',
+			'signatures' => array(),
+			'esign' => false,
+			'pagesign' => false,
+			'footer' => $this->footer(),
+			'watermark' => '',
+			'append' => array(),
+		);
+	}
+
+	/**
 	 * The company logo from the setup, full size for a sharp print, the
 	 * small thumbnail when only that exists; '' without a logo.
 	 *

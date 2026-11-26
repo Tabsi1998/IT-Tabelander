@@ -15,7 +15,8 @@ the IT-Tabelander repository; run this from that folder.
     python scripts/dev_dolibarr.py rollout    Mahnwesen and ticket texts into docs/rollout/, sent to Mailpit
     python scripts/dev_dolibarr.py ui         log in and check the card banner and the queue page
     python scripts/dev_dolibarr.py tickets    the module's own ticket confirmation (tests/ticket_confirm.php), checked in Mailpit
-    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets
+    python scripts/dev_dolibarr.py unterlagen company documents from the knowledge base (tests/unterlagen.php), mail form, ticket, setup
+    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets, unterlagen
     python scripts/dev_dolibarr.py down       remove containers, volumes and network
 
 Standard library only. Passwords are new on every start; the local test
@@ -46,6 +47,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -341,16 +343,185 @@ def tickets() -> None:
         raise SystemExit("ticket check failed")
 
 
+class FormFields(HTMLParser):
+    """The named fields of one form (by id or class) as a browser would post them."""
+
+    def __init__(self, marker: str) -> None:
+        super().__init__(convert_charrefs=True)
+        self.marker, self.depth, self.fields = marker, 0, []
+        self.textarea: str | None = None
+        self.select: str | None = None
+        self.multiple, self.chosen = False, False
+        self.first: str | None = None
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        attr = {key: value or "" for key, value in attrs}
+        if tag == "form":
+            if self.depth or self.marker in (attr.get("id", ""), *attr.get("class", "").split()):
+                self.depth += 1
+            return
+        if not self.depth:
+            return
+        name = attr.get("name", "")
+        if tag == "input" and name:
+            kind = attr.get("type", "text").lower()
+            if kind in ("hidden", "text", "email") or (kind in ("checkbox", "radio") and "checked" in attr):
+                self.fields.append((name, attr.get("value", "")))
+        elif tag == "textarea" and name:
+            self.textarea, self.text = name, ""
+        elif tag == "select" and name:
+            self.select, self.multiple, self.first, self.chosen = name, "multiple" in attr, None, False
+        elif tag == "option" and self.select:
+            if self.first is None:
+                self.first = attr.get("value", "")
+            if "selected" in attr:
+                self.fields.append((self.select, attr.get("value", "")))
+                self.chosen = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "form" and self.depth:
+            self.depth -= 1
+        elif tag == "textarea" and self.textarea:
+            self.fields.append((self.textarea, self.text))
+            self.textarea = None
+        elif tag == "select" and self.select:
+            # A single select without a selected option posts its first one.
+            if not self.multiple and not self.chosen and self.first is not None:
+                self.fields.append((self.select, self.first))
+            self.select = None
+
+    def handle_data(self, data: str) -> None:
+        if self.textarea:
+            self.text += data
+
+
+def form_fields(html: str, marker: str) -> list:
+    parser = FormFields(marker)
+    parser.feed(html)
+    return parser.fields
+
+
+def browser() -> urllib.request.OpenerDirector:
+    """A logged-in session of the local test administrator."""
+    login = json.loads(LOGIN.read_text(encoding="utf-8"))
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    page = opener.open(f"{URL}/index.php", timeout=30).read().decode("utf-8", "replace")
+    token = re.search(r'name="token" value="([^"]+)"', page).group(1)
+    form = urllib.parse.urlencode({"token": token, "actionlogin": "login", "loginfunction": "loginfunction",
+                                   "username": login["login"], "password": login["password"]}).encode()
+    opener.open(f"{URL}/index.php?mainmenu=home", data=form, timeout=30).read()
+    return opener
+
+
+def unterlagen() -> None:
+    """Company documents: articles -> PDFs (tests/unterlagen.php), then the pages a person uses.
+
+    The article card shows where its PDF is and writes it again on "PDF
+    erzeugen"; the proposal's mail form offers the Unterlagen, adds the
+    defaults for companies and private persons and sends the chosen ones
+    (checked in Mailpit); the ticket message gets them from the box above it;
+    every form passes Dolibarr's WAF. Example PDFs go to beispiele/.
+    """
+    php("enable", script="unterlagen.php")
+    result = php("run", script="unterlagen.php")
+    checks = [dict(entry, page="php") for entry in result["checks"]]
+    EXAMPLES.mkdir(parents=True, exist_ok=True)
+    for name in ("unterlage-nutzungsbedingungen.pdf", "unterlage-widerruf.pdf", "unterlage-checkliste-uebergabe.pdf", "angebot-mit-agb.pdf"):
+        docker("cp", f"{WEB}:/tmp/ittpdf-out/{name}", str(EXAMPLES / name))
+    opener = browser()
+
+    def get(path: str) -> str:
+        return opener.open(f"{URL}{path}", timeout=60).read().decode("utf-8", "replace")
+
+    def post(path: str, fields: list) -> tuple:
+        try:
+            answer = opener.open(f"{URL}{path}", data=urllib.parse.urlencode(fields).encode(), timeout=120)
+            return answer.status, answer.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as error:
+            return error.code, ""
+
+    def attached(html: str) -> list:
+        return re.findall(r'<div id="attachfile_\d+">.*?(?:</span>|>)\s*([^<>]+?\.pdf)', html)
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
+
+    # Article card: box with the file, button, and the file itself.
+    card = f"/knowledgemanagement/knowledgerecord_card.php?id={result['article']}"
+    html = get(card)
+    check("article card shows the PDF", "ittabpdf-unterlage" in html and "nutzungsbedingungen.pdf" in html)
+    button = re.search(r'href="([^"]*action=ittabpdf_unterlage_pdf[^"]*)"', html)
+    check("article card has PDF erzeugen", bool(button))
+    if button:
+        html = get(unescape(button.group(1)).replace(URL, ""))
+        check("PDF erzeugen saves it again", "Unterlagen/nutzungsbedingungen.pdf" in html and "</html>" in html)
+    with opener.open(f"{URL}/document.php?modulepart=ecm&file=IT-Tabelander/Unterlagen/nutzungsbedingungen.pdf", timeout=60) as answer:
+        check("PDF downloads from Documents", answer.status == 200 and answer.read(4) == b"%PDF")
+
+    # Mail form of a proposal to a company: choice, default, chosen file, sent.
+    urllib.request.urlopen(urllib.request.Request(f"{MAILPIT_URL}/api/v1/messages", method="DELETE"), timeout=30)
+    path = f"/comm/propal/card.php?id={result['propal_firm']}"
+    html = get(f"{path}&action=presend&mode=init")
+    check("mail form offers the Unterlagen", 'name="ittabpdf_unterlagen[]"' in html and "Nutzungsbedingungen" in html)
+    check("company default agb-unternehmer.pdf is attached", "agb-unternehmer.pdf" in attached(html), str(attached(html)))
+    fields = [entry for entry in form_fields(html, "mailform") if entry[0] != "ittabpdf_unterlagen[]"]
+    status, html = post(path, fields + [("addfile", "Beilegen"), ("ittabpdf_unterlagen[]", "nutzungsbedingungen.pdf")])
+    names = attached(html)
+    check("chosen Unterlage is added (WAF passes)", status == 200 and "nutzungsbedingungen.pdf" in names and "agb-unternehmer.pdf" in names, f"{status} {names}")
+    # The local administrator has no e-mail address: send as the company.
+    fields = [entry for entry in form_fields(html, "mailform") if entry[0] not in ("ittabpdf_unterlagen[]", "sendto", "fromtype")]
+    status, html = post(path, fields + [("sendto", "office@musterfirma.example"), ("fromtype", "company"), ("sendmail", "Senden")])
+    time.sleep(2)
+    sent = [mailpit(f"message/{item['ID']}") for item in mailpit("messages?limit=50").get("messages", [])]
+    files = sorted(entry["FileName"] for detail in sent for entry in detail.get("Attachments") or [])
+    check("mail goes out with the proposal and both Unterlagen", status == 200 and len(sent) == 1
+          and {"agb-unternehmer.pdf", "nutzungsbedingungen.pdf"} <= set(files) and len(files) == 3,
+          f"{status} {files}")
+
+    # Private person: the B2C defaults.
+    html = get(f"/comm/propal/card.php?id={result['propal_private']}&action=presend&mode=init")
+    check("private default nutzungsbedingungen.pdf + widerruf.pdf", {"nutzungsbedingungen.pdf", "widerruf.pdf"} <= set(attached(html))
+          and "agb-unternehmer.pdf" not in attached(html), str(attached(html)))
+
+    # Ticket message: the box above the form.
+    ticket = f"/ticket/card.php?track_id={result['ticket']}"
+    html = get(f"{ticket}&action=presend_addmessage&mode=init")
+    check("ticket message offers the Unterlagen", 'value="ittabpdf_attach"' in html)
+    status, html = post(ticket, form_fields(html, "ittabpdf-unterlagen") + [("ittabpdf_unterlagen[]", "widerruf.pdf")])
+    check("ticket message gets widerruf.pdf (WAF passes)", status == 200 and "widerruf.pdf" in attached(html), f"{status} {attached(html)}")
+
+    # Setup: the section, saving it, writing all again.
+    setup = "/custom/ittabelanderpdf/admin/setup.php"
+    html = get(setup)
+    check("setup lists the Unterlagen", 'name="ITTABPDF_UNTERLAGEN_CATEGORIES[]"' in html and "checkliste-uebergabe.pdf" in html)
+    token = re.search(r'name="token" value="([^"]+)"', html).group(1)
+    status, html = post(setup, [("token", token), ("action", "save_unterlagen"), ("ITTABPDF_UNTERLAGEN_DIR", "IT-Tabelander/Unterlagen"),
+                                ("ITTABPDF_UNTERLAGEN_AUTO", "1"), ("ITTABPDF_DOCS_PROPAL_SEND_B2B[]", "agb-unternehmer.pdf"),
+                                ("ITTABPDF_DOCS_PROPAL_SEND_B2C[]", "nutzungsbedingungen.pdf"), ("ITTABPDF_DOCS_PROPAL_SEND_B2C[]", "widerruf.pdf")]
+                         + [("ITTABPDF_UNTERLAGEN_CATEGORIES[]", value) for value in re.findall(
+                             r'<option value="(\d+)"[^>]*selected', html.split('ITTABPDF_UNTERLAGEN_CATEGORIES', 1)[1].split("</select>", 1)[0])])
+    check("setup saves (WAF passes) and keeps the categories", status == 200 and "nutzungsbedingungen.pdf" in html and "Rechtstexte" in html, str(status))
+    token = re.search(r'name="token" value="([^"]+)"', html).group(1)
+    status, html = post(setup, [("token", token), ("action", "regenerate_unterlagen")])
+    check("write all again", status == 200 and "</html>" in html, str(status))
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"unterlagen check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} Unterlagen checks passed")
+
+
 def main() -> int:
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen"):
                 steps[name]()
         elif step in steps:
             steps[step]()

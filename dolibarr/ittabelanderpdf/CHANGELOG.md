@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0] - 2026-11-26
+
+- Company documents (Unterlagen) from the knowledge base: released articles of the chosen categories (default "Rechtstexte" and "Unterlagen", chosen by id in the setup; "FAQ" gets none) become Werkbank PDFs with title, "Stand", headings, lists, tables and page numbers, saved as `IT-Tabelander/Unterlagen/<slug>.pdf` in Documents (ECM folder and index created on the fly). New extra field `ittab_slug` on articles (default from the title, umlauts spelt out); a name used by another article is refused.
+- Written again automatically on release, change or when put into a chosen category (trigger `ITTabPdfUnterlagen`, switch `ITTABPDF_UNTERLAGEN_AUTO`), by hand with "PDF erzeugen" on the article card (which also shows where the file is) or "Alle freigegebenen Unterlagen neu erzeugen" in the setup. A failed PDF never blocks saving the article.
+- "Unterlagen beilegen" in Dolibarr's e-mail form (proposal, order, invoice, contract, intervention, shipment, third party; posts as "addfile", so the text stays) and in a box above the ticket message form. Default attachments per document type for companies and private persons (third party type "Privatperson"); proposals default to `agb-unternehmer.pdf` (companies) and `nutzungsbedingungen.pdf`, `widerruf.pdf` (private persons), missing files are skipped.
+- `werkbank` appends a company document to proposal, order and invoice PDFs (`ITTABPDF_APPEND_PROPAL`/`_ORDER`/`_INVOICE`), and honours Dolibarr's own `MAIN_PDF_ADD_TERMSOFSALE_*` when the module setting is empty.
+- Renderer: sheet layout without address field, flowing HTML over pages with the follow-up head, appended PDFs after the page count.
+
 ## [1.0.9] - 2026-11-26
 
 - Questions by e-mail or through the customer area, not by phone: the templates no longer say "Bei Fragen erreichen Sie mich unter <Telefon>". New variables `__ITTAB_FRAGEN_SATZ__`/`__ITTAB_FRAGEN_SATZ_DU__` ("antworten Sie einfach auf diese E-Mail", with the customer area on also "oder schreiben Sie mir im Kundenbereich"); supplier templates ask for a reply by e-mail. The phone number stays in the footer. Templates holding the 1.0.8 text are renewed on activation.
