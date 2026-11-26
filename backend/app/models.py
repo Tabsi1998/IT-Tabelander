@@ -233,20 +233,6 @@ class ContactInput(BaseModel):
         return self
 
 
-class InquiryStatusQuery(BaseModel):
-    """Status lookup on the website: reference number plus the e-mail (#43)."""
-    ref: str = Field(min_length=12, max_length=12)
-    email: EmailStr
-
-    @field_validator("ref", mode="before")
-    @classmethod
-    def normalize_ref(cls, value):
-        text = str(value or "").strip().upper()
-        if not re.fullmatch(r"ANF-[A-Z0-9]{8}", text):
-            raise ValueError("Die Anfrage-Nummer hat die Form ANF-XXXXXXXX")
-        return text
-
-
 # ---------- Review requests (#71) ----------
 REVIEW_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{20,100}$"
 

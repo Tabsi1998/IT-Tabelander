@@ -5,6 +5,7 @@ first, then falls back to environment variables. The frontend never talks to
 Dolibarr directly. Demo mode is used when no API key is configured.
 """
 import base64
+import html
 import logging
 import os
 import re
@@ -406,9 +407,42 @@ def _ticket_state(previous: dict) -> dict:
     return {
         key: previous.get(key)
         for key in ("thirdparty_id", "existing_customer", "ticket_id", "ticket_ref",
-                    "ticket_track_id", "documents_uploaded", "callback_event_id")
+                    "ticket_track_id", "documents_uploaded", "callback_event_id", "internal_note_added")
         if previous.get(key) not in (None, "", [])
     }
+
+
+def as_note(text: str) -> str:
+    """Text for a ticket message or note: Dolibarr shows those as HTML, so
+    nothing a customer typed may come through as markup. Plain text stays
+    plain; once escaped, the line breaks become <br> to stay visible."""
+    escaped = html.escape(str(text or ""), quote=False)
+    return escaped if escaped == text else escaped.replace("\n", "<br>\n")
+
+
+async def post_ticket_message(client: httpx.AsyncClient, cfg: dict, *, track_id: str, message: str,
+                              private: bool = False) -> None:
+    """One message on the ticket (POST /tickets/newmessage); private ones only
+    the workshop sees in Dolibarr (#122)."""
+    body = {"track_id": track_id, "message": message}
+    if private:
+        body["private"] = 1
+    response = await client.post(f"{cfg['base']}/api/index.php/tickets/newmessage", headers=_headers(cfg), json=body)
+    response.raise_for_status()
+
+
+EXISTING_CUSTOMER_HINT = ("Der Kunde war in Dolibarr schon vorhanden und wurde nicht geändert. "
+                          "Die Kontaktdaten unten stammen aus dem Formular.")
+NOTE_HEADER = "Interne Angaben aus dem Website-Formular (der Kunde sieht sie nicht):"
+
+
+async def _has_internal_note(client: httpx.AsyncClient, cfg: dict, ticket_id: str) -> bool:
+    """Whether an earlier attempt already wrote the note (its answer got lost)."""
+    response = await client.get(f"{cfg['base']}/api/index.php/tickets/{int(ticket_id)}", headers=_headers(cfg),
+                                params={"contact_list": -1})
+    response.raise_for_status()
+    return any(str(item.get("private")) == "1" and NOTE_HEADER in str(item.get("message") or "")
+               for item in (response.json() or {}).get("messages") or [])
 
 
 async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
@@ -419,10 +453,13 @@ async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
                                    attachments: list | None = None,
                                    create_thirdparty: bool = True,
                                    notify: bool = True,
-                                   callback: dict | None = None) -> dict:
-    """Third party, ticket, photos, callback - each stage resumes where an
-    attempt stopped. Without create_thirdparty (contact messages) a known
-    customer is linked and a stranger stays without third party (#42)."""
+                                   callback: dict | None = None,
+                                   internal_note: str = "") -> dict:
+    """Third party, ticket, internal note, photos, callback - each stage
+    resumes where an attempt stopped. Without create_thirdparty (contact
+    messages) a known customer is linked and a stranger stays without third
+    party (#42). The ticket's message is what the customer wrote; contact
+    details and hints for the workshop go into a private note (#122)."""
     state = _ticket_state(previous or {})
 
     def failed(exc: Exception, stage: str, action: str) -> dict:
@@ -464,22 +501,17 @@ async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
                 except Exception as exc:  # noqa: BLE001
                     return failed(exc, "thirdparty_create", "Anlegen des Interessenten")
                 state["existing_customer"] = False
-        ticket_message = message
-        if state.get("existing_customer"):
-            ticket_message = (
-                "Hinweis: Der Kunde war in Dolibarr schon vorhanden und wurde nicht geändert. "
-                "Die Kontaktdaten unten stammen aus dem Formular.\n\n" + message
-            )
         try:
             ticket_id = await _create_ticket(
-                client, cfg, subject=subject, message=ticket_message,
+                client, cfg, subject=subject, message=message,
                 email=email,
                 thirdparty_id=str(state["thirdparty_id"]) if state.get("thirdparty_id") else None,
                 track_id=track_id, classification=classification, notify=notify,
             )
         except Exception as exc:  # noqa: BLE001
             return failed(exc, "ticket_create", "Anlegen des Tickets")
-        state.update({"ticket_id": ticket_id, "ticket_ref": ticket_id, "ticket_track_id": track_id})
+        state.update({"ticket_id": ticket_id, "ticket_ref": ticket_id, "ticket_track_id": track_id,
+                      "created_now": True})
         if track_id:
             try:
                 created_ticket = await _lookup_ticket_by_track_id(client, cfg, track_id)
@@ -489,6 +521,17 @@ async def _sync_ticket_with_client(client: httpx.AsyncClient, cfg: dict, *,
                 # The ticket exists. A cosmetic reference lookup must never
                 # turn a successful sync into a failed customer inquiry.
                 logger.info("Dolibarr ticket reference lookup failed after creation")
+
+    if internal_note and not state.get("internal_note_added") and state.get("ticket_track_id"):
+        note = f"{NOTE_HEADER}\n\n" + (f"{EXISTING_CUSTOMER_HINT}\n\n" if state.get("existing_customer") else "")
+        try:
+            if state.get("created_now") or not await _has_internal_note(client, cfg, state["ticket_id"]):
+                await post_ticket_message(client, cfg, track_id=str(state["ticket_track_id"]),
+                                          message=as_note(note + internal_note), private=True)
+        except Exception as exc:  # noqa: BLE001
+            return failed(exc, "internal_note", "Anlegen der internen Notiz am Ticket")
+        state["internal_note_added"] = True
+    state.pop("created_now", None)
 
     uploaded = list(state.get("documents_uploaded") or [])
     for attachment in attachments or []:
@@ -722,74 +765,69 @@ def callback_text(value) -> str:
 
 
 def format_contact_message(inquiry: dict) -> str:
-    """A contact message as ticket body: the text, then who wrote it (#42)."""
-    contact = inquiry.get("contact") or {}
-    lines = [
-        f"Kontaktnachricht über die Website ({inquiry.get('ref') or '–'})",
-        "",
-        str(inquiry.get("description") or "–"),
-        "",
-        "Kontakt:",
-        f"Name: {contact.get('name') or '–'}",
-        f"E-Mail: {contact.get('email') or '–'}",
-        f"Telefon: {contact.get('phone') or '–'}",
-    ]
-    if inquiry.get("callback_at"):
-        lines.append(f"Rückruf gewünscht: {callback_text(inquiry['callback_at'])} (Termin im Kalender)")
-    return "\n".join(lines)
+    """A contact message as ticket body: what the sender wrote, nothing else
+    (#42, #122). Who wrote it stands in the internal note."""
+    return str(inquiry.get("description") or "–")
 
 
 def format_inquiry_message(inquiry: dict) -> str:
-    """Build the complete, readable plain-text ticket body."""
+    """The ticket body the customer sees, in the customer area as in
+    Dolibarr's mails: what was asked and the description, only filled lines.
+    Contact details and hints for the workshop: format_internal_note (#122)."""
     if inquiry.get("request_type") == "contact":
         return format_contact_message(inquiry)
-    contact = inquiry.get("contact") or {}
-    type_label = REQUEST_TYPE_LABELS.get(inquiry.get("request_type"), inquiry.get("request_type") or "–")
-    photo_count = len(inquiry.get("attachments") or inquiry.get("attachment_ids") or [])
-    attachment_lines = [f"- {photo_count} Foto(s), am Ticket unter „Dokumente“"] if photo_count else []
+    type_label = REQUEST_TYPE_LABELS.get(inquiry.get("request_type"), inquiry.get("request_type") or "")
     lines = [
-        f"Anfrage-Referenz: {inquiry.get('ref') or '–'}",
-        f"Anfrageart: {type_label}",
-        f"Quelle: {inquiry.get('source') or '–'}",
-        f"Gerät / Bereich: {DEVICE_LABELS.get(inquiry.get('device_type'), inquiry.get('device_type')) or '–'}",
-        f"Geräteherkunft: {DEVICE_SOURCE_LABELS.get(inquiry.get('device_source'), inquiry.get('device_source')) or '–'}",
-        f"Hersteller: {inquiry.get('manufacturer') or '–'}",
-        f"Modell: {inquiry.get('model') or '–'}",
-        f"Probleme / Symptome: {', '.join(inquiry.get('issues') or []) or '–'}",
-        f"Gewünschte Leistungen: {', '.join(inquiry.get('desired_services') or []) or '–'}",
-        f"Budget: {inquiry.get('budget') or '–'}",
-        f"Zeitrahmen: {inquiry.get('timeframe') or '–'}",
-        "",
-        "Beschreibung:",
-        str(inquiry.get("description") or "–"),
-        "",
-        "Fotos:",
-        *(attachment_lines or ["–"]),
+        ("Anfrageart", type_label),
+        ("Gerät / Bereich", DEVICE_LABELS.get(inquiry.get("device_type"), inquiry.get("device_type"))),
+        ("Geräteherkunft", DEVICE_SOURCE_LABELS.get(inquiry.get("device_source"), inquiry.get("device_source"))),
+        ("Hersteller", inquiry.get("manufacturer")),
+        ("Modell", inquiry.get("model")),
+        ("Probleme / Symptome", ", ".join(inquiry.get("issues") or [])),
+        ("Gewünschte Leistungen", ", ".join(inquiry.get("desired_services") or [])),
+        ("Budget", inquiry.get("budget")),
+        ("Zeitrahmen", inquiry.get("timeframe")),
+    ]
+    head = [f"{label}: {value}" for label, value in lines if value]
+    return "\n".join([*head, "", "Beschreibung:", str(inquiry.get("description") or "–")])
+
+
+def format_internal_note(inquiry: dict) -> str:
+    """What only the workshop sees: reference, contact, callback, photos,
+    review consent, request id - a private ticket message (#122)."""
+    contact = inquiry.get("contact") or {}
+    lines = [
+        f"Anfrage-Nummer: {inquiry.get('ref') or '–'}",
+        f"Quelle: {inquiry.get('source') or 'website'}",
         "",
         "Kontakt:",
         f"Name: {contact.get('name') or '–'}",
         f"E-Mail: {contact.get('email') or '–'}",
         f"Telefon: {contact.get('phone') or '–'}",
-        f"Bevorzugter Kontakt: {contact.get('preferred_contact') or '–'}",
     ]
-    optional_contact = [
-        ("Kontaktart", "Firma" if contact.get("contact_type") == "business" else "Privatperson"),
-        ("Firma", contact.get("company_name")),
-        ("Adresse", contact.get("address")),
-        ("PLZ / Ort", " ".join(filter(None, [contact.get("postal_code"), contact.get("city")]))),
-        ("Land", contact.get("country_code")),
-        ("Website", contact.get("website")),
-        ("UID", contact.get("vat_id")),
-        ("Firmenbuchnummer", contact.get("company_registration")),
-        ("Steuernummer", contact.get("tax_number")),
-        ("Gerichtsstand", contact.get("court")),
-        ("EORI", contact.get("eori")),
-    ]
-    lines.extend(f"{label}: {value}" for label, value in optional_contact if value)
+    if inquiry.get("request_type") != "contact":
+        lines.append(f"Bevorzugter Kontakt: {contact.get('preferred_contact') or '–'}")
+        optional_contact = [
+            ("Kontaktart", "Firma" if contact.get("contact_type") == "business" else "Privatperson"),
+            ("Firma", contact.get("company_name")),
+            ("Adresse", contact.get("address")),
+            ("PLZ / Ort", " ".join(filter(None, [contact.get("postal_code"), contact.get("city")]))),
+            ("Land", contact.get("country_code")),
+            ("Website", contact.get("website")),
+            ("UID", contact.get("vat_id")),
+            ("Firmenbuchnummer", contact.get("company_registration")),
+            ("Steuernummer", contact.get("tax_number")),
+            ("Gerichtsstand", contact.get("court")),
+            ("EORI", contact.get("eori")),
+        ]
+        lines.extend(f"{label}: {value}" for label, value in optional_contact if value)
     if inquiry.get("callback_at"):
         lines.append(f"Rückruf gewünscht: {callback_text(inquiry['callback_at'])} (Termin im Kalender)")
-    lines.append("Bewertungsbitte nach Abschluss: "
-                 + ("ja, eine Mail mit Link, sobald das Ticket geschlossen ist" if inquiry.get("review_ok") else "nein"))
+    if inquiry.get("request_type") != "contact":
+        photo_count = len(inquiry.get("attachments") or inquiry.get("attachment_ids") or [])
+        lines.append(f"Fotos: {photo_count} am Ticket unter „Dokumente“" if photo_count else "Fotos: keine")
+        lines.append("Bewertungsbitte nach Abschluss: "
+                     + ("ja, eine Mail mit Link, sobald das Ticket geschlossen ist" if inquiry.get("review_ok") else "nein"))
     if inquiry.get("request_id"):
         lines.extend(["", f"Request-ID: {inquiry['request_id']}"])
     return "\n".join(lines)
@@ -842,6 +880,7 @@ async def create_ticket_for_inquiry(inquiry: dict, previous: dict | None = None,
                 create_thirdparty=inquiry.get("request_type") != "contact",
                 notify=notify,
                 callback=_callback(inquiry),
+                internal_note=format_internal_note(ticket_inquiry),
             )
             return result
     except Exception as exc:  # noqa: BLE001

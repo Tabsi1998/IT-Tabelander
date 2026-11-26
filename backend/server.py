@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -45,8 +46,6 @@ class PublicRequestGuardMiddleware:
         ("POST", "/api/uploads/repair-attachment"): (
             30, 60 * 60, 9 * 1024 * 1024,
         ),
-        # Guessing reference numbers and e-mail addresses stays slow (#43).
-        ("POST", "/api/inquiries/status"): (20, 60 * 60, 4 * 1024),
         ("POST", "/api/contact"): (10, 60 * 60, 32 * 1024),
         # The personal review link (#71): guessing stays hopeless and slow.
         ("POST", "/api/review-invites/check"): (30, 60 * 60, 4 * 1024),
@@ -56,6 +55,13 @@ class PublicRequestGuardMiddleware:
         ("POST", "/api/portal/login"): (10, 60 * 60, 4 * 1024),
         ("POST", "/api/portal/session"): (20, 60 * 60, 4 * 1024),
     }
+    # Addresses with a ticket number in them (#122): one counter per pattern,
+    # so another number does not open another allowance. Each answer and each
+    # closing mails the owner; a busy customer stays far below these.
+    PATTERN_RULES = (
+        ("POST", re.compile(r"^/api/portal/inquiries/\d{1,10}/messages$"), (30, 60 * 60, 32 * 1024)),
+        ("POST", re.compile(r"^/api/portal/inquiries/\d{1,10}/close$"), (10, 60 * 60, 4 * 1024)),
+    )
 
     def __init__(self, application):
         self.application = application
@@ -67,7 +73,14 @@ class PublicRequestGuardMiddleware:
         if scope.get("type") != "http":
             await self.application(scope, receive, send)
             return
-        rule = self.RULES.get((scope.get("method"), scope.get("path")))
+        path = scope.get("path")
+        rule = self.RULES.get((scope.get("method"), path))
+        counter = path
+        if not rule:
+            for method, pattern, pattern_rule in self.PATTERN_RULES:
+                if scope.get("method") == method and pattern.fullmatch(path or ""):
+                    rule, counter = pattern_rule, pattern.pattern
+                    break
         if not rule:
             await self.application(scope, receive, send)
             return
@@ -98,8 +111,7 @@ class PublicRequestGuardMiddleware:
 
         client = scope.get("client")
         client_ip = client[0] if client else "unknown"
-        path = scope.get("path")
-        key = (client_ip, path)
+        key = (client_ip, counter)
         now = time.monotonic()
         async with self.lock:
             hits = self.hits[key]
@@ -368,8 +380,9 @@ async def api_not_found(requested_path: str):
 
 
 @app.api_route("/{requested_path:path}", methods=READ_METHODS, include_in_schema=False)
-async def frontend_app(requested_path: str):
-    """The website's pages and files, the admin under /admin (#54)."""
+async def frontend_app(requested_path: str, track_id: str | None = None):
+    """The website's pages and files, the admin under /admin (#54); track_id
+    belongs to the old status link of Dolibarr's mails (#122)."""
     if requested_path == "api" or requested_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="API-Endpunkt nicht gefunden")
-    return await website.respond(requested_path, FRONTEND_BUILD_DIR)
+    return await website.respond(requested_path, FRONTEND_BUILD_DIR, track_id=track_id)

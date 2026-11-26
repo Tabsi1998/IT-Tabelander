@@ -26,7 +26,8 @@ FONT = "Arial, Helvetica, sans-serif"
 
 # The logo comes from the module's public endpoint: a linked image, never an
 # inline or cid: one (those show as broken attachments on mobile clients).
-LOGO = "https://erp.tabelander.co.at/custom/ittabelanderpdf/public/maillogo.php"
+ERP_URL = "https://erp.tabelander.co.at"
+LOGO = ERP_URL + "/custom/ittabelanderpdf/public/maillogo.php"
 LOGO_DARK = LOGO + "?variant=dark"
 
 CLOSING = "Liebe Grüße"
@@ -59,7 +60,7 @@ LOGO_SWITCH = {
 
 @dataclass(frozen=True)
 class Part:
-    kind: str  # "p", "heading", "button", "link", "items"
+    kind: str  # "p", "heading", "button", "link", "items", "quote"
     text: str = ""
     url: str = ""
     items: tuple = field(default_factory=tuple)
@@ -86,6 +87,11 @@ def items(*lines: str) -> Part:
     return Part("items", items=tuple(lines))
 
 
+def quote(text: str) -> Part:
+    """What somebody wrote, with its line breaks, set off by a line (#122)."""
+    return Part("quote", text)
+
+
 def _html_part(part: Part) -> str:
     text = escape(part.text)
     if part.kind == "p":
@@ -108,10 +114,15 @@ def _html_part(part: Part) -> str:
         rows = "".join(f'<li style="margin:0 0 6px 0;">{escape(line)}</li>' for line in part.items)
         return (f'<ul class="wb-tx" style="margin:0 0 16px 0;padding:0 0 0 20px;font-family:{FONT};font-size:16px;'
                 f'line-height:1.6;color:{BODY};">{rows}</ul>')
+    if part.kind == "quote":
+        lines = "<br>".join(escape(line) for line in part.text.split("\n"))
+        return (f'<p class="wb-tx wb-ln" style="{TEXT}padding:0 0 0 14px;border-left:3px solid {LINE};">{lines}</p>')
     raise ValueError(f"unknown mail part {part.kind!r}")
 
 
 def _text_part(part: Part) -> str:
+    if part.kind == "quote":
+        return "\n".join(f"> {line}" for line in part.text.split("\n"))
     if part.kind == "button":
         return f"{part.text}:\n{part.url}"
     if part.kind == "link":
@@ -152,10 +163,11 @@ def _style() -> str:
             f"@media (prefers-color-scheme: dark){{{dark}}}{outlook}</style>")
 
 
-def render(parts: list, *, site_base: str = "") -> tuple[str, str]:
-    """Plain text and HTML of one mail, both with the closing and the footer."""
+def render(parts: list, *, site_base: str = "", closing: bool = True) -> tuple[str, str]:
+    """Plain text and HTML of one mail, both with the closing and the footer.
+    A notice to the owner himself goes without the closing (#122)."""
     closing_html = (f'<p class="wb-tx" style="{TEXT}margin:24px 0 0 0;">{CLOSING}<br>'
-                    f'<strong class="wb-ink" style="color:{INK};">{OWNER}</strong><br>{COMPANY}</p>')
+                    f'<strong class="wb-ink" style="color:{INK};">{OWNER}</strong><br>{COMPANY}</p>') if closing else ""
     sheet = (f'<div class="wb-bg wb-tx" style="max-width:560px;margin:0 auto;padding:12px 20px 28px 20px;'
              f'background:#ffffff;font-family:{FONT};font-size:16px;line-height:1.6;color:{BODY};">'
              + _logo(site_base)
@@ -169,6 +181,7 @@ def render(parts: list, *, site_base: str = "") -> tuple[str, str]:
             + _style() + '</head><body class="ittab-page" style="margin:0;padding:0;background:#ffffff;">'
             + sheet + "</body></html>")
     text = "\n\n".join(_text_part(part) for part in parts)
-    text += (f"\n\n{CLOSING}\n{OWNER}\n{COMPANY}\n\n--\n{COMPANY} · {OWNER}\n{ADDRESS}\n"
-             f"{EMAIL} · {WEB}\n{PHONE}\n")
+    if closing:
+        text += f"\n\n{CLOSING}\n{OWNER}\n{COMPANY}"
+    text += f"\n\n--\n{COMPANY} · {OWNER}\n{ADDRESS}\n{EMAIL} · {WEB}\n{PHONE}\n"
     return text, html

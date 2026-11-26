@@ -13,7 +13,7 @@ from pymongo.errors import DuplicateKeyError
 from .. import dolibarr, handover
 from ..db import get_db, now_utc, serialize, to_oid
 from ..website import seo_data
-from ..models import ContactInput, InquiryInput, InquiryStatusQuery
+from ..models import ContactInput, InquiryInput
 from ..security import require_admin
 from .media import mark_repair_attachments_linked, release_repair_attachment_claims
 
@@ -27,8 +27,8 @@ def _inquiry_ref() -> str:
 
 
 def _track_id() -> str:
-    """Random Dolibarr tracking id; it also opens the status view from the
-    confirmation mail, so it must not be guessable (#43)."""
+    """Random Dolibarr tracking id; the link in the confirmation mail names it
+    (#43). Since #122 it opens the inquiry in the customer area, after sign-in."""
     alphabet = string.ascii_uppercase + string.digits
     return "IT" + "".join(secrets.choice(alphabet) for _ in range(14))
 
@@ -269,65 +269,10 @@ async def create_contact_message(payload: ContactInput):
     return await _hand_over(db, data)
 
 
-NOT_FOUND = "Keine Anfrage mit dieser Nummer und E-Mail gefunden."
-STATUS_CREATED = "eingegangen"
-
-
-async def _status_response(doc: dict, email: str | None) -> dict:
-    """What the customer sees about one inquiry; no personal data (#43).
-
-    With an e-mail, it must match the inquiry; the tracking id from the
-    confirmation mail is proof enough on its own.
-    """
-    contact_email = str((doc.get("contact") or {}).get("email") or "").strip().lower()
-    sync = doc.get("dolibarr") or {}
-    ticket = None
-    if sync.get("synced") and sync.get("ticket_id"):
-        try:
-            ticket = await dolibarr.fetch_ticket_status(str(sync["ticket_id"]))
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Ticket status unavailable: %s", type(exc).__name__)
-            raise HTTPException(status_code=503, detail="Der Status ist gerade nicht abrufbar. Bitte später erneut versuchen.") from None
-    if email is not None:
-        known = {address for address in (contact_email, (ticket or {}).get("origin_email")) if address}
-        if email.strip().lower() not in known:
-            raise HTTPException(status_code=404, detail=NOT_FOUND)
-    return {
-        "ref": doc.get("ref"),
-        "request_type": doc.get("request_type") or "repair",
-        "request_type_label": dolibarr.REQUEST_TYPE_LABELS.get(doc.get("request_type") or "repair", "Anfrage"),
-        "step": (ticket or {}).get("step") or STATUS_CREATED,
-        "created_at": serialize({"at": doc.get("created_at")})["at"],
-        "updated_at": (ticket or {}).get("updated") or serialize({"at": doc.get("updated_at")})["at"],
-    }
-
-
-@router.post("/inquiries/status")
-async def inquiry_status(payload: InquiryStatusQuery):
-    """Status by reference number and e-mail, as typed on the website."""
-    doc = await get_db().repair_requests.find_one({"ref": payload.ref})
-    if not doc:
-        raise HTTPException(status_code=404, detail=NOT_FOUND)
-    return await _status_response(doc, str(payload.email))
-
-
-@router.get("/inquiries/status/track/{track_id}")
-async def inquiry_status_by_track_id(track_id: str):
-    """Status behind the link in Dolibarr's confirmation mail."""
-    if not re.fullmatch(r"[A-Za-z0-9]{8,64}", track_id):
-        raise HTTPException(status_code=404, detail=NOT_FOUND)
-    doc = await get_db().repair_requests.find_one(
-        {"$or": [{"track_id": track_id}, {"dolibarr.ticket_track_id": track_id}]}
-    )
-    if not doc:
-        raise HTTPException(status_code=404, detail=NOT_FOUND)
-    return await _status_response(doc, None)
-
-
 @router.get("/admin/labels/{ref}")
 async def device_label(ref: str, _: dict = Depends(require_admin)):
     """What the device label shows (#72): number, device, date and the QR
-    link to the status page. No name: the label sits on the device in the shop."""
+    link to the inquiry in the customer area (#122). No name: the label sits on the device in the shop."""
     wanted = ref.strip()
     if not re.fullmatch(r"[A-Za-z0-9-]{4,40}", wanted):
         raise HTTPException(status_code=404, detail="Keine Anfrage mit dieser Nummer gefunden.")
