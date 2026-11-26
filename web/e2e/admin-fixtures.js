@@ -45,12 +45,17 @@ export function adminState(overrides = {}) {
       ],
       texts: [
         { kind: "impressum", label: "Ergänzung zum Impressum", setting: "dolibarr_imprint_article_id",
-          article: { id: 7, question: "Impressum – Ergänzung", status: 1 }, gone: false, state: "released", open_points: [] },
+          article: { id: 7, question: "Impressum – Ergänzung", status: 1 }, gone: false, state: "released", open_points: [], can_draft: true },
         { kind: "datenschutz", label: "Datenschutzerklärung", setting: "dolibarr_privacy_article_id",
-          article: null, gone: false, state: "missing", open_points: [] },
+          article: null, gone: false, state: "missing", open_points: [], can_draft: true },
         { kind: "nutzungsbedingungen", label: "Nutzungsbedingungen", setting: "dolibarr_terms_article_id",
           article: { id: 9, question: "Nutzungsbedingungen", status: 0 }, gone: false, state: "draft",
-          open_points: ["[BITTE ERGÄNZEN: z. B. 4 Wochen]", "[BITTE MIT DER WKO KLÄREN: nicht abgeholte Geräte]"] },
+          open_points: ["[BITTE ERGÄNZEN: z. B. 4 Wochen]", "[BITTE MIT DER WKO KLÄREN: nicht abgeholte Geräte]"], can_draft: true,
+          outside_category: true },
+        { kind: "widerruf", label: "Widerrufsbelehrung", setting: "dolibarr_withdrawal_article_id",
+          article: null, gone: false, state: "missing", open_points: [], can_draft: false, optional: true },
+        { kind: "agb-unternehmer", label: "AGB für Unternehmer", setting: "dolibarr_b2b_terms_article_id",
+          article: null, gone: false, state: "missing", open_points: [], can_draft: false, optional: true },
       ],
       choices: [{ id: 7, question: "Impressum – Ergänzung", status: 1 }, { id: 9, question: "Nutzungsbedingungen", status: 0 }],
       todo: ["Unternehmensgegenstand fehlt im Impressum", "Datenschutzerklärung fehlt", "Nutzungsbedingungen ist noch ein Entwurf",
@@ -197,8 +202,12 @@ export async function mockAdmin(page, state = adminState()) {
     }
     if (path === "/admin/dolibarr/content") {
       return json(route, { company: { name: "IT-Tabelander", address: "Gasse 1", zip: "6410", town: "Telfs" }, opening_hours: [{ day: "Montag", hours: "09:00–17:00" }],
-        categories: [{ id: 5, label: "Website" }], articles: [{ id: 7, question: "Impressum – Ergänzung", status: 1 }], faq_count: 2,
-        legal: state.legal, errors: {} });
+        categories: [{ id: 5, label: "FAQ" }, { id: 6, label: "Rechtstexte" }], category_ids: { faq: 5, legal: 6, internal: null },
+        articles: [{ id: 7, question: "Impressum – Ergänzung", status: 1 }], faq_count: 2, legal: state.legal, errors: {},
+        pdf: { available: { impressum: true, datenschutz: false, nutzungsbedingungen: false, widerruf: false, "agb-unternehmer": false },
+          files: { impressum: "IT-Tabelander/Unterlagen/impressum-ergaenzung.pdf", datenschutz: "IT-Tabelander/Unterlagen/datenschutz.pdf",
+            nutzungsbedingungen: "IT-Tabelander/Unterlagen/nutzungsbedingungen.pdf", widerruf: "IT-Tabelander/Unterlagen/widerruf.pdf",
+            "agb-unternehmer": "IT-Tabelander/Unterlagen/agb-unternehmer.pdf" }, problem: null } });
     }
     const legalDraft = path.match(/^\/admin\/legal\/(\w+)\/draft$/);
     if (legalDraft) {
