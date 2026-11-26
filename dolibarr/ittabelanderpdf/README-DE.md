@@ -2,9 +2,17 @@
 
 Belege im Werkbank-Design von IT-Tabelander, mit den echten Markenschriften, dazu passende E-Mail-Vorlagen und ein verzögerter, abbrechbarer automatischer Versand.
 
-Modulnummer **756230** · Version 1.5.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
+Modulnummer **756230** · Version 2.0.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
 
 ![Entwurf](docs/entwurf/mockup.png)
+
+## Neu in 2.0.0 auf einen Blick
+
+- **Reiter „Unterlagen“** beim Kunden: Fortschritt oben, je Zeile der nächste Schritt als Knopf und alle anderen Aktionen sichtbar (kein Menü), am Handy Karten; **Alle fehlenden zusenden** in einer Mail; Zahl der offenen Unterlagen am Reiter.
+- **Agenda:** Erzeugen, Unterschreiben, Hochladen, Abhaken, Erinnerungen, abgeschlossene Prüfprotokolle und Geräteannahmen stehen als Ereignis „Unterlage“ beim Kunden und beim Beleg.
+- **Nachfassen:** Widget **Offen** auf der Startseite; automatische **Erinnerung** für verschickte, unbeantwortete Pflicht-Unterlagen (einschaltbar).
+- **Mails:** Fakten-Box und Knöpfe überstehen Dolibarrs Editor; händisch und automatisch versendete Mails sehen gleich aus.
+- **Einstellungen:** Reiter **Texte außerhalb des Moduls** (Mahnwesen-Vorlagen und Ticket-Einleitung per Knopf, mit Vorschau und Sicherung), **Systemcheck** (Rechte, Cron, Logo, Vorlagen, Regeln, Preisliste, E-Mail-Sammler, CAPTCHA) und **Hilfe**.
 
 ## Was das Modul kann
 

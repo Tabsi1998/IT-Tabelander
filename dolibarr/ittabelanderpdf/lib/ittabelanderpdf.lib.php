@@ -26,5 +26,10 @@ function ittabpdf_admin_prepare_head()
 		$head[] = array(dol_buildpath('/ittabelanderpdf/admin/docrules.php', 1), $langs->trans('WerkbankSetupTabDocRules'), 'docrules');
 	}
 	$head[] = array(dol_buildpath('/ittabelanderpdf/admin/werkstatt.php', 1), $langs->trans('WerkbankSetupTabWorkshop'), 'workshop');
+	if ($user->admin) {
+		$head[] = array(dol_buildpath('/ittabelanderpdf/admin/rollout.php', 1), $langs->trans('WerkbankSetupTabRollout'), 'rollout');
+		$head[] = array(dol_buildpath('/ittabelanderpdf/admin/check.php', 1), $langs->trans('WerkbankSetupTabCheck'), 'check');
+	}
+	$head[] = array(dol_buildpath('/ittabelanderpdf/admin/help.php', 1), $langs->trans('WerkbankSetupTabHelp'), 'help');
 	return $head;
 }

@@ -35,6 +35,8 @@ Kontrolle: ein Angebot und eine Rechnung öffnen, „Erzeugen“ mit `werkbank`,
 
 ## 5. Mahnwesen-Vorlagen im Werkbank-Look
 
+**Ab 2.0.0:** Einstellungen → IT-Tabelander PDF → **Texte außerhalb des Moduls** schreibt diese Vorlagen und die Ticket-Einleitung per Knopf (Vorschau, Bestätigung, Sicherung der alten Werte). Die Schritte unten sind nur noch der Weg von Hand.
+
 Dateien: `docs/rollout/mahnwesen/` (je Stufe `*.html` = Inhalt, `*.betreff.txt` = Betreff). Platzhalter genau wie im Plugin (`{INVOICE_REF}`, `{INVOICE_DATE}`, `{DUE_DATE}`, `{OPEN_AMOUNT}`, `{DUNNING_TOTAL}`, `{FEE_PARAGRAPH}`, `{INTEREST_PARAGRAPH}`, `{PAYMENT_PARAGRAPH}`, `{COMPANY_NAME}`).
 
 | Vorlage in Produktion | Datei |
