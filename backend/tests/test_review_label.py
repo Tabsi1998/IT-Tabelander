@@ -197,8 +197,10 @@ def test_the_review_form_checks_its_fields():
 def test_the_ticket_says_whether_a_review_may_be_asked_for():
     inquiry = {"request_type": "repair", "ref": "ANF-7K3M9Q2X", "device_type": "notebook", "description": "Startet nicht.",
                "contact": {"name": "Eva", "email": "eva@example.com"}}
-    assert "Bewertungsbitte nach Abschluss: nein" in dolibarr.format_inquiry_message(inquiry)
-    assert "Bewertungsbitte nach Abschluss: ja" in dolibarr.format_inquiry_message({**inquiry, "review_ok": True})
+    # The workshop sees it in the private note (#122); the customer's text stays free of it.
+    assert "Bewertungsbitte nach Abschluss: nein" in dolibarr.format_internal_note(inquiry)
+    assert "Bewertungsbitte nach Abschluss: ja" in dolibarr.format_internal_note({**inquiry, "review_ok": True})
+    assert "Bewertungsbitte" not in dolibarr.format_inquiry_message(inquiry)
     assert "Gerät / Bereich: Notebook" in dolibarr.format_inquiry_message(inquiry)
 
 

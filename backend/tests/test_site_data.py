@@ -229,7 +229,13 @@ def test_pages_admin_files_and_unknown_addresses(monkeypatch, tmp_path):
     assert b"RECHT" in legal.body and b'href="https://it.example.at/rechtliches/impressum"' in legal.body
     service = _serve(monkeypatch, tmp_path, "leistungen/pc-reparatur")
     assert b"START" in service.body and b'rel="canonical" href="https://it.example.at/"' in service.body
-    assert b'name="robots" content="noindex"' in _serve(monkeypatch, tmp_path, "status/view.php").body
+    # The old status link leads into the customer area (#122); never anything outside it.
+    from app import website
+    status = asyncio.run(website.respond("status/view.php", _build(tmp_path), track_id="ITABCDEFGHIJKLMN"))
+    assert status.status_code == 302 and status.headers["location"] == "/kundenbereich/anfragen?track_id=ITABCDEFGHIJKLMN"
+    odd = asyncio.run(website.respond("status/view.php", _build(tmp_path), track_id="//evil.example/x"))
+    assert odd.headers["location"] == "/kundenbereich/anfragen"
+    assert _serve(monkeypatch, tmp_path, "status").headers["location"] == "/kundenbereich/anfragen"
     with pytest.raises(HTTPException) as outside:
         _serve(monkeypatch, tmp_path, "../../backend/.env")
     assert outside.value.status_code == 404

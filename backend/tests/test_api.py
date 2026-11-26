@@ -583,8 +583,11 @@ class TestReviewRequestAndLabel:
             assert data["title"] == "Reparatur: Notebook Lenovo ThinkPad T14"
             assert "/status/view.php?track_id=" in data["status_url"]
             track_id = data["status_url"].split("track_id=", 1)[1]
-            status = api_client.get(f"{BASE_URL}/api/inquiries/status/track/{track_id}", timeout=60)
-            assert status.status_code == 200 and status.json()["ref"] == created["ref"]
+            # The link shows nothing by itself any more: it leads into the customer area (#122).
+            status = api_client.get(f"{BASE_URL}/status/view.php?track_id={track_id}", timeout=60, allow_redirects=False)
+            assert status.status_code == 302
+            assert status.headers["location"] == f"/kundenbereich/anfragen?track_id={track_id}"
+            assert api_client.get(f"{BASE_URL}/api/inquiries/status/track/{track_id}", timeout=30).status_code == 404
             assert "TEST_Eva" not in label.text and "test_eva@example.com" not in label.text
             assert admin_client.get(f"{BASE_URL}/api/admin/labels/ANF-GIBTSNIX", timeout=30).status_code == 404
             assert api_client.get(f"{BASE_URL}/api/admin/labels/{created['ref']}", timeout=30).status_code == 401
