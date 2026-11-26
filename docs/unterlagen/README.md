@@ -26,9 +26,9 @@ eigene Fassungen in einfacher Sprache, keine Abschriften.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `agb-unternehmer.html` | AGB für Unternehmer | Firmenkunden | Sie | Rechtstexte | ja (Website, PDF) | `agb-unternehmer` | empfohlen |
 | `widerruf.html` | Widerrufsbelehrung und Muster-Widerrufsformular | Privatkunden (aus den Nutzungsbedingungen) | Du | Rechtstexte | ja (Website, PDF) | `widerruf` | empfohlen |
-| `leistungsbeschreibung-hosting-wartung.html` | Leistungsbeschreibung Hosting und Wartung | Firmenkunden mit Hosting/Wartung, Teil des Vertrags | Sie | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-hosting-wartung` | empfohlen |
-| `leistungsbeschreibung-hosting-wartung-privat.html` | Leistungsbeschreibung Hosting und Wartung für Privatkunden | Privatkunden mit Hosting/Wartung (§ 15 KSchG) | Du | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-hosting-wartung-privat` | empfohlen |
-| `auftragsverarbeitung.html` | Vereinbarung zur Auftragsverarbeitung (Art. 28 DSGVO) | Firmenkunden mit Hosting, Wartung, Fernwartung | Sie | Unterlagen | auf Anfrage, zum Unterschreiben | `auftragsverarbeitung` | empfohlen |
+| `leistungsbeschreibung-betreuung-wartung.html` | Leistungsbeschreibung IT-Betreuung und Wartung | Firmenkunden mit IT-Wartung/Webseiten-Wartung, Teil des Vertrags | Sie | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-betreuung-wartung` | empfohlen |
+| `leistungsbeschreibung-betreuung-wartung-privat.html` | Leistungsbeschreibung IT-Betreuung und Wartung für Privatkunden | Privatkunden mit IT-Wartung/Webseiten-Wartung (§ 15 KSchG) | Du | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-betreuung-wartung-privat` | empfohlen |
+| `auftragsverarbeitung.html` | Vereinbarung zur Auftragsverarbeitung (Art. 28 DSGVO) | Firmenkunden mit IT-Betreuung, Webseiten-Wartung, Fernwartung | Sie | Unterlagen | auf Anfrage, zum Unterschreiben | `auftragsverarbeitung` | empfohlen |
 | `fernwartung-einverstaendnis.html` | Einverständniserklärung Fernwartung | alle Fernwartungskunden | neutral (Ich-Form des Kunden) | Unterlagen | auf Anfrage | `fernwartung-einverstaendnis` | empfohlen |
 | `geraeteannahme-bausteine.html` | Geräteannahmeschein – Textbausteine | Privatkunden (ein Baustein für Firmen) | Du | Unterlagen | nein, Text für das Modul | `geraeteannahme-bausteine` | empfohlen |
 | `qs-checklisten.html` | Qualitätsprüfung – Checklisten je Auftragsart | intern | – | Unterlagen | nein | `qs-checklisten` | nicht nötig |
@@ -125,12 +125,17 @@ Folgeschäden bei grober Fahrlässigkeit · keine Stornogebühr.
 
 **Widerruf:** Rücksendekosten trägt der Kunde.
 
-**Hosting und Wartung:** auch für Privatkunden, mit eigener Du-Fassung
-(`leistungsbeschreibung-hosting-wartung-privat.html`, Kündigung nach § 15 KSchG) ·
-keine E-Mail-Postfächer, Domain auf den Namen des Kunden · 15 Minuten
-Textänderungen pro Monat und die Support-Stunde verfallen am Monatsende ·
-täglich sichern, 14 Tage plus 4 Wochensicherungen · Reaktion bei Ausfall 4
-Stunden in den Geschäftszeiten, spätestens am nächsten Werktag ·
+**IT-Betreuung und Wartung** (seit 26.11.2026 statt „Hosting und Wartung“:
+kein eigenes Hosting, keine Nextcloud; Hosting, Domain, Microsoft 365 und
+Lizenzen hat der Kunde direkt beim Anbieter, z. B. World4You oder OVH): auch
+für Privatkunden, mit eigener Du-Fassung
+(`leistungsbeschreibung-betreuung-wartung-privat.html`, Kündigung nach § 15 KSchG) ·
+keine Haftung für Ausfälle der Anbieter · Sicherung liegt beim Kunden bzw.
+seinem Anbieter, IT-Tabelander prüft sie nur · 15 Minuten Textänderungen pro
+Monat und die Support-Stunde verfallen am Monatsende · Reaktion an Werktagen,
+bei Ausfall binnen 4 Stunden, spätestens am nächsten Werktag, Termine nach
+Vereinbarung · Fernwartung über RustDesk mit eigenem Server, Zugangsdaten im
+Passwortmanager, am Ende alle Zugänge übergeben ·
 Wartungsfenster dienstags 21–23 Uhr · Zielwert 99 % ohne Zusage, Gutschrift ab
 24 Stunden Ausfall durch eigenen Fehler.
 
@@ -164,15 +169,16 @@ Kostenregel für Prüfungen übernommen · Sicherungskopien höchstens 4 Wochen.
   Widerrufsbelehrung nennt die Online-Rücktrittsfunktion „Vertrag widerrufen“ auf
   `/rechtliches/widerruf` mit Eingangsbestätigung per E-Mail. Die Website-Funktion
   baut Issue #142.
-- **Technik:** als Zusagen formuliert, die ein Ein-Personen-Betrieb mit eigenem
-  Server erfüllen muss (Liste unten). USV und RAID sind nicht zugesagt; zugesagt ist
-  die Wiederherstellung aus der Sicherung binnen 2 Werktagen.
+- **Technik:** als Zusagen formuliert, die ein Ein-Personen-Betrieb erfüllen muss
+  (Liste unten). Seit 26.11.2026 ohne eigenes Hosting: Kundendaten liegen beim
+  Kunden und seinen Anbietern, bei IT-Tabelander nur Zugangsdaten im
+  Passwortmanager und Arbeitskopien für die Dauer eines Auftrags.
 - **Fernwartung:** kein Programmname, sondern „durchgehend verschlüsselt, nur nach
   Freigabe, Sitzung sichtbar“. Läuft die Verbindung über Server des Herstellers,
   sieht dieser nur Verbindungsdaten und steht dann in Anlage 3 des AVV.
-- **Zahlen aus dem Angebot:** Speicherplatz, Benutzer und Geräte „im Umfang aus dem
-  Angebot“. Geschäftszeiten: „werktags Montag bis Freitag, aktuelle Zeiten auf
-  it.tabelander.co.at“.
+- **Zahlen aus dem Angebot:** betreute Geräte und Systeme „aus dem Angebot“, Preise
+  über `__ITTAB_PREIS:<REF>__`, Erreichbarkeit über `__ITTAB_GESCHAEFTSZEITEN__`
+  (Reaktion an Werktagen, Termine nach Vereinbarung).
 - **Firmendatenblatt:** Steuernummer und UID-Nummer stehen nicht im Text. Das Modul
   kann sie als Variablen aus den Dolibarr-Firmendaten einsetzen (Kleinunternehmer
   ohne UID: Zeile entfällt).
@@ -187,16 +193,13 @@ Jede Zusage in den Texten muss stimmen, bevor sie freigegeben werden:
 
 - [ ] **Serverraum** abschließbar und abgeschlossen, wenn niemand da ist; Fremde nur in Begleitung (AVV Anlage 2).
 - [ ] **SSH nur mit Schlüssel**, Passwort-Anmeldung am Server aus.
-- [ ] **Passwortmanager** für alle Zugänge, jedes Passwort einzigartig; **zweiter Faktor** überall, wo es ihn gibt (Dolibarr, Nextcloud, Mail, Domain-Anbieter, GitHub).
+- [ ] **Passwortmanager** für alle Zugänge, jedes Passwort einzigartig; **zweiter Faktor** überall, wo es ihn gibt (Dolibarr, Mail, Hosting-Konten der Kunden, Microsoft 365, GitHub).
 - [ ] **Verwaltungsoberflächen nicht öffentlich** (Dolibarr, Server-Oberflächen, Nginx Proxy Manager): nur aus dem eigenen Netz oder per VPN (#67).
 - [ ] **Arbeitsgeräte** mit Festplattenverschlüsselung (BitLocker) und automatischer Bildschirmsperre.
-- [ ] **Datenträger mit Kundendaten und Sicherungen verschlüsselt** (z. B. LUKS). Geht das für bestehende Platten nicht sofort, Hosting erst danach anbieten.
-- [ ] **Kunden getrennt:** eigene Datenbank, eigenes Verzeichnis, eigene Benutzer je Kunde.
-- [ ] **Sicherung:** täglich, 14 Tage plus 4 Wochensicherungen, verschlüsselt, mit **Kopie an einem zweiten Ort** (z. B. NAS an einem anderen Standort). Stand 24.11.2026 fehlt die Kopie außer Haus. Liegt sie bei einem Cloud-Anbieter, ist er Unterauftragsverarbeiter (AVV Abschnitt 5 und Anlage 3, nur EU/EWR).
-- [ ] **Wiederherstellung** einmal im Quartal testen und festhalten; das Ziel von 2 Werktagen muss realistisch sein (Ersatzhardware griffbereit).
-- [ ] **Überwachung** alle 5 Minuten mit Warnung (z. B. Uptime Kuma), auch für Zertifikat und Speicherplatz.
+- [ ] **Arbeitskopien von Kundendaten** (Datenübernahme) nur auf verschlüsselten Datenträgern, nach dem Auftrag löschen.
+- [ ] **Kunden getrennt** im Passwortmanager (eigener Bereich je Kunde) und bei Arbeitskopien (eigenes verschlüsseltes Verzeichnis je Kunde).
+- [ ] **Überwachung** der betreuten Webseiten und Systeme mit Warnung (z. B. Uptime Kuma).
 - [ ] **Sicherheitsupdates** innerhalb von 3 Werktagen (z. B. automatische Updates plus monatliche Kontrolle).
-- [ ] **Webserver-Protokolle** nach 14 Tagen löschen (logrotate).
 - [ ] **Firewall:** von außen nur die nötigen Ports offen; Anmeldungen und Verwaltungszugriffe am Server werden protokolliert.
 - [ ] **Alte Datenträger** vor dem Weggeben sicher löschen oder zerstören; Kopien aus Datenübernahmen nach dem Auftrag löschen.
 - [ ] **Jährliche Prüfung** der Maßnahmen im Kalender eintragen (AVV Anlage 2).
@@ -206,8 +209,8 @@ Jede Zusage in den Texten muss stimmen, bevor sie freigegeben werden:
 - [ ] **Rücktrittsfunktion** auf `/rechtliches/widerruf` live (#142), bevor die Widerrufsbelehrung freigegeben wird. Bis dahin die Online-Annahme für Privatkunden aussetzen oder die Widerrufsbelehrung erst mit #142 freigeben.
 - [ ] **Leistungskatalog in Dolibarr:** Beschreibung von `DL-WEB-BASIS` auf „Einbindung von Impressum und Datenschutzerklärung“ ändern.
 - [ ] **WKO-Übergabeprotokoll** für gesetzeskonforme Webseiten besorgen und bei jeder Übergabe verwenden.
-- [ ] **Live-Rechtstexte** nach `pruefung-bestehende-rechtstexte.md` anpassen (Nutzungsbedingungen: Rücktritt mit Verweis auf die Widerrufsbelehrung, Abschnitt Hosting für Privatkunden).
-- [ ] **Betriebshaftpflichtversicherung** prüfen, gerade für Hosting und Fernwartung.
+- [ ] **Live-Rechtstexte** nach `pruefung-bestehende-rechtstexte.md` anpassen (Nutzungsbedingungen: Rücktritt mit Verweis auf die Widerrufsbelehrung, Abschnitt Betreuung und Wartung für Privatkunden; Datenschutz: Abschnitt Betreuung für Unternehmen).
+- [ ] **Betriebshaftpflichtversicherung** prüfen, gerade für IT-Betreuung und Fernwartung.
 
 Gerichtsstand: Telfs hat ein eigenes Bezirksgericht. Die AGB nennen wie gewünscht
 Innsbruck; für Verbraucher gilt ohnehin ihr Wohnsitz.

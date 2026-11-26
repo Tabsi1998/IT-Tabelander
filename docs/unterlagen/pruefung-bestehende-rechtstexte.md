@@ -18,7 +18,7 @@ die Kopie in `backend/app/legal_drafts/` bei Gelegenheit nachziehen.
    PC-Bau und Beratung. Vorschlag:
    > Grundlegende Richtung: Information über die Leistungen von IT-Tabelander
    > (Reparatur, Aufrüstung und Bau von PCs, Notebooks, Konsolen und
-   > Controllern, Webseiten, Softwareentwicklung, Hosting, Wartung und
+   > Controllern, Webseiten, Softwareentwicklung, IT-Betreuung, Wartung und
    > Beratung) und die Möglichkeit, Kontakt aufzunehmen.
 3. Kleinigkeiten: Land „AT“ statt „Österreich“ und die Telefonnummer ohne
    Leerzeichen kommen aus den Firmendaten. Vorschlag: in Dolibarr
@@ -58,10 +58,18 @@ die Kopie in `backend/app/legal_drafts/` bei Gelegenheit nachziehen.
 
    Läuft das Fernwartungsprogramm über Server des Herstellers, gehört der
    Hersteller in die Empfängerliste.
-7. **Neu: Hosting für Kunden.** Ein Satz, dass ich bei Hosting und Wartung
+7. **Neu: Betreuung für Unternehmen.** Ein Satz, dass ich bei IT-Betreuung und Wartung
    Daten im Auftrag meiner Kunden verarbeite und dafür eine eigene
    Vereinbarung gilt (`auftragsverarbeitung.html`). Für Besucher der
-   Kunden-Webseiten ist der jeweilige Kunde verantwortlich.
+   Kunden-Webseiten ist der jeweilige Kunde verantwortlich. Vorschlag (ersetzt
+   einen Abschnitt „Hosting und Wartung für Unternehmen“, falls es ihn gibt):
+   > **Betreuung für Unternehmen.** Betreue ich die IT oder die Webseite eines
+   > Unternehmens, verarbeite ich Daten in dessen Systemen nur in seinem
+   > Auftrag; dafür schließen wir eine Vereinbarung zur Auftragsverarbeitung.
+   > Verantwortlich für diese Daten ist das Unternehmen. Hosting-Anbieter wie
+   > World4You oder OVH und Microsoft arbeiten dabei für das Unternehmen, nicht
+   > für mich. Bei mir liegen nur Zugangsdaten, verschlüsselt im
+   > Passwortmanager, und für die Dauer eines Auftrags Arbeitskopien.
 8. **Zahlungen prüfen.** Laut Leistungskatalog bleibt Stripe in Dolibarr
    eingeschaltet. Gehen Zahlungslinks oder Online-Zahlungen über Stripe an
    Kunden, muss Stripe (mit Übermittlung in die USA) in die
@@ -80,18 +88,18 @@ die Kopie in `backend/app/legal_drafts/` bei Gelegenheit nachziehen.
    seit dem festen Preis von 29 € überflüssig; streichen.
 4. **Geltungsbereich zu eng.** Der erste Satz nennt nur Geräte, PC-Bau,
    Controller und Beratung. Privatkunden bestellen aber auch Webseiten,
-   Hosting und Fernwartung. Vorschlag:
+   IT-Betreuung, Webseiten-Wartung und Fernwartung. Vorschlag:
    > Diese Bedingungen gelten, wenn du mir ein Gerät zur Reparatur oder
    > Aufrüstung gibst, einen PC bauen oder einen Controller umbauen lässt,
-   > eine Webseite oder Software bei mir bestellst, Hosting oder Wartung
+   > eine Webseite oder Software bei mir bestellst, IT-Betreuung oder Wartung
    > nutzt, ich dir per Fernwartung helfe oder dich berate. Für Unternehmen
    > gelten meine AGB für Unternehmer.
 
-   Hosting und Wartung gibt es auch für Privatkunden (Entscheidung
-   26.11.2026). Vorschlag für einen eigenen Abschnitt:
-   > **Hosting und Wartung.** Was im Monatspreis enthalten ist, wie schnell
+   Betreuung und Wartung gibt es auch für Privatkunden; eigenes Hosting gibt es
+   nicht mehr (Entscheidung 26.11.2026). Vorschlag für einen eigenen Abschnitt:
+   > **Betreuung und Wartung.** Was im Monatspreis enthalten ist, wie schnell
    > ich reagiere und was bei Vertragsende mit deinen Daten passiert, steht in
-   > der Leistungsbeschreibung Hosting und Wartung für Privatkunden; du
+   > der Leistungsbeschreibung IT-Betreuung und Wartung für Privatkunden; du
    > bekommst sie mit dem Angebot. Mindestlaufzeit und Kündigungsfrist stehen
    > im Vertrag. Läuft er unbefristet oder länger als ein Jahr, kannst du
    > trotzdem mit zwei Monaten Frist zum Ende des ersten Jahres und danach zum
