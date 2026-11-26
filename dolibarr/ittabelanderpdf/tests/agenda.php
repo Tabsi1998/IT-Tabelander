@@ -71,6 +71,28 @@ $check('sent by e-mail: no second event', $count("fk_soc = ".$firmId." AND code 
 $docs->removeManual($ruleId, $firmId);
 $check('removing: event "entfernt"', $count("fk_soc = ".$firmId." AND code = 'AC_ITTAB_DOC_REMOVED'") > 0);
 
+// The Stand in the title is TT.MM.JJJJ also when the language is another one (REST API, cron).
+$german = $langs;
+$langs = new Translate('', $conf);
+$langs->setDefaultLang('en_US');
+$langs->loadLangs(array('main', 'ittabelanderpdf@ittabelanderpdf'));
+$GLOBALS['langs'] = $langs;
+$english = $docs->record($firmId, 'agb-unternehmer', 'checked', 'hand', $admin, array('fk_rule' => $ruleId, 'version' => '2026-11-26'));
+$langs = $german;
+$GLOBALS['langs'] = $german;
+$label = (string) rt_value($db, "SELECT a.label FROM ".MAIN_DB_PREFIX."actioncomm AS a INNER JOIN ".MAIN_DB_PREFIX."ittabpdf_docevent AS e ON e.fk_actioncomm = a.id WHERE e.rowid = ".((int) $english));
+$check('the date in the title is TT.MM.JJJJ in any language', strpos($label, '26.11.2026') !== false && strpos($label, '11/26/2026') === false, $label);
+// Titles of 2.0.0 with the US date are corrected once on activation.
+rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."actioncomm SET label = 'Unterlage abgehakt: AGB für Unternehmer (Stand 11/26/2026)' WHERE id = ".((int) $checked->id));
+$fixed = $agenda->fixDates();
+$check('US dates of 2.0.0 are corrected', $fixed >= 1 && rt_value($db, "SELECT label FROM ".MAIN_DB_PREFIX."actioncomm WHERE id = ".((int) $checked->id)) === 'Unterlage abgehakt: AGB für Unternehmer (Stand 26.11.2026)'
+	&& $agenda->fixDates() === 0, (string) $fixed);
+// The event type has no module (else Dolibarr leaves it out of its list and the timeline shows the code); 2.0.0 had one.
+rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."c_actioncomm SET module = 'ittabelanderpdf' WHERE code = 'AC_ITTAB_DOC'");
+WerkbankAgenda::ensureType($db);
+$check('the event type of 2.0.0 loses its module', rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_actioncomm WHERE code = 'AC_ITTAB_DOC' AND module IS NULL") == 1);
+$check('the event type is translated', $langs->trans('ActionAC_ITTAB_DOC') === 'Unterlage');
+
 // 3. A new version of a renewing document: customers who had confirmed it are asked again.
 $store = new WerkbankDoc($db);
 $agb = $store->bySlug('agb-unternehmer');
@@ -89,6 +111,8 @@ $check('switched off: no event', $count("code LIKE 'AC_ITTAB_%'") === $all);
 rt_const($db, 'ITTABPDF_AGENDA', '1');
 
 $check('the tab counts the open required documents', $docs->openCount($firmId) === count($docs->missing($firm)));
+// The timeline of the third party with event types shown (as in production): checked in the browser by dev_dolibarr.py.
+rt_const($db, 'AGENDA_USE_EVENT_TYPE', '1');
 
 $failed = array_values(array_filter($checks, function ($entry) {
 	return !$entry['ok'];
