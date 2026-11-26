@@ -132,9 +132,9 @@ class WerkbankMailData
 		if (!$auto) {
 			return $cache[$key] = $light;
 		}
-		$dark = self::logoImage('dark');
-		return $cache[$key] = '<div class="ittab-logo-light">'.$light.'</div>'
-			.'<div class="ittab-logo-dark" style="display:none;max-height:0;overflow:hidden;mso-hide:all;">'.$dark.'</div>';
+		// Two images side by side (no blocks: the logo stands in a paragraph of the signature).
+		$dark = self::logoImage('dark', 'ittab-logo-dark', 'display:none;max-height:0;overflow:hidden;mso-hide:all;');
+		return $cache[$key] = str_replace('<img ', '<img class="ittab-logo-light" ', $light).$dark;
 	}
 
 	/**
@@ -143,11 +143,12 @@ class WerkbankMailData
 	 * @param string $variant 'light' or 'dark'
 	 * @return string
 	 */
-	private static function logoImage($variant)
+	private static function logoImage($variant, $class = '', $hide = '')
 	{
 		global $mysoc;
 		$url = trim(getDolGlobalString($variant === 'dark' ? 'ITTABPDF_MAIL_LOGO_DARK_URL' : 'ITTABPDF_MAIL_LOGO_URL'));
-		$shown = 240;
+		// 180 px wide in the signature, as in the owner's own.
+		$shown = 180;
 		$shownHeight = 0;
 		if ($url === '') {
 			$file = self::logoFile($variant);
@@ -156,13 +157,12 @@ class WerkbankMailData
 				return '';
 			}
 			$size = @getimagesize($file);
-			$shown = (int) ceil($size[0] / 2);
-			$shownHeight = (int) ceil($size[1] / 2);
+			$shownHeight = !empty($size[0]) ? (int) round($size[1] * $shown / $size[0]) : 0;
 			// The version changes with the logo, so caches load the new one.
 			$url = $root.'?'.($variant === 'dark' ? 'variant=dark&' : '').'v='.substr(md5_file($file), 0, 8);
 		}
-		return '<img src="'.dol_escape_htmltag($url).'" width="'.$shown.'"'.($shownHeight > 0 ? ' height="'.$shownHeight.'"' : '')
-			.' alt="'.dol_escape_htmltag((string) $mysoc->name).'" style="display:block;border:0;outline:none;text-decoration:none;width:'.$shown.'px;max-width:100%;height:auto;">';
+		return '<img'.($class !== '' ? ' class="'.$class.'"' : '').' src="'.dol_escape_htmltag($url).'" width="'.$shown.'"'.($shownHeight > 0 ? ' height="'.$shownHeight.'"' : '')
+			.' alt="'.dol_escape_htmltag((string) $mysoc->name).'" style="'.$hide.'border:0;display:'.($hide !== '' ? 'none' : 'block').';height:auto;max-width:100%;width:'.$shown.'px" />';
 	}
 
 	/**
