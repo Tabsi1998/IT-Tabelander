@@ -344,12 +344,14 @@ class WerkbankMailTemplates
 	public static function signature($words, $name, $company, $logo, $address, $email, $url, $web, $phone, $gap = 24)
 	{
 		$link = 'color:'.self::MUTED.';text-decoration:none;';
-		return '<p style="'.self::P.'margin:'.((int) $gap).'px 0 16px 0;">'.$words.'</p>'
-			.'<div style="color:#3b4d63">'
-			.'<p style="margin:0 0 10px 0"><strong>'.$name.'</strong><br>'.$company.'</p>'
-			.'<hr />'
-			.'<p style="margin:0 0 8px 0">'.$logo.'</p>'
-			.'<p style="margin:0">'.$address.'<br><a href="mailto:'.$email.'" style="'.$link.'">'.$email.'</a> · <a href="'.$url.'" style="'.$link.'">'.$web.'</a><br>'.$phone.'</p>'
+		// Every block carries its font: hand-sent mails have no frame around them.
+		$font = 'font-family:'.self::FONT.';line-height:1.6;';
+		return ($words !== '' ? '<p style="'.self::P.'margin:'.((int) $gap).'px 0 16px 0;">'.$words.'</p>' : '')
+			.'<div style="color:#3b4d63;'.$font.'font-size:16px;">'
+			.'<p style="margin:0 0 10px 0;'.$font.'font-size:16px;color:#3b4d63;"><strong>'.$name.'</strong><br>'.$company.'</p>'
+			.'<hr style="border:0;border-top:1px solid '.self::LINE.';" />'
+			.'<p style="margin:0 0 8px 0;">'.$logo.'</p>'
+			.'<p style="margin:0;'.$font.'font-size:14px;color:#3b4d63;">'.$address.'<br><a href="mailto:'.$email.'" style="'.$link.'">'.$email.'</a> · <a href="'.$url.'" style="'.$link.'">'.$web.'</a><br>'.$phone.'</p>'
 			.'</div>';
 	}
 
@@ -489,7 +491,8 @@ class WerkbankMailTemplates
 				}
 			}
 		}
-		return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">'
+		// No doctype: Dolibarr's mailer wraps anything that does not start with <html> once more.
+		return '<html lang="de"><head><meta charset="utf-8">'
 			.'<meta name="viewport" content="width=device-width, initial-scale=1">'
 			.'<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">'
 			.'<style>:root{color-scheme:light dark;supported-color-schemes:light dark;}'

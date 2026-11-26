@@ -984,7 +984,7 @@ if ($stage === 'rollout') {
 		// 1.9.0: no logo on top; after the marker the signature block as in the owner's signature.
 		$signature = $T::signatureFor('', $mysoc, '__ITTAB_LOGO__');
 		// The name stands in the letter already: from the rule on (logo and contact).
-		$signature = '<div style="color:#3b4d63">'.substr($signature, strpos($signature, '<hr />'));
+		$signature = substr($signature, 0, strpos($signature, '<p ')).substr($signature, strpos($signature, '<hr '));
 		$html = '<div style="max-width:560px;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;">'.$body.'</div>'.$end
 			.'<div style="max-width:560px;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;margin:16px 0 0 0;">'.$signature.'</div>';
 		file_put_contents($out.'/mahnwesen/'.$name.'.html', $html."\n");

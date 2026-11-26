@@ -180,6 +180,13 @@ def mailpit(path: str) -> dict:
         return json.loads(answer.read().decode("utf-8"))
 
 
+def save_mail(path: Path, html: str) -> None:
+    """A caught message as a file to look at: with a charset, so umlauts show (Dolibarr's own wrapper has none)."""
+    if html and "charset" not in html[:600].lower():
+        html = '<meta charset="utf-8">' + html
+    path.write_text(html, encoding="utf-8")
+
+
 def mails() -> None:
     """E-mail scenarios in PHP, then every caught message as HTML plus a summary."""
     urllib.request.urlopen(urllib.request.Request(f"{MAILPIT_URL}/api/v1/messages", method="DELETE"), timeout=30)
@@ -199,13 +206,17 @@ def mails() -> None:
         attachments = [entry["FileName"] for entry in detail.get("Attachments") or []]
         inline = [entry.get("ContentID", "") for entry in detail.get("Inline") or []]
         slug = f"{number:02d}-" + re.sub(r"[^a-z0-9]+", "-", f"{detail['Subject']} {to}".lower()).strip("-")[:80]
-        (MAILS / f"{slug}.html").write_text(detail.get("HTML") or "", encoding="utf-8")
+        save_mail(MAILS / f"{slug}.html", detail.get("HTML") or "")
         found = re.search(r">\s*((?:Hallo|Guten Tag)[^<]*)<", detail.get("HTML") or "")
         greeting = found.group(1).strip() if found else ""
         summary.append({"file": f"{slug}.html", "subject": detail["Subject"], "to": to, "bcc": bcc,
                         "attachments": attachments, "inline": inline, "greeting": greeting})
     (MAILS / "uebersicht.json").write_text(json.dumps({"scenarios": result, "messages": summary}, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
+    # Every message is one document: one <html>, one </html> (the automatic send must not be wrapped twice).
+    doubled = [entry["file"] for entry in summary if (MAILS / entry["file"]).read_text(encoding="utf-8").lower().count("</html>") > 1]
+    if doubled:
+        raise SystemExit(f"mails with a document inside a document: {', '.join(doubled)}")
     print(f"{len(summary)} messages -> {shown(MAILS)}")
 
 
@@ -228,7 +239,7 @@ def rollout() -> None:
         number += 1
         detail = mailpit(f"message/{item['ID']}")
         slug = f"rollout-{number:02d}-" + re.sub(r"[^a-z0-9]+", "-", detail["Subject"].lower()).strip("-")[:70]
-        (MAILS / f"{slug}.html").write_text(detail.get("HTML") or "", encoding="utf-8")
+        save_mail(MAILS / f"{slug}.html", detail.get("HTML") or "")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print(f"{number} rollout messages -> {shown(MAILS)}")
 
@@ -329,7 +340,7 @@ def tickets() -> None:
     MAILS.mkdir(parents=True, exist_ok=True)
     for number, detail in enumerate(messages, 1):
         slug = f"ticket-{number:02d}-" + re.sub(r"[^a-z0-9]+", "-", detail["Subject"].lower()).strip("-")[:70]
-        (MAILS / f"{slug}.html").write_text(detail.get("HTML") or "", encoding="utf-8")
+        save_mail(MAILS / f"{slug}.html", detail.get("HTML") or "")
 
     def to(detail: dict) -> set:
         return {entry["Address"] for entry in detail.get("To") or []}

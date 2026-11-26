@@ -70,6 +70,12 @@ foreach ($before as $label => $entry) {
 		'ok' => $saved && $old['tags'] === $new['tags'] && $old['text'] === $new['text'] && $new['empty'] <= $old['empty'],
 		'detail' => $old['tags'] === $new['tags'] ? ($old['text'] === $new['text'] ? 'empty '.$old['empty'].' -> '.$new['empty'] : 'text: '.$new['text'])
 			: 'tags before: '.$old['tags'].' | after: '.$new['tags']);
+	$sign = (string) substr((string) $row->content, (int) strrpos((string) $row->content, '<div'));
+	$checks[] = array('check' => $label.': the signature keeps its font and sizes after saving',
+		'ok' => substr_count($sign, 'font-family:Arial') >= 3 && strpos($sign, 'font-size:14px') !== false && strpos($sign, 'font-size:16px') !== false,
+		'detail' => substr($sign, 0, 400));
+	$checks[] = array('check' => $label.': the rule keeps its light colour', 'ok' => (bool) preg_match('~<hr[^>]*border-top:\s*1px solid #D6DEE7~i', (string) $row->content),
+		'detail' => preg_match('#<hr[^>]*>#i', (string) $row->content, $hr) ? $hr[0] : 'no hr');
 	$checks[] = array('check' => $label.': no logo or line on top, the signature at the end',
 		'ok' => strpos((string) $row->content, 'border-top:2px') === false && strpos((string) $row->content, '<hr') !== false
 			&& strpos((string) $row->content, '__ITTAB_LOGO__') > strpos((string) $row->content, '<hr'));
