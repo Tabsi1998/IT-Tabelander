@@ -1163,19 +1163,54 @@ def versand() -> None:
     print(f"{len(checks)} sending checks passed")
 
 
+def playwright_module() -> str:
+    """Playwright of the website (web/node_modules) of this checkout or a sibling one, '' when none is installed."""
+    for root in (ROOT.parents[1], *ROOT.parents[2].glob("IT-Tabelander*")):
+        candidate = root / "web" / "node_modules" / "playwright"
+        if candidate.is_dir():
+            return str(candidate)
+    return ""
+
+
+def editor() -> None:
+    """The module's templates in Dolibarr's editor (tests/editor.php, scripts/editor_roundtrip.cjs).
+
+    CKEditor loads each template and saves it unchanged, as a person would;
+    afterwards the text must have the same blocks and words and no empty
+    block more (the old orange line turned into one). Needs Playwright of
+    the website; without it the stage says so and fails.
+    """
+    prepared = php("prepare", script="editor.php")
+    module = playwright_module()
+    if not module or not shutil.which("node"):
+        raise SystemExit("editor check needs node and Playwright (npm ci in web/)")
+    rowids = ",".join(str(rowid) for rowid in prepared["rowids"])
+    run = subprocess.run(["node", str(Path(__file__).with_name("editor_roundtrip.cjs")), module, URL, str(LOGIN), rowids],
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
+    if run.returncode != 0:
+        raise SystemExit("editor round trip failed: " + (run.stderr or run.stdout)[-1500:])
+    result = php("compare", script="editor.php")
+    checks = result["checks"]
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"editor check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} editor checks passed")
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "editor": editor, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand", "editor"):
                 steps[name]()
         elif step in steps:
             steps[step]()

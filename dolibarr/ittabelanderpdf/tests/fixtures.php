@@ -760,7 +760,7 @@ if ($stage === 'mails') {
 	$off = $vars();
 	$check('portal off: no button', $off['__ITTAB_KUNDENBEREICH_BLOCK__'] === '');
 	$check('portal off: reply sentence', strpos($off['__ITTAB_ANNAHME_SATZ__'], 'antworten Sie einfach auf diese E-Mail') !== false && strpos($off['__ITTAB_ANNAHME_SATZ_DU__'], 'antworte einfach auf diese Mail') !== false);
-	$check('logo from the public endpoint', strpos($off['__ITTAB_LOGO__'], '/custom/ittabelanderpdf/public/maillogo.php?v=') !== false && strpos($off['__ITTAB_LOGO__'], 'width="240"') !== false, $off['__ITTAB_LOGO__']);
+	$check('logo from the public endpoint', strpos($off['__ITTAB_LOGO__'], '/custom/ittabelanderpdf/public/maillogo.php?v=') !== false && strpos($off['__ITTAB_LOGO__'], 'width="180"') !== false, $off['__ITTAB_LOGO__']);
 	rt_const($db, 'ITTABPDF_PORTAL_ENABLED', '1');
 	$conf->global->ITTABPDF_PORTAL_ENABLED = '1';
 	$on = $vars();
