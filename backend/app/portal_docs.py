@@ -175,7 +175,8 @@ async def sign(session: dict, slug: str, *, name: str, png: str, version: str, i
 
 def owner_mail(*, what: str, item: dict, name: str, email: str, ip: str, when: str) -> tuple[str, str, str]:
     """The owner's notice, in the look of the other mails (no logo on top, signature below)."""
-    title, customer = item["title"], item["customer"]
+    # Names from Dolibarr go into the subject: one line, whatever they hold.
+    title, customer = " ".join(item["title"].split()), " ".join(item["customer"].split())
     stand = f", Stand {item['stand'][8:10]}.{item['stand'][5:7]}.{item['stand'][:4]}" if item["stand"] else ""
     proof = f"Name „{name}“, angemeldet als {email}, IP {ip or 'unbekannt'}{stand}."
     if what == "confirm":

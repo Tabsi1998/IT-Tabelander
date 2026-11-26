@@ -162,7 +162,7 @@ def test_the_tick_and_a_real_name_are_needed():
             ConfirmInput(**bad)
 
 
-@pytest.mark.parametrize("png", ["data:image/png;base64," + PNG, PNG + "==", PNG[:100], "A" * (portal_docs.PNG_MAX + 1), PNG[:300] + "<svg"],
+@pytest.mark.parametrize("png", ["data:image/png;base64," + PNG, PNG + "==", PNG[:40], "A" * (portal_docs.PNG_MAX + 1), PNG[:300] + "<svg"],
                          ids=["data-url", "padding", "too-short", "too-long", "markup"])
 def test_a_signature_goes_only_as_plain_base64(png):
     with pytest.raises(ValidationError):
