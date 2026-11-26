@@ -248,7 +248,8 @@ def ui() -> None:
 
     def look(name: str, path: str, needles: list[str]) -> None:
         html = opener.open(f"{URL}{path}", timeout=60).read().decode("utf-8", "replace")
-        missing = [needle for needle in needles if needle not in html]
+        # Dolibarr writes some characters as entities (· as &middot;).
+        missing = [needle for needle in needles if needle not in html and needle not in unescape(html)]
         checks.append({"page": name, "ok": not missing, "missing": missing})
         (STATE / f"ui-{name}.html").write_text(html, encoding="utf-8")
 
