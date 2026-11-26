@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '1.7.1';
+		$this->version = '1.8.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -291,6 +291,8 @@ class modITTabelanderPDF extends DolibarrModules
 				dol_syslog('ittabelanderpdf: takeover of knowledge articles failed: '.$store->error, LOG_WARNING);
 			}
 		}
+		// A template per customer never lies blank in the folder (1.8.0).
+		$store->removeBlanks($GLOBALS['user']);
 		// The shipped rules for company documents, only when there are none yet.
 		dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');
 		$docs = new WerkbankDocs($this->db);

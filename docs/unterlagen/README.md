@@ -73,6 +73,8 @@ erkennt die Unterlage am Dateinamen (= Slug).
 - Öffentliche Texte (Spalte „Öffentlich“ = ja) werden als Rechtstext angelegt,
   alle anderen als interne Unterlage; die Art „Vorlage je Kunde“ stellst du an
   der Karte ein.
+- `Versendbar: nein` im Kopfkommentar: die Unterlage wird nie an Kunden angeboten
+  (Textbausteine wie Geräteannahme und QS-Checklisten).
 
 ```bash
 # Probelauf: zeigt, was passieren würde, schreibt nichts

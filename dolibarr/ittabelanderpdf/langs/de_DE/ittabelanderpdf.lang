@@ -597,3 +597,37 @@ WerkbankPricelistPerWeek = pro Woche
 WerkbankPricelistPerMonth = pro Monat
 WerkbankPricelistPerYear = pro Jahr
 WerkbankVar_ITTAB_PREISLISTE = Preisliste aus den Produkten (Abschnitte je Kategorie, Einstellungen → Allgemein)
+
+# 1.8.0: documents added by hand, sending documents
+WerkbankDocsManualTitle = Weitere Unterlage
+WerkbankDocsManualHelp = Jede freigegebene Unterlage lässt sich diesem Kunden auch ohne Regel geben. Sie erscheint oben als eigene Zeile mit Status und lässt sich dort erzeugen, senden, unterschreiben lassen, hochladen oder abhaken. Eine Vorlage je Kunde wird gleich für ihn ausgefüllt.
+WerkbankDocsManualNone = Es gibt noch keine freigegebene Unterlage (Geschäftspartner → Unterlagen).
+WerkbankDocsManualAction = Was der Kunde tut
+WerkbankDocsManualActionAuto = nach der Art der Unterlage
+WerkbankDocsManualRequiredHelp = zählt als offen, bis es erledigt ist
+WerkbankDocsManualAdd = Hinzufügen
+WerkbankDocsManualAdded = „%s“ ist jetzt in der Liste dieses Kunden.
+WerkbankDocsManualUnknown = Diese Unterlage gibt es nicht oder sie ist noch nicht freigegeben.
+WerkbankDocsManualRemoved = „%s“ ist aus der Liste genommen; der Verlauf bleibt.
+WerkbankDocsManualBadge = von Hand hinzugefügt
+WerkbankDocsManualRemove = Entfernen
+WerkbankDocsManualRemoveHelp = Nimmt die Zeile aus der Liste dieses Kunden; Dateien und Verlauf bleiben.
+WerkbankDocsManualCopyTo = (eine Kopie kommt auch zum Angebot)
+WerkbankDocsManualFromObject = Unterlage erzeugen
+WerkbankDocsMailGroupGenerate = Für diesen Kunden erzeugen:
+WerkbankDocsMailGroupMade = Für diesen Kunden schon erzeugt:
+WerkbankDocsMailGroupGeneral = Allgemeine Unterlagen:
+WerkbankDocsMailMade = erzeugt am %s
+WerkbankDocsMailMadeSigned = unterschrieben am %s
+WerkbankDocsMailFillFirst = Für „%s“ fehlen noch Angaben. <a href="%s">Jetzt ausfüllen und erzeugen</a> – danach geht es mit der fertigen Unterlage hierher zurück.
+WerkbankDocsMailEdited = Du hast den Text geändert; die Liste der Unterlagen darin wird nicht mehr nachgezogen.
+WerkbankDocsMailRetext = Text beim nächsten „Beilegen“ neu aus der Vorlage aufbauen (eigene Änderungen gehen verloren)
+WerkbankDocCustomerNoPdf = Eine Vorlage je Kunde hat kein allgemeines PDF; sie wird je Kunde erzeugt.
+WerkbankDocSample = Muster ansehen
+WerkbankDocSampleMark = MUSTER
+WerkbankDocSendable = An Kunden versendbar
+WerkbankDocSendableHelp = Wird beim Mailen unter „Unterlagen beilegen“ angeboten und kann Standard-Anhang sein. Aus für interne Textbausteine.
+WerkbankDocForCustomer = Für Kunden erzeugen …
+WerkbankDocForCustomerGo = Weiter zum Kunden
+WerkbankDocsEvent_generated = für den Kunden erzeugt
+WerkbankDocsGenerateFirst = Vorlage je Kunde: erst „Erzeugen“, dann senden oder unterschreiben lassen.

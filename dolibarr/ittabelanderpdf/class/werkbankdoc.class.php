@@ -23,6 +23,9 @@ class WerkbankDoc
 	/** Kinds: legal text (may be public), internal document, template per customer. */
 	const KINDS = array('legal', 'internal', 'customer');
 
+	/** Text blocks for the module and the website, never sent to customers (default of "sendable"). */
+	const NOT_SENDABLE = array('geraeteannahme-bausteine', 'qs-checklisten', 'impressum-ergaenzung');
+
 	/** @var DoliDB */
 	private $db;
 
@@ -166,6 +169,9 @@ class WerkbankDoc
 			'kind' => "'".$this->db->escape($kind)."'",
 			// Only legal texts go to the website.
 			'public' => $kind === 'legal' && !empty($values['public']) ? 1 : 0,
+			// Not given (import, takeover): may be sent unless it is a text block for the module or the website.
+			'sendable' => array_key_exists('sendable', $values) ? (empty($values['sendable']) ? 0 : 1)
+				: (in_array($slug, self::NOT_SENDABLE, true) ? 0 : 1),
 			'text' => "'".$this->db->escape((string) $values['text'])."'",
 			'changed' => 1,
 			'position' => (int) (isset($values['position']) ? $values['position'] : 0),
@@ -182,12 +188,21 @@ class WerkbankDoc
 			if ($version && (string) $version->text === (string) $values['text'] && (string) $version->title === $title) {
 				$fields['changed'] = 0;
 			}
+			if (!array_key_exists('sendable', $values)) {
+				unset($fields['sendable']);
+			}
 			$set = array();
 			foreach ($fields as $column => $literal) {
 				$set[] = $column." = ".$literal;
 			}
-			return $this->db->query("UPDATE ".MAIN_DB_PREFIX."ittabpdf_doc SET ".implode(', ', $set)." WHERE rowid = ".((int) $id)." AND entity = ".((int) $conf->entity))
-				? (int) $id : $this->fail();
+			if (!$this->db->query("UPDATE ".MAIN_DB_PREFIX."ittabpdf_doc SET ".implode(', ', $set)." WHERE rowid = ".((int) $id)." AND entity = ".((int) $conf->entity))) {
+				return $this->fail();
+			}
+			// A template per customer has no general PDF (it would go out blank).
+			if ($kind === 'customer') {
+				$this->removeBlank($this->get($id), $user);
+			}
+			return (int) $id;
 		}
 		$fields = array('entity' => (int) $conf->entity, 'date_creation' => "'".$this->db->idate(dol_now())."'",
 			'fk_km' => !empty($values['fk_km']) ? (int) $values['fk_km'] : 'NULL') + $fields;
@@ -251,6 +266,12 @@ class WerkbankDoc
 	 */
 	public function writePdf($doc, $user, $archive = true)
 	{
+		if ($doc->kind === 'customer') {
+			// Made per customer only; a general PDF would go out blank.
+			$this->removeBlank($doc, $user);
+			$this->error = 'WerkbankDocCustomerNoPdf';
+			return '';
+		}
 		$record = $this->asRecord($doc);
 		if (!$record) {
 			$this->error = 'WerkbankDocNotReleased';
@@ -289,6 +310,50 @@ class WerkbankDoc
 				." WHERE fk_doc = ".((int) $doc->rowid)." AND version = ".((int) $doc->version));
 		}
 		return $path;
+	}
+
+	/**
+	 * Take the general PDF of a template per customer out of the Unterlagen
+	 * folder (written there while it was another kind, or by an older
+	 * version): only files the module wrote, never uploads.
+	 *
+	 * @param object|null $doc  Document
+	 * @param User        $user User
+	 * @return int              Files removed
+	 */
+	public function removeBlank($doc, $user)
+	{
+		if (!$doc) {
+			return 0;
+		}
+		$file = WerkbankUnterlagen::dir().'/'.$doc->slug.'.pdf';
+		if (!is_file($file)) {
+			return 0;
+		}
+		$rel = WerkbankUnterlagen::relativeDir();
+		$resql = $this->db->query("SELECT rowid, gen_or_uploaded FROM ".MAIN_DB_PREFIX."ecm_files WHERE filepath = '".$this->db->escape($rel)."'"
+			." AND filename = '".$this->db->escape($doc->slug.'.pdf')."'");
+		$row = $resql ? $this->db->fetch_object($resql) : null;
+		if ($row && $row->gen_or_uploaded !== 'generated') {
+			return 0;
+		}
+		dol_delete_file($file, 0, 1);
+		return 1;
+	}
+
+	/**
+	 * After an update: no blank PDF of a template per customer stays in the folder.
+	 *
+	 * @param User $user User
+	 * @return int       Files removed
+	 */
+	public function removeBlanks($user)
+	{
+		$removed = 0;
+		foreach ($this->all(array('kind' => 'customer')) as $doc) {
+			$removed += $this->removeBlank($doc, $user);
+		}
+		return $removed;
 	}
 
 	// ------------------------------------------------------------ from the knowledge base

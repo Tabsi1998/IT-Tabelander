@@ -260,7 +260,7 @@ print '<br><br><a id="unterlagen"></a>'.load_fiche_titre($langs->trans('Werkbank
 	dol_include_once('/ittabelanderpdf/class/werkbankdoc.class.php');
 	$store = new WerkbankDoc($db);
 	foreach ($store->all() as $doc) {
-		if ($doc->kind !== 'customer' && !isset($choosable[$doc->slug.'.pdf'])) {
+		if ($doc->kind !== 'customer' && (int) $doc->sendable && !isset($choosable[$doc->slug.'.pdf'])) {
 			$choosable[$doc->slug.'.pdf'] = $doc->title;
 		}
 	}

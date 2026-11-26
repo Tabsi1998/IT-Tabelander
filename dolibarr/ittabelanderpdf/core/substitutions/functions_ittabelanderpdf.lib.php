@@ -55,6 +55,12 @@ function ittabelanderpdf_completesubstitutionarray(&$substitutionarray, $langs, 
 		? 'Bei Fragen antworte einfach auf diese Mail oder schreib mir im Kundenbereich.'
 		: 'Bei Fragen antworte einfach auf diese Mail.';
 
+	// Company documents of the e-mail: the mail form puts in the attached ones (WerkbankDocMail).
+	if (!isset($substitutionarray['__ITTAB_UNTERLAGEN_LISTE__'])) {
+		require_once dol_buildpath('/ittabelanderpdf/class/werkbankdocmail.class.php', 0);
+		$substitutionarray = array_merge($substitutionarray, WerkbankDocMail::fromItems(array()));
+	}
+
 	if (!is_array($parameters) || ($parameters['mode'] ?? '') !== 'formemail' || !is_object($object)) {
 		$substitutionarray['__ITTAB_HALLO__'] = 'Hallo,';
 		$substitutionarray['__ITTAB_GUTENTAG__'] = 'Guten Tag,';

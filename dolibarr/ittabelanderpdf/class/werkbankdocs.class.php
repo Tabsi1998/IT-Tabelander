@@ -107,14 +107,69 @@ class WerkbankDocs
 	}
 
 	/**
-	 * @param bool $activeOnly Only active rules
+	 * The rules of the setup; with $socid also the documents added to that
+	 * customer by hand (rules with fk_soc), after the general ones.
+	 *
+	 * @param bool     $activeOnly Only active rules
+	 * @param int|null $socid      Customer, null = only the general rules
 	 * @return array<int,object>
 	 */
-	public function rules($activeOnly = false)
+	public function rules($activeOnly = false, $socid = null)
 	{
 		global $conf;
-		return $this->rows("SELECT * FROM ".MAIN_DB_PREFIX."ittabpdf_docrule WHERE entity = ".((int) $conf->entity)
-			.($activeOnly ? " AND active = 1" : "")." ORDER BY position, rowid");
+		$who = $socid === null ? " AND COALESCE(fk_soc, 0) = 0" : " AND (COALESCE(fk_soc, 0) = 0 OR fk_soc = ".((int) $socid).")";
+		return $this->rows("SELECT * FROM ".MAIN_DB_PREFIX."ittabpdf_docrule WHERE entity = ".((int) $conf->entity).$who
+			.($activeOnly ? " AND active = 1" : "")." ORDER BY COALESCE(fk_soc, 0), position, rowid");
+	}
+
+	/**
+	 * Add a company document to one customer by hand: a rule of its own for
+	 * this customer (the same document added twice stays one line).
+	 *
+	 * @param Societe $soc      Customer
+	 * @param string  $slug     Document
+	 * @param string  $action   accept, sign, handover; '' = by the kind of the document
+	 * @param int     $required Required (1) or optional (0)
+	 * @return int              Rule id, -1 on error
+	 */
+	public function addManual($soc, $slug, $action = '', $required = 1)
+	{
+		global $conf;
+		$documents = $this->documents();
+		if (!isset($documents[$slug])) {
+			$this->error = 'WerkbankDocsManualUnknown';
+			return -1;
+		}
+		$rows = $this->rows("SELECT rowid FROM ".MAIN_DB_PREFIX."ittabpdf_docrule WHERE entity = ".((int) $conf->entity)
+			." AND fk_soc = ".((int) $soc->id)." AND slug = '".$this->db->escape($slug)."'");
+		if ($rows) {
+			return (int) $rows[0]->rowid;
+		}
+		$kinds = array('legal' => 'accept', 'customer' => 'sign', 'internal' => 'handover');
+		if (!in_array($action, self::ACTIONS, true)) {
+			$kind = (string) $documents[$slug]['kind'];
+			$action = isset($kinds[$kind]) ? $kinds[$kind] : 'handover';
+		}
+		return $this->saveRule(0, array('label' => $documents[$slug]['title'], 'slug' => $slug, 'action' => $action, 'customer_type' => '', 'products' => '',
+			'fk_category' => 0, 'required' => $required ? 1 : 0, 'renew' => 0, 'position' => 0, 'active' => 1, 'fk_soc' => (int) $soc->id));
+	}
+
+	/**
+	 * Remove a document added by hand from the customer's list; its history stays.
+	 *
+	 * @param int $id    Rule
+	 * @param int $socid Customer it belongs to
+	 * @return int       1 removed, 0 not such a rule, -1 error
+	 */
+	public function removeManual($id, $socid)
+	{
+		global $conf;
+		if ($socid <= 0) {
+			return 0;
+		}
+		$ok = $this->db->query("DELETE FROM ".MAIN_DB_PREFIX."ittabpdf_docrule WHERE rowid = ".((int) $id)." AND fk_soc = ".((int) $socid)
+			." AND entity = ".((int) $conf->entity));
+		return $ok ? ($this->db->affected_rows(true) > 0 ? 1 : 0) : $this->fail();
 	}
 
 	/**
@@ -159,6 +214,9 @@ class WerkbankDocs
 			'position' => (int) $values['position'],
 			'active' => empty($values['active']) ? 0 : 1,
 		);
+		if (array_key_exists('fk_soc', $values)) {
+			$fields['fk_soc'] = (int) $values['fk_soc'] > 0 ? (int) $values['fk_soc'] : "NULL";
+		}
 		if ($id > 0) {
 			$set = array();
 			foreach ($fields as $column => $literal) {
@@ -183,6 +241,10 @@ class WerkbankDocs
 	 */
 	public function applies($rule, $soc)
 	{
+		// Added to one customer by hand: for that customer, whatever else holds.
+		if (!empty($rule->fk_soc)) {
+			return (int) $rule->fk_soc === (int) $soc->id;
+		}
 		// Every condition that is set must hold (customer type AND product AND tag).
 		if ($rule->customer_type === 'company' && self::isPrivate($this->db, $soc)) {
 			return false;
@@ -299,7 +361,7 @@ class WerkbankDocs
 		$documents = $this->documents();
 		$events = $this->events((int) $soc->id);
 		$list = array();
-		foreach ($this->rules(true) as $rule) {
+		foreach ($this->rules(true, (int) $soc->id) as $rule) {
 			if (!$this->applies($rule, $soc)) {
 				continue;
 			}
@@ -529,7 +591,8 @@ class WerkbankDocs
 			." AND state = 'generated' AND data IS NOT NULL ORDER BY rowid DESC");
 		$data = $rows ? json_decode((string) $rows[0]->data, true) : null;
 		return array('fields' => isset($data['fields']) && is_array($data['fields']) ? $data['fields'] : array(),
-			'contract' => isset($data['contract']) ? (int) $data['contract'] : 0, 'contact' => isset($data['contact']) ? (int) $data['contact'] : 0);
+			'contract' => isset($data['contract']) ? (int) $data['contract'] : 0, 'contact' => isset($data['contact']) ? (int) $data['contact'] : 0,
+			'propal' => 0);
 	}
 
 	/**
@@ -575,9 +638,10 @@ class WerkbankDocs
 	 * @param Contrat|null         $contract Contract or null
 	 * @param Contact|null         $contact  Contact or null
 	 * @param User                 $user     User
+	 * @param Propal|null          $propal   Proposal it is made for (a copy goes there too)
 	 * @return int                           Event id, -1 error ($this->error, $this->errors with the details)
 	 */
-	public function generate($soc, $rule, array $answers, $contract, $contact, $user)
+	public function generate($soc, $rule, array $answers, $contract, $contact, $user, $propal = null)
 	{
 		global $langs;
 		$this->errors = array();
@@ -600,7 +664,8 @@ class WerkbankDocs
 			$this->error = $langs->transnoentities('WerkbankGenPlaceholdersLeft', implode(', ', $left));
 			return -1;
 		}
-		$data = json_encode(array('fields' => $answers, 'contract' => $contract ? (int) $contract->id : 0, 'contact' => $contact ? (int) $contact->id : 0));
+		$data = json_encode(array('fields' => $answers, 'contract' => $contract ? (int) $contract->id : 0, 'contact' => $contact ? (int) $contact->id : 0,
+			'propal' => $propal ? (int) $propal->id : 0));
 		$event = $this->record((int) $soc->id, (string) $rule->slug, 'generated', 'hand', $user, array('fk_rule' => (int) $rule->rowid,
 			'element' => $contract ? 'contrat' : '', 'fk_object' => $contract ? (int) $contract->id : 0));
 		if ($event <= 0) {
@@ -697,11 +762,22 @@ class WerkbankDocs
 			return '';
 		}
 		dolChmod($target);
-		// A copy with the contract, when it belongs to one.
+		// A copy with the contract and the proposal it belongs to.
 		if ($contract) {
 			$dir = $conf->contrat->dir_output.'/'.dol_sanitizeFileName($contract->ref);
 			if (is_dir($dir) || dol_mkdir($dir) >= 0) {
 				dol_copy($target, $dir.'/'.basename($target), '0', 1);
+			}
+		}
+		if (!empty($data['propal'])) {
+			require_once DOL_DOCUMENT_ROOT.'/comm/propal/class/propal.class.php';
+			$propal = new Propal($this->db);
+			if ($propal->fetch((int) $data['propal']) > 0 && (int) $propal->socid === (int) $soc->id) {
+				$dir = (!empty($conf->propal->multidir_output[$propal->entity]) ? $conf->propal->multidir_output[$propal->entity] : $conf->propal->dir_output)
+					.'/'.dol_sanitizeFileName($propal->ref);
+				if (is_dir($dir) || dol_mkdir($dir) >= 0) {
+					dol_copy($target, $dir.'/'.basename($target), '0', 1);
+				}
 			}
 		}
 		return $target;

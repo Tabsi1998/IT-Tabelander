@@ -230,7 +230,8 @@ class WerkbankUnterlagen
 		$list = array();
 		foreach ($store->all(array('released' => 1)) as $doc) {
 			$list[$doc->slug] = array('title' => (string) $doc->title, 'stand' => dol_print_date($this->db->jdate($doc->date_release), '%Y-%m-%d'),
-				'id' => (int) $doc->rowid, 'version' => (int) $doc->version, 'kind' => (string) $doc->kind);
+				'id' => (int) $doc->rowid, 'version' => (int) $doc->version, 'kind' => (string) $doc->kind,
+				'sendable' => isset($doc->sendable) ? (int) $doc->sendable : 1);
 		}
 		return $list;
 	}
@@ -257,20 +258,20 @@ class WerkbankUnterlagen
 	// ------------------------------------------------------------ files
 
 	/**
-	 * The PDFs in the folder, file name => label (the article title when an
-	 * article of the chosen categories has that name, else the file name).
+	 * The general PDFs that may go to customers, file name => title: released
+	 * documents marked "an Kunden versendbar", not a template per customer
+	 * (that one is generated for the customer), with their file in the folder.
+	 * Anything else lying in the folder is never offered.
 	 *
 	 * @return array<string,string>
 	 */
 	public function files()
 	{
-		$titles = array();
-		foreach ($this->documents() as $slug => $document) {
-			$titles[$slug.'.pdf'] = $document['title'];
-		}
 		$list = array();
-		foreach (dol_dir_list(self::dir(), 'files', 0, '\.pdf$', '', 'name', SORT_ASC) as $file) {
-			$list[$file['name']] = isset($titles[$file['name']]) ? $titles[$file['name']] : $file['name'];
+		foreach ($this->documents() as $slug => $document) {
+			if ($document['kind'] !== 'customer' && $document['sendable'] && is_file(self::dir().'/'.$slug.'.pdf')) {
+				$list[$slug.'.pdf'] = $document['title'];
+			}
 		}
 		asort($list, SORT_NATURAL | SORT_FLAG_CASE);
 		return $list;

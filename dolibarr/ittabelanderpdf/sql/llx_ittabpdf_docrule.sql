@@ -14,5 +14,6 @@ CREATE TABLE llx_ittabpdf_docrule(
   renew           smallint DEFAULT 0 NOT NULL,
   position        integer DEFAULT 0 NOT NULL,
   active          smallint DEFAULT 1 NOT NULL,
+  fk_soc          integer NULL,
   tms             timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=innodb;
