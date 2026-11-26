@@ -264,16 +264,17 @@ def ui() -> None:
         checks.append({"page": name, "ok": not missing, "missing": missing})
         (STATE / f"ui-{name}.html").write_text(html, encoding="utf-8")
 
-    # The e-mail logo must load without a session (mail clients have none).
+    # The e-mail logo must load without a session (mail clients have none)
+    # and keep its transparency (PNG colour type 6, RGBA).
     with urllib.request.urlopen(f"{URL}/custom/ittabelanderpdf/public/maillogo.php", timeout=30) as answer:
         data = answer.read()
         width, height = int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
         checks.append({"page": "maillogo without login", "ok": answer.status == 200 and answer.headers.get("Content-Type") == "image/png"
-                       and data[1:4] == b"PNG" and width <= 480 and "max-age" in (answer.headers.get("Cache-Control") or ""),
+                       and data[1:4] == b"PNG" and data[25] == 6 and width <= 480 and "max-age" in (answer.headers.get("Cache-Control") or ""),
                        "missing": [f"{answer.status} {answer.headers.get('Content-Type')} {width}x{height} {answer.headers.get('Cache-Control')}"]})
     with urllib.request.urlopen(f"{URL}/custom/ittabelanderpdf/public/maillogo.php?variant=dark", timeout=30) as answer:
         data = answer.read()
-        checks.append({"page": "dark maillogo without login", "ok": answer.status == 200 and data[1:4] == b"PNG"
+        checks.append({"page": "dark maillogo without login", "ok": answer.status == 200 and data[1:4] == b"PNG" and data[25] == 6
                        and int.from_bytes(data[16:20], "big") <= 480, "missing": [f"{answer.status} {len(data)} bytes"]})
     # Dolibarr's WAF checks every POST: the texts must pass it, or nobody can save them.
     samples = [ROLLOUT / "mahnwesen" / "mahnung-1.html", ROLLOUT / "ticket" / "signatur.html",

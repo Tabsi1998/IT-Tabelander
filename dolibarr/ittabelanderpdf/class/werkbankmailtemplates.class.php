@@ -17,7 +17,7 @@ require_once __DIR__.'/werkbankmaildata.class.php';
  *
  * Mail clients get tables and inline styles only, at most 600 px wide, white
  * like the PDF also where a client forces a dark mode, the logo as a hosted
- * PNG on white (public/maillogo.php). The
+ * transparent PNG (public/maillogo.php). The
  * texts use Dolibarr's own variables (__REF__, __MYCOMPANY_NAME__, ...) and
  * the module's __ITTAB_*__ variables from
  * core/substitutions/functions_ittabelanderpdf.lib.php.

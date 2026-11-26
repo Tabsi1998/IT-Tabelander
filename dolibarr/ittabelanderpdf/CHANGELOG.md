@@ -13,6 +13,10 @@
 - History in Dolibarr's agenda: event type "Unterlage" (`AC_ITTAB_DOC`, created on activation). Generated, signed, uploaded, ticked, added, removed, reset and "neue Fassung nötig" become finished events with the third party and, where there is one, the contract, proposal, intervention or ticket (tab "Ereignisse/Agenda" of both), with title, source, file and note. Sent by e-mail is left to Dolibarr's own event. QS test reports closed and intake slips signed likewise. The history so far is written once on activation (`fk_actioncomm` per row, `update_2.0.0.sql`). Setting "Verlauf in der Agenda" (default on).
 - A new version of a document with "neu bestätigen" marks every customer who had confirmed an older one ("neue Fassung nötig", also in the tab's history).
 
+### Mail logo (#179)
+
+- Mail logo (`public/maillogo.php`, light and dark) keeps the transparency of its source instead of a white or dark badge.
+
 ## [1.9.0] - 2026-11-26
 
 - New mail layout for every module mail (templates Sie/Du, automatic send, ticket confirmation and owner notice, signed copies, documents, rollout texts for Mahnwesen and tickets): no logo and no orange line on top any more (CKEditor turned the line into an empty block); the mail starts with the greeting and ends in the style of the owner's signature: closing words, name and company, a rule (`<hr />`), the logo at 180 px, address, e-mail, web and phone, all from the company data and variables.
