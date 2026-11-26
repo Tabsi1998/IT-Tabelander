@@ -61,9 +61,13 @@ const WAITING = {
 };
 export const TRACK_ID = "ITPORTALTEST0008";
 
-function detail(item, messages) {
-  return { ...item, closed_at: item.open ? null : "2026-08-30T08:00:00+00:00", can_reply: item.open, messages };
+function detail(item, messages, files = []) {
+  return { ...item, closed_at: item.open ? null : "2026-08-30T08:00:00+00:00", can_reply: item.open, messages, files };
 }
+
+// A tiny PNG, as the ticket's photo (#123).
+export const PHOTO = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "base64");
 
 function inquiries(tickets) {
   const [offer, closed] = tickets;
@@ -73,6 +77,9 @@ function inquiries(tickets) {
         text: "Anfrageart: Reparatur\nGerät / Bereich: PlayStation\n\nBeschreibung:\nDas Laufwerk zieht keine Discs mehr ein." },
       { id: "41", at: "2026-09-26T10:15:00+00:00", from: "team", author: "IT-Tabelander", via: "email",
         text: "Danke für die Fotos! Ist das die Digital Edition oder die mit Laufwerk?" },
+    ], [
+      { name: "kunde-20260925-080000-a1b2c3-laufwerk.webp", size: 182000, kind: "image", at: "2026-09-25T08:00:00+00:00", from: "customer" },
+      { name: "kostenvoranschlag.pdf", size: 52000, kind: "pdf", at: "2026-09-26T10:15:00+00:00", from: "team" },
     ]),
     5: detail(offer, [
       { id: "start", at: "2026-09-24T08:00:00+00:00", from: "customer", author: null, via: null, text: "Der Akku hält nur noch 20 Minuten." },
@@ -90,7 +97,7 @@ export function portalState(overrides = {}) {
     signedIn: false,
     me: { email: "kunde@example.at", customers: ["Max Muster"] },
     overview: {
-      email: "kunde@example.at", customers: ["Max Muster"],
+      email: "kunde@example.at", customers: ["Max Muster"], accounts: [{ id: 7, name: "Max Muster" }],
       counts: { offers_open: 1, invoices_open: 1, repairs_running: 2, inquiries_waiting: 1 },
       tickets: [
         { ...WAITING },
@@ -162,14 +169,36 @@ export async function mockPortal(page, state = portalState()) {
     }
     const track = path.match(/^\/inquiries\/track\/([A-Za-z0-9]+)$/);
     if (track) return track[1] === TRACK_ID ? json(route, { id: 8 }) : json(route, { detail: "Diese Anfrage gibt es hier nicht." }, 404);
+    if (path === "/inquiries" && method === "POST") {
+      const id = 9;
+      state.inquiries[id] = detail({ id, ref: "TS2609-0009", title: "Reparatur: Notebook Lenovo", inquiry_ref: "ANF-NEUPORT1",
+        step: "eingegangen", open: true, created_at: "2026-09-27T12:00:00+00:00", updated_at: "2026-09-27T12:00:00+00:00" },
+      [{ id: "start", at: "2026-09-27T12:00:00+00:00", from: "customer", author: null, via: null, text: body.description }]);
+      return json(route, { id, ref: "ANF-NEUPORT1" });
+    }
+    const file = path.match(/^\/inquiries\/(\d+)\/files(?:\/(.+))?$/);
+    if (file) {
+      const item = state.inquiries[file[1]];
+      if (!item) return json(route, { detail: "Diese Anfrage gibt es hier nicht." }, 404);
+      if (method === "POST") {
+        const original = /filename="([^"]+)"/.exec(request.postData() || "")?.[1] || "datei";
+        const pdf = /\.pdf$/i.test(original);
+        const name = `kunde-20260927-120000-${String(state.sent.length).padStart(6, "0")}.${pdf ? "pdf" : "webp"}`;
+        state.inquiries[file[1]] = { ...item, files: [...item.files, { name, size: 1000, kind: pdf ? "pdf" : "image", at: null, from: "customer" }] };
+        return json(route, { name, size: 1000, kind: pdf ? "pdf" : "image" });
+      }
+      return route.fulfill({ status: 200, contentType: /\.pdf$/.test(file[2]) ? "application/pdf" : "image/png",
+        body: /\.pdf$/.test(file[2]) ? "%PDF-1.4\n%%EOF\n" : PHOTO });
+    }
     const inquiry = path.match(/^\/inquiries\/(\d+)(\/messages|\/close)?$/);
     if (inquiry) {
       const item = state.inquiries[inquiry[1]];
       if (!item) return json(route, { detail: "Diese Anfrage gibt es hier nicht." }, 404);
       if (inquiry[2] === "/messages") {
         const step = item.step === "wartet_auf_dich" ? "eingegangen" : item.step;
+        const text = [body.message, body.files?.length ? `Angehängt: ${body.files.join(", ")}` : ""].filter(Boolean).join("\n\n");
         state.inquiries[inquiry[1]] = { ...item, step, messages: [...item.messages,
-          { id: `m${item.messages.length}`, at: "2026-09-27T12:00:00+00:00", from: "customer", author: "Max Muster", via: "portal", text: body.message }] };
+          { id: `m${item.messages.length}`, at: "2026-09-27T12:00:00+00:00", from: "customer", author: "Max Muster", via: "portal", text }] };
       }
       if (inquiry[2] === "/close") {
         state.inquiries[inquiry[1]] = { ...item, step: "abgeschlossen", open: false, can_reply: false, closed_at: "2026-09-27T12:00:00+00:00" };

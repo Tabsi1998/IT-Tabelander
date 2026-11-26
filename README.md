@@ -93,7 +93,8 @@ sudo systemctl reload apache2
 
 ```nginx
 location / {
-    client_max_body_size 10m;
+    # Fotos aus dem Kundenbereich: bis 15 MB je Datei
+    client_max_body_size 16m;
     proxy_pass http://127.0.0.1:8001;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -406,7 +407,9 @@ Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie
      Kontakts),
    - Tickets: **lesen** und **anlegen/ändern** – „ändern“ braucht der
      Kundenbereich für Antworten (`POST /tickets/newmessage`), für die interne
-     Notiz an neuen Tickets und für „Hat sich erledigt“ (Status geschlossen),
+     Notiz an neuen Tickets, für „Hat sich erledigt“ (Status geschlossen) und
+     für Dateien am Ticket (`POST /documents/upload`, `modulepart=ticket`);
+     „lesen“ für die Dateiliste und den Download,
    - Agenda: **eigene Termine einsehen** und **eigene Termine anlegen**
      (Rückruf-Wünsche; „einsehen“ liest außerdem den Verlauf eines Tickets im
      Kundenbereich – Dolibarrs Ticket-Schnittstelle sagt nicht, welche
@@ -581,6 +584,27 @@ vorne und hat die Zahl am Reiter **Anfragen**.
   antworten geht nicht mehr – der Kunde startet dann eine neue.
 - Der Anmelde-Link kann direkt zu einer Anfrage führen: Wer über einen Link
   aus Dolibarrs Mails kommt, landet nach der Anmeldung dort.
+- **Dateien:** An eine Antwort oder eine neue Anfrage hängt der Kunde bis zu 5
+  Fotos (JPG, PNG, WebP, je bis 15 MB) oder PDFs (je bis 5 MB), am Handy auch
+  direkt mit der Kamera. Die Website prüft jede Datei nach ihrem Inhalt, nicht
+  nach Name oder Endung: ein Foto wird neu als WebP gespeichert (aufrecht,
+  höchstens 2000 px, ohne EXIF und Standort), ein PDF muss wie eines beginnen.
+  Sie geht sofort per Dokument-Schnittstelle ans Ticket
+  (`kunde-<Datum>-<Zeit>-<Zufall>-<Name>.webp|pdf`); die Website behält
+  nichts. HEIC kann die Website nicht lesen – iPhones schicken über den
+  Browser ohnehin JPG. Höchstens 40 Kundendateien je Ticket.
+- **Welche Dateien der Kunde sieht:** seine eigenen (`kunde-…` und
+  `anfrage-foto-…` aus dem Formular), Dateien, die an einer öffentlichen
+  Nachricht von dir hängen, und Dateien, die du in Dolibarr am Ticket unter
+  **Dokumente** über das Teilen-Symbol **freigibst**. Alles andere im
+  Ticket-Ordner (Lieferantenrechnung, Notizen, Anhänge privater Nachrichten,
+  Anhänge von Mails, die der E-Mail-Sammler ablegt) bleibt unsichtbar.
+- **Neue Anfrage** (`/kundenbereich/anfragen/neu`): dieselben Arten wie das
+  Formular der Website, ohne Kontaktdaten – das Ticket hängt direkt am
+  Geschäftspartner des Kunden (bei mehreren wählt er „Für“), `origin_email`
+  ist die angemeldete Adresse. Dolibarr schickt wie beim Formular Bestätigung
+  und Werkstatt-Hinweis; eine private Notiz sagt, wer sie im Kundenbereich
+  angelegt hat. Danach geht es direkt auf die neue Anfrage.
 
 **Sperren** geht direkt in Dolibarr am Kunden, und die Website fragt spätestens
 alle 5 Minuten neu:

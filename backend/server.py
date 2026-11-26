@@ -54,6 +54,8 @@ class PublicRequestGuardMiddleware:
         # opened once; guessing either stays hopeless and slow.
         ("POST", "/api/portal/login"): (10, 60 * 60, 4 * 1024),
         ("POST", "/api/portal/session"): (20, 60 * 60, 4 * 1024),
+        # A new inquiry from the customer area (#123): each one is a ticket and a mail.
+        ("POST", "/api/portal/inquiries"): (10, 60 * 60, 32 * 1024),
     }
     # Addresses with a ticket number in them (#122): one counter per pattern,
     # so another number does not open another allowance. Each answer and each
@@ -61,6 +63,8 @@ class PublicRequestGuardMiddleware:
     PATTERN_RULES = (
         ("POST", re.compile(r"^/api/portal/inquiries/\d{1,10}/messages$"), (30, 60 * 60, 32 * 1024)),
         ("POST", re.compile(r"^/api/portal/inquiries/\d{1,10}/close$"), (10, 60 * 60, 4 * 1024)),
+        # One photo or PDF per request (#123): 15 MB plus the form around it.
+        ("POST", re.compile(r"^/api/portal/inquiries/\d{1,10}/files$"), (60, 60 * 60, 16 * 1024 * 1024)),
     )
 
     def __init__(self, application):

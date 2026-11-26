@@ -1,15 +1,19 @@
-"""The customer area as a ticket portal (#122): history, answers, closing."""
+"""The customer area as a ticket portal (#122): history, answers, closing;
+files and new inquiries (#123)."""
 import asyncio
+import base64
+import io
 import json
 import re
 from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
+from PIL import Image
 
 import server
-from app import dolibarr, mailer, portal, portal_inquiries as inquiries
-from app.routers.portal import LoginInput, MessageInput
+from app import dolibarr, mailer, portal, portal_files, portal_inquiries as inquiries
+from app.routers.portal import LoginInput, MessageInput, NewInquiryInput
 
 REAL_CLIENT = httpx.AsyncClient
 CFG = {"enabled": True, "base": "https://erp.example.com", "api_key": "key", "timeout": 5,
@@ -45,10 +49,11 @@ EVENTS = [
 class Dolibarr:
     """A small Dolibarr: tickets, their agenda events, messages and changes."""
 
-    def __init__(self, tickets=(), events=EVENTS):
+    def __init__(self, tickets=(), events=EVENTS, files=()):
         self.tickets = {str(item["id"]): item for item in tickets}
         self.events = list(events)
-        self.posted, self.put = [], []
+        self.files = list(files)
+        self.posted, self.put, self.uploaded, self.created, self.downloads = [], [], [], [], []
 
     def __call__(self, request: httpx.Request):
         path = request.url.path.removeprefix("/api/index.php")
@@ -69,6 +74,23 @@ class Dolibarr:
             return httpx.Response(200, json="1")
         if path == "/agendaevents":
             return httpx.Response(200, json=self.events)
+        if request.method == "GET" and path == "/documents":
+            return httpx.Response(200, json=self.files) if self.files else httpx.Response(404, json={})
+        if path == "/documents/upload":
+            body = json.loads(request.content)
+            self.uploaded.append(body)
+            self.files.append({"name": body["filename"], "size": len(base64.b64decode(body["filecontent"])),
+                               "date": 1790000100})
+            return httpx.Response(200, json=body["filename"])
+        if path == "/documents/download":
+            self.downloads.append(request.url.params["original_file"])
+            return httpx.Response(200, json={"content": base64.b64encode(b"%PDF-1.4 test").decode()})
+        if request.method == "POST" and path == "/tickets":
+            body = json.loads(request.content)
+            self.created.append(body)
+            self.tickets["77"] = _ticket(77, socid=str(body["socid"]), subject=body["subject"], message=body["message"],
+                                         track_id=body["track_id"], status="0")
+            return httpx.Response(200, json=77)
         if path in ("/proposals", "/contacts"):
             return httpx.Response(404, json={})
         raise AssertionError(f"not expected: {request.method} {path}")
@@ -266,3 +288,127 @@ def test_answers_and_closing_are_limited_per_pattern_not_per_ticket():
 
     statuses = asyncio.run(run())
     assert statuses[:10] == [204] * 10 and statuses[10:] == [429, 429]
+
+
+# ------------------------------------------------------------------ files (#123)
+
+FILES = [
+    {"name": "kunde-20260926-101500-a1b2c3-defekt.webp", "size": 2048, "date": 1790000010},
+    {"name": "anfrage-foto-6523f0.webp", "size": 1024, "date": 1790000000},
+    {"relativename": "rechnung-lieferant.pdf", "size": 5000, "date": 1790000011},
+    {"name": "angebot-geteilt.pdf", "size": 3000, "date": 1790000012, "share": "abc123"},
+    {"name": "antwort-anhang.pdf", "size": 3000, "date": 1790000013, "agenda_id": "3"},
+    {"name": "intern-anhang.pdf", "size": 3000, "date": 1790000014, "agenda_id": "2"},
+    {"name": "boese.php.noexe", "size": 10, "date": 1790000015, "share": "x"},
+]
+
+
+def _photo(fmt="JPEG", size=(3000, 2000)) -> bytes:
+    buffer = io.BytesIO()
+    image = Image.new("RGB", size, "orange")
+    if fmt == "JPEG":
+        exif = Image.Exif()
+        exif[0x0112] = 6  # the phone was held upright
+        exif[0x010F] = "Testphone"
+        image.save(buffer, fmt, exif=exif)
+    else:
+        image.save(buffer, fmt)
+    return buffer.getvalue()
+
+
+def test_the_customer_sees_his_own_shared_and_answered_files_only(world):
+    world["use"](Dolibarr([_ticket()], files=FILES))
+    shown = asyncio.run(inquiries.detail(SESSION, 11))
+    assert [(item["name"], item["from"], item["kind"]) for item in shown["files"]] == [
+        ("anfrage-foto-6523f0.webp", "customer", "image"),
+        ("kunde-20260926-101500-a1b2c3-defekt.webp", "customer", "image"),
+        ("angebot-geteilt.pdf", "team", "pdf"),
+        ("antwort-anhang.pdf", "team", "pdf"),
+    ]
+
+
+def test_a_file_comes_only_from_the_own_ticket_and_only_if_visible(world):
+    fake = world["use"](Dolibarr([_ticket(), _ticket(12, socid="8")], files=FILES))
+    name, media_type, content = asyncio.run(portal_files.download(SESSION, 11, "antwort-anhang.pdf"))
+    assert media_type == "application/pdf" and content.startswith(b"%PDF") and fake.downloads == ["TS11/antwort-anhang.pdf"]
+    for ticket_id, wanted in ((11, "rechnung-lieferant.pdf"), (11, "intern-anhang.pdf"), (11, "../TS12/x.pdf"),
+                              (11, "boese.php.noexe"), (12, "antwort-anhang.pdf")):
+        with pytest.raises(portal.NotFound):
+            asyncio.run(portal_files.download(SESSION, ticket_id, wanted))
+    assert len(fake.downloads) == 1
+
+
+def test_a_photo_is_made_anew_without_its_location_and_smaller(world):
+    fake = world["use"](Dolibarr([_ticket()]))
+    stored = asyncio.run(portal_files.upload(SESSION, 11, _photo(), "Mein Foto (1).jpg"))
+    assert re.fullmatch(r"kunde-\d{8}-\d{6}-[a-f0-9]{6}-Mein-Foto-1\.webp", stored["name"]), stored
+    [sent] = fake.uploaded
+    assert sent["modulepart"] == "ticket" and sent["ref"] == "11" and sent["overwriteifexists"] == 0
+    image = Image.open(io.BytesIO(base64.b64decode(sent["filecontent"])))
+    # Upright as taken, at most 2000 px, and nothing of the phone's data comes along.
+    assert image.format == "WEBP" and image.size == (1333, 2000)
+    assert not dict(image.getexif()), "EXIF left with the photo"
+    assert portal_files.UPLOADED.fullmatch(stored["name"])
+
+
+def test_a_pdf_stays_as_it_is_anything_else_is_refused(world):
+    fake = world["use"](Dolibarr([_ticket()]))
+    pdf = asyncio.run(portal_files.upload(SESSION, 11, b"%PDF-1.7\n...", "Rechnung.PDF"))
+    assert pdf["name"].endswith("-Rechnung.pdf") and base64.b64decode(fake.uploaded[0]["filecontent"]) == b"%PDF-1.7\n..."
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+    for raw, name in ((svg, "bild.jpg"), (b"MZ\x90\x00", "programm.pdf"), (b"", "leer.png"), (_photo("BMP", (10, 10)), "x.bmp"),
+                      (b"%PDF-" + b"x" * portal_files.PDF_MAX, "gross.pdf")):
+        with pytest.raises(portal.PortalError):
+            asyncio.run(portal_files.upload(SESSION, 11, raw, name))
+    assert len(fake.uploaded) == 1
+
+
+def test_no_upload_to_a_closed_or_someone_elses_ticket(world):
+    fake = world["use"](Dolibarr([_ticket(status="8"), _ticket(12, socid="8")]))
+    with pytest.raises(portal.PortalError, match="abgeschlossen"):
+        asyncio.run(portal_files.upload(SESSION, 11, b"%PDF-1.7", "a.pdf"))
+    with pytest.raises(portal.NotFound):
+        asyncio.run(portal_files.upload(SESSION, 12, b"%PDF-1.7", "a.pdf"))
+    assert fake.uploaded == []
+
+
+def test_an_answer_names_the_files_that_are_really_on_the_ticket(world):
+    fake = world["use"](Dolibarr([_ticket()], files=FILES))
+    own = "kunde-20260926-101500-a1b2c3-defekt.webp"
+    asyncio.run(inquiries.reply(SESSION, 11, "", [own, "kunde-20260926-101500-ffffff.webp"]))
+    [message] = fake.posted
+    assert message["message"].startswith(f"Angehängt: {own}") and "ffffff" not in message["message"]
+    assert own in world["mails"][0]["text"]
+    with pytest.raises(ValueError):
+        MessageInput(message="", files=[])
+    with pytest.raises(ValueError):
+        MessageInput(message="Hallo", files=["../../etc/passwd"])
+    assert MessageInput(files=[own]).files == [own]
+
+
+# ------------------------------------------------------------------ a new inquiry (#123)
+
+def test_a_new_inquiry_goes_onto_the_own_customer_with_a_note(world):
+    fake = world["use"](Dolibarr([]))
+    payload = NewInquiryInput(request_type="repair", device_type="notebook", manufacturer="Lenovo",
+                              description="Startet seit gestern nicht mehr.", customer_id=999)
+    created = asyncio.run(inquiries.create(SESSION, payload.model_dump(exclude={"customer_id"}), payload.customer_id))
+    assert created["id"] == 77 and created["ref"].startswith("ANF-")
+    [ticket] = fake.created
+    # Someone else's customer number is ignored: the ticket lands on the session's own customer.
+    assert ticket["socid"] == "7" and ticket["origin_email"] == "max@example.com"
+    assert ticket["subject"] == f"Reparatur: Notebook Lenovo ({created['ref']})"
+    assert ticket["message"].endswith("Beschreibung:\nStartet seit gestern nicht mehr.")
+    assert ticket["type_code"] == "ISSUE" and ticket["notify_tiers_at_create"] == 1 and ticket["track_id"].startswith("IT")
+    [note] = fake.posted
+    assert note["private"] == 1 and "Im Kundenbereich angelegt von Max Muster (max@example.com)" in note["message"]
+
+
+def test_a_new_inquiry_needs_what_the_form_needs():
+    with pytest.raises(ValueError):
+        NewInquiryInput(request_type="repair", description="Startet nicht mehr.")
+    with pytest.raises(ValueError):
+        NewInquiryInput(request_type="controller_custom", description="Bitte Hall-Sticks.")
+    with pytest.raises(ValueError):
+        NewInquiryInput(request_type="contact", description="Hallo, eine Frage.")
+    assert NewInquiryInput(request_type="consulting", description="Welcher Laptop fürs Studium?").topic == ""

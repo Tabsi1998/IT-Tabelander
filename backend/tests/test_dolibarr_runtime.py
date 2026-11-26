@@ -1149,3 +1149,68 @@ class TestTicketPortal:
         assert late.status_code == 409 and "abgeschlossen" in late.json()["detail"]
         assert len(a.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60).json()["messages"]) == 3
         assert mail_with(WARNINGS_TO, f"Kundenbereich: {ticket['ref']} als erledigt geschlossen")
+
+
+# ---------------------------------------------------------------- files and new inquiries (#123)
+
+def admin_upload(ticket_id, name: str, content: bytes):
+    import base64
+    dolibarr_post("documents/upload", {"filename": name, "modulepart": "ticket", "ref": str(ticket_id),
+                                       "filecontent": base64.b64encode(content).decode(), "fileencoding": "base64"})
+
+
+class TestPortalFiles:
+    def test_photos_and_pdfs_go_to_the_own_ticket_and_internal_files_stay_hidden(self, ticket_world):
+        world = ticket_world
+        a, b = world["a_session"], world["b_session"]
+        ticket, foreign = world["a_ticket"], world["b_ticket"]
+        admin_upload(ticket["id"], "intern-lieferant.pdf", b"%PDF-1.4 intern")
+
+        photo = a.post(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/files",
+                       files={"file": ("Display kaputt.png", png_bytes(), "image/png")}, timeout=60)
+        assert photo.status_code == 200, photo.text
+        name = photo.json()["name"]
+        assert re.fullmatch(r"kunde-\d{8}-\d{6}-[a-f0-9]{6}-Display-kaputt\.webp", name), name
+        pdf = a.post(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/files",
+                     files={"file": ("beleg.pdf", b"%PDF-1.4\n%%EOF\n", "application/pdf")}, timeout=60)
+        assert pdf.status_code == 200, pdf.text
+        refused = a.post(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/files",
+                         files={"file": ("bild.jpg", b"<svg onload=alert(1)>", "image/jpeg")}, timeout=60)
+        assert refused.status_code == 409 and "nur Fotos" in refused.json()["detail"]
+
+        # In Dolibarr at the ticket, as a WebP.
+        stored = {next(str(item[key]) for key in ("name", "relativename", "filename") if item.get(key))
+                  for item in dolibarr_get("documents", modulepart="ticket", id=ticket["id"])}
+        assert {name, pdf.json()["name"], "intern-lieferant.pdf"} <= stored
+
+        # The customer sees his two files, never the workshop's own.
+        shown = a.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60).json()
+        assert sorted(item["name"] for item in shown["files"]) == sorted([name, pdf.json()["name"]])
+        image = a.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/files/{name}", timeout=60)
+        assert image.status_code == 200 and image.headers["content-type"] == "image/webp"
+        assert Image.open(io.BytesIO(image.content)).format == "WEBP"
+        assert a.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/files/intern-lieferant.pdf", timeout=60).status_code == 404
+
+        # The answer names the files; the other customer reaches none of it.
+        answered = a.post(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/messages", json={"files": [name]}, timeout=60)
+        assert answered.status_code == 200 and f"Angehängt: {name}" in answered.json()["messages"][-1]["text"]
+        assert b.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/files/{name}", timeout=60).status_code == 404
+        assert b.post(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/files",
+                      files={"file": ("x.pdf", b"%PDF-1.4", "application/pdf")}, timeout=60).status_code == 404
+        assert a.post(f"{BASE_URL}/api/portal/inquiries/{foreign['id']}/files",
+                      files={"file": ("x.pdf", b"%PDF-1.4", "application/pdf")}, timeout=60).status_code == 404
+
+    def test_a_new_inquiry_from_the_customer_area_lands_on_the_own_customer(self, ticket_world):
+        a = ticket_world["a_session"]
+        created = a.post(f"{BASE_URL}/api/portal/inquiries", json={
+            "request_type": "repair", "device_type": "notebook", "manufacturer": "Lenovo",
+            "description": "Das Display flackert seit dem Sturz.", "customer_id": 1}, timeout=60)
+        assert created.status_code == 200, created.text
+        ticket = dolibarr_get(f"tickets/{created.json()['id']}")
+        assert str(ticket["fk_soc"]) == str(ticket_world["a_ticket"]["fk_soc"]), "never another customer's"
+        assert ticket["subject"] == f"Reparatur: Notebook Lenovo ({created.json()['ref']})"
+        assert ticket["message"].endswith("Das Display flackert seit dem Sturz.")
+        assert any("Im Kundenbereich angelegt von" in str(item["message"]) for item in ticket.get("messages") or []
+                   if str(item.get("private")) == "1")
+        shown = a.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60).json()
+        assert shown["can_reply"] is True and shown["messages"][0]["from"] == "customer"

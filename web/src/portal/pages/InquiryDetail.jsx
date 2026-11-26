@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 import { Field, FormError } from "../../forms/fields.jsx";
 import { day, portalRequest, usePortalData } from "../api.js";
+import { DocumentIcon, FilePicker, size, uploadAll } from "../files.jsx";
 import { usePortal } from "../PortalApp.jsx";
 import { STEPS, TIMELINE, stepOf, stepTone } from "../steps.js";
 import { Badge, Loading, PageTitle, Problem } from "./parts.jsx";
 
-// Where a new inquiry starts; the customer area gets its own form with #123.
-export const NEW_INQUIRY = "/?kontakt=anfrage#kontakt";
+// Where a new inquiry starts: the customer area's own form (#123).
+export const NEW_INQUIRY = "/kundenbereich/anfragen/neu";
 
 function when(value) {
   const date = value ? new Date(value) : null;
@@ -60,20 +61,63 @@ function Message({ message }) {
   );
 }
 
+/** "kunde-20260925-080000-a1b2c3-laufwerk.webp" -> "laufwerk.webp": the name the customer gave it. */
+export function fileLabel(file) {
+  if (file.name.startsWith("anfrage-foto-")) return "Foto aus der Anfrage";
+  const own = file.name.match(/^kunde-\d{8}-\d{6}-[a-f0-9]{6}(?:-(.+))?\.(\w+)$/);
+  if (!own) return file.name;
+  return own[1] ? `${own[1]}.${own[2]}` : file.kind === "pdf" ? "PDF" : "Foto";
+}
+
+/** The ticket's photos and PDFs the customer may see (#123); a tap opens one. */
+function Files({ item }) {
+  if (!item.files?.length) return null;
+  const href = (file) => `/api/portal/inquiries/${item.id}/files/${encodeURIComponent(file.name)}`;
+  return (
+    <section aria-labelledby="dateien" className="flex flex-col gap-3">
+      <h2 id="dateien" className="m-0 text-xl font-bold">Dateien</h2>
+      <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-4">
+        {item.files.map((file) => (
+          <li key={file.name}>
+            <a href={href(file)} target="_blank" rel="noopener noreferrer"
+              className="flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface no-underline hover:border-ink hover:text-ink">
+              {file.kind === "image" ? (
+                <img src={href(file)} alt="" loading="lazy" className="aspect-[4/3] w-full bg-line-soft object-cover" />
+              ) : (
+                <span className="flex aspect-[4/3] w-full items-center justify-center bg-subtle text-muted"><DocumentIcon /></span>
+              )}
+              <span className="flex flex-col gap-0.5 p-3">
+                <span className="truncate text-sm font-semibold text-ink">{fileLabel(file)}</span>
+                <span className="text-[13px] text-muted">
+                  {[file.from === "customer" ? "von dir" : "von IT-Tabelander", file.size && size(file.size)].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function Reply({ item, onSent }) {
   const [text, setText] = useState("");
+  const [picked, setPicked] = useState([]);
   const [state, setState] = useState({ busy: false, error: "", sent: false });
 
   const send = async (event) => {
     event.preventDefault();
-    if (text.trim().length < 2) {
+    if (text.trim().length < 2 && picked.length === 0) {
       setState({ busy: false, error: "Bitte schreib kurz, was du mitteilen möchtest.", sent: false });
       return;
     }
     setState({ busy: true, error: "", sent: false });
     try {
-      const updated = await portalRequest("POST", `/inquiries/${item.id}/messages`, { message: text.trim() });
+      // The files first, straight to the ticket; the message then names them.
+      const files = await uploadAll(item.id, picked, setPicked);
+      const updated = await portalRequest("POST", `/inquiries/${item.id}/messages`, { message: text.trim(), files });
       setText("");
+      setPicked([]);
       setState({ busy: false, error: "", sent: true });
       onSent(updated);
     } catch (error) {
@@ -88,10 +132,12 @@ function Reply({ item, onSent }) {
       <Field label="Deine Nachricht" as="textarea" rows={5} maxLength={5000} value={text}
         hint="(ich bekomme sie sofort und antworte hier oder per E-Mail)"
         onChange={(event) => { setText(event.target.value); if (state.sent || state.error) setState({ busy: false, error: "", sent: false }); }} />
+      <FilePicker picked={picked} setPicked={setPicked} busy={state.busy}
+        onRefuse={(problem) => setState({ busy: false, error: problem, sent: false })} />
       <FormError message={state.error} />
       {state.sent && <p role="status" className="m-0 text-[15px] font-semibold text-ink">Danke, deine Nachricht ist da. Du siehst sie oben im Verlauf.</p>}
       <button type="submit" disabled={state.busy} className="btn-primary min-h-[52px] self-stretch text-[17px] disabled:opacity-60 sm:self-start">
-        {state.busy ? "Wird gesendet …" : "Nachricht senden"}
+        {state.busy ? (picked.some((entry) => !entry.name) ? "Dateien werden hochgeladen …" : "Wird gesendet …") : "Nachricht senden"}
       </button>
     </form>
   );
@@ -141,6 +187,7 @@ function Close({ item, onClosed }) {
 export default function InquiryDetail() {
   const { id } = useParams();
   const { overview } = usePortal();
+  const location = useLocation();
   const inquiry = usePortalData(`/inquiries/${encodeURIComponent(id)}`);
   const [fresh, setFresh] = useState(null);
   const [closedNow, setClosedNow] = useState(false);
@@ -168,6 +215,12 @@ export default function InquiryDetail() {
         <Badge tone={stepTone(item)}>{step.label}</Badge>
       </div>
 
+      {location.state?.created && (
+        <p role="status" className="card m-0 p-5 font-semibold text-ink">
+          Danke, deine Anfrage ist da. Du bekommst gleich eine Bestätigung per E-Mail.
+          {location.state.failed ? ` ${location.state.failed}` : ""}
+        </p>
+      )}
       <section aria-labelledby="stand" className="card flex flex-col gap-5 p-5 md:p-7">
         <div className="flex flex-col gap-1.5">
           <h2 id="stand" className="m-0 text-xl font-bold">Stand</h2>
@@ -194,6 +247,8 @@ export default function InquiryDetail() {
         )}
       </section>
 
+      <Files item={item} />
+
       {closedNow && <p role="status" className="card m-0 p-5 font-semibold text-ink">Erledigt – die Anfrage ist geschlossen. Danke für die Rückmeldung!</p>}
       {item.can_reply ? (
         <>
@@ -205,7 +260,7 @@ export default function InquiryDetail() {
           <p className="m-0 text-body">
             {item.step === "abgebrochen" ? STEPS.abgebrochen.text : "Diese Anfrage ist abgeschlossen. Du kannst alles nachlesen; antworten geht hier nicht mehr."}
           </p>
-          <a href={NEW_INQUIRY} className="btn-outline min-h-[48px] border-line">Neue Anfrage starten</a>
+          <Link to={NEW_INQUIRY} className="btn-outline min-h-[48px] border-line">Neue Anfrage starten</Link>
         </div>
       )}
     </>

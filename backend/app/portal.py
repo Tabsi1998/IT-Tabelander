@@ -469,6 +469,8 @@ async def overview(session: dict) -> dict:
     bills = [_invoice(item) for item in invoices]
     return {
         **public(session),
+        # Who a new inquiry can be for, when one address reaches several customers (#123).
+        "accounts": [{"id": customer["id"], "name": customer["name"]} for customer in session["customers"]],
         "counts": {
             "offers_open": sum(1 for item in offers if item["status"] == 1),
             "invoices_open": sum(1 for item in bills if item["open"]),

@@ -78,7 +78,8 @@ module's own `dev_dolibarr.py` 18051/18151.
 - `backend/app/`: `dolibarr.py` (client), `handover.py` (queue to Dolibarr),
   `site_data.py` (company data, opening hours, knowledge articles, cache),
   `legal_texts.py` + `legal_drafts/`, `portal.py` (customer area),
-  `portal_inquiries.py` (inquiries in the customer area: history, answers, closing),
+  `portal_inquiries.py` (inquiries in the customer area: history, answers, closing, new inquiry),
+  `portal_files.py` (their files: which the customer sees, uploads checked by content),
   `review_invites.py`, `mailer.py`, `mail_layout.py` (HTML + text of customer
   mails in the look of the Dolibarr module's mails: one style block for dark
   mode by class only, no tables; Du, so always "Liebe Grüße", never "Viele

@@ -6,6 +6,7 @@ import { Field, FormError } from "../forms/fields.jsx";
 import { portalRequest, usePortalData } from "./api.js";
 import Inquiries from "./pages/Inquiries.jsx";
 import InquiryDetail from "./pages/InquiryDetail.jsx";
+import NewInquiry from "./pages/NewInquiry.jsx";
 import { OfferDetail, Offers } from "./pages/Offers.jsx";
 import { DocumentDetail, Documents } from "./pages/Documents.jsx";
 import { InvoiceDetail } from "./pages/Invoices.jsx";
@@ -192,6 +193,7 @@ function SignedIn({ me, onSignOut }) {
             <Routes>
               <Route index element={<Overview />} />
               <Route path="anfragen" element={<Inquiries />} />
+              <Route path="anfragen/neu" element={<NewInquiry />} />
               <Route path="anfragen/:id" element={<InquiryDetail />} />
               <Route path="angebote" element={<Offers />} />
               <Route path="angebote/:id" element={<OfferDetail />} />
