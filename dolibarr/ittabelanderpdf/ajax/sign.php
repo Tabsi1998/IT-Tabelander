@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || GETPOST('action', 'aZ09') !== 'sign
 }
 $kind = GETPOST('kind', 'aZ09');
 $allowed = $user->socid <= 0 && (($kind === 'qs' && $user->hasRight('ittabelanderpdf', 'qs', 'run') && $user->hasRight('ficheinter', 'lire'))
-	|| ($kind === 'intake' && $user->hasRight('ticket', 'write')));
+	|| ($kind === 'intake' && $user->hasRight('ticket', 'write')) || ($kind === 'doc' && $user->hasRight('societe', 'creer')));
 if (!$allowed) {
 	$answer(403, array('ok' => false));
 }

@@ -64,6 +64,23 @@ class WerkbankSignature
 			$fichinter->fetch_thirdparty();
 			return array('object' => $fichinter, 'run' => $run, 'socid' => (int) $fichinter->socid, 'ref' => (string) $fichinter->ref);
 		}
+		if ($kind === 'doc') {
+			// A company document a customer signs or confirms: the "signing" event of WerkbankDocs.
+			require_once __DIR__.'/werkbankdocs.class.php';
+			require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+			$docs = new WerkbankDocs($this->db);
+			$event = $docs->event($id);
+			$rule = $event ? $docs->rule((int) $event->fk_rule) : null;
+			if (!$event || !$rule || !in_array($event->state, array('signing', 'signed'), true)) {
+				return null;
+			}
+			$soc = new Societe($this->db);
+			if ($soc->fetch((int) $event->fk_soc) <= 0) {
+				return null;
+			}
+			$soc->thirdparty = $soc;
+			return array('object' => $soc, 'run' => $event, 'rule' => $rule, 'socid' => (int) $soc->id, 'ref' => (string) $rule->label);
+		}
 		if ($kind === 'intake') {
 			require_once DOL_DOCUMENT_ROOT.'/ticket/class/ticket.class.php';
 			$ticket = new Ticket($this->db);
@@ -91,6 +108,10 @@ class WerkbankSignature
 		if ($kind === 'qs') {
 			return array_values(array_intersect(WerkbankQs::SIGNERS, explode(',', (string) $loaded['run']->signers)));
 		}
+		if ($kind === 'doc') {
+			// A contract (AVV, remote maintenance) both sign; accepting or receiving only the customer.
+			return $loaded['rule']->action === 'sign' ? WerkbankQs::SIGNERS : array('customer');
+		}
 		return WerkbankQs::SIGNERS;
 	}
 
@@ -106,6 +127,9 @@ class WerkbankSignature
 		if ($kind === 'qs') {
 			return WerkbankQs::pdfPath($loaded['object'], $loaded['run']);
 		}
+		if ($kind === 'doc') {
+			return self::thirdpartyDir((int) $loaded['socid']).'/'.$loaded['rule']->slug.'-unterschrieben-'.((int) $loaded['run']->rowid).'.pdf';
+		}
 		require_once __DIR__.'/werkbankbuilder.intake.class.php';
 		return WerkbankBuilderIntake::pathFor($loaded['object']);
 	}
@@ -120,9 +144,22 @@ class WerkbankSignature
 	public static function documentLink($kind, $path)
 	{
 		global $conf;
-		$modulepart = $kind === 'qs' ? 'ficheinter' : 'ticket';
-		$root = $kind === 'qs' ? $conf->ficheinter->dir_output : $conf->ticket->dir_output;
+		$modulepart = $kind === 'qs' ? 'ficheinter' : ($kind === 'doc' ? 'societe' : 'ticket');
+		$root = $kind === 'qs' ? $conf->ficheinter->dir_output : ($kind === 'doc' ? self::thirdpartyDir(0) : $conf->ticket->dir_output);
 		return array($modulepart, ltrim(substr($path, strlen($root)), '/'));
+	}
+
+	/**
+	 * Documents folder of the third parties, or of one.
+	 *
+	 * @param int $socid Third party, 0 = the root
+	 * @return string
+	 */
+	public static function thirdpartyDir($socid)
+	{
+		global $conf;
+		$root = !empty($conf->societe->multidir_output[$conf->entity]) ? $conf->societe->multidir_output[$conf->entity] : $conf->societe->dir_output;
+		return $socid > 0 ? $root.'/'.((int) $socid) : $root;
 	}
 
 	/**
@@ -287,6 +324,15 @@ class WerkbankSignature
 			$qs = new WerkbankQs($this->db);
 			$path = $qs->writePdf($loaded['run'], $loaded['object'], $signed);
 			$this->error = $qs->error;
+		} elseif ($kind === 'doc') {
+			$path = $this->writeDoc($loaded, $signed);
+			// Complete: the customer's document counts as signed.
+			if ($path !== '' && count(array_intersect(self::roles($kind, $loaded), array_keys($signed))) === count(self::roles($kind, $loaded))) {
+				require_once __DIR__.'/werkbankdocs.class.php';
+				$docs = new WerkbankDocs($this->db);
+				$docs->markSigned((int) $loaded['run']->rowid, basename($path));
+			}
+			return $path;
 		} else {
 			require_once __DIR__.'/werkbankintake.class.php';
 			$intake = new WerkbankIntake($this->db);
@@ -300,6 +346,37 @@ class WerkbankSignature
 	}
 
 	/**
+	 * The confirmation sheet with the signatures, the document itself behind it.
+	 *
+	 * @param array                              $loaded From load()
+	 * @param array<string,array<string,string>> $signed role => image, name, when
+	 * @return string                                    Path, '' on error
+	 */
+	private function writeDoc(array $loaded, array $signed)
+	{
+		global $langs;
+		require_once __DIR__.'/werkbankbuilder.docsign.class.php';
+		require_once __DIR__.'/werkbankrenderer.class.php';
+		$langs->loadLangs(array('main', 'companies', 'ittabelanderpdf@ittabelanderpdf'));
+		$target = self::pdfPath('doc', $loaded);
+		if (!is_dir(dirname($target)) && dol_mkdir(dirname($target)) < 0) {
+			$this->error = 'ErrorCanNotCreateDir';
+			return '';
+		}
+		try {
+			$builder = new WerkbankBuilderDocSign($this->db, $loaded['object'], $langs, $loaded['rule'], $loaded['run'], $signed);
+			$renderer = new WerkbankRenderer(pdf_getInstance(array(WerkbankRenderer::PAGE_W, WerkbankRenderer::PAGE_H)), $langs);
+			$renderer->render($builder->build(), $target);
+		} catch (Throwable $exception) {
+			dol_syslog('ittabelanderpdf: '.$exception->getMessage(), LOG_ERR);
+			$this->error = $exception->getMessage();
+			return '';
+		}
+		dolChmod($target);
+		return $target;
+	}
+
+	/**
 	 * A copy in the third party's documents, so the customer's card shows it too.
 	 *
 	 * @param string $path  PDF
@@ -309,11 +386,10 @@ class WerkbankSignature
 	public static function copyToThirdparty($path, $socid)
 	{
 		global $conf;
-		if ($socid <= 0 || !is_readable($path)) {
+		if ($socid <= 0 || !is_readable($path) || dirname($path) === self::thirdpartyDir($socid)) {
 			return;
 		}
-		$root = !empty($conf->societe->multidir_output[$conf->entity]) ? $conf->societe->multidir_output[$conf->entity] : $conf->societe->dir_output;
-		$dir = $root.'/'.((int) $socid);
+		$dir = self::thirdpartyDir($socid);
 		if (!is_dir($dir) && dol_mkdir($dir) < 0) {
 			return;
 		}
@@ -373,8 +449,8 @@ class WerkbankSignature
 			return -1;
 		}
 		$queue = new WerkbankMailQueue($this->db);
-		$result = $queue->send($loaded['object'], $kind === 'qs' ? 'qsreport' : 'intake', $user, false,
-			$kind === 'qs' ? 'FICHINTER_SENTBYMAIL' : 'TICKET_SENTBYMAIL', '', array($path), trim((string) $to));
+		$keys = array('qs' => array('qsreport', 'FICHINTER_SENTBYMAIL'), 'intake' => array('intake', 'TICKET_SENTBYMAIL'), 'doc' => array('unterlage', 'COMPANY_SENTBYMAIL'));
+		$result = $queue->send($loaded['object'], $keys[$kind][0], $user, false, $keys[$kind][1], '', array($path), trim((string) $to));
 		if (!$result['ok']) {
 			$this->error = $result['error'];
 			return -1;

@@ -37,7 +37,7 @@ $langs->loadLangs(array('interventions', 'ticket', 'mails', 'ittabelanderpdf@itt
 $kind = GETPOST('kind', 'aZ09');
 $id = GETPOSTINT('id');
 $action = GETPOST('action', 'aZ09');
-if ($user->socid > 0 || !in_array($kind, array('qs', 'intake'), true)) {
+if ($user->socid > 0 || !in_array($kind, array('qs', 'intake', 'doc'), true)) {
 	accessforbidden();
 }
 if ($kind === 'qs' && (!$user->hasRight('ittabelanderpdf', 'qs', 'run') || !$user->hasRight('ficheinter', 'lire'))) {
@@ -46,13 +46,18 @@ if ($kind === 'qs' && (!$user->hasRight('ittabelanderpdf', 'qs', 'run') || !$use
 if ($kind === 'intake' && !$user->hasRight('ticket', 'write')) {
 	accessforbidden();
 }
+if ($kind === 'doc' && !$user->hasRight('societe', 'creer')) {
+	accessforbidden();
+}
 $signature = new WerkbankSignature($db);
 $loaded = $signature->load($kind, $id);
 if (!$loaded) {
 	accessforbidden();
 }
 $self = dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind='.$kind.'&id='.$id;
-$back = $kind === 'qs' ? dol_buildpath('/ittabelanderpdf/qs.php', 1).'?id='.$id : DOL_URL_ROOT.'/ticket/card.php?id='.$id;
+$backs = array('qs' => dol_buildpath('/ittabelanderpdf/qs.php', 1).'?id='.$id, 'intake' => DOL_URL_ROOT.'/ticket/card.php?id='.$id,
+	'doc' => dol_buildpath('/ittabelanderpdf/docs.php', 1).'?socid='.$loaded['socid']);
+$back = $backs[$kind];
 if ($kind === 'qs' && (int) $loaded['run']->status !== 1) {
 	setEventMessages($langs->trans('WerkbankSignCloseFirst'), null, 'warnings');
 	header('Location: '.$back);
@@ -79,7 +84,7 @@ $object = $loaded['object'];
 $roles = WerkbankSignature::roles($kind, $loaded);
 $signed = $signature->signatures($kind, $id, $loaded);
 $recipient = WerkbankSignature::recipient($kind, $loaded);
-$document = $langs->trans($kind === 'qs' ? 'WerkbankQsTitle' : 'WerkbankIntakeTitle').' '.$loaded['ref'];
+$document = $kind === 'doc' ? $loaded['ref'] : $langs->trans($kind === 'qs' ? 'WerkbankQsTitle' : 'WerkbankIntakeTitle').' '.$loaded['ref'];
 
 llxHeader('<meta name="viewport" content="width=device-width, initial-scale=1">', $langs->trans('WerkbankSignTitle'), '', '', 0, 0,
 	array('/ittabelanderpdf/js/sign.js'), array('/ittabelanderpdf/css/qs.css'), '', 'mod-ittabelanderpdf page-sign');

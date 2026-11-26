@@ -22,6 +22,9 @@ function ittabpdf_admin_prepare_head()
 	if ($user->admin) {
 		$head[] = array(dol_buildpath('/ittabelanderpdf/admin/setup.php', 1), $langs->trans('WerkbankSetupTabGeneral'), 'general');
 	}
+	if ($user->admin) {
+		$head[] = array(dol_buildpath('/ittabelanderpdf/admin/docrules.php', 1), $langs->trans('WerkbankSetupTabDocRules'), 'docrules');
+	}
 	$head[] = array(dol_buildpath('/ittabelanderpdf/admin/werkstatt.php', 1), $langs->trans('WerkbankSetupTabWorkshop'), 'workshop');
 	return $head;
 }
