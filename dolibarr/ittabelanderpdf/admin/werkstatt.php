@@ -52,6 +52,7 @@ if ($action === 'save_options' && $user->admin) {
 		$notices = trim(GETPOST($const, 'restricthtml'));
 		$error += dolibarr_set_const($db, $const, $notices !== '' ? $notices : $default, 'chaine', 0, '', $conf->entity) > 0 ? 0 : 1;
 	}
+	$error += dolibarr_set_const($db, 'ITTABPDF_SIGN_RECIPIENT', GETPOST('ITTABPDF_SIGN_RECIPIENT', 'aZ09') === 'thirdparty' ? 'thirdparty' : 'contact', 'chaine', 0, '', $conf->entity) > 0 ? 0 : 1;
 	foreach (array('ITTABPDF_INTAKE_PASSWORD_FIELD', 'ITTABPDF_QS_BLOCK_CLOSE', 'ITTABPDF_QS_APPEND_WORKREPORT') as $const) {
 		$error += dolibarr_set_const($db, $const, GETPOST($const) ? '1' : '0', 'chaine', 0, '', $conf->entity) > 0 ? 0 : 1;
 	}
@@ -153,6 +154,10 @@ if ($type) {
 		print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankQsMenu').'</td><td></td></tr>';
 		print '<tr class="oddeven"><td>'.$langs->trans('WerkbankQsBlockClose').'</td><td><input type="checkbox" name="ITTABPDF_QS_BLOCK_CLOSE" value="1"'.(getDolGlobalInt('ITTABPDF_QS_BLOCK_CLOSE', 1) ? ' checked' : '').'> '.$langs->trans('WerkbankQsBlockCloseHelp').'</td></tr>';
 		print '<tr class="oddeven"><td>'.$langs->trans('WerkbankQsAppendReport').'</td><td><input type="checkbox" name="ITTABPDF_QS_APPEND_WORKREPORT" value="1"'.(getDolGlobalInt('ITTABPDF_QS_APPEND_WORKREPORT') ? ' checked' : '').'> '.$langs->trans('WerkbankQsAppendReportHelp').'</td></tr>';
+		print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankSignSendTitle').'</td><td></td></tr>';
+		print '<tr class="oddeven"><td>'.$langs->trans('WerkbankSignRecipient').'</td><td>'.Form::selectarray('ITTABPDF_SIGN_RECIPIENT', array(
+			'contact' => $langs->trans('WerkbankSignRecipientContact'), 'thirdparty' => $langs->trans('WerkbankSignRecipientThirdparty')),
+			getDolGlobalString('ITTABPDF_SIGN_RECIPIENT', 'contact')).'<div class="opacitymedium">'.$langs->trans('WerkbankSignRecipientHelp').'</div></td></tr>';
 		print '</table></div>';
 		print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans('Save').'"></div></form><br>';
 	}

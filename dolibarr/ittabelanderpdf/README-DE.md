@@ -2,7 +2,7 @@
 
 Belege im Werkbank-Design von IT-Tabelander, mit den echten Markenschriften, dazu passende E-Mail-Vorlagen und ein verzögerter, abbrechbarer automatischer Versand.
 
-Modulnummer **756230** · Version 1.2.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
+Modulnummer **756230** · Version 1.3.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
 
 ![Entwurf](docs/entwurf/mockup.png)
 
@@ -34,7 +34,7 @@ Ist die Firma nicht umsatzsteuerpflichtig (Firmeneinstellung „Umsatzsteuer: ne
 
 ## Installation
 
-1. `module_ittabelanderpdf-1.2.0.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
+1. `module_ittabelanderpdf-1.3.0.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
 2. In der Modulliste **IT-Tabelander PDF** aktivieren. Dabei passiert:
    - die Vorlage `werkbank` wird für alle neun Belegarten eingeschaltet (noch nicht als Standard),
    - Zusatzfelder: Kunde/Lieferant „Anrede per Du“ (`ittab_du`), Vertrag „Mindestlaufzeit (Monate)“ (`ittab_mindestlaufzeit`) und „Kündigungsfrist“ (`ittab_kuendigungsfrist`),
@@ -94,6 +94,15 @@ Unternehmensunterlagen entstehen aus Artikeln im **Wissensmanagement** (Modul �
 - **Serviceauftrag schließen:** schließt fertige QS mit (Prüfprotokoll entsteht) und wird verweigert, solange eine QS offene Pflichtpunkte hat (abschaltbar). Auf Wunsch hängen die Prüfprotokolle hinter dem Arbeitsbericht-PDF.
 - **Checklisten pflegen:** Einstellungen → IT-Tabelander PDF → Reiter **Werkstatt und QS** (oder Menü **QS-Checklisten**): Auftragsarten anlegen, umbenennen, sortieren, abschalten, je Auftragsart die Unterschriften (Techniker, Kunde) und einen Hinweis fürs Protokoll; Punkte mit Art (Häkchen, Messwert, Text), Einheit, Pflicht, Hilfetext, Reihenfolge, aktiv. Gelöscht wird nichts; eine laufende oder fertige QS behält ihre eigene Kopie der Punkte. Mitgeliefert: Reparatur PC/Notebook, Aufrüstung, PC-Bau, Controller-Umbau, Windows-Neuinstallation und Datenübernahme, Webseite-Übergabe, Einsatz vor Ort.
 - **Rechte:** „QS-Checklisten abhaken und mit Prüfprotokoll abschließen“ und „QS-Checklisten verwalten“ (Benutzer → Berechtigungen → IT-Tabelander PDF); dazu Leserecht auf Serviceaufträge, zum Anlegen Schreibrecht.
+
+## Unterschreiben am Handy und an den Kunden senden
+
+- **Wann:** Nach „QS abschließen“ geht die Seite direkt weiter zum Unterschreiben (oder später über „Unterschreiben und senden“ in der fertigen QS). Für den Geräteannahmeschein: Knopf **„Am Gerät unterschreiben“** auf der Ticketkarte.
+- **Wer:** Techniker und/oder Kunde, so wie es die Auftragsart vorgibt (Einstellung „Unterschriften“ je Auftragsart); beim Annahmeschein beide. Mit Finger oder Stift aufs Feld, Name in Druckschrift darunter (beim Techniker vorausgefüllt), **Unterschrift speichern**. „Neu unterschreiben“ ersetzt eine Unterschrift; wird eine QS wieder geöffnet, fallen ihre Unterschriften weg.
+- **Im PDF:** Die Unterschrift steht auf der Unterschriftslinie, darunter Name und „elektronisch unterschrieben am TT.MM.JJJJ HH:MM“. Das ist eine einfache elektronische Unterschrift; als Nachweis zählen Bild, Name, Zeitpunkt und angemeldeter Benutzer (Tabelle `llx_ittabpdf_signature`, auch die IP-Adresse). Das Bild liegt in den Dokumenten des Objekts im Unterordner `signatures/`.
+- **Ablage:** Prüfprotokoll beim Serviceauftrag, Annahmeschein beim Ticket, beide zusätzlich in den Dokumenten des Geschäftspartners.
+- **Senden:** Sobald alle Unterschriften da sind, zeigt die Seite den Empfänger zum Prüfen (Kontakt des Auftrags, sonst Geschäftspartner, bei Anfragen ohne Geschäftspartner die Adresse der Anfrage; einstellbar unter „Werkstatt und QS“) – **Jetzt senden** schickt das PDF mit der Vorlage „Prüfprotokoll“ bzw. „Geräteannahme“ (Sie/Du nach „Anrede per Du“; andere Vorlage wählbar in den Moduleinstellungen), Blindkopie wie beim automatischen Versand, Eintrag in der Ereignisliste des Serviceauftrags bzw. Tickets. Die QS merkt sich, wann und an wen gesendet wurde.
+- **Technik:** Das Bild geht als Base64 ohne „data:“ und ohne „=“ an `ajax/sign.php`; Dolibarrs WAF blockt `=data:` und Muster wie `on…=` in jedem Formular. Der Server nimmt nur echte PNGs bis 600 KB.
 
 ## Werkstatt: Geräteannahmeschein
 

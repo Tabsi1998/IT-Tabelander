@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0] - 2026-11-26
+
+- Sign on the device (`sign.php`, simple electronic signature): after "QS abschließen" the page goes on to signing; the ticket card has "Am Gerät unterschreiben" for the intake slip. One pad per signer (technician and/or customer as the kind of job says; both on the intake slip), finger or pen, name in block letters. The drawing is cropped and sent as base64 without "data:" prefix and "=" padding (`ajax/sign.php`), so Dolibarr's WAF lets it pass; it is checked as a real PNG, stored in the object's documents (`signatures/`) and in the new table `llx_ittabpdf_signature`, and the PDF is written again at once: image on the signature line, name, "elektronisch unterschrieben am …". Signing again replaces; reopening a QS drops its signatures.
+- Test report and intake slip are copied into the third party's documents as well.
+- Sending: once every signature is there, the page shows the suggested recipient (contact of the document, else the third party, else the request's address; setting "Empfänger") to check or change, then sends with the new templates "Prüfprotokoll (Sie/Du)" and "Geräteannahme (Sie/Du)" (choosable in the setup), the BCC of the automatic send and the agenda entry `FICHINTER_SENTBYMAIL` / `TICKET_SENTBYMAIL`. The run notes when and to whom (`update_1.3.0.sql`: `date_sent`, `sent_to`).
+- `WerkbankMailQueue::send()` takes given attachments and a confirmed recipient; facts box for tickets.
+
 ## [1.2.0] - 2026-11-26
 
 - QS checklists: kinds of job (Auftragsart) with their points in the module setup, tab "Werkstatt und QS" (add, rename, sort, switch off; kinds Tick, Value with unit, Text; required yes/no; help text; who signs; notice on the report). Seven shipped checklists (repair, upgrade, PC build, controller mod, Windows reinstall and data transfer, website handover, on-site job), written only when an entity has none. New tables `llx_ittabpdf_qs_type`, `_item`, `_run`, `_result`; rights "QS ausführen" and "QS-Checklisten verwalten".

@@ -277,19 +277,35 @@ class WerkbankMailQueue
 	 * @param bool         $withPdf Attach the PDF
 	 * @param string       $trigger Trigger name, '' for none
 	 * @param string       $form    'sie' or 'du' to override the third party's field
+	 * @param string[]|null $files  PDFs to attach instead of the document's own (test report, intake slip)
+	 * @param string       $to      Recipient confirmed by the user, instead of contact/third party
 	 * @return array{ok:bool,to:string,template:int,error:string}
 	 */
-	public function send($object, $key, $user, $withPdf, $trigger, $form = '')
+	public function send($object, $key, $user, $withPdf, $trigger, $form = '', $files = null, $to = '')
 	{
 		global $conf, $langs, $mysoc;
-		$langs->loadLangs(array('main', 'mails', 'ittabelanderpdf@ittabelanderpdf'));
+		$langs->loadLangs(array('main', 'mails', 'errors', 'ittabelanderpdf@ittabelanderpdf'));
 		$out = array('ok' => false, 'to' => '', 'template' => 0, 'error' => '');
 
 		$thirdparty = ($object instanceof Societe) ? $object : $object->thirdparty;
+		if (!is_object($thirdparty)) {
+			// A ticket from the website without a third party yet.
+			require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+			$thirdparty = new Societe($this->db);
+			$thirdparty->email = !empty($object->origin_email) ? (string) $object->origin_email : '';
+		}
 		// Recipient: the document's contact, else the third party.
 		$contact = WerkbankMailData::contact($object);
 		$sendtoid = array();
-		if ($contact && isValidEmail($contact->email)) {
+		if ($to !== '') {
+			if (!isValidEmail(CMailFile::getValidAddress($to, 2))) {
+				$out['error'] = $langs->transnoentities('ErrorBadEMail', $to);
+				return $out;
+			}
+			if ($contact && strtolower((string) $contact->email) === strtolower(CMailFile::getValidAddress($to, 2))) {
+				$sendtoid[] = $contact->id;
+			}
+		} elseif ($contact && isValidEmail($contact->email)) {
 			$to = $contact->getFullName($langs).' <'.$contact->email.'>';
 			$sendtoid[] = $contact->id;
 		} elseif (isValidEmail($thirdparty->email)) {
@@ -317,8 +333,17 @@ class WerkbankMailQueue
 		}
 		$out['template'] = $templateId;
 
+		$given = $files;
 		$files = array('paths' => array(), 'names' => array(), 'mimes' => array());
-		if ($withPdf) {
+		if (is_array($given)) {
+			foreach ($given as $path) {
+				if (is_readable($path)) {
+					$files['paths'][] = $path;
+					$files['names'][] = basename($path);
+					$files['mimes'][] = dol_mimetype($path);
+				}
+			}
+		} elseif ($withPdf) {
 			if ($object->generateDocument('werkbank', $langs) <= 0) {
 				$out['error'] = 'PDF: '.$object->error;
 				return $out;
@@ -344,7 +369,7 @@ class WerkbankMailQueue
 		$from = dol_string_nospecial((string) $mysoc->name, ' ', array(',')).' <'.$fromAddress.'>';
 		$bcc = getDolGlobalString('ITTABPDF_AUTOSEND_BCC', (string) $mysoc->email);
 		$prefixes = array('propal' => 'pro', 'facture' => 'inv', 'commande' => 'ord', 'shipping' => 'shi', 'fichinter' => 'int', 'contrat' => 'con',
-			'supplier_proposal' => 'spr', 'order_supplier' => 'sor', 'societe' => 'thi');
+			'supplier_proposal' => 'spr', 'order_supplier' => 'sor', 'societe' => 'thi', 'ticket' => 'tic');
 		$trackid = ($prefixes[$object->element] ?? 'ittab').$object->id;
 		$mail = new CMailFile($subject, $to, $from, $message, $files['paths'], $files['mimes'], $files['names'], '', $bcc, 0, 1, '', '', $trackid, '', 'standard');
 		if (!empty($mail->error) || !empty($mail->errors) || !$mail->sendfile()) {
@@ -354,7 +379,7 @@ class WerkbankMailQueue
 
 		// History entry, the same fields a manual send fills in.
 		if ($trigger !== '') {
-			$object->socid = $thirdparty->id;
+			$object->socid = !empty($thirdparty->id) ? $thirdparty->id : 0;
 			$object->sendtoid = $sendtoid;
 			$object->actiontypecode = 'AC_OTH_AUTO';
 			$object->actionmsg = $message;

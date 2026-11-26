@@ -480,14 +480,18 @@ class WerkbankQs
 	}
 
 	/**
-	 * Open a closed run again (the old PDF stays until the next close).
+	 * Open a closed run again (the old PDF stays until the next close; its
+	 * signatures are dropped).
 	 *
 	 * @param int $runId Run
 	 * @return int       1 OK, -1 error
 	 */
 	public function reopen($runId)
 	{
-		return $this->db->query("UPDATE ".MAIN_DB_PREFIX."ittabpdf_qs_run SET status = 0 WHERE rowid = ".((int) $runId)) ? 1 : $this->fail();
+		global $conf;
+		// What was signed may change: the signatures go, the run is signed again after closing.
+		$this->db->query("DELETE FROM ".MAIN_DB_PREFIX."ittabpdf_signature WHERE kind = 'qs' AND fk_object = ".((int) $runId)." AND entity = ".((int) $conf->entity));
+		return $this->db->query("UPDATE ".MAIN_DB_PREFIX."ittabpdf_qs_run SET status = 0, date_sent = NULL, sent_to = NULL WHERE rowid = ".((int) $runId)) ? 1 : $this->fail();
 	}
 
 	/**
@@ -527,11 +531,12 @@ class WerkbankQs
 	/**
 	 * The test report as a Werkbank PDF.
 	 *
-	 * @param object    $run       Run
-	 * @param Fichinter $fichinter Intervention
-	 * @return string              Path, '' on error
+	 * @param object                             $run       Run
+	 * @param Fichinter                          $fichinter Intervention
+	 * @param array<string,array<string,string>> $signed    role => image, name, when (WerkbankSignature::forPdf)
+	 * @return string                                       Path, '' on error
 	 */
-	public function writePdf($run, $fichinter)
+	public function writePdf($run, $fichinter, array $signed = array())
 	{
 		global $langs;
 		require_once __DIR__.'/werkbankbuilder.qs.class.php';
@@ -546,7 +551,7 @@ class WerkbankQs
 			return '';
 		}
 		try {
-			$builder = new WerkbankBuilderQs($this->db, $fichinter, $langs, $run, $this->results((int) $run->rowid));
+			$builder = new WerkbankBuilderQs($this->db, $fichinter, $langs, $run, $this->results((int) $run->rowid), $signed);
 			$renderer = new WerkbankRenderer(pdf_getInstance(array(WerkbankRenderer::PAGE_W, WerkbankRenderer::PAGE_H)), $langs);
 			$renderer->render($builder->build(), $target);
 		} catch (Throwable $exception) {
@@ -555,6 +560,9 @@ class WerkbankQs
 			return '';
 		}
 		dolChmod($target);
+		// The customer's card shows the report too.
+		require_once __DIR__.'/werkbanksignature.class.php';
+		WerkbankSignature::copyToThirdparty($target, (int) $fichinter->socid);
 		return $target;
 	}
 

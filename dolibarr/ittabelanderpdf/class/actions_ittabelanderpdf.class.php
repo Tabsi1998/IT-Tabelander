@@ -135,6 +135,8 @@ class ActionsIttabelanderpdf
 			$langs->load('ittabelanderpdf@ittabelanderpdf');
 			$url = $_SERVER['PHP_SELF'].'?track_id='.urlencode((string) $object->track_id).'&action=ittabpdf_intake&token='.newToken();
 			print dolGetButtonAction($user->hasRight('ticket', 'write') ? '' : $langs->trans('NotEnoughPermissions'), $langs->trans('WerkbankIntakeButton'), 'default', $url, 'ittabpdf-intake', $user->hasRight('ticket', 'write'));
+			print dolGetButtonAction($user->hasRight('ticket', 'write') ? '' : $langs->trans('NotEnoughPermissions'), $langs->trans('WerkbankSignButtonIntake'), 'default',
+				dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=intake&id='.((int) $object->id), 'ittabpdf-intake-sign', $user->hasRight('ticket', 'write'));
 			return 0;
 		}
 		if (!is_object($object) || empty($object->id) || $object->element !== 'knowledgerecord') {
@@ -395,8 +397,12 @@ class ActionsIttabelanderpdf
 		}
 		dol_include_once('/ittabelanderpdf/class/werkbankintake.class.php');
 		$langs->load('ittabelanderpdf@ittabelanderpdf');
+		dol_include_once('/ittabelanderpdf/class/werkbanksignature.class.php');
 		$intake = new WerkbankIntake($this->db);
-		$path = $intake->write($ticket);
+		// Signatures given on the device so far stay on the slip.
+		$signature = new WerkbankSignature($this->db);
+		$path = $signature->write('intake', (int) $ticket->id, array('object' => $ticket, 'run' => null, 'socid' => (int) $ticket->fk_soc, 'ref' => (string) $ticket->ref));
+		$intake->error = $signature->error;
 		if ($path === '') {
 			setEventMessages($langs->trans('WerkbankIntakeFailed', $intake->error), null, 'errors');
 		} else {

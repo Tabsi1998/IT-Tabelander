@@ -638,7 +638,7 @@ if ($stage === 'mails') {
 
 	// Installation: templates, extra field, cron job.
 	$templates = (int) rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf'");
-	$check('templates installed (23)', $templates === 23, (string) $templates);
+	$check('templates installed (27)', $templates === 27, (string) $templates);
 	$check('extra field ittab_du', (bool) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."extrafields WHERE name = 'ittab_du' AND elementtype = 'societe'"));
 	$check('cron job registered', (bool) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."cronjob WHERE objectname = 'WerkbankMailQueue' AND methodename = 'runCron' AND frequency = 5 AND unitfrequency = 60"));
 
@@ -667,7 +667,7 @@ if ($stage === 'mails') {
 	$check('upgrade renews untouched 1.0.1 templates', is_array($result) && $result['updated'] === 2 && $result['edited'] === 1, json_encode($result));
 	$check('upgrade keeps the edited template', strpos((string) rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND label = 'Vertrag (Sie)'"), 'Eigener Zusatz') !== false);
 	$result = WerkbankMailTemplates::upgrade($db, (int) $conf->entity, true);
-	$check('forced upgrade replaces the edited one', is_array($result) && $result['updated'] === 1 && $result['current'] === 22, json_encode($result));
+	$check('forced upgrade replaces the edited one', is_array($result) && $result['updated'] === 1 && $result['current'] === 26, json_encode($result));
 	$check('own templates stay untouched', rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE label = 'Angebot senden'") === 'Eigener Text');
 	if (!function_exists('testSqlAndScriptInject')) {
 		require_once DOL_DOCUMENT_ROOT.'/waf.inc.php';

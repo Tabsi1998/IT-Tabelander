@@ -453,3 +453,107 @@ textarea.ittabqs-input {
 		transition: none !important;
 	}
 }
+
+/* Signatures (sign.php) */
+.ittabsig {
+	display: grid;
+	gap: 14px;
+	margin-top: 8px;
+}
+.ittabsig-card {
+	display: grid;
+	gap: 10px;
+	padding: 14px;
+	border: 1px solid var(--ittabqs-line);
+	border-radius: var(--ittabqs-radius);
+	background: #fff;
+}
+.ittabsig-card .ittabqs-subtitle {
+	margin: 0;
+}
+.ittabsig-card.is-signed {
+	background: var(--ittabqs-soft);
+}
+.ittabsig-pad {
+	position: relative;
+	border: 1px dashed #9fb0c2;
+	border-radius: 8px;
+	background: #fff;
+}
+.ittabsig-pad::after {
+	content: "";
+	position: absolute;
+	left: 16px;
+	right: 16px;
+	bottom: 38px;
+	border-bottom: 1px solid var(--ittabqs-line);
+	pointer-events: none;
+}
+.ittabsig-pad canvas {
+	display: block;
+	width: 100%;
+	height: 190px;
+	touch-action: none;
+	cursor: crosshair;
+}
+.ittabsig-hint {
+	position: absolute;
+	left: 16px;
+	bottom: 14px;
+	font-size: 13px;
+	color: var(--ittabqs-muted);
+	pointer-events: none;
+	transition: opacity 160ms ease-out;
+}
+.ittabsig-pad.has-ink .ittabsig-hint {
+	opacity: 0;
+}
+.ittabsig-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+.ittabsig-actions .ittabqs-primary {
+	flex: 1 1 200px;
+}
+.ittabsig-done {
+	display: grid;
+	gap: 6px;
+}
+.ittabsig-done img {
+	box-sizing: border-box;
+	max-width: 100%;
+	max-height: 120px;
+	justify-self: start;
+	background: #fff;
+	border-radius: 6px;
+	padding: 6px 10px;
+}
+.ittabsig-done p {
+	margin: 0;
+	color: var(--ittabqs-ink);
+	font-weight: 600;
+}
+.ittabsig-again summary {
+	min-height: 40px;
+	display: inline-flex;
+	align-items: center;
+	color: var(--ittabqs-ink);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	cursor: pointer;
+}
+.ittabsig-again[open] {
+	display: grid;
+	gap: 10px;
+}
+.ittabsig-sent {
+	margin: 0;
+	color: var(--ittabqs-ink);
+	font-weight: 600;
+}
+.ittabqs-primary:disabled,
+.ittabqs-input:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
