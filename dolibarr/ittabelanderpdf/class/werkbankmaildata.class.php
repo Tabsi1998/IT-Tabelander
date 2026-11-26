@@ -104,9 +104,8 @@ class WerkbankMailData
 
 	/**
 	 * The company logo for e-mails as hosted images from public/maillogo.php
-	 * (or ITTABPDF_MAIL_LOGO_URL): the light logo, an opaque PNG on white with
-	 * an even margin, so a mail app that darkens the mail by force shows it as
-	 * a white badge. The automatic send adds the dark logo, hidden inline and
+	 * (or ITTABPDF_MAIL_LOGO_URL): the light logo, a PNG that keeps the
+	 * transparency of its source (no white badge). The automatic send adds the dark logo, hidden inline and
 	 * shown only by the dark-mode style of wrapDocument(); hand-sent mails
 	 * carry no style, so they get the light logo alone. Without a usable
 	 * logo: the word mark.
@@ -169,11 +168,11 @@ class WerkbankMailData
 	 * A logo as PNG for e-mails, at most 480 px wide including 16 px of margin
 	 * (shown at half size), built once per source file and kept in the
 	 * documents folder.
-	 * - light: the logo of the company setup, opaque on white;
+	 * - light: the logo of the company setup;
 	 * - dark: ITTABPDF_MAIL_LOGO_DARK (path below DOL_DATA_ROOT/ecm, default
-	 *   "IT-Tabelander/Bilder/Logo/IT-Tabelander Banner Hell Transparent.png"),
-	 *   opaque on the dark page colour #0D1823. Without that file the dark
-	 *   variant is the light logo on white.
+	 *   "IT-Tabelander/Bilder/Logo/IT-Tabelander Banner Hell Transparent.png").
+	 *   Without that file the dark variant is the light logo.
+	 * Both keep the transparency of their source (transparent margin).
 	 *
 	 * @param string $variant 'light' or 'dark'
 	 * @return string Path of the PNG, '' without a usable logo
@@ -182,13 +181,11 @@ class WerkbankMailData
 	{
 		global $conf, $mysoc;
 		$candidates = array();
-		$background = array(255, 255, 255);
 		if ($variant === 'dark') {
 			$relative = getDolGlobalString('ITTABPDF_MAIL_LOGO_DARK', 'IT-Tabelander/Bilder/Logo/IT-Tabelander Banner Hell Transparent.png');
 			$file = DOL_DATA_ROOT.'/ecm/'.ltrim($relative, '/');
 			if (strpos($relative, '..') === false && is_readable($file) && is_file($file)) {
 				$candidates[] = $file;
-				$background = array(13, 24, 35);
 			}
 		}
 		if (!$candidates) {
@@ -210,7 +207,7 @@ class WerkbankMailData
 			return '';
 		}
 		$dir = DOL_DATA_ROOT.'/ittabelanderpdf';
-		$cache = $dir.'/maillogo-'.md5($source.'|'.filemtime($source).'|'.implode(',', $background).'|3').'.png';
+		$cache = $dir.'/maillogo-'.md5($source.'|'.filemtime($source).'|transparent|4').'.png';
 		if (is_readable($cache)) {
 			return $cache;
 		}
@@ -224,8 +221,9 @@ class WerkbankMailData
 		$inner = min(480 - 2 * $pad, $width);
 		$innerHeight = (int) round($height * $inner / $width);
 		$canvas = imagecreatetruecolor($inner + 2 * $pad, $innerHeight + 2 * $pad);
-		imagefill($canvas, 0, 0, imagecolorallocate($canvas, $background[0], $background[1], $background[2]));
-		imagealphablending($canvas, true);
+		imagealphablending($canvas, false);
+		imagesavealpha($canvas, true);
+		imagefill($canvas, 0, 0, imagecolorallocatealpha($canvas, 255, 255, 255, 127));
 		imagecopyresampled($canvas, $image, $pad, $pad, 0, 0, $inner, $innerHeight, $width, $height);
 		dol_mkdir($dir);
 		return imagepng($canvas, $cache, 9) ? $cache : '';
