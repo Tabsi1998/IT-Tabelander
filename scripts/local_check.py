@@ -100,9 +100,10 @@ NODE_MAJOR = 24
 # database, the Dolibarr file a test Dolibarr; their groups provide both.
 UNIT_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py", "tests/test_handover.py",
                  "tests/test_site_data.py", "tests/test_review_label.py", "tests/test_legal_texts.py",
-                 "tests/test_portal.py", "tests/test_portal_inquiries.py", "tests/test_mail_certificate.py")
+                 "tests/test_portal.py", "tests/test_portal_inquiries.py", "tests/test_mail_certificate.py",
+                 "tests/test_unterlagen.py")
 INTEGRATION_TEST_FILES = ("tests/test_api.py", "tests/test_regression_iter2.py")
-DOLIBARR_TEST_FILES = ("tests/test_dolibarr_runtime.py",)
+DOLIBARR_TEST_FILES = ("tests/test_dolibarr_runtime.py", "tests/test_dolibarr_unterlagen.py")
 
 # The disposable Dolibarr of the "dolibarr" group: the release the owner runs,
 # built from Dolibarr's own docker repository at a pinned commit (as in
@@ -953,7 +954,8 @@ def backend_snapshot(context: Context) -> str:
     credentials - SMTP, Dolibarr - and a test that picks them up can send real
     mail. The CI has no .env; neither has this copy.
     """
-    count = snapshot(context, SNAPSHOT, "backend")
+    # The documents and their import script come along for their tests (#127).
+    count = snapshot(context, SNAPSHOT, "backend", "docs/unterlagen", "scripts/import_unterlagen.py")
     if not (SNAPSHOT_BACKEND / "server.py").is_file():
         raise StepFailed("the snapshot has no backend/server.py")
     (SNAPSHOT_BACKEND / "uploads").mkdir(parents=True, exist_ok=True)

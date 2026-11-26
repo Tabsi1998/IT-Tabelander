@@ -89,6 +89,10 @@ module's own `dev_dolibarr.py` 18051/18151.
 - `web/`: one Vite app - website (prerendered), admin `src/admin/`, customer
   area `src/portal/` (lazy chunks, empty shells from `scripts/prerender.mjs`).
 - `dolibarr/ittabelanderpdf/`: the Dolibarr module (below).
+- `docs/unterlagen/`: company documents as HTML for Dolibarr's knowledge base
+  (drafts for the WKO review, see its README); `scripts/import_unterlagen.py`
+  brings them in as drafts, standard library only. Both are part of the
+  backend snapshot for their tests.
 - Customer data lives only in Dolibarr; the website never changes an existing
   third party. Public output goes through field whitelists.
 - The Content-Security-Policy is enforced everywhere; a Vitest test keeps the
