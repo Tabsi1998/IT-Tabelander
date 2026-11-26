@@ -259,16 +259,21 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 			? 'danke für deine Anfrage. Sie ist bei mir angekommen, ich sehe sie mir an und melde mich bei dir.'
 			: 'danke für Ihre Anfrage. Sie ist bei mir angekommen, ich sehe sie mir an und melde mich bei Ihnen.');
 		$body .= self::requestBox(($du ? 'Deine Anfrage' : 'Ihre Anfrage').' '.$e($object->ref), $e($subjectText));
-		if (getDolGlobalInt('TICKET_ENABLE_PUBLIC_INTERFACE') && !empty($object->track_id)) {
-			$url = getDolGlobalString('TICKET_URL_PUBLIC_INTERFACE', dol_buildpath('/public/ticket/', 2));
-			$url = rtrim($url, '/').'/view.php?track_id='.urlencode((string) $object->track_id);
-			$body .= WerkbankMailTemplates::paragraph(($du ? 'Den Stand siehst du jederzeit hier:' : 'Den Stand sehen Sie jederzeit hier:')
-				.'<br><a href="'.$e($url).'" style="color:'.WerkbankMailTemplates::INK.';">'.$e($url).'</a>');
+		// Status, messages and replies live in the website's customer area
+		// (/kundenbereich/anfragen/<id>); questions go by e-mail or there, not by phone.
+		if (getDolGlobalInt('ITTABPDF_PORTAL_ENABLED')) {
+			$body .= WerkbankMailTemplates::paragraph($du
+				? 'Den Stand und alle Nachrichten siehst du im Kundenbereich. Dort kannst du mir auch schreiben und Fotos schicken.'
+				: 'Den Stand und alle Nachrichten sehen Sie im Kundenbereich. Dort können Sie mir auch schreiben und Fotos schicken.');
+			$body .= WerkbankMailTemplates::portalButton(WerkbankMailData::portalUrl($object));
+			$body .= WerkbankMailTemplates::paragraph($du
+				? 'Oder antworte einfach auf diese Mail.'
+				: 'Oder antworten Sie einfach auf diese E-Mail.');
+		} else {
+			$body .= WerkbankMailTemplates::paragraph($du
+				? 'Ergänzungen und Fragen schickst du einfach als Antwort auf diese Mail.'
+				: 'Ergänzungen und Fragen schicken Sie einfach als Antwort auf diese E-Mail.');
 		}
-		$phone = WerkbankMailData::phoneLink(!empty($mysoc->phone_mobile) ? $mysoc->phone_mobile : $mysoc->phone);
-		$body .= WerkbankMailTemplates::paragraph($du
-			? 'Ergänzungen schickst du einfach als Antwort auf diese Mail, bei Fragen erreichst du mich unter '.$phone.'.'
-			: 'Ergänzungen schicken Sie einfach als Antwort auf diese E-Mail, bei Fragen erreichen Sie mich unter '.$phone.'.');
 		$body .= WerkbankMailTemplates::closing($du ? 'Liebe Grüße' : 'Mit freundlichen Grüßen', $e($mysoc->managers), $e($mysoc->name));
 
 		$subject = ($du ? 'Deine' : 'Ihre').' Anfrage '.$object->ref.($subjectText !== '' ? ': '.$subjectText : '');
@@ -317,7 +322,12 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 		}
 		$facts = '';
 		foreach (array_filter($rows, 'strlen') as $name => $value) {
-			$facts .= WerkbankMailData::factRow($e($name), $value);
+			// Long values (a company name with its number) go below their label,
+			// floated they would push the label under them on a phone.
+			$facts .= mb_strlen(trim(strip_tags($value))) > 24
+				? '<div style="padding:2px 0;"><div style="'.WerkbankMailData::LABEL.'">'.$e($name).'</div>'
+					.'<div style="'.str_replace('float:right;', '', WerkbankMailData::VALUE).'line-height:1.4;">'.$value.'</div></div>'
+				: WerkbankMailData::factRow($e($name), $value);
 		}
 
 		$body = WerkbankMailTemplates::paragraph('Neue Anfrage: <strong style="color:'.WerkbankMailTemplates::INK.';">'.$e($subjectText !== '' ? $subjectText : $object->ref).'</strong>');

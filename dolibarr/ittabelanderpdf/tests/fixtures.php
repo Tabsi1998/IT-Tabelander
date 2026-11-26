@@ -688,7 +688,8 @@ if ($stage === 'mails') {
 		}
 	}
 	$check('templates pass the WAF, no <style>, no <table>, survive restricthtml', !$blocked, implode(', ', $blocked));
-	$check('no "Viele Grüße" in any module template', !rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND content LIKE '%Viele Grüße%'"));
+	$check('no "call me" in any module template (questions by e-mail or customer area)', !rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND (content LIKE '%erreichen Sie mich%' OR content LIKE '%erreichst du mich%')"));
+	$check('no "Viele Grüße" in any module template',!rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND content LIKE '%Viele Grüße%'"));
 
 	// 1. Every template, Sie and Du, through the module's own send path.
 	$firm = new Societe($db);

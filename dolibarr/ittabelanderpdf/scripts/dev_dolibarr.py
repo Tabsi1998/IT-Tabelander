@@ -322,7 +322,8 @@ def tickets() -> None:
         html = unescape(mine[0].get("HTML") or "") if len(mine) == 1 else ""
         checks.append({"check": f"{case}: one confirmation to {address}",
                        "ok": len(mine) == 1 and mine[0]["Subject"].startswith(f"{opening} {ref}")
-                       and closing in html and internal not in html and "\\n" not in html,
+                       and closing in html and internal not in html and "\\n" not in html
+                       and f"/kundenbereich/anfragen/{created[case]['id']}" in html and "erreich" not in html,
                        "found": [detail["Subject"] for detail in mine]})
         notice = [detail for detail in messages if "inhaber@tabelander.example" in to(detail) and ref in detail["Subject"]]
         checks.append({"check": f"{case}: one owner notice with the full text",
