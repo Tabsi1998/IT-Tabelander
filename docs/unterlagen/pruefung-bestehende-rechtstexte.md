@@ -86,8 +86,15 @@ die Kopie in `backend/app/legal_drafts/` bei Gelegenheit nachziehen.
    > nutzt, ich dir per Fernwartung helfe oder dich berate. Für Unternehmen
    > gelten meine AGB für Unternehmer.
 
-   Wenn Hosting für Privatkunden kommt: eigener Abschnitt mit Verweis auf die
-   Leistungsbeschreibung und der Kündigung nach § 15 KSchG.
+   Hosting und Wartung gibt es auch für Privatkunden (Entscheidung
+   26.11.2026). Vorschlag für einen eigenen Abschnitt:
+   > **Hosting und Wartung.** Was im Monatspreis enthalten ist, wie schnell
+   > ich reagiere und was bei Vertragsende mit deinen Daten passiert, steht in
+   > der Leistungsbeschreibung Hosting und Wartung für Privatkunden; du
+   > bekommst sie mit dem Angebot. Mindestlaufzeit und Kündigungsfrist stehen
+   > im Vertrag. Läuft er unbefristet oder länger als ein Jahr, kannst du
+   > trotzdem mit zwei Monaten Frist zum Ende des ersten Jahres und danach zum
+   > Ende jedes halben Jahres kündigen (§ 15 KSchG).
 5. **Rücktrittsrecht zu eng.** Es nennt nur Verträge ohne persönliches
    Treffen. Das gesetzliche Rücktrittsrecht gilt auch bei Verträgen, die
    außerhalb der Werkstatt geschlossen werden, etwa beim Kunden zuhause

@@ -22,7 +22,8 @@ eigene Fassungen in einfacher Sprache, keine Abschriften.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `agb-unternehmer.html` | AGB für Unternehmer | Firmenkunden | Sie | Rechtstexte | ja (Website, PDF) | `agb-unternehmer` | offen |
 | `widerruf.html` | Widerrufsbelehrung und Muster-Widerrufsformular | Privatkunden (aus den Nutzungsbedingungen) | Du | Rechtstexte | ja (Website, PDF) | `widerruf` | offen |
-| `leistungsbeschreibung-hosting-wartung.html` | Leistungsbeschreibung Hosting und Wartung | Kunden mit Hosting/Wartung, Teil des Vertrags | Sie | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-hosting-wartung` | offen |
+| `leistungsbeschreibung-hosting-wartung.html` | Leistungsbeschreibung Hosting und Wartung | Firmenkunden mit Hosting/Wartung, Teil des Vertrags | Sie | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-hosting-wartung` | offen |
+| `leistungsbeschreibung-hosting-wartung-privat.html` | Leistungsbeschreibung Hosting und Wartung für Privatkunden | Privatkunden mit Hosting/Wartung (§ 15 KSchG) | Du | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-hosting-wartung-privat` | offen |
 | `auftragsverarbeitung.html` | Vereinbarung zur Auftragsverarbeitung (Art. 28 DSGVO) | Firmenkunden mit Hosting, Wartung, Fernwartung | Sie | Unterlagen | auf Anfrage, zum Unterschreiben | `auftragsverarbeitung` | offen |
 | `fernwartung-einverstaendnis.html` | Einverständniserklärung Fernwartung | alle Fernwartungskunden | neutral (Ich-Form des Kunden) | Unterlagen | auf Anfrage | `fernwartung-einverstaendnis` | offen |
 | `geraeteannahme-bausteine.html` | Geräteannahmeschein – Textbausteine | Privatkunden (ein Baustein für Firmen) | Du | Unterlagen | nein, Text für das Modul | `geraeteannahme-bausteine` | offen |
@@ -82,7 +83,7 @@ Wegwerf-Dolibarr in `backend/tests/test_dolibarr_unterlagen.py` (Gruppe
 
 ## Ablauf bis zur Verwendung
 
-1. Die `[BITTE …]`-Stellen unten entscheiden und in den Dateien ändern.
+1. Die restlichen `[BITTE PRÜFEN/ERGÄNZEN …]`-Stellen (unten unter „Noch offen“) in den Dateien ausfüllen.
 2. Alles vom WKO-Rechtsservice prüfen lassen (Tirol: Wirtschaftsrecht, Mitgliederservice).
 3. Import laufen lassen, Kategorien zuordnen, in Dolibarr freigeben.
 4. Die Modul-Sitzung erzeugt die PDFs; die öffentlichen legt sie in Dokumente (ECM)
@@ -90,58 +91,58 @@ Wegwerf-Dolibarr in `backend/tests/test_dolibarr_unterlagen.py` (Gruppe
 5. Bei jeder Änderung: Datei hier ändern, „Stand“ anpassen, Import erneut (nur Entwürfe)
    oder in Dolibarr direkt ändern und die Datei hier nachziehen.
 
-## Offene Punkte
+## Entscheidungen (Fabian, 26.11.2026: Empfehlungen übernommen)
 
-`python scripts/import_unterlagen.py --offene-punkte` listet alle Stellen
-wörtlich. Zusammengefasst, jeweils mit Empfehlung:
+Alle `[BITTE ENTSCHEIDEN …]`-Stellen sind damit aufgelöst und im Text ausformuliert.
 
-**AGB für Unternehmer**
-- Schwelle für Mehrkosten beim Kostenvoranschlag: 15 %.
-- Barrierefreiheit (WCAG 2.1 AA): nur auf Vereinbarung zusagen.
-- „Rechtstexte“ im Paket Webseite Basis: mit der WKO klären (keine Rechtsberatung).
-- Prüffrist für die Abnahme: 14 Tage.
-- Nutzungsrecht: nicht ausschließlich als Standard, ausschließlich gegen Aufpreis.
-- Quellcode: Webseiten immer, Software nach Vereinbarung.
-- Referenz und Verweis im Fußbereich: Standard mit Widerspruchsmöglichkeit.
-- Abrechnungstakt: 15 Minuten (auch Leistungsbeschreibung und Preisliste).
-- Anzahlung: 50 % ab 500 € Auftragswert bei Webseiten und Software.
-- Sperre bei Zahlungsverzug nach Mahnung mit 14 Tagen Nachfrist: aufnehmen.
-- Wertsicherung nach VPI 2020: aufnehmen.
-- Gewährleistungsfrist: 12 Monate.
-- Haftungsgrenze bei grober Fahrlässigkeit für Folgeschäden: aufnehmen; Betriebshaftpflicht prüfen.
-- Stornogebühr: keine Pauschale.
+**AGB für Unternehmer:** Mehrkosten-Schwelle beim Kostenvoranschlag 15 % ·
+Barrierefreiheit (WCAG 2.1 AA) nur auf Vereinbarung · Prüffrist für die
+Abnahme 14 Tage · nicht ausschließliches Nutzungsrecht, ausschließliches nur
+gegen Aufpreis · Quellcode bei Webseiten immer, bei Software nach
+Vereinbarung · Referenz und Verweis im Fußbereich mit Widerspruchsmöglichkeit ·
+Abrechnung je angefangene 15 Minuten · Anzahlung 50 % ab 500 € bei Webseiten
+und Software · Sperre laufender Leistungen nach Mahnung mit 14 Tagen Nachfrist ·
+Wertsicherung nach VPI 2020 · Gewährleistung 12 Monate · Haftungsgrenze für
+Folgeschäden bei grober Fahrlässigkeit · keine Stornogebühr.
 
-**Widerruf**
-- Rücksendekosten trägt der Kunde.
-- Ausnahme für nach Wunsch gebaute PCs: mit der WKO klären.
+**Widerruf:** Rücksendekosten trägt der Kunde.
 
-**Leistungsbeschreibung Hosting und Wartung**
-- Hosting auch für Privatkunden: ja, dann Du-Fassung und Abschnitt in den Nutzungsbedingungen (§ 15 KSchG).
-- Technik beschreiben: USV, RAID, Internet; Monitoring-Werkzeug.
-- Speicherplatz Webhosting, Benutzerzahl Nextcloud, Geräteanzahl IT-Wartung ergänzen.
-- eigene Nextcloud je Kunde oder gemeinsame Instanz klären.
-- E-Mail-Postfächer: nicht anbieten oder nur gegen Aufpreis.
-- kleine Textänderungen: 15 Minuten im Monat, nicht übertragbar.
-- Support-Stunde der IT-Wartung: verfällt am Monatsende.
-- Sicherungen: zusätzlich 4 Wochensicherungen; **Kopie außer Haus vor dem ersten Hosting-Vertrag einrichten** (Stand 24.11.2026 fehlt sie).
-- Geschäftszeiten ergänzen, Reaktionszeit bei Ausfall wie vorgeschlagen, Wartungsfenster dienstags 21–23 Uhr.
-- Verfügbarkeit: Zielwert 99 % ohne Zusage, Gutschrift ab 24 Stunden Ausfall durch eigenen Fehler.
+**Hosting und Wartung:** auch für Privatkunden, mit eigener Du-Fassung
+(`leistungsbeschreibung-hosting-wartung-privat.html`, Kündigung nach § 15 KSchG) ·
+keine E-Mail-Postfächer, Domain auf den Namen des Kunden · 15 Minuten
+Textänderungen pro Monat und die Support-Stunde verfallen am Monatsende ·
+täglich sichern, 14 Tage plus 4 Wochensicherungen · Reaktion bei Ausfall 4
+Stunden in den Geschäftszeiten, spätestens am nächsten Werktag ·
+Wartungsfenster dienstags 21–23 Uhr · Zielwert 99 % ohne Zusage, Gutschrift ab
+24 Stunden Ausfall durch eigenen Fehler.
 
-**Auftragsverarbeitung**
-- Meldung von Datenpannen an den Kunden: innerhalb von 24 Stunden.
-- Kostenregel für Prüfungen beim Kunden: übernehmen.
-- Anlage 2 (TOMs) Punkt für Punkt bestätigen: abgeschlossener Raum, zweiter Faktor, Festplattenverschlüsselung, Trennung je Kunde, Server-Verschlüsselung, Kopie außer Haus, USV/RAID, Wiederherstellungsziel, #67 (Dolibarr von außen sperren).
-- Fernwartungsprogramm nennen; läuft es über Server des Herstellers, gehört er in Anlage 3.
+**Auftragsverarbeitung:** Datenpanne binnen 24 Stunden an den Kunden ·
+Kostenregel für Prüfungen übernommen · Sicherungskopien höchstens 4 Wochen.
 
-**Fernwartung**
-- Programm nennen.
-- dauerhafter Zugang für IT-Wartungskunden: nur auf ausdrücklichen Wunsch (Kästchen).
+**Fernwartung:** dauerhafter Zugang nur, wenn das Kästchen angekreuzt ist.
 
-**Firmendatenblatt**
-- Geschäftszeiten, Steuernummer (falls gewünscht), UID-Nummer (falls vorhanden).
+## Noch offen
 
-**QS-Checklisten**
-- Grenzwert Kreisgenauigkeit Controller, Lighthouse-Zielwert.
+`python scripts/import_unterlagen.py --offene-punkte` listet die Stellen
+wörtlich. Es sind nur noch Fakten, die Fabian bestätigen oder ergänzen muss,
+und Fragen an die WKO:
+
+- **Technik (AVV Anlage 2, Leistungsbeschreibungen):** abgeschlossener Raum,
+  zweiter Faktor, Festplattenverschlüsselung (Arbeitsgeräte und Server),
+  Trennung je Kunde, USV/RAID, Wiederherstellungsziel, Monitoring-Werkzeug,
+  eigene oder gemeinsame Nextcloud, #67 (Dolibarr von außen sperren).
+- **Sicherungskopie außer Haus vor dem ersten Hosting-Vertrag einrichten**
+  (Stand 24.11.2026 fehlt sie).
+- **Fernwartungsprogramm** nennen; läuft es über Server des Herstellers, gehört
+  er in Anlage 3 des AVV und in die Datenschutzerklärung.
+- **Zahlen ergänzen:** Speicherplatz Webhosting, Benutzer Nextcloud, Geräte
+  IT-Wartung, Geschäftszeiten, Steuernummer und UID-Nummer im Firmendatenblatt.
+- **QS-Checklisten:** Grenzwert Kreisgenauigkeit Controller, Lighthouse-Zielwert.
+- **WKO:** Ausnahme vom Rücktrittsrecht für Wunsch-PCs; wie weit „Rechtstexte“
+  im Paket Webseite Basis gehen dürfen (keine Rechtsberatung); was mit nie
+  abgeholten Geräten passieren darf.
+- **Nutzungsbedingungen:** Abschnitt zu Hosting und Wartung für Privatkunden
+  einfügen (Vorschlag in `pruefung-bestehende-rechtstexte.md`).
 
 Zu klären außerhalb der Texte:
 - Betriebshaftpflichtversicherung, gerade für Hosting und Fernwartung.
