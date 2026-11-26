@@ -247,7 +247,11 @@ def test_contact_ticket_text_names_the_callback():
         "contact": {"name": "Eva", "email": "eva@example.com", "phone": "+43 1"},
         "callback_at": "2026-10-02T10:30:00+02:00",
     })
-    assert "Bitte zurückrufen." in text and "02.10.2026 um 10:30 Uhr" in text
+    assert text == "Bitte zurückrufen."
+    note = dolibarr.format_internal_note({
+        "request_type": "contact", "ref": "ANF-12345678", "callback_at": "2026-10-02T10:30:00+02:00",
+        "contact": {"name": "Eva", "email": "eva@example.com", "phone": "+43 1"}})
+    assert "02.10.2026 um 10:30 Uhr" in note and "Eva" in note and "+43 1" in note
     assert dolibarr.inquiry_subject({"request_type": "contact", "ref": "ANF-12345678"}) == \
         "Kontaktnachricht (ANF-12345678)"
 

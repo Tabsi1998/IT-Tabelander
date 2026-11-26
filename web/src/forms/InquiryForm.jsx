@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
 import { deletePhoto, postJson, requestId, uploadPhoto } from "../lib/api.js";
 import { ArrowRight } from "../components/Icons.jsx";
+import { useSite } from "../lib/site.jsx";
 import { Choice, Consent, Field, FormError, Honeypot, explain } from "./fields.jsx";
 
 export const REQUEST_TYPES = [
@@ -22,31 +24,17 @@ const WITHOUT_DEVICE = new Set(["pc_build", "consulting"]);
 const WITH_BUDGET = new Set(["pc_build", "pc_upgrade", "controller_custom"]);
 const STEPS = ["Anliegen", "Gerät & Fotos", "Kontakt"];
 const MAX_PHOTOS = 5;
-const SLOTS = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
 
-/** "2026-10-02" + "10:30" as ISO time with this browser's UTC offset, so the
- *  workshop sees the time the customer meant (#73). */
-export function localIso(date, time) {
-  const moment = new Date(`${date}T${time}:00`);
-  const offset = -moment.getTimezoneOffset();
-  const sign = offset >= 0 ? "+" : "-";
-  const pad = (value) => String(Math.floor(Math.abs(value))).padStart(2, "0");
-  return `${date}T${time}:00${sign}${pad(offset / 60)}:${pad(offset % 60)}`;
-}
-
-function tomorrow() {
-  const date = new Date(Date.now() + 86_400_000);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-/** The inquiry in three steps (#47): what, which device with photos, contact. */
-export default function InquiryForm({ preset, onShowStatus }) {
+/** The inquiry in three steps (#47): what, which device with photos, contact.
+ *  A callback is no longer offered (#122): contact runs through the customer
+ *  area or an answer to the mail. */
+export default function InquiryForm({ preset }) {
+  const { settings } = useSite();
   const [draftId, setDraftId] = useState(() => requestId("anfrage"));
   const [step, setStep] = useState(0);
   const [type, setType] = useState(preset?.requestType || "");
   const [device, setDevice] = useState({ device_type: "", device_source: "", manufacturer: "", model: "", topic: "", description: "", budget: "", timeframe: "" });
   const [contact, setContact] = useState({ name: "", email: "", phone: "", preferred_contact: "email", contact_type: "private", company_name: "" });
-  const [callback, setCallback] = useState({ wanted: false, date: "", time: "10:00" });
   const [photos, setPhotos] = useState([]);
   const [consent, setConsent] = useState(false);
   const [reviewOk, setReviewOk] = useState(false);
@@ -76,8 +64,6 @@ export default function InquiryForm({ preset, onShowStatus }) {
     if (step === 2) {
       if (contact.name.trim().length < 2) return "Bitte gib deinen Namen an.";
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact.email.trim())) return "Bitte gib eine gültige E-Mail-Adresse an.";
-      if ((contact.preferred_contact === "phone" || callback.wanted) && !contact.phone.trim()) return "Für einen Anruf brauche ich deine Telefonnummer.";
-      if (callback.wanted && !callback.date) return "Bitte wähle einen Tag für den Rückruf.";
       if (contact.contact_type === "business" && !contact.company_name.trim()) return "Bitte gib den Firmennamen an.";
       if (!consent) return "Bitte bestätige, dass ich deine Angaben verwenden darf.";
     }
@@ -97,9 +83,7 @@ export default function InquiryForm({ preset, onShowStatus }) {
       ...(WITHOUT_DEVICE.has(type) ? { topic: device.topic.trim() } : {}),
       budget: device.budget, timeframe: device.timeframe,
       attachment_ids: photos.map((photo) => photo.id),
-      contact: { ...contact, preferred_contact: callback.wanted ? "phone" : contact.preferred_contact },
-      consent: true, honeypot, review_ok: reviewOk,
-      ...(callback.wanted ? { callback_at: localIso(callback.date, callback.time) } : {}),
+      contact, consent: true, honeypot, review_ok: reviewOk,
     };
     try {
       const answer = await postJson("/inquiries", payload);
@@ -145,14 +129,15 @@ export default function InquiryForm({ preset, onShowStatus }) {
       <div className="flex flex-col gap-4" role="status">
         <h3 className="m-0 text-[26px] font-bold md:text-[32px]">Danke, deine Anfrage ist da.</h3>
         <p className="m-0 text-[17px] leading-normal text-body md:text-lg">
-          Du bekommst gleich eine Bestätigung per E-Mail. Mit dieser Nummer siehst du jederzeit den Stand:
+          Du bekommst gleich eine Bestätigung per E-Mail. Willst du etwas ergänzen, antworte einfach darauf.
+          {settings.portal_enabled && " Den Stand und alle Nachrichten siehst du im Kundenbereich – melde dich dort mit derselben E-Mail-Adresse an."}
         </p>
         <div className="self-start rounded-xl border border-line bg-page px-5 py-4">
           <span className="kicker">Anfrage-Nummer</span>
           <div className="font-display text-[26px] font-bold md:text-[28px]">{state.done.ref}</div>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <button type="button" onClick={() => onShowStatus?.(state.done.ref, contact.email)} className="btn-primary min-h-[52px] text-base">Status ansehen</button>
+          {settings.portal_enabled && <Link to="/kundenbereich" className="btn-primary min-h-[52px] text-base">Zum Kundenbereich</Link>}
           <button type="button" onClick={restart} className="btn-outline min-h-[52px] text-base">Neue Anfrage</button>
         </div>
       </div>
@@ -257,7 +242,7 @@ export default function InquiryForm({ preset, onShowStatus }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Name" autoComplete="name" maxLength={128} value={contact.name} onChange={setC("name")} />
             <Field label="E-Mail" type="email" autoComplete="email" value={contact.email} onChange={setC("email")} />
-            <Field label="Telefon" hint={callback.wanted || contact.preferred_contact === "phone" ? "" : "(optional)"} type="tel" autoComplete="tel" maxLength={40} value={contact.phone} onChange={setC("phone")} />
+            <Field label="Telefon" hint="(optional)" type="tel" autoComplete="tel" maxLength={40} value={contact.phone} onChange={setC("phone")} />
             <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
               <legend className="mb-1.5 p-0 text-[15px] font-semibold">Anfrage als</legend>
               <div className="flex gap-2">
@@ -270,19 +255,6 @@ export default function InquiryForm({ preset, onShowStatus }) {
           </div>
           {contact.contact_type === "business" && (
             <Field label="Firmenname" autoComplete="organization" maxLength={128} value={contact.company_name} onChange={setC("company_name")} />
-          )}
-          <label className="flex items-center gap-3 text-[15px] font-semibold">
-            <input type="checkbox" checked={callback.wanted} onChange={(event) => setCallback((current) => ({ ...current, wanted: event.target.checked, date: current.date || tomorrow() }))}
-              className="h-5 w-5 accent-[var(--c-ink)]" />
-            Lieber anrufen lassen? Wunschzeit für einen Rückruf wählen
-          </label>
-          {callback.wanted && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Tag" type="date" min={tomorrow()} value={callback.date} onChange={(event) => setCallback((current) => ({ ...current, date: event.target.value }))} />
-              <Field label="Uhrzeit" as="select" value={callback.time} onChange={(event) => setCallback((current) => ({ ...current, time: event.target.value }))}>
-                {SLOTS.map((slot) => <option key={slot} value={slot}>{slot} Uhr</option>)}
-              </Field>
-            </div>
           )}
           {/* Asking for a review by mail needs a yes beforehand; it stays optional (#71). */}
           <label className="flex items-start gap-3 text-[15px] font-semibold">

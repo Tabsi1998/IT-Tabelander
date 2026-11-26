@@ -1,4 +1,5 @@
 import { expect, expectNoSidewaysScroll, mockApi, test } from "./fixtures.js";
+import { mockPortal } from "./portal-fixtures.js";
 
 // A tiny PNG, as a phone camera would hand it over.
 const PHOTO = Buffer.from(
@@ -56,71 +57,22 @@ test("the full inquiry with a photo (#47)", async ({ page }) => {
     contact: { name: "Max Muster", email: "max@example.at", preferred_contact: "email", contact_type: "private" },
   });
   expect(inquiry.callback_at).toBeUndefined();
-
-  await contact.getByRole("button", { name: "Status ansehen" }).click();
-  await expect(contact.getByLabel("Anfrage-Nummer")).toHaveValue("ANF-NEU12345");
+  await expect(contact.getByText(/antworte einfach darauf/)).toBeVisible();
   await expectNoSidewaysScroll(page);
 });
 
-test("a callback wish needs a phone number and sends the local time (#73)", async ({ page }) => {
-  const sent = await mockApi(page);
+test("no status page and no phone call is offered any more (#122)", async ({ page }) => {
+  await mockApi(page, { portal: true });
   await page.goto("/?kontakt=anfrage");
   const contact = page.locator("#kontakt");
-  await contact.getByRole("button", { name: /^Beratung/ }).click();
-  await contact.getByRole("button", { name: "Weiter" }).click();
-  await contact.getByLabel("Worum geht es?").fill("Laptop fürs Studium");
-  await contact.getByLabel("Was ist passiert?").fill("Welcher Laptop passt fürs Studium?");
-  await contact.getByRole("button", { name: "Weiter" }).click();
-  await contact.getByLabel("Name").fill("Max Muster");
-  await contact.getByLabel("E-Mail").fill("max@example.at");
-  await contact.getByLabel(/Lieber anrufen lassen/).check();
-  await contact.getByLabel(/Meine Angaben und Fotos/).check();
-  await contact.getByRole("button", { name: "Anfrage senden" }).click();
-  await expect(contact.getByRole("alert")).toHaveText("Für einen Anruf brauche ich deine Telefonnummer.");
-  await contact.getByLabel("Telefon").fill("+43 660 1234567");
-  await contact.getByLabel("Uhrzeit").selectOption("14:00");
-  await contact.getByRole("button", { name: "Anfrage senden" }).click();
-  await expect(contact.getByText("ANF-NEU12345")).toBeVisible();
-  const inquiry = sent.find((item) => item.path === "/inquiries").body;
-  expect(inquiry.callback_at).toMatch(/T14:00:00[+-]\d\d:\d\d$/);
-  expect(inquiry.contact.preferred_contact).toBe("phone");
-  expect(inquiry.topic).toBe("Laptop fürs Studium");
+  await expect(contact.getByRole("tab")).toHaveText(["Nachricht", "Reparatur anfragen"]);
+  await expect(page.getByText(/Status prüfen|anrufen lassen|Rückruf/)).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "Direkter Kontakt" }).getByText("Anrufen")).toHaveCount(0);
 });
 
-const STEP_LABELS = {
-  eingegangen: "Eingegangen", angebot_bereit: "Angebot bereit", in_arbeit: "In Arbeit",
-  wartet_auf_dich: "Wartet auf dich", pausiert: "Pausiert", abholbereit: "Abholbereit",
-  abgeschlossen: "Abgeschlossen", abgebrochen: "Beendet",
-};
-
-for (const [step, label] of Object.entries(STEP_LABELS)) {
-  test(`status shows "${label}" (#48)`, async ({ page }) => {
-    await mockApi(page, { status: step });
-    await page.goto("/?kontakt=status");
-    const contact = page.locator("#kontakt");
-    await contact.getByLabel("Anfrage-Nummer").fill("anf-abcd1234");
-    await contact.getByLabel("E-Mail aus der Anfrage").fill("kunde@example.at");
-    await contact.getByRole("button", { name: "Status anzeigen" }).click();
-    await expect(contact.getByRole("status")).toContainText(label);
-    await expect(contact.getByRole("status")).toContainText("ANF-ABCD1234");
-  });
-}
-
-test("a wrong combination of number and e-mail says so (#48)", async ({ page }) => {
-  await mockApi(page);
-  await page.goto("/?kontakt=status");
-  const contact = page.locator("#kontakt");
-  await contact.getByLabel("Anfrage-Nummer").fill("ANF-ABCD1234");
-  await contact.getByLabel("E-Mail aus der Anfrage").fill("fremd@example.at");
-  await contact.getByRole("button", { name: "Status anzeigen" }).click();
-  await expect(contact.getByRole("alert")).toContainText("Keine Anfrage mit dieser Nummer und E-Mail gefunden.");
-});
-
-test("the link from the confirmation mail shows the status at once (#48)", async ({ page }) => {
-  await mockApi(page);
+test("the old link from the confirmation mail leads into the customer area (#122)", async ({ page }) => {
+  await mockPortal(page);
   await page.goto("/status/view.php?track_id=ITABCDEFGHIJKLMN");
-  const contact = page.locator("#kontakt");
-  await expect(contact.getByRole("tab", { name: "Status prüfen" })).toHaveAttribute("aria-selected", "true");
-  await expect(contact.getByRole("status")).toContainText("In Arbeit");
-  await expect(contact.getByRole("status")).toContainText("ANF-LINK0001");
+  await expect(page).toHaveURL(/\/kundenbereich\/anfragen\?track_id=ITABCDEFGHIJKLMN$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Anmelden ohne Passwort" })).toBeVisible();
 });

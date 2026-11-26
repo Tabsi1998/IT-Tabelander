@@ -69,7 +69,7 @@ def test_dolibarr_reuses_prospect_found_by_official_email_endpoint():
         "origin_email": "max@example.com",
         "notify_tiers_at_create": 1,
     }
-    assert ticket["message"].endswith("Vollständige Anfrage")
+    assert ticket["message"] == "Vollständige Anfrage"
     assert result["existing_customer"] is True
 
 
@@ -320,12 +320,21 @@ def test_inquiry_ticket_message_contains_all_customer_choices():
     })
 
     for expected in (
-        "ANF-ABCDEFGH", "Controller-Umbau", "PS5 DualSense Edge", "Sony",
+        "Controller-Umbau", "PS5 DualSense Edge", "Sony",
         "CFI-ZCP1", "Stick-Drift", "Hall-Effect-Sticks", "Neue Tasten",
-        "bis 200 €", "2–3 Wochen", "Bitte vorher anrufen.", "1 Foto(s)",
-        "Max Muster", "browser:12345678",
+        "bis 200 €", "2–3 Wochen", "Bitte vorher anrufen.",
     ):
         assert expected in message
+    # What only the workshop needs stays out of the text the customer sees (#122).
+    for internal in ("Max Muster", "max@example.com", "browser:12345678", "Quelle", "Foto", "Bewertungsbitte"):
+        assert internal not in message
+    note = dolibarr.format_internal_note({
+        "ref": "ANF-ABCDEFGH", "request_id": "browser:12345678", "request_type": "controller_custom",
+        "attachment_ids": ["media-1"], "contact": CONTACT, "review_ok": True,
+    })
+    for expected in ("ANF-ABCDEFGH", "Max Muster", "max@example.com", "+43 1 234", "Fotos: 1", "browser:12345678",
+                     "Bewertungsbitte nach Abschluss: ja"):
+        assert expected in note
     # Photos travel as ticket documents, never as public links (#37).
     assert "/api/media/" not in message
 
@@ -489,58 +498,6 @@ def test_photos_go_to_the_ticket_and_a_retry_uploads_only_the_missing(tmp_path, 
     assert len(tickets) == 1  # the retry never creates a second ticket
 
 
-class _StatusCollection:
-    def __init__(self, doc):
-        self.doc = doc
-
-    async def find_one(self, query):
-        if "ref" in query:
-            return self.doc if query["ref"] == self.doc["ref"] else None
-        track = query["$or"][0]["track_id"]
-        return self.doc if track == self.doc.get("track_id") else None
-
-
-def _status_db(monkeypatch, doc, ticket=None):
-    class Database:
-        repair_requests = _StatusCollection(doc)
-
-    async def fake_status(_ticket_id):
-        return ticket
-
-    monkeypatch.setattr(repairs, "get_db", lambda: Database())
-    monkeypatch.setattr(dolibarr, "fetch_ticket_status", fake_status)
-
-
-def test_status_needs_the_matching_email_and_shows_no_personal_data(monkeypatch):
-    from app.models import InquiryStatusQuery
-    doc = {"ref": "ANF-ABCD1234", "track_id": "ITABCDEFGHIJKLMN", "request_type": "repair",
-           "contact": {"email": "kunde@example.com", "name": "Max"},
-           "dolibarr": {"synced": True, "ticket_id": "501"}}
-    _status_db(monkeypatch, doc, {"step": "in_arbeit", "origin_email": "kunde@example.com", "updated": None})
-
-    shown = asyncio.run(repairs.inquiry_status(InquiryStatusQuery(ref="anf-abcd1234", email="KUNDE@example.com")))
-    assert shown["step"] == "in_arbeit" and shown["ref"] == "ANF-ABCD1234"
-    assert "Max" not in json.dumps(shown, default=str) and "kunde@" not in json.dumps(shown, default=str)
-
-    with pytest.raises(HTTPException) as wrong:
-        asyncio.run(repairs.inquiry_status(InquiryStatusQuery(ref="ANF-ABCD1234", email="fremd@example.com")))
-    assert wrong.value.status_code == 404
-
-    by_link = asyncio.run(repairs.inquiry_status_by_track_id("ITABCDEFGHIJKLMN"))
-    assert by_link["step"] == "in_arbeit"
-    with pytest.raises(HTTPException):
-        asyncio.run(repairs.inquiry_status_by_track_id("ITWRONGWRONGWRON"))
-
-
-def test_status_of_an_inquiry_still_waiting_for_dolibarr(monkeypatch):
-    from app.models import InquiryStatusQuery
-    doc = {"ref": "ANF-WAIT0001", "request_type": "pc_build",
-           "contact": {"email": "kunde@example.com"}, "dolibarr": {"synced": False}}
-    _status_db(monkeypatch, doc)
-    shown = asyncio.run(repairs.inquiry_status(InquiryStatusQuery(ref="ANF-WAIT0001", email="kunde@example.com")))
-    assert shown["step"] == "eingegangen" and shown["request_type_label"] == "PC-Neubau"
-
-
 def test_ticket_status_reads_dolibarr_24_fields():
     ticket = {"status": "3", "fk_statut": "3", "origin_email": " Kunde@Example.com ",
               "date_modification": 1790518795, "date_close": ""}
@@ -569,3 +526,68 @@ def test_new_inquiries_get_a_random_track_id():
     assert first != second and len(first) == 16 and first.startswith("IT")
     assert dolibarr.inquiry_track_id({"track_id": first, "ref": "ANF-12345678"}) == first
     assert dolibarr.inquiry_track_id({"ref": "ANF-12345678"}) == "ITANF12345678"
+
+
+def _run_with_note(handler, previous=None):
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await dolibarr._sync_ticket_with_client(
+                client, CFG, subject="Reparatur: PC (ANF-12345678)", message="Startet nicht.", contact=CONTACT,
+                previous=previous, track_id="ITNOTE0000000001", internal_note="Kontakt:\nName: Max <Muster>")
+
+    return asyncio.run(run())
+
+
+def test_hints_and_contact_go_into_a_private_note_not_the_customer_text():
+    """#122: the ticket's message is what the customer wrote; everything for the workshop is private."""
+    posted = []
+
+    def handler(request: httpx.Request):
+        if request.method == "GET" and "/thirdparties/email/" in request.url.path:
+            return httpx.Response(200, json={"id": "42"})
+        if request.method == "GET" and "/tickets/track_id/" in request.url.path:
+            return httpx.Response(404)
+        posted.append((request.url.path, json.loads(request.content)))
+        if request.url.path.endswith("/tickets/newmessage"):
+            return httpx.Response(200, json="501")
+        return httpx.Response(200, json=501)
+
+    result = _run_with_note(handler)
+    assert result["synced"] is True and result["internal_note_added"] is True
+    ticket = next(body for path, body in posted if path.endswith("/tickets"))
+    assert ticket["message"] == "Startet nicht." and "Hinweis" not in ticket["message"]
+    note = next(body for path, body in posted if path.endswith("/tickets/newmessage"))
+    assert note["private"] == 1 and note["track_id"] == "ITNOTE0000000001"
+    assert dolibarr.NOTE_HEADER in note["message"] and dolibarr.EXISTING_CUSTOMER_HINT in note["message"]
+    # What the customer typed never comes through as markup in Dolibarr.
+    assert "Max &lt;Muster&gt;" in note["message"] and "<Muster>" not in note["message"]
+
+
+def test_a_retry_writes_the_note_once():
+    calls = []
+    fail = {"note": True}
+
+    def handler(request: httpx.Request):
+        calls.append((request.method, request.url.path))
+        if request.method == "GET" and "/thirdparties/email/" in request.url.path:
+            return httpx.Response(404)
+        if request.method == "GET" and "/tickets/track_id/" in request.url.path:
+            return httpx.Response(404)
+        if request.method == "GET" and request.url.path.endswith("/tickets/501"):
+            return httpx.Response(200, json={"messages": [{"private": 1, "message": dolibarr.NOTE_HEADER + " …"}]})
+        if request.url.path.endswith("/tickets/newmessage"):
+            if fail["note"]:
+                return httpx.Response(500, json={"error": {"message": "kaputt"}})
+            return httpx.Response(200, json="501")
+        if request.url.path.endswith("/thirdparties"):
+            return httpx.Response(200, json=42)
+        return httpx.Response(200, json=501)
+
+    first = _run_with_note(handler)
+    assert first["synced"] is False and first["stage"] == "internal_note" and first["ticket_id"] == "501"
+    # The answer got lost, but the note is there: the retry sees it and writes no second one.
+    fail["note"] = False
+    second = _run_with_note(handler, previous=first)
+    assert second["synced"] is True
+    assert calls.count(("POST", "/api/index.php/tickets/newmessage")) == 1
+    assert calls.count(("POST", "/api/index.php/tickets")) == 1

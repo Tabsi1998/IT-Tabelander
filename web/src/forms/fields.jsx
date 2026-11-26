@@ -64,9 +64,9 @@ export function FormError({ message }) {
 
 /** The server's answer in words a customer understands. */
 export function explain(error) {
-  if (error?.status === 429) return "Zu viele Versuche in kurzer Zeit. Bitte in einer Stunde noch einmal, oder ruf einfach an.";
+  if (error?.status === 429) return "Zu viele Versuche in kurzer Zeit. Bitte in einer Stunde noch einmal, oder schreib mir eine E-Mail.";
   if (error?.status === 413) return "Das ist zu groß. Bitte ein kleineres Foto wählen.";
-  if (error?.status >= 500) return "Da ist gerade etwas schiefgegangen. Bitte gleich noch einmal versuchen, oder ruf einfach an.";
+  if (error?.status >= 500) return "Da ist gerade etwas schiefgegangen. Bitte gleich noch einmal versuchen, oder schreib mir eine E-Mail.";
   if (error?.name === "TypeError") return "Keine Verbindung. Bitte die Internetverbindung prüfen und noch einmal versuchen.";
   return error?.message || "Das hat nicht geklappt. Bitte die Angaben prüfen.";
 }

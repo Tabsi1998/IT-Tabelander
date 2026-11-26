@@ -21,6 +21,7 @@ import logging
 import re
 import secrets
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 import httpx
 from pymongo import ReturnDocument
@@ -40,6 +41,9 @@ BLOCK_FIELD = "options_kundenbereich_gesperrt"
 CUSTOMER_ROLES = {1, 2, 3}
 EMAIL = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$")
 INQUIRY_REF = re.compile(r"\((ANF-[A-Z0-9]{8})\)\s*$")
+# Where the sign-in link leads after signing in (#122): a page of the customer
+# area, at most with the tracking id of Dolibarr's mails.
+NEXT_PAGE = re.compile(r"^/kundenbereich(/[A-Za-z0-9_-]{1,40}){0,3}(\?track_id=[A-Za-z0-9]{8,64})?$")
 
 
 class PortalError(Exception):
@@ -118,13 +122,22 @@ def link_mail(link: str, *, site_base: str) -> tuple[str, str, str]:
         mail_layout.paragraph("Hallo,"),
         mail_layout.paragraph("hier ist dein Link zum Kundenbereich von IT-Tabelander:"),
         mail_layout.button("Zum Kundenbereich", link),
-        mail_layout.paragraph("Er gilt 15 Minuten und funktioniert einmal. Hast du ihn nicht angefordert, kannst du "
-                              "diese Mail einfach löschen – ohne den Link kommt niemand hinein."),
+        mail_layout.paragraph("Dort siehst du deine Anfragen mit dem ganzen Verlauf und kannst mir direkt antworten, "
+                              "dazu deine Angebote und Rechnungen."),
+        mail_layout.paragraph("Der Link gilt 15 Minuten und funktioniert einmal. Hast du ihn nicht angefordert, kannst "
+                              "du diese Mail einfach löschen – ohne den Link kommt niemand hinein."),
     ], site_base=site_base)
     return subject, text, body
 
 
-async def send_link(email: str) -> bool:
+def sign_in_link(site_base: str, token: str, next_page: str | None = None) -> str:
+    """The link in the mail; with a page of the customer area to open after
+    signing in (#122). The token stays behind the "#": no server log sees it."""
+    target = f"?ziel={quote(next_page, safe='')}" if next_page and NEXT_PAGE.fullmatch(next_page) else ""
+    return f"{site_base}/kundenbereich/anmelden{target}#{token}"
+
+
+async def send_link(email: str, next_page: str | None = None) -> bool:
     """Runs after the answer went out: the answer never tells whether the
     address is known. The link goes to this address only, and only if it
     belongs to a customer who may enter."""
@@ -141,7 +154,7 @@ async def send_link(email: str) -> bool:
         await db.portal_links.insert_one({"token_hash": token_hash(token), "email": email,
                                           "created_at": now, "expires_at": now + LINK_VALID})
         cfg = await dolibarr.get_config()
-        subject, text, body = link_mail(f"{cfg['site_base']}/kundenbereich/anmelden#{token}", site_base=cfg["site_base"])
+        subject, text, body = link_mail(sign_in_link(cfg["site_base"], token, next_page), site_base=cfg["site_base"])
         await mailer.send_mail(email, subject, text, html=body)
         return True
     except Exception as exc:  # noqa: BLE001 - nobody waits for this answer
@@ -460,6 +473,8 @@ async def overview(session: dict) -> dict:
             "offers_open": sum(1 for item in offers if item["status"] == 1),
             "invoices_open": sum(1 for item in bills if item["open"]),
             "repairs_running": sum(1 for item in ticket_items if item["open"]),
+            # Inquiries that need the customer's answer (#122).
+            "inquiries_waiting": sum(1 for item in ticket_items if item["open"] and item["step"] == "wartet_auf_dich"),
         },
         "tickets": ticket_items, "offers": offers, "invoices": bills, "services": services,
         **{kind: [_document(kind, item) for item in items if _socid(item) in allowed and _status(item) != 0]
@@ -730,7 +745,8 @@ async def answer(session: dict, offer_id: int, *, accept: bool, name: str = "", 
         )
         if response.status_code == 403:
             logger.warning("Offer answer refused by Dolibarr: the website user may not change offers")
-            raise PortalError("Das hat gerade nicht geklappt. Bitte versuch es später noch einmal oder ruf kurz an.")
+            raise PortalError("Das hat gerade nicht geklappt. Bitte versuch es später noch einmal oder antworte "
+                              "einfach auf die Mail mit dem Angebot.")
         if response.status_code != 304:
             response.raise_for_status()
     if response.status_code == 304:

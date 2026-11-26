@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { mkdirSync } from "node:fs";
 import { expect, expectNoSidewaysScroll, test } from "./fixtures.js";
-import { SIGN_IN_LINK, mockPortal, portalState } from "./portal-fixtures.js";
+import { SIGN_IN_LINK, TRACK_ID, mockPortal, portalState } from "./portal-fixtures.js";
 
 async function signedIn(page, path = "/kundenbereich") {
   const state = await mockPortal(page, portalState({ signedIn: true }));
@@ -114,6 +114,92 @@ test("an open invoice: transfer data to copy and the code for the banking app (#
   await expectNoSidewaysScroll(page);
 });
 
+test("what waits for the customer stands first and leads to the inquiry (#122)", async ({ page }) => {
+  await signedIn(page);
+  const waiting = page.getByRole("link", { name: /Wartet auf dich.*Reparatur: PlayStation 5/ });
+  await expect(waiting).toContainText("Jetzt antworten");
+  await expect(page.getByRole("link", { name: /Offene Anfragen\s*2/ })).toBeVisible();
+  const nav = page.getByRole("navigation", { name: page.viewportSize().width < 1024 ? "Kundenbereich unten" : "Kundenbereich", exact: true });
+  await expect(nav.getByRole("link", { name: /Anfragen/ })).toBeVisible();
+  await waiting.click();
+  await expect(page).toHaveURL(/\/kundenbereich\/anfragen\/8$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Reparatur: PlayStation 5" })).toBeVisible();
+  await expectNoSidewaysScroll(page);
+});
+
+test("an inquiry shows its stand, the timeline and the whole history (#122)", async ({ page }) => {
+  await signedIn(page, "/kundenbereich/anfragen/8");
+  await expect(page.getByText("ANF-9Z8Y7X6W · Ticket TS2609-0008")).toBeVisible();
+  const timeline = page.getByRole("list", { name: "Zeitstrahl" });
+  await expect(timeline.getByRole("listitem")).toHaveCount(5);
+  await expect(timeline.locator("[aria-current=step]")).toContainText("Wartet auf dich");
+  const history = page.getByRole("region", { name: "Verlauf" });
+  await expect(history.getByRole("listitem")).toHaveCount(2);
+  await expect(history.getByRole("listitem").first()).toContainText("Du");
+  await expect(history.getByRole("listitem").first()).toContainText("Das Laufwerk zieht keine Discs mehr ein.");
+  await expect(history.getByRole("listitem").nth(1)).toContainText("IT-Tabelander");
+  await expect(history.getByRole("listitem").nth(1)).toContainText("per E-Mail");
+  await expectNoSidewaysScroll(page);
+});
+
+test("answer an inquiry: the message lands in the history (#122)", async ({ page }) => {
+  const state = await signedIn(page, "/kundenbereich/anfragen/8");
+  const form = page.getByRole("form", { name: "Antworten" });
+  await form.getByRole("button", { name: "Nachricht senden" }).click();
+  await expect(form.getByRole("alert")).toHaveText("Bitte schreib kurz, was du mitteilen möchtest.");
+  await form.getByLabel(/Deine Nachricht/).fill("Die mit Laufwerk, gekauft 2021.");
+  await form.getByRole("button", { name: "Nachricht senden" }).click();
+  await expect(form.getByRole("status")).toContainText("Danke, deine Nachricht ist da.");
+  await expect(page.getByRole("region", { name: "Verlauf" }).getByRole("listitem").last()).toContainText("Die mit Laufwerk, gekauft 2021.");
+  expect(state.sent.find((item) => item.path === "/inquiries/8/messages").body).toEqual({ message: "Die mit Laufwerk, gekauft 2021." });
+  await expect(form.getByLabel(/Deine Nachricht/)).toHaveValue("");
+});
+
+test("close an inquiry after a question; closed stays readable (#122)", async ({ page }) => {
+  const state = await signedIn(page, "/kundenbereich/anfragen/5");
+  await page.getByRole("button", { name: "Hat sich erledigt" }).click();
+  const ask = page.getByRole("group", { name: /Anfrage wirklich schließen/ });
+  await ask.getByRole("button", { name: "Nein, offen lassen" }).click();
+  expect(state.sent.filter((item) => item.path === "/inquiries/5/close")).toEqual([]);
+  await page.getByRole("button", { name: "Hat sich erledigt" }).click();
+  await page.getByRole("button", { name: "Ja, Anfrage schließen" }).click();
+  await expect(page.getByRole("status")).toContainText("die Anfrage ist geschlossen");
+  await expect(page.getByRole("form", { name: "Antworten" })).toHaveCount(0);
+  await expect(page.getByText("antworten geht hier nicht mehr")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Verlauf" })).toContainText("Der Akku hält nur noch 20 Minuten.");
+});
+
+test("someone else's inquiry is not there (#122)", async ({ page }) => {
+  await signedIn(page, "/kundenbereich/anfragen/99");
+  await expect(page.getByRole("alert")).toHaveText(/Diese Anfrage gibt es hier nicht/);
+  await expect(page.getByRole("link", { name: "← Alle Anfragen" })).toBeVisible();
+});
+
+test("the link from Dolibarr's mail: sign in, then straight to the inquiry (#122)", async ({ page }) => {
+  const state = await mockPortal(page);
+  await page.goto(`/kundenbereich/anfragen?track_id=${TRACK_ID}`);
+  await expect(page.getByText("Danach geht es direkt zu deiner Anfrage.")).toBeVisible();
+  await page.getByLabel("E-Mail").fill("kunde@example.at");
+  await page.getByRole("button", { name: "Anmelde-Link senden" }).click();
+  expect(state.sent.find((item) => item.path === "/login").body)
+    .toEqual({ email: "kunde@example.at", next: `/kundenbereich/anfragen?track_id=${TRACK_ID}` });
+
+  await page.goto(`/kundenbereich/anmelden?ziel=${encodeURIComponent(`/kundenbereich/anfragen?track_id=${TRACK_ID}`)}#${SIGN_IN_LINK}`);
+  await expect(page).toHaveURL(/\/kundenbereich\/anfragen\/8$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Reparatur: PlayStation 5" })).toBeVisible();
+
+  // A link to another customer's inquiry shows the own list instead.
+  await page.goto("/kundenbereich/anfragen?track_id=ITFREMDESTICKET1");
+  await expect(page.getByRole("status")).toContainText("gehört nicht zu deiner Anmeldung");
+  await expect(page.getByRole("heading", { level: 1, name: "Anfragen" })).toBeVisible();
+});
+
+test("a target outside the customer area is ignored after sign-in (#122)", async ({ page }) => {
+  await mockPortal(page);
+  await page.goto(`/kundenbereich/anmelden?ziel=${encodeURIComponent("https://example.com/")}#${SIGN_IN_LINK}`);
+  await expect(page).toHaveURL(/\/kundenbereich$/);
+});
+
 // The documents of the list, not the filter above it.
 const DOCUMENT_LINK = /^(Rechnung|Gutschrift|Auftragsbestätigung|Lieferschein|Arbeitsbericht|Vertrag) /;
 
@@ -182,6 +268,9 @@ test("a work report and a contract show what was done and what runs (#100)", asy
 for (const scheme of ["light", "dark"]) {
   for (const [name, path, heading, signIn] of [
     ["anmelden", "/kundenbereich", "Anmelden ohne Passwort", false],
+    ["anfrage", "/kundenbereich/anfragen/8", "Reparatur: PlayStation 5", true],
+    ["anfrage-geschlossen", "/kundenbereich/anfragen/3", "Controller-Umbau: Controller", true],
+    ["anfragen", "/kundenbereich/anfragen", "Anfragen", true],
     ["uebersicht", "/kundenbereich", "Dein Kundenbereich", true],
     ["angebot", "/kundenbereich/angebote/31", "Angebot PR2609-0007", true],
     ["rechnung", "/kundenbereich/rechnungen/41", "Rechnung FA2609-0012", true],

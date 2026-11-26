@@ -310,7 +310,7 @@ def test_the_overview_keeps_other_customers_and_drafts_out(monkeypatch):
     assert data["tickets"][1]["step"] == "abgeschlossen" and data["tickets"][1]["open"] is False
     assert [item["ref"] for item in data["offers"]] == ["PR1"]
     assert [(item["ref"], item["state"]) for item in data["invoices"]] == [("FA1", "offen"), ("FA2", "bezahlt")]
-    assert data["counts"] == {"offers_open": 1, "invoices_open": 1, "repairs_running": 1}
+    assert data["counts"] == {"offers_open": 1, "invoices_open": 1, "repairs_running": 1, "inquiries_waiting": 0}
     # Every question to Dolibarr names this customer only.
     for call in calls:
         query = parse_qs(urlparse(str(call.url)).query)

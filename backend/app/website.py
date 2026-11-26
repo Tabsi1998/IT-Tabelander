@@ -35,7 +35,7 @@ OLD_ADDRESSES = {
     "kontakt": "/?kontakt=nachricht#kontakt",
     "anfrage": "/?kontakt=anfrage#kontakt",
     "reparatur": "/?kontakt=anfrage#kontakt",
-    "status": "/?kontakt=status#kontakt",
+    "status": "/kundenbereich/anfragen",
     "impressum": "/rechtliches/impressum",
     "datenschutz": "/rechtliches/datenschutz",
     "nutzungsbedingungen": "/rechtliches/nutzungsbedingungen",
@@ -152,10 +152,21 @@ def json_ld(data: dict) -> str:
     return f'<script type="application/ld+json">{text}</script>'
 
 
-async def respond(requested_path: str, build_dir: Path):
+def status_link_target(track_id: str | None) -> str:
+    """Where the old status link leads (#122): Dolibarr's mails and the QR code
+    on the device label name /status/view.php?track_id=…. It shows nothing
+    by itself any more: the customer area signs in and opens that inquiry."""
+    if track_id and re.fullmatch(r"[A-Za-z0-9]{8,64}", track_id):
+        return f"/kundenbereich/anfragen?track_id={track_id}"
+    return "/kundenbereich/anfragen"
+
+
+async def respond(requested_path: str, build_dir: Path, *, track_id: str | None = None):
     """The answer for one address outside /api."""
     root = build_dir.resolve()
     clean = requested_path.strip("/")
+    if clean == "status/view.php":
+        return RedirectResponse(status_link_target(track_id), status_code=302)
     if clean == "kundenbereich" or clean.startswith("kundenbereich/"):
         # The customer area (#63) is drawn in the browser; its page is an empty shell.
         shell = root / "kundenbereich.html"
@@ -190,8 +201,6 @@ async def respond(requested_path: str, build_dir: Path):
     elif re.fullmatch(r"leistungen/[a-z0-9-]{1,80}", clean):
         # The same one-pager with one tab open: search engines index the page once.
         page, canonical = root / "index.html", "/"
-    elif clean == "status/view.php":
-        page, canonical, extra = root / "index.html", "/", '<meta name="robots" content="noindex" />'
     elif clean == "bewertung":
         # The page behind the personal link from the mail (#71); the link
         # itself follows the "#", which never reaches the server.

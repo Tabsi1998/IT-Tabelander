@@ -212,17 +212,20 @@ class TestNewCustomer:
         workshop = [mail_text(item) for item in mails_to(WORKSHOP_EMAIL)]
         assert any(ticket["ref"] in text for text in workshop), "the workshop got no notice of this ticket"
 
-        # The status view: by number and e-mail, and by the link in the mail (#43).
-        by_number = requests.post(f"{BASE_URL}/api/inquiries/status",
-                                  json={"ref": created["ref"], "email": email.upper()}, timeout=30)
-        assert by_number.status_code == 200, by_number.text
-        assert by_number.json()["step"] == "eingegangen"
-        assert email not in by_number.text
-        by_link = requests.get(f"{BASE_URL}/api/inquiries/status/track/{track_id}", timeout=30)
-        assert by_link.status_code == 200 and by_link.json()["ref"] == created["ref"]
-        stranger = requests.post(f"{BASE_URL}/api/inquiries/status",
-                                 json={"ref": created["ref"], "email": "fremd@example.com"}, timeout=30)
-        assert stranger.status_code == 404
+        # The link in the mail leads into the customer area; it shows nothing by itself (#122).
+        link = requests.get(f"{BASE_URL}/status/view.php", params={"track_id": track_id}, timeout=30,
+                            allow_redirects=False)
+        assert link.status_code == 302 and link.headers["location"] == f"/kundenbereich/anfragen?track_id={track_id}"
+        assert requests.post(f"{BASE_URL}/api/inquiries/status", json={"ref": created["ref"], "email": email},
+                             timeout=30).status_code == 404
+
+        # The ticket's text is the customer's; name, phone and request id are a private note (#122).
+        full = dolibarr_get(f"tickets/{ticket['id']}")
+        assert "Startet seit gestern nicht mehr" in full["message"]
+        for internal in ("Runtime Kunde", "+43 660 0000000", "Request-ID", email):
+            assert internal not in full["message"], internal
+        [note] = [item for item in full.get("messages") or [] if str(item.get("private")) == "1"]
+        assert "Runtime Kunde" in note["message"] and "+43 660 0000000" in note["message"]
 
 
 class TestExistingCustomer:
@@ -240,13 +243,17 @@ class TestExistingCustomer:
         after = dolibarr_get(f"thirdparties/{CUSTOMER_ID}")
         assert {field: after.get(field) for field in fields} == {field: before.get(field) for field in fields}
         ticket = ticket_for(created["ref"], CUSTOMER_ID)
-        message = str(ticket.get("message"))
-        assert "schon vorhanden und wurde nicht geändert" in message
-        assert "Irgendwas Anderes GmbH" in message and "ATU99999999" in message
+        # The hint and what the form said about the company: only the workshop sees it (#122).
+        message = str(dolibarr_get(f"tickets/{ticket['id']}").get("message"))
+        assert "schon vorhanden" not in message and "Irgendwas Anderes GmbH" not in message
+        notes = [str(item["message"]) for item in dolibarr_get(f"tickets/{ticket['id']}").get("messages") or []
+                 if str(item.get("private")) == "1"]
+        assert any("schon vorhanden und wurde nicht geändert" in note and "Irgendwas Anderes GmbH" in note
+                   and "ATU99999999" in note for note in notes), notes
 
 
 class TestStatusFollowsDolibarr:
-    def test_status_changes_when_the_ticket_moves_on(self):
+    def test_status_changes_when_the_ticket_moves_on(self, admin_client):
         email = f"status-{uuid.uuid4().hex[:10]}@example.com"
         created = send_inquiry(email)
         party = dolibarr_get(f"thirdparties/email/{email}")
@@ -255,8 +262,9 @@ class TestStatusFollowsDolibarr:
         # Dolibarr 24 writes the state from "status"; "fk_statut" is only read.
         dolibarr_put(f"tickets/{ticket['id']}", {"status": 3})
 
-        status = requests.post(f"{BASE_URL}/api/inquiries/status",
-                               json={"ref": created["ref"], "email": email}, timeout=30)
+        # The new prospect sees it in the customer area (#122).
+        enable_portal(admin_client)
+        status = direct_session(email, party).get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60)
         assert status.status_code == 200 and status.json()["step"] == "in_arbeit", status.text
         # Dolibarr's Unix seconds arrive as a real point in time, not hours off.
         updated = datetime.fromisoformat(status.json()["updated_at"])
@@ -323,10 +331,6 @@ class TestQueue:
         for field in ("contact", "description", "manufacturer", "model", "attachments", "device_type"):
             assert field not in stored, field
         assert stored["dolibarr"]["ticket_id"] and stored["personal_data_removed_at"]
-        # The customer still finds the status: Dolibarr knows the e-mail.
-        status = requests.post(f"{BASE_URL}/api/inquiries/status",
-                               json={"ref": created["ref"], "email": email}, timeout=30)
-        assert status.status_code == 200, status.text
 
 
 class TestMigration:
@@ -431,7 +435,10 @@ class TestCallback:
         created = send_inquiry(email, extra={"callback_at": wish.isoformat()})
         party = dolibarr_get(f"thirdparties/email/{email}")
         ticket = ticket_for(created["ref"], party["id"])
-        assert "Rückruf gewünscht" in str(ticket["message"])
+        # For the workshop only: a private note, not the customer's text (#122).
+        assert "Rückruf gewünscht" not in str(ticket["message"])
+        assert any("Rückruf gewünscht" in str(item["message"]) for item in dolibarr_get(f"tickets/{ticket['id']}")["messages"]
+                   if str(item.get("private")) == "1")
         events = dolibarr_get("agendaevents", sqlfilters=f"(t.fk_element:=:{int(ticket['id'])}) "
                                                          "and (t.elementtype:=:'ticket')")
         calls = [event for event in events if event.get("type_code") == "AC_TEL"]
@@ -549,16 +556,17 @@ class TestLegalTexts:
 
 
 class TestStatusSteps:
-    def test_an_offer_waits_then_the_device_is_ready_for_pickup(self):
-        """#78."""
+    def test_an_offer_waits_then_the_device_is_ready_for_pickup(self, admin_client):
+        """#78, in the customer area since #122."""
         email = f"abholen-{uuid.uuid4().hex[:10]}@example.com"
         created = send_inquiry(email)
         party = dolibarr_get(f"thirdparties/email/{email}")
         ticket = ticket_for(created["ref"], party["id"])
+        enable_portal(admin_client)
+        session = direct_session(email, party)
 
         def step():
-            response = requests.post(f"{BASE_URL}/api/inquiries/status",
-                                     json={"ref": created["ref"], "email": email}, timeout=30)
+            response = session.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60)
             assert response.status_code == 200, response.text
             return response.json()["step"]
 
@@ -597,15 +605,17 @@ class TestReviewRequestAndLabel:
         ticket = ticket_with(asked["ref"])
         other = ticket_with(silent["ref"])
         # The ticket tells the owner about the yes; the subject names the device.
-        assert "Bewertungsbitte nach Abschluss: ja" in str(dolibarr_get(f"tickets/{ticket['id']}").get("message"))
+        assert any("Bewertungsbitte nach Abschluss: ja" in str(item["message"])
+                   for item in dolibarr_get(f"tickets/{ticket['id']}").get("messages") or [] if str(item.get("private")) == "1")
         assert ticket["subject"] == f"Reparatur: Notebook Lenovo ThinkPad T14 ({asked['ref']})"
 
         # The device label (#72): from the ticket in Dolibarr, the website forgot the device.
         label = admin_client.get(f"{BASE_URL}/api/admin/labels/{asked['ref']}", timeout=60).json()
         assert label["title"] == "Reparatur: Notebook Lenovo ThinkPad T14" and label["ticket_ref"] == ticket["ref"]
         track_id = label["status_url"].split("track_id=", 1)[1]
-        by_label = requests.get(f"{BASE_URL}/api/inquiries/status/track/{track_id}", timeout=60)
-        assert by_label.status_code == 200 and by_label.json()["ref"] == asked["ref"]
+        by_label = requests.get(f"{BASE_URL}/status/view.php", params={"track_id": track_id}, timeout=60,
+                                allow_redirects=False)
+        assert by_label.headers["location"] == f"/kundenbereich/anfragen?track_id={track_id}"
         assert yes not in json.dumps(label)
         # Whatever the owner calls the ticket in Dolibarr is on the label.
         dolibarr_put(f"tickets/{ticket['id']}", {"subject": f"Akku tauschen ({asked['ref']})"})
@@ -668,11 +678,33 @@ def mail_with(address: str, subject_start: str, seconds: int = 30) -> dict | Non
         time.sleep(1)
 
 
-def portal_session(email: str) -> requests.Session:
+def enable_portal(admin_client):
+    use_mailpit_for_website_mail(admin_client)
+    switched = admin_client.put(f"{BASE_URL}/api/admin/settings", json={"portal_enabled": True}, timeout=30)
+    assert switched.status_code == 200, switched.text
+
+
+def direct_session(email: str, party: dict) -> requests.Session:
+    """A customer-area session written straight into the website's database:
+    for scenarios about what a signed-in customer sees, without one more
+    sign-in mail (those are limited per hour)."""
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    website_db().portal_sessions.insert_one({
+        "_id": hashlib.sha256(token.encode()).hexdigest(), "email": email,
+        "customers": [{"id": int(party["id"]), "name": str(party.get("name") or "")}],
+        "created_at": now, "checked_at": now, "expires_at": now + timedelta(hours=1)})
+    session = requests.Session()
+    session.headers["Cookie"] = f"portal_session={token}"
+    return session
+
+
+def portal_session(email: str, next_page: str | None = None) -> requests.Session:
     """Sign in like a customer: address, mail, link."""
     before = len(link_mails_to(email))
     session = requests.Session()
-    asked = session.post(f"{BASE_URL}/api/portal/login", json={"email": email}, timeout=30)
+    asked = session.post(f"{BASE_URL}/api/portal/login",
+                         json={"email": email, **({"next": next_page} if next_page else {})}, timeout=30)
     assert asked.status_code == 200 and asked.json() == {"ok": True}, asked.text
     deadline = time.time() + 30
     while len(link_mails_to(email)) <= before and time.time() < deadline:
@@ -681,7 +713,11 @@ def portal_session(email: str) -> requests.Session:
     text = mail_text(newest)
     # #114: HTML with the module's logo and the Du closing, plus the text part.
     assert "maillogo.php" in text and "Liebe Grüße" in text and "Viele Grüße" not in text
-    token = re.search(r"/kundenbereich/anmelden#([A-Za-z0-9_-]{40,})", text).group(1)
+    if next_page:
+        # The link leads to that page after signing in (#122).
+        assert "/kundenbereich/anmelden?ziel=" + requests.utils.quote(next_page, safe="") + "#" in text, text[:2000]
+        assert "kannst mir direkt antworten" in text
+    token = re.search(r"/kundenbereich/anmelden(?:\?ziel=[A-Za-z0-9%._-]*)?#([A-Za-z0-9_-]{40,})", text).group(1)
     opened = session.post(f"{BASE_URL}/api/portal/session", json={"token": token}, timeout=60)
     assert opened.status_code == 200, opened.text
     return session
@@ -755,7 +791,7 @@ class TestCustomerArea:
         assert overview["tickets"][0]["inquiry_ref"] == "ANF-PORTAL0A"
         assert [item["ref"] for item in overview["offers"]] == [world["a_offer"]["ref"]]
         assert [item["ref"] for item in overview["invoices"]] == [world["a_invoice"]["ref"]]
-        assert overview["counts"] == {"offers_open": 1, "invoices_open": 1, "repairs_running": 1}
+        assert overview["counts"] == {"offers_open": 1, "invoices_open": 1, "repairs_running": 1, "inquiries_waiting": 0}
         for path in (f"offers/{world['b_offer']['id']}", f"offers/{world['b_offer']['id']}/pdf",
                      f"invoices/{world['b_invoice']['id']}", f"invoices/{world['b_invoice']['id']}/pdf"):
             assert a.get(f"{BASE_URL}/api/portal/{path}", timeout=60).status_code == 404, path
@@ -768,7 +804,8 @@ class TestCustomerArea:
         assert world["b_offer"]["ref"] in refs and world["a_offer"]["ref"] not in refs and world["a_invoice"]["ref"] not in refs
 
     def test_a_contact_sees_the_company(self, portal_world):
-        overview = portal_session(portal_world["contact"]).get(f"{BASE_URL}/api/portal/overview", timeout=60).json()
+        target = f"/kundenbereich/anfragen?track_id={portal_world['a_ticket']['track_id']}"
+        overview = portal_session(portal_world["contact"], target).get(f"{BASE_URL}/api/portal/overview", timeout=60).json()
         assert overview["customers"] == [f"Portal Firma D {portal_world['tag']}"]
 
     def test_a_blocked_customer_gets_no_link_and_an_old_link_opens_nothing(self, portal_world):
@@ -1026,3 +1063,89 @@ class TestRunningServices:
         assert foreign["ref"] not in json.dumps(g.get(f"{BASE_URL}/api/portal/overview", timeout=60).json())
         for suffix in ("", "/pdf"):
             assert g.get(f"{BASE_URL}/api/portal/documents/contracts/{foreign['id']}{suffix}", timeout=60).status_code == 404
+
+
+# ---------------------------------------------------------------- ticket portal (#122)
+
+def agenda(ticket_id) -> list:
+    """The ticket's events as an administrator sees them in Dolibarr."""
+    response = requests.get(f"{DOLIBARR}/api/index.php/agendaevents", headers={"DOLAPIKEY": ADMIN_KEY, "Accept": "application/json"},
+                            params={"sqlfilters": f"(t.fk_element:=:{int(ticket_id)}) and (t.elementtype:=:'ticket')"}, timeout=30)
+    return response.json() if response.status_code == 200 else []
+
+
+@pytest.fixture(scope="class")
+def ticket_world(admin_client):
+    enable_portal(admin_client)
+    tag = uuid.uuid4().hex[:8]
+    world = {}
+    for key in ("a", "b"):
+        email = f"ticket-{key}-{tag}@example.com"
+        socid = new_customer(f"Ticket {key.upper()} {tag}", email)
+        world[key] = email
+        world[f"{key}_ticket"] = new_ticket(socid, f"Reparatur: Notebook {key.upper()} (ANF-TICKET0{key.upper()})")
+        world[f"{key}_session"] = direct_session(email, {"id": socid, "name": f"Ticket {key.upper()} {tag}"})
+    return world
+
+
+class TestTicketPortal:
+    def test_history_answers_and_closing_stay_with_the_own_customer(self, ticket_world):
+        world = ticket_world
+        a, b = world["a_session"], world["b_session"]
+        ticket, foreign = world["a_ticket"], world["b_ticket"]
+        # The workshop asks publicly and notes something privately; the ticket waits for the customer.
+        requests.post(f"{DOLIBARR}/api/index.php/tickets/newmessage", headers={"DOLAPIKEY": ADMIN_KEY},
+                      json={"track_id": ticket["track_id"], "message": "<p>Welches Modell genau?</p>"}, timeout=30).raise_for_status()
+        requests.post(f"{DOLIBARR}/api/index.php/tickets/newmessage", headers={"DOLAPIKEY": ADMIN_KEY},
+                      json={"track_id": ticket["track_id"], "message": "Intern: Ersatzteil teuer", "private": 1},
+                      timeout=30).raise_for_status()
+        dolibarr_put(f"tickets/{ticket['id']}", {"status": 5})
+
+        shown = a.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60)
+        assert shown.status_code == 200, shown.text
+        detail = shown.json()
+        assert detail["step"] == "wartet_auf_dich" and detail["can_reply"] is True
+        assert [(item["from"], item["text"]) for item in detail["messages"]] == [
+            ("team", "Portal-Szenario"), ("team", "Welches Modell genau?")]
+        assert "Intern" not in shown.text and "erstellt" not in shown.text and "geändert" not in shown.text
+        overview = a.get(f"{BASE_URL}/api/portal/overview", timeout=60).json()
+        assert overview["counts"]["inquiries_waiting"] == 1
+
+        # Customer A answers; Dolibarr has the signed message, the workshop a mail with the link.
+        before = len(mails_to(WARNINGS_TO, seconds=0))
+        answered = a.post(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/messages",
+                          json={"message": "Ein T14 <Gen 2> & Netzteil."}, timeout=60)
+        assert answered.status_code == 200, answered.text
+        assert answered.json()["messages"][-1] == {**answered.json()["messages"][-1], "from": "customer", "via": "portal",
+                                                  "text": "Ein T14 <Gen 2> & Netzteil."}
+        events = agenda(ticket["id"])
+        assert any(item["code"] == "TICKET_MSG" and "geschrieben im Kundenbereich von" in str(item["note_private"])
+                   and world["a"] in str(item["note_private"]) for item in events), events
+        assert int(dolibarr_get(f"tickets/{ticket['id']}")["fk_statut"]) in (0, 2), "back to the workshop"
+        deadline = time.time() + 30
+        while len(mails_to(WARNINGS_TO, seconds=0)) <= before and time.time() < deadline:
+            time.sleep(1)
+        notice = mail_text(mail_with(WARNINGS_TO, f"Kundenbereich: Antwort zu {ticket['ref']}"))
+        assert "Ein T14 &lt;Gen 2&gt;" in notice and f"/ticket/card.php?track_id={ticket['track_id']}" in notice
+
+        # The link from the mails finds A's ticket for A only.
+        assert a.get(f"{BASE_URL}/api/portal/inquiries/track/{ticket['track_id']}", timeout=60).json() == {"id": int(ticket["id"])}
+        assert b.get(f"{BASE_URL}/api/portal/inquiries/track/{ticket['track_id']}", timeout=60).status_code == 404
+
+        # Customer B sees, answers and closes nothing of A's - and A nothing of B's.
+        for session, other in ((b, ticket), (a, foreign)):
+            assert session.get(f"{BASE_URL}/api/portal/inquiries/{other['id']}", timeout=60).status_code == 404
+            assert session.post(f"{BASE_URL}/api/portal/inquiries/{other['id']}/messages", json={"message": "Fremd hier"},
+                                timeout=60).status_code == 404
+            assert session.post(f"{BASE_URL}/api/portal/inquiries/{other['id']}/close", timeout=60).status_code == 404
+        assert not any("Fremd hier" in str(item["note_private"]) for item in agenda(ticket["id"]) + agenda(foreign["id"]))
+        assert int(dolibarr_get(f"tickets/{foreign['id']}")["fk_statut"]) not in (8, 9)
+
+        # "Hat sich erledigt": closed in Dolibarr, still readable, no more answers.
+        closed = a.post(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/close", timeout=60)
+        assert closed.status_code == 200 and closed.json()["step"] == "abgeschlossen" and closed.json()["can_reply"] is False
+        assert int(dolibarr_get(f"tickets/{ticket['id']}")["fk_statut"]) == 8
+        late = a.post(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}/messages", json={"message": "Noch was"}, timeout=60)
+        assert late.status_code == 409 and "abgeschlossen" in late.json()["detail"]
+        assert len(a.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60).json()["messages"]) == 3
+        assert mail_with(WARNINGS_TO, f"Kundenbereich: {ticket['ref']} als erledigt geschlossen")

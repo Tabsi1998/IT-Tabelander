@@ -33,7 +33,6 @@ export default function Footer({ onHome = true }) {
           <nav aria-label="Für Kunden" className="flex flex-col gap-0 text-base md:gap-2.5 md:text-[15px]">
             <b className="mb-1.5 text-on-navy">Für Kunden</b>
             {customerLink("anfrage", "Anfrage starten")}
-            {customerLink("status", "Status prüfen")}
             {settings.portal_enabled && (
               <Link to="/kundenbereich" className="flex min-h-[44px] items-center text-on-navy-muted no-underline md:min-h-0">Kundenbereich</Link>
             )}

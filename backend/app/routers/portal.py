@@ -1,8 +1,8 @@
 import httpx
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, Request, Response
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from .. import portal
+from .. import portal, portal_inquiries
 from ..db import get_db
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
@@ -15,15 +15,42 @@ AWAY = "Der Kundenbereich ist gerade nicht erreichbar. Bitte versuch es später 
 
 class LoginInput(BaseModel):
     email: str = Field(max_length=254)
+    # The page to open after signing in, e.g. the inquiry from a Dolibarr mail (#122).
+    next: str | None = Field(default=None, max_length=200)
 
     @field_validator("email")
     @classmethod
     def valid_email(cls, value):
         return portal.clean_email(value)
 
+    @field_validator("next")
+    @classmethod
+    def only_the_customer_area(cls, value):
+        return value if value and portal.NEXT_PAGE.fullmatch(value) else None
+
 
 class SessionInput(BaseModel):
     token: str = Field(pattern=r"^[A-Za-z0-9_-]{20,100}$")
+
+
+class MessageInput(BaseModel):
+    """An answer to an inquiry (#122)."""
+    message: str = Field(max_length=5000)
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def strip_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("message")
+    @classmethod
+    def something_to_say(cls, value):
+        if len(value) < 2:
+            raise ValueError("Bitte schreib kurz, was du mitteilen möchtest.")
+        return value
+
+
+TicketId = Path(ge=1, le=2_147_483_647)
 
 
 class AnswerInput(BaseModel):
@@ -63,7 +90,7 @@ async def _session(request: Request) -> dict:
 async def login(payload: LoginInput, background: BackgroundTasks):
     """Always the same answer; whether the address is known stays unsaid (#63)."""
     await _switched_on()
-    background.add_task(portal.send_link, payload.email)
+    background.add_task(portal.send_link, payload.email, payload.next)
     return {"ok": True}
 
 
@@ -163,6 +190,42 @@ async def document_pdf(kind: str, object_id: int, request: Request):
         raise HTTPException(status_code=404, detail="Das gibt es hier nicht.")
     try:
         return _pdf(*await portal.document(session, kind, object_id))
+    except (portal.PortalError, httpx.HTTPError) as exc:
+        raise _problem(exc) from None
+
+
+@router.get("/inquiries/track/{track_id}")
+async def inquiry_by_track(track_id: str, request: Request):
+    """The link in Dolibarr's mails (/status/view.php?track_id=…) leads here (#122)."""
+    try:
+        return await portal_inquiries.find_by_track(await _session(request), track_id)
+    except (portal.PortalError, httpx.HTTPError) as exc:
+        raise _problem(exc) from None
+
+
+@router.get("/inquiries/{ticket_id}")
+async def inquiry(request: Request, ticket_id: int = TicketId):
+    try:
+        return await portal_inquiries.detail(await _session(request), ticket_id)
+    except (portal.PortalError, httpx.HTTPError) as exc:
+        raise _problem(exc) from None
+
+
+@router.post("/inquiries/{ticket_id}/messages")
+async def answer_inquiry(payload: MessageInput, request: Request, ticket_id: int = TicketId):
+    session = await _session(request)
+    try:
+        return await portal_inquiries.reply(session, ticket_id, payload.message)
+    except (portal.PortalError, httpx.HTTPError) as exc:
+        raise _problem(exc) from None
+
+
+@router.post("/inquiries/{ticket_id}/close")
+async def close_inquiry(request: Request, ticket_id: int = TicketId):
+    """"Hat sich erledigt" (#122)."""
+    session = await _session(request)
+    try:
+        return await portal_inquiries.close(session, ticket_id)
     except (portal.PortalError, httpx.HTTPError) as exc:
         raise _problem(exc) from None
 
