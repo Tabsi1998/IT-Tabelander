@@ -304,7 +304,7 @@ class WerkbankDocs
 				continue;
 			}
 			$stand = isset($documents[$rule->slug]) ? (string) $documents[$rule->slug]['stand'] : '';
-			$entry = array('rule' => $rule, 'state' => 'missing', 'done' => null, 'sent' => null, 'signing' => null, 'generated' => null,
+			$entry = array('rule' => $rule, 'state' => 'missing', 'done' => null, 'sent' => null, 'signing' => null, 'generated' => null, 'before' => array(),
 				'title' => isset($documents[$rule->slug]) ? $documents[$rule->slug]['title'] : $rule->slug, 'stand' => $stand,
 				'exists' => is_file(WerkbankUnterlagen::dir().'/'.$rule->slug.'.pdf'));
 			foreach ($events as $event) {
@@ -323,6 +323,16 @@ class WerkbankDocs
 					$entry['signing'] = $event;
 				} elseif (!$entry['generated'] && $event->state === 'generated') {
 					$entry['generated'] = $event;
+				}
+			}
+			// Generated again after it was sent, signed or done: the new version counts,
+			// what happened to an older one no longer does.
+			if ($entry['generated']) {
+				foreach (array('done', 'sent', 'signing') as $key) {
+					if ($entry[$key] && (int) $entry[$key]->rowid < (int) $entry['generated']->rowid) {
+						$entry['before'][$key] = $entry[$key];
+						$entry[$key] = null;
+					}
 				}
 			}
 			if ($entry['done']) {

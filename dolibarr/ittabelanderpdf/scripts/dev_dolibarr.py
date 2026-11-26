@@ -924,7 +924,7 @@ def gen() -> None:
     fields[0] = ("token", token.group(1) if token else "")
     status, html = post(tab, fields + [("field_ansprech", "Maria Muster & Co"), ("field_bemerkung", "Zugang über <VPN>")])
     notes = re.findall(r'jnotify\("([^"]{0,200})', html) + re.findall(r'class="(?:error|warning)[^"]*">([^<]{0,200})', html)
-    check("generating through the form (WAF passes)", status == 200 and "erzeugt." in html, f"{status} {notes} {html[:300] if not notes else ''}")
+    check("generating through the form (WAF passes)", status == 200 and "erzeugt." in html and "state-generated" in html, f"{status} {notes} {html[:300] if not notes else ''}")
     status, html = get(f"{base}/admin/docrules.php")
     check("settings list the placeholders and the business hours", status == 200 and "__ITTAB_GESCHAEFTSZEITEN__" in html and "__ITTAB_PREIS:&lt;REF&gt;__" in html
           and 'name="ITTABPDF_GESCHAEFTSZEITEN"' in html)

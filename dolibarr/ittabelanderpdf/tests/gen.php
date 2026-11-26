@@ -149,6 +149,11 @@ $images = preg_match_all('#/Subtype\s*/Image#', (string) file_get_contents($pdf)
 $check('signed: done, the PDF carries both signatures', $state() === 'done' && is_file($pdf) && $images >= 2, $pdf.' '.$images);
 copy($pdf, '/tmp/ittpdf-out/vereinbarung-unterschrieben.pdf');
 
+// Generated again (new contract, other values): the new version has to go out and be signed again.
+$again = $docs->generate($firm, $rule, $answers, $contract, null, $admin);
+$check('generating again after done asks for it again', $again > $event && $state() === 'generated', $state());
+$event = $again;
+
 $failed = array_values(array_filter($checks, function ($entry) {
 	return !$entry['ok'];
 }));
