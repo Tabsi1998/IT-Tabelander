@@ -185,23 +185,15 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 	}
 
 	/**
-	 * The sheet around a body: logo, orange line, body, footer.
+	 * The frame around a body (light and dark); the body ends with the
+	 * signature where there is one.
 	 *
 	 * @param string $body Body HTML
-	 * @return string      Full document (light and dark)
+	 * @return string      Full document
 	 */
 	private static function document($body)
 	{
-		global $mysoc;
-		$e = function ($text) {
-			return dol_escape_htmltag((string) $text);
-		};
-		$phone = WerkbankMailData::phoneLink(!empty($mysoc->phone_mobile) ? $mysoc->phone_mobile : $mysoc->phone);
-		$address = trim(str_replace("\n", ', ', trim((string) $mysoc->address)).', '.trim($mysoc->zip.' '.$mysoc->town), ', ');
-		return WerkbankMailTemplates::wrapDocument(WerkbankMailTemplates::sheet(WerkbankMailData::logoHtml(true), $body, WerkbankMailTemplates::footerLines(
-			$e($mysoc->name), $e($mysoc->managers), $e($address), $e($mysoc->email), $e($mysoc->url),
-			$e(WerkbankBuilder::bareUrl((string) $mysoc->url)), $phone
-		)));
+		return WerkbankMailTemplates::wrapDocument($body);
 	}
 
 	/**
@@ -274,7 +266,7 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 				? 'Ergänzungen und Fragen schickst du einfach als Antwort auf diese Mail.'
 				: 'Ergänzungen und Fragen schicken Sie einfach als Antwort auf diese E-Mail.');
 		}
-		$body .= WerkbankMailTemplates::closing($du ? 'Liebe Grüße' : 'Mit freundlichen Grüßen', $e($mysoc->managers), $e($mysoc->name));
+		$body .= WerkbankMailTemplates::signatureFor($du ? 'Liebe Grüße' : 'Mit freundlichen Grüßen', $mysoc, WerkbankMailData::logoHtml(true));
 
 		$subject = ($du ? 'Deine' : 'Ihre').' Anfrage '.$object->ref.($subjectText !== '' ? ': '.$subjectText : '');
 		return self::mail($subject, $to, self::document($body), (int) $object->id);

@@ -760,7 +760,7 @@ if ($stage === 'mails') {
 	$off = $vars();
 	$check('portal off: no button', $off['__ITTAB_KUNDENBEREICH_BLOCK__'] === '');
 	$check('portal off: reply sentence', strpos($off['__ITTAB_ANNAHME_SATZ__'], 'antworten Sie einfach auf diese E-Mail') !== false && strpos($off['__ITTAB_ANNAHME_SATZ_DU__'], 'antworte einfach auf diese Mail') !== false);
-	$check('logo from the public endpoint', strpos($off['__ITTAB_LOGO__'], '/custom/ittabelanderpdf/public/maillogo.php?v=') !== false && strpos($off['__ITTAB_LOGO__'], 'width="240"') !== false, $off['__ITTAB_LOGO__']);
+	$check('logo from the public endpoint', strpos($off['__ITTAB_LOGO__'], '/custom/ittabelanderpdf/public/maillogo.php?v=') !== false && strpos($off['__ITTAB_LOGO__'], 'width="180"') !== false, $off['__ITTAB_LOGO__']);
 	rt_const($db, 'ITTABPDF_PORTAL_ENABLED', '1');
 	$conf->global->ITTABPDF_PORTAL_ENABLED = '1';
 	$on = $vars();
@@ -973,15 +973,20 @@ if ($stage === 'rollout') {
 				$body .= $T::factsBox($rows);
 			}
 		}
-		$body .= $T::closing('Mit freundlichen Grüßen', dol_escape_htmltag($mysoc->managers), '{COMPANY_NAME}');
+		// The letter keeps the closing words; the signature with the logo is for the e-mail (after the marker).
+		$body .= '<p style="'.$T::P.'margin:24px 0 0 0;">'.$T::text('Mit freundlichen Grüßen<br>'.dol_escape_htmltag($mysoc->managers)).'</p>';
 		// Mahnwesen runs its texts through complete_substitutions_array, so the
 		// logo variable of this module works there (FormMail::setSubstitFromObject).
 		// Mahnwesen prints everything before the marker into the letter, so logo
 		// and footer come after it (e-mail only). __ITTAB_LOGO__ works there
 		// because Mahnwesen runs FormMail::setSubstitFromObject (light logo:
 		// Mahnwesen sends without a style sheet).
-		$html = '<div style="max-width:560px;margin:0 auto;padding:12px 20px 0 20px;background:#ffffff;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;">'.$body.'</div>'.$end
-			.'<div style="max-width:560px;margin:0 auto;padding:28px 20px 28px 20px;background:#ffffff;">__ITTAB_LOGO__'.$footer.'</div>';
+		// 1.9.0: no logo on top; after the marker the signature block as in the owner's signature.
+		$signature = $T::signatureFor('', $mysoc, '__ITTAB_LOGO__');
+		// The name stands in the letter already: from the rule on (logo and contact).
+		$signature = substr($signature, 0, strpos($signature, '<p ')).substr($signature, strpos($signature, '<hr '));
+		$html = '<div style="max-width:560px;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;">'.$body.'</div>'.$end
+			.'<div style="max-width:560px;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;margin:16px 0 0 0;">'.$signature.'</div>';
 		file_put_contents($out.'/mahnwesen/'.$name.'.html', $html."\n");
 		if (!function_exists('testSqlAndScriptInject')) {
 			require_once DOL_DOCUMENT_ROOT.'/waf.inc.php';
@@ -1024,19 +1029,19 @@ if ($stage === 'rollout') {
 		$file = WerkbankMailData::logoFile($variant);
 		$size = $file !== '' ? getimagesize($file) : array(480, 110);
 		$url = $production.($variant === 'dark' ? '?variant=dark' : '');
-		return '<img src="'.$url.'" width="'.((int) ceil($size[0] / 2)).'" height="'.((int) ceil($size[1] / 2)).'" alt="'.dol_escape_htmltag($mysoc->name).'"'
-			.' style="display:block;border:0;outline:none;text-decoration:none;width:'.((int) ceil($size[0] / 2)).'px;max-width:100%;height:auto;">';
+		return '<img alt="'.dol_escape_htmltag($mysoc->name).'" src="'.$url.'" width="180" height="'.((int) round($size[1] * 180 / $size[0])).'"'
+			.' style="border:0;display:block;height:auto;max-width:100%;width:180px" />';
 	};
 	// Both logos, as asked: the dark one stays hidden (inline display:none);
 	// ticket mails carry no style sheet that could show it.
 	$logo = $image('light').'<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">'.$image('dark').'</div>';
 	$div = '<div style="max-width:560px;background:#ffffff;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;">';
 	$texts = array(
-		'neues-ticket' => $T::headerBlock($logo).$div.$T::paragraph('Guten Tag,')
+		'neues-ticket' => $div.$T::paragraph('Guten Tag,')
 			.$T::paragraph('danke für Ihre Anfrage. Sie ist bei mir angekommen, ich sehe sie mir an und melde mich bei Ihnen.')
 			.$T::paragraph('Den aktuellen Stand finden Sie jederzeit über den Link unten.').'</div>',
-		'einleitung' => $T::headerBlock($logo).$div.$T::paragraph('Guten Tag,').'</div>',
-		'signatur' => $div.$T::closing('Mit freundlichen Grüßen', dol_escape_htmltag($mysoc->managers), dol_escape_htmltag($mysoc->name)).'</div>'.$footer,
+		'einleitung' => $div.$T::paragraph('Guten Tag,').'</div>',
+		'signatur' => $div.$T::signatureFor('Mit freundlichen Grüßen', $mysoc, $image('light')).'</div>',
 	);
 	foreach ($texts as $name => $html) {
 		file_put_contents($out.'/ticket/'.$name.'.html', $html."\n");

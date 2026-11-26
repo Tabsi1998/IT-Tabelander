@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0] - 2026-11-26
+
+- New mail layout for every module mail (templates Sie/Du, automatic send, ticket confirmation and owner notice, signed copies, documents, rollout texts for Mahnwesen and tickets): no logo and no orange line on top any more (CKEditor turned the line into an empty block); the mail starts with the greeting and ends in the style of the owner's signature: closing words, name and company, a rule (`<hr />`), the logo at 180 px, address, e-mail, web and phone, all from the company data and variables.
+- Only what CKEditor and the WAF keep: paragraphs, one div, `<hr />`, inline styles. The frame (560 px, background, dark design) is added only by the automatic send. The dark logo is a second image next to the light one (no blocks inside the paragraph).
+- Untouched templates of 1.8.x are brought up to date on activation (`PREVIOUS` hashes); edited ones only with "Vorlagen aktualisieren".
+- New test stage `editor`: the templates are opened in Dolibarr's CKEditor and saved as a person would; the text keeps its blocks and words and gains no empty block.
+- `docs/rollout/` (Mahnwesen, ticket texts) in the new layout; the letter keeps its closing, the e-mail adds the signature after the marker.
+
 ## [1.8.2] - 2026-11-26
 
 - No own hosting any more: the shipped rules ask for "Leistungsbeschreibung IT-Betreuung und Wartung" (`leistungsbeschreibung-betreuung-wartung`, and `-privat`) and, like the AVV, for contracts with `DL-WART*` (was `DL-HOST*,DL-WART*`).

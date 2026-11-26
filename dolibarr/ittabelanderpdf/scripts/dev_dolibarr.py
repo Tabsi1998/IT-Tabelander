@@ -180,6 +180,13 @@ def mailpit(path: str) -> dict:
         return json.loads(answer.read().decode("utf-8"))
 
 
+def save_mail(path: Path, html: str) -> None:
+    """A caught message as a file to look at: with a charset, so umlauts show (Dolibarr's own wrapper has none)."""
+    if html and "charset" not in html[:600].lower():
+        html = '<meta charset="utf-8">' + html
+    path.write_text(html, encoding="utf-8")
+
+
 def mails() -> None:
     """E-mail scenarios in PHP, then every caught message as HTML plus a summary."""
     urllib.request.urlopen(urllib.request.Request(f"{MAILPIT_URL}/api/v1/messages", method="DELETE"), timeout=30)
@@ -199,13 +206,17 @@ def mails() -> None:
         attachments = [entry["FileName"] for entry in detail.get("Attachments") or []]
         inline = [entry.get("ContentID", "") for entry in detail.get("Inline") or []]
         slug = f"{number:02d}-" + re.sub(r"[^a-z0-9]+", "-", f"{detail['Subject']} {to}".lower()).strip("-")[:80]
-        (MAILS / f"{slug}.html").write_text(detail.get("HTML") or "", encoding="utf-8")
+        save_mail(MAILS / f"{slug}.html", detail.get("HTML") or "")
         found = re.search(r">\s*((?:Hallo|Guten Tag)[^<]*)<", detail.get("HTML") or "")
         greeting = found.group(1).strip() if found else ""
         summary.append({"file": f"{slug}.html", "subject": detail["Subject"], "to": to, "bcc": bcc,
                         "attachments": attachments, "inline": inline, "greeting": greeting})
     (MAILS / "uebersicht.json").write_text(json.dumps({"scenarios": result, "messages": summary}, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
+    # Every message is one document: one <html>, one </html> (the automatic send must not be wrapped twice).
+    doubled = [entry["file"] for entry in summary if (MAILS / entry["file"]).read_text(encoding="utf-8").lower().count("</html>") > 1]
+    if doubled:
+        raise SystemExit(f"mails with a document inside a document: {', '.join(doubled)}")
     print(f"{len(summary)} messages -> {shown(MAILS)}")
 
 
@@ -228,7 +239,7 @@ def rollout() -> None:
         number += 1
         detail = mailpit(f"message/{item['ID']}")
         slug = f"rollout-{number:02d}-" + re.sub(r"[^a-z0-9]+", "-", detail["Subject"].lower()).strip("-")[:70]
-        (MAILS / f"{slug}.html").write_text(detail.get("HTML") or "", encoding="utf-8")
+        save_mail(MAILS / f"{slug}.html", detail.get("HTML") or "")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print(f"{number} rollout messages -> {shown(MAILS)}")
 
@@ -329,7 +340,7 @@ def tickets() -> None:
     MAILS.mkdir(parents=True, exist_ok=True)
     for number, detail in enumerate(messages, 1):
         slug = f"ticket-{number:02d}-" + re.sub(r"[^a-z0-9]+", "-", detail["Subject"].lower()).strip("-")[:70]
-        (MAILS / f"{slug}.html").write_text(detail.get("HTML") or "", encoding="utf-8")
+        save_mail(MAILS / f"{slug}.html", detail.get("HTML") or "")
 
     def to(detail: dict) -> set:
         return {entry["Address"] for entry in detail.get("To") or []}
@@ -342,7 +353,7 @@ def tickets() -> None:
     for case, (address, opening, closing) in expected.items():
         ref = created[case]["ref"]
         mine = [detail for detail in messages if address in to(detail)]
-        html = unescape(mine[0].get("HTML") or "") if len(mine) == 1 else ""
+        html = re.sub(r"\s+", " ", unescape(mine[0].get("HTML") or "")) if len(mine) == 1 else ""  # mailers fold long lines
         checks.append({"check": f"{case}: one confirmation to {address}",
                        "ok": len(mine) == 1 and mine[0]["Subject"].startswith(f"{opening} {ref}")
                        and closing in html and internal not in html and "\\n" not in html
@@ -1086,8 +1097,8 @@ def versand() -> None:
     mail = sent[0] if len(sent) == 1 else {}
     files = sorted(entry["FileName"] for entry in mail.get("Attachments") or [])
     check("the e-mail goes out with subject, list and every document, one closing", status == 200 and mail.get("Subject", "").startswith("Ihre Unterlagen von")
-          and "AGB für Unternehmer" in (mail.get("HTML") or "") and "agb-unternehmer.pdf" in files and any(name.startswith("gen-test-vereinbarung-") for name in files)
-          and (mail.get("HTML") or "").count("Mit freundlichen Grüßen") == 1, f"{status} {mail.get('Subject')} {files}")
+          and "AGB für Unternehmer" in re.sub(r"\s+", " ", unescape(mail.get("HTML") or "")) and "agb-unternehmer.pdf" in files and any(name.startswith("gen-test-vereinbarung-") for name in files)
+          and re.sub(r"\s+", " ", unescape(mail.get("HTML") or "")).count("Mit freundlichen Grüßen") == 1, f"{status} {mail.get('Subject')} {files}")
     blanks = []
     for entry in mail.get("Attachments") or []:
         if entry["FileName"].startswith("gen-test-vereinbarung-"):
@@ -1163,19 +1174,54 @@ def versand() -> None:
     print(f"{len(checks)} sending checks passed")
 
 
+def playwright_module() -> str:
+    """Playwright of the website (web/node_modules) of this checkout or a sibling one, '' when none is installed."""
+    for root in (ROOT.parents[1], *ROOT.parents[2].glob("IT-Tabelander*")):
+        candidate = root / "web" / "node_modules" / "playwright"
+        if candidate.is_dir():
+            return str(candidate)
+    return ""
+
+
+def editor() -> None:
+    """The module's templates in Dolibarr's editor (tests/editor.php, scripts/editor_roundtrip.cjs).
+
+    CKEditor loads each template and saves it unchanged, as a person would;
+    afterwards the text must have the same blocks and words and no empty
+    block more (the old orange line turned into one). Needs Playwright of
+    the website; without it the stage says so and fails.
+    """
+    prepared = php("prepare", script="editor.php")
+    module = playwright_module()
+    if not module or not shutil.which("node"):
+        raise SystemExit("editor check needs node and Playwright (npm ci in web/)")
+    rowids = ",".join(str(rowid) for rowid in prepared["rowids"])
+    run = subprocess.run(["node", str(Path(__file__).with_name("editor_roundtrip.cjs")), module, URL, str(LOGIN), rowids],
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
+    if run.returncode != 0:
+        raise SystemExit("editor round trip failed: " + (run.stderr or run.stdout)[-1500:])
+    result = php("compare", script="editor.php")
+    checks = result["checks"]
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"editor check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} editor checks passed")
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "editor": editor, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand", "editor"):
                 steps[name]()
         elif step in steps:
             steps[step]()
