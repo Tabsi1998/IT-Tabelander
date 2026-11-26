@@ -14,6 +14,7 @@ CREATE TABLE llx_ittabpdf_qs_run(
   fk_user_creat   integer NULL,
   date_creation   datetime NOT NULL,
   fk_user_close   integer NULL,
+  fk_actioncomm   integer NULL,
   date_close      datetime NULL,
   tms             timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=innodb;

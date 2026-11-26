@@ -1568,6 +1568,8 @@ def module_steps() -> list:
              module_stage("versand", 1800), ("preise",)),
         Step(group, "editor", "Templates opened and saved in CKEditor stay as they are",
              module_stage("editor", 1800), ("mails",)),
+        Step(group, "agenda", "History in Dolibarr's agenda, the counter of the tab",
+             module_stage("agenda", 1800), ("versand",)),
     ]
 
 

@@ -476,6 +476,10 @@ class WerkbankQs
 		}
 		$this->db->query("UPDATE ".MAIN_DB_PREFIX."ittabpdf_qs_run SET filename = '".$this->db->escape(basename($file))."' WHERE rowid = ".((int) $runId));
 		$this->db->commit();
+		// The closed run in the agenda of the customer and the intervention.
+		require_once __DIR__.'/werkbankagenda.class.php';
+		$agenda = new WerkbankAgenda($this->db);
+		$agenda->logQs($this->run($runId), $user);
 		return 1;
 	}
 

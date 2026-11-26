@@ -211,7 +211,7 @@ if (in_array($action, array('startsign', 'upload', 'check', 'revoke'), true)) {
  */
 
 $form = new Form($db);
-llxHeader('', $langs->trans('WerkbankDocsTab').' - '.$soc->name, '', '', 0, 0, array(), array(), '', 'mod-ittabelanderpdf page-docs');
+llxHeader('', $langs->trans('WerkbankDocsTab').' - '.$soc->name, '', '', 0, 0, array(), array('/ittabelanderpdf/css/docs.css'), '', 'mod-ittabelanderpdf page-docs');
 print dol_get_fiche_head(societe_prepare_head($soc), 'ittabpdfdocs', $langs->trans('ThirdParty'), -1, 'company');
 dol_banner_tab($soc, 'socid', '', ($user->socid ? 0 : 1), 'rowid', 'nom');
 print dol_get_fiche_end();
@@ -227,8 +227,12 @@ $doneCount = count(array_filter($status, function ($entry) {
 $formFor = in_array($action, array('uploadform', 'checkform', 'revokeform', 'generateform'), true) && $rule ? $action : '';
 $documents = $docs->documents();
 
-print '<div class="'.($open ? 'warning' : 'info').' ittabdocs-summary">'.($open ? $langs->trans('WerkbankDocsSummaryOpen', count($open)) : $langs->trans('WerkbankDocsSummaryDone'))
-	.' · '.$langs->trans('WerkbankDocsSummaryCount', $doneCount, count($status)).'</div>';
+// Progress first: how much is done, what is open.
+$percent = $status ? (int) round(100 * $doneCount / count($status)) : 100;
+print '<div class="'.($open ? 'warning' : 'info').' ittabdocs-summary">'
+	.'<div class="ittabdocs-progress" title="'.$percent.' %"><div class="ittabdocs-progress-bar" style="width:'.$percent.'%"></div></div>'
+	.'<strong>'.$langs->trans('WerkbankDocsProgress', $doneCount, count($status)).'</strong>'
+	.($open ? ' · '.$langs->trans('WerkbankDocsSummaryOpen', count($open)) : ' · '.$langs->trans('WerkbankDocsSummaryDone')).'</div>';
 
 $states = array('missing' => array('WerkbankDocsStateMissing', 'status8'), 'sent' => array('WerkbankDocsStateSent', 'status1'),
 	'signing' => array('WerkbankDocsStateSigning', 'status3'), 'generated' => array('WerkbankDocsStateGenerated', 'status1'),
@@ -262,7 +266,7 @@ foreach ($status as $entry) {
 		.(!empty($rule->fk_soc) ? ' <span class="badge badge-status0">'.$langs->trans('WerkbankDocsManualBadge').'</span>' : '')
 		.'<br><span class="opacitymedium small">'.dol_escape_htmltag($entry['title'])
 		.($entry['stand'] !== '' ? ' · '.$langs->trans('WerkbankDocsStand', dol_print_date(dol_stringtotime($entry['stand'].' 00:00:00'), 'day')) : '').'</span></td>';
-	print '<td class="center">'.dolGetStatus($langs->trans($states[$state][0]), '', '', $states[$state][1], 5).'</td>';
+	print '<td class="center" data-label="'.dol_escape_htmltag($langs->trans('Status')).'">'.dolGetStatus($langs->trans($states[$state][0]), '', '', $states[$state][1], 5).'</td>';
 
 	// What counts now: when, how, who, the file.
 	$lines = array();
@@ -288,10 +292,11 @@ foreach ($status as $entry) {
 	} elseif (!$isTemplate && !$entry['exists'] && $state !== 'done') {
 		$lines[] = '<span class="opacitymedium">'.$langs->trans('WerkbankDocsNoFile', dol_escape_htmltag(WerkbankUnterlagen::relativeDir().'/'.$rule->slug.'.pdf')).'</span>';
 	}
-	print '<td class="small">'.implode('<br>', $lines).'</td>';
+	print '<td class="small ittabdocs-proof">'.implode('<br>', $lines).'</td>';
 
-	// One main action as a button, everything else in Dolibarr's "more" menu (keeps the line narrow).
-	print '<td class="right">';
+	// The main action as a button, the others as small links with an icon next to it,
+	// wrapping on narrow screens; no menus.
+	print '<td class="right ittabdocs-actions-cell">';
 	if ($write) {
 		$template = isset($documents[$rule->slug]) && $documents[$rule->slug]['kind'] === 'customer';
 		$open = $state !== 'done';
@@ -302,41 +307,45 @@ foreach ($status as $entry) {
 			$sendUrl = DOL_URL_ROOT.'/societe/card.php?socid='.$socid.'&action=presend&mode=init&ittabpdf_preselect='.urlencode($rule->slug.'.pdf').'#formmail';
 		}
 		$signable = $open && !$entry['signing'] && ($entry['exists'] && !$template || !empty($entry['generated']));
-		$signLabel = $langs->trans($rule->action === 'handover' ? 'WerkbankDocsConfirmReceipt' : 'WerkbankDocsSignNow');
+		$signShort = $rule->action === 'handover' ? 'WerkbankDocsActionReceiptShort' : 'WerkbankDocsActionSignShort';
 		$signUrl = $self.'&action=startsign&rule='.$id.'&token='.newToken();
-		$more = array();
-		// The main action.
+		// label key, url, picto, main
+		$actions = array();
 		if ($open && $entry['signing']) {
-			print '<a class="butAction smallpaddingimp" href="'.dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=doc&amp;id='.((int) $entry['signing']->rowid).'">'.$langs->trans('WerkbankDocsContinueSign').'</a>';
-		} elseif ($open && $template && empty($entry['generated'])) {
-			print '<a class="butAction smallpaddingimp" href="'.$self.'&amp;action=generateform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankGenButton').'</a>';
-		} elseif ($signable && $rule->action === 'sign') {
-			print '<form method="POST" action="'.$self.'" class="inline-block"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="startsign"><input type="hidden" name="rule" value="'.$id.'">';
-			print '<input type="submit" class="butAction smallpaddingimp" value="'.dol_escape_htmltag($signLabel).'"></form>';
-			$signable = false;
-		} elseif ($sendUrl !== '') {
-			print '<a class="butAction smallpaddingimp" href="'.dol_escape_htmltag($sendUrl).'">'.$langs->trans('WerkbankDocsSend').'</a>';
-			$sendUrl = '';
+			$actions[] = array('WerkbankDocsActionContinueShort', dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=doc&id='.((int) $entry['signing']->rowid), 'fa-signature');
 		}
-		// The rest.
+		// Not generated yet: generating is the next step; generated: it moves to the end.
+		if ($template && empty($entry['generated'])) {
+			$actions[] = array('WerkbankDocsActionGenerateShort', $self.'&action=generateform&rule='.$id.'#docform', 'fa-file-signature');
+		}
+		if ($signable && $rule->action === 'sign') {
+			$actions[] = array($signShort, $signUrl, 'fa-signature');
+		}
 		if ($sendUrl !== '') {
-			$more[] = array('urlraw' => $sendUrl, 'label' => $langs->trans('WerkbankDocsSend'), 'perm' => 1);
+			$actions[] = array('WerkbankDocsActionSendShort', $sendUrl, 'fa-paper-plane');
 		}
-		if ($signable) {
-			$more[] = array('urlraw' => $signUrl, 'label' => $signLabel, 'perm' => 1);
+		if ($signable && $rule->action !== 'sign') {
+			$actions[] = array($signShort, $signUrl, 'fa-signature');
 		}
-		if ($template && (!empty($entry['generated']) || !$open)) {
-			$more[] = array('urlraw' => $self.'&action=generateform&rule='.$id.'#docform', 'label' => $langs->trans('WerkbankGenAgain'), 'perm' => 1);
+		$actions[] = array('WerkbankDocsActionUploadShort', $self.'&action=uploadform&rule='.$id.'#docform', 'fa-upload');
+		if ($template && !empty($entry['generated'])) {
+			$actions[] = array('WerkbankDocsActionGenerateAgainShort', $self.'&action=generateform&rule='.$id.'#docform', 'fa-file-signature');
 		}
-		$more[] = array('urlraw' => $self.'&action=uploadform&rule='.$id.'#docform', 'label' => $langs->trans('WerkbankDocsUploadButton'), 'perm' => 1);
-		$more[] = array('urlraw' => $self.'&action=checkform&rule='.$id.'#docform', 'label' => $langs->trans('WerkbankDocsTickButton'), 'perm' => 1);
+		$actions[] = array('WerkbankDocsActionTickShort', $self.'&action=checkform&rule='.$id.'#docform', 'fa-check');
 		if (!$open) {
-			$more[] = array('urlraw' => $self.'&action=revokeform&rule='.$id.'#docform', 'label' => $langs->trans('WerkbankDocsRevoke'), 'perm' => 1);
+			$actions[] = array('WerkbankDocsActionRevokeShort', $self.'&action=revokeform&rule='.$id.'#docform', 'fa-undo');
 		}
 		if (!empty($rule->fk_soc)) {
-			$more[] = array('urlraw' => $self.'&action=removemanual&rule='.$id.'&token='.newToken(), 'label' => $langs->trans('WerkbankDocsManualRemove'), 'perm' => 1);
+			$actions[] = array('WerkbankDocsActionRemoveShort', $self.'&action=removemanual&rule='.$id.'&token='.newToken(), 'fa-trash');
 		}
-		print dolGetButtonAction('', $langs->trans('WerkbankDocsMoreActions'), 'default', $more, 'ittabdocs-more-'.$id);
+		// The first one is what to do next, unless the document is done.
+		print '<div class="ittabdocs-actions">';
+		foreach ($actions as $index => $act) {
+			$main = $index === 0 && $open;
+			print '<a class="'.($main ? 'butAction smallpaddingimp' : 'ittabdocs-action').'" href="'.dol_escape_htmltag($act[1]).'">'
+				.($main ? '' : '<span class="fa '.$act[2].' paddingright"></span>').$langs->trans($act[0]).'</a>';
+		}
+		print '</div>';
 	}
 	print '</td></tr>';
 }

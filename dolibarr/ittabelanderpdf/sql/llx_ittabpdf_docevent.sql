@@ -17,5 +17,6 @@ CREATE TABLE llx_ittabpdf_docevent(
   filename        varchar(255) NULL,
   note            text NULL,
   fk_user         integer NULL,
+  fk_actioncomm   integer NULL,
   tms             timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=innodb;
