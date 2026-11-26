@@ -65,39 +65,84 @@ class WerkbankSystemCheck
 	}
 
 	/**
+	 * Active users without admin rights that have an API key: who could be
+	 * the website's user.
+	 *
+	 * @return array<int,string> id => login
+	 */
+	public function apiUsers()
+	{
+		$resql = $this->db->query("SELECT rowid, login FROM ".MAIN_DB_PREFIX."user WHERE api_key IS NOT NULL AND api_key <> '' AND statut = 1 AND admin = 0"
+			." AND entity IN (0, ".((int) $GLOBALS['conf']->entity).") ORDER BY login");
+		$users = array();
+		while ($resql && ($row = $this->db->fetch_object($resql))) {
+			$users[(int) $row->rowid] = (string) $row->login;
+		}
+		return $users;
+	}
+
+	/**
+	 * The website's user: the one chosen (ITTABPDF_WEBSITE_USER), else the
+	 * only API user, else the only API user with the right for the customer
+	 * area's documents. 0 when it is not clear (a maintenance user with an
+	 * API key of its own, for example).
+	 *
+	 * @return int User id, 0 none or not clear
+	 */
+	public function websiteUser()
+	{
+		$users = $this->apiUsers();
+		$chosen = getDolGlobalInt('ITTABPDF_WEBSITE_USER');
+		if ($chosen > 0) {
+			return isset($users[$chosen]) ? $chosen : 0;
+		}
+		if (count($users) === 1) {
+			return (int) key($users);
+		}
+		$portal = array();
+		foreach (array_keys($users) as $id) {
+			$api = new User($this->db);
+			if ($api->fetch($id) > 0) {
+				$api->loadRights();
+				if ($api->hasRight('ittabelanderpdf', 'unterlagen', 'read')) {
+					$portal[] = $id;
+				}
+			}
+		}
+		return count($portal) === 1 ? $portal[0] : 0;
+	}
+
+	/**
 	 * @return array<int,array<string,string>>
 	 */
 	private function apiUser()
 	{
 		global $langs;
-		$items = array();
-		$resql = $this->db->query("SELECT rowid FROM ".MAIN_DB_PREFIX."user WHERE api_key IS NOT NULL AND api_key <> '' AND statut = 1 AND admin = 0"
-			." AND entity IN (0, ".((int) $GLOBALS['conf']->entity).")");
-		$ids = array();
-		while ($resql && ($row = $this->db->fetch_object($resql))) {
-			$ids[] = (int) $row->rowid;
-		}
-		if (!$ids) {
+		$users = $this->apiUsers();
+		if (!$users) {
 			return array($this->item('api', 'warn', $langs->trans('WerkbankCheckApiUser'), $langs->trans('WerkbankCheckApiUserNone'), DOL_URL_ROOT.'/user/list.php'));
 		}
-		foreach ($ids as $id) {
-			$api = new User($this->db);
-			$api->fetch($id);
-			$api->loadRights();
-			$missing = array();
-			foreach (self::API_RIGHTS as $right) {
-				if (!isModEnabled($right[0] === 'facture' ? 'invoice' : ($right[0] === 'propal' ? 'propal' : $right[0]))) {
-					continue;
-				}
-				if (!$api->hasRight($right[0], $right[1], $right[2])) {
-					$missing[] = $langs->trans($right[3]);
-				}
-			}
-			$items[] = $this->item('api-'.$id, $missing ? 'warn' : 'ok', $langs->trans('WerkbankCheckApiUserName', $api->login),
-				$missing ? $langs->trans('WerkbankCheckApiMissing', implode(', ', $missing)) : $langs->trans('WerkbankCheckApiOk'),
-				DOL_URL_ROOT.'/user/perms.php?id='.$id);
+		$id = $this->websiteUser();
+		if ($id <= 0) {
+			$chosen = getDolGlobalInt('ITTABPDF_WEBSITE_USER');
+			return array($this->item('api', 'warn', $langs->trans('WerkbankCheckApiUser'),
+				$langs->trans($chosen > 0 ? 'WerkbankCheckApiUserGone' : 'WerkbankCheckApiUserChoose', dol_escape_htmltag(implode(', ', $users))), '#websiteuser'));
 		}
-		return $items;
+		$api = new User($this->db);
+		$api->fetch($id);
+		$api->loadRights();
+		$missing = array();
+		foreach (self::API_RIGHTS as $right) {
+			if (!isModEnabled($right[0] === 'facture' ? 'invoice' : ($right[0] === 'propal' ? 'propal' : $right[0]))) {
+				continue;
+			}
+			if (!$api->hasRight($right[0], $right[1], $right[2])) {
+				$missing[] = $langs->transnoentitiesnoconv($right[3]);
+			}
+		}
+		return array($this->item('api', $missing ? 'warn' : 'ok', $langs->trans('WerkbankCheckApiUserName', $api->login),
+			$missing ? $langs->trans('WerkbankCheckApiMissing', implode(', ', $missing)) : $langs->trans('WerkbankCheckApiOk'),
+			DOL_URL_ROOT.'/user/perms.php?id='.$id));
 	}
 
 	/**
@@ -126,11 +171,22 @@ class WerkbankSystemCheck
 	{
 		global $langs;
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
-		$url = trim(getDolGlobalString('ITTABPDF_MAIL_LOGO_URL')) ?: dol_buildpath('/ittabelanderpdf/public/maillogo.php', 2);
+		require_once __DIR__.'/werkbankmaildata.class.php';
+		$own = trim(getDolGlobalString('ITTABPDF_MAIL_LOGO_URL'));
+		$url = $own ?: dol_buildpath('/ittabelanderpdf/public/maillogo.php', 2);
+		$link = '<a href="'.dol_escape_htmltag($url).'" target="_blank" rel="noopener">'.dol_escape_htmltag($url).'</a>';
+		// Here first: the module's own logo (public/maillogo.php serves exactly this file).
+		if ($own === '') {
+			$file = WerkbankMailData::logoFile();
+			if ($file === '' || strpos((string) file_get_contents($file, false, null, 0, 4), "\x89PNG") !== 0) {
+				return $this->item('logo', 'warn', $langs->trans('WerkbankCheckLogo'), $langs->trans('WerkbankCheckLogoNoFile'), DOL_URL_ROOT.'/admin/company.php');
+			}
+		}
+		// From outside: a server often does not reach its own public address
+		// (hairpin NAT), so a failed call from here is only a hint, no error.
 		$answer = getURLContent($url, 'GET', '', 1, array(), array('http', 'https'), 2, 5);
 		$ok = isset($answer['http_code']) && (int) $answer['http_code'] === 200 && strpos((string) ($answer['content'] ?? ''), "\x89PNG") === 0;
-		return $this->item('logo', $ok ? 'ok' : 'warn', $langs->trans('WerkbankCheckLogo'),
-			$langs->trans($ok ? 'WerkbankCheckLogoOk' : 'WerkbankCheckLogoFail', dol_escape_htmltag($url)), $url);
+		return $this->item('logo', 'ok', $langs->trans('WerkbankCheckLogo'), $langs->trans($ok ? 'WerkbankCheckLogoOk' : 'WerkbankCheckLogoHint', $link), $url);
 	}
 
 	/**

@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '2.0.0';
+		$this->version = '2.0.1';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -68,10 +68,10 @@ class modITTabelanderPDF extends DolibarrModules
 			'thirdparty:+ittabpdfqs:WerkbankQsTab:ittabelanderpdf@ittabelanderpdf:$user->hasRight("ittabelanderpdf", "qs", "run") && isModEnabled("ficheinter"):/ittabelanderpdf/qs.php?socid=__ID__',
 		);
 
-		// Start page: customers with required documents missing.
+		// Start page: what is open (documents, signatures, QS). The widget
+		// "Fehlende Unterlagen" of 1.x is gone (2.0.1, see init()).
 		$this->boxes = array(
-			0 => array('file' => 'box_ittabpdf_docs.php@ittabelanderpdf', 'note' => 'Fehlende Unterlagen', 'enabledbydefaulton' => 'Home'),
-			1 => array('file' => 'box_ittabpdf_open.php@ittabelanderpdf', 'note' => 'Offen', 'enabledbydefaulton' => 'Home'),
+			0 => array('file' => 'box_ittabpdf_open.php@ittabelanderpdf', 'note' => 'Offen', 'enabledbydefaulton' => 'Home'),
 		);
 
 		$this->dirs = array();
@@ -297,7 +297,13 @@ class modITTabelanderPDF extends DolibarrModules
 		if (WerkbankAgenda::ensureType($this->db) > 0) {
 			$agenda = new WerkbankAgenda($this->db);
 			$agenda->backfill();
+			// 2.0.1: titles of 2.0.0 with the date as MM/DD/YYYY.
+			$agenda->fixDates();
 		}
+		// 2.0.1: the widget "Fehlende Unterlagen" is replaced by "Offen": off every start page.
+		$old = "SELECT rowid FROM ".MAIN_DB_PREFIX."boxes_def WHERE file = 'box_ittabpdf_docs.php@ittabelanderpdf'";
+		$this->db->query("DELETE FROM ".MAIN_DB_PREFIX."boxes WHERE box_id IN (SELECT rowid FROM (".$old.") AS old)");
+		$this->db->query("DELETE FROM ".MAIN_DB_PREFIX."boxes_def WHERE file = 'box_ittabpdf_docs.php@ittabelanderpdf'");
 		// A template per customer never lies blank in the folder (1.8.0).
 		$store->removeBlanks($GLOBALS['user']);
 		// The shipped rules for company documents, only when there are none yet.

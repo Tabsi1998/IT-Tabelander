@@ -202,10 +202,11 @@ $check('reset opens it again', $state($firm, 'leistungsbeschreibung-betreuung-wa
 // 5. What shows on the cards and the start page.
 $missing = $docs->missing($firm);
 $check('missing list for the banner', in_array('Auftragsverarbeitung (AVV) unterschrieben', $missing, true) && in_array('Leistungsbeschreibung IT-Betreuung und Wartung übergeben', $missing, true), implode(', ', $missing));
-$names = array_map(function ($entry) {
-	return (int) $entry['soc']->id;
-}, $docs->customersMissing(50));
-$check('start page widget lists the customers', in_array($firmId, $names, true) && in_array($privateId, $names, true));
+$who = implode(' ', array_column(array_filter($docs->openItems(200), function ($item) {
+	return $item['kind'] === 'missing';
+}), 'who'));
+$check('start page widget "Offen" lists the customers by name', strpos($who, 'socid='.$firmId.'"') !== false && strpos($who, 'socid='.$privateId.'"') !== false
+	&& strpos($who, (string) $firm->name) !== false, $who);
 
 // 6. Activating a maintenance line without AVV: warn, or refuse.
 $maint = new Product($db);

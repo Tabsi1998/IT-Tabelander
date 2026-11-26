@@ -503,33 +503,6 @@ class WerkbankDocs
 		return $labels;
 	}
 
-	/**
-	 * Customers with required documents not done, for the start page.
-	 *
-	 * @param int $limit At most
-	 * @return array<int,array{soc:Societe,missing:string[]}>
-	 */
-	public function customersMissing($limit = 15)
-	{
-		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
-		$list = array();
-		$rows = $this->rows("SELECT rowid FROM ".MAIN_DB_PREFIX."societe WHERE client IN (1, 3) AND status = 1 AND entity IN (".getEntity('societe').") ORDER BY nom");
-		foreach ($rows as $row) {
-			$soc = new Societe($this->db);
-			if ($soc->fetch((int) $row->rowid) <= 0) {
-				continue;
-			}
-			$missing = $this->missing($soc);
-			if ($missing) {
-				$list[] = array('soc' => $soc, 'missing' => $missing);
-				if (count($list) >= $limit) {
-					break;
-				}
-			}
-		}
-		return $list;
-	}
-
 	// ------------------------------------------------------------ events
 
 	/**
@@ -652,24 +625,24 @@ class WerkbankDocs
 				$title = (string) $entry['title'];
 				if ($entry['state'] === 'sent' && $entry['sent'] && $this->db->jdate($entry['sent']->date_event) < $limit) {
 					$days = (int) floor((dol_now() - $this->db->jdate($entry['sent']->date_event)) / 86400);
-					$items[] = array('kind' => 'waiting', 'who' => $soc->getNomUrl(1), 'what' => $title, 'url' => $tab.((int) $soc->id).'#rule-'.((int) $entry['rule']->rowid),
+					$items[] = array('kind' => 'waiting', 'who' => $this->customerLink((int) $soc->id, (string) $soc->name, (string) $soc->code_client), 'what' => $title, 'url' => $tab.((int) $soc->id).'#rule-'.((int) $entry['rule']->rowid),
 						'since' => $langs->trans('WerkbankOpenDays', $days));
 				} elseif ($entry['state'] === 'signing' && $entry['signing']) {
-					$items[] = array('kind' => 'signing', 'who' => $soc->getNomUrl(1), 'what' => $title,
+					$items[] = array('kind' => 'signing', 'who' => $this->customerLink((int) $soc->id, (string) $soc->name, (string) $soc->code_client), 'what' => $title,
 						'url' => dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=doc&id='.((int) $entry['signing']->rowid),
 						'since' => dol_print_date($this->db->jdate($entry['signing']->date_event), 'day'));
 				} elseif ((int) $entry['rule']->required && in_array($entry['state'], array('missing', 'outdated', 'generated'), true)) {
-					$items[] = array('kind' => 'missing', 'who' => $soc->getNomUrl(1), 'what' => $title, 'url' => $tab.((int) $soc->id).'#rule-'.((int) $entry['rule']->rowid),
+					$items[] = array('kind' => 'missing', 'who' => $this->customerLink((int) $soc->id, (string) $soc->name, (string) $soc->code_client), 'what' => $title, 'url' => $tab.((int) $soc->id).'#rule-'.((int) $entry['rule']->rowid),
 						'since' => '');
 				}
 			}
 		}
 		// QS checklists still open.
 		if (isModEnabled('ficheinter')) {
-			foreach ($this->rows("SELECT r.rowid, r.type_label, r.date_creation, f.ref, f.fk_soc, s.nom FROM ".MAIN_DB_PREFIX."ittabpdf_qs_run AS r"
+			foreach ($this->rows("SELECT r.rowid, r.type_label, r.date_creation, f.ref, f.fk_soc, s.nom, s.code_client FROM ".MAIN_DB_PREFIX."ittabpdf_qs_run AS r"
 				." INNER JOIN ".MAIN_DB_PREFIX."fichinter AS f ON f.rowid = r.fk_fichinter LEFT JOIN ".MAIN_DB_PREFIX."societe AS s ON s.rowid = f.fk_soc"
 				." WHERE r.status = 0 AND f.entity IN (".getEntity('intervention').") ORDER BY r.date_creation") as $run) {
-				$items[] = array('kind' => 'qs', 'who' => dol_escape_htmltag((string) $run->nom), 'what' => $run->type_label.' · '.$run->ref,
+				$items[] = array('kind' => 'qs', 'who' => $this->customerLink((int) $run->fk_soc, (string) $run->nom, (string) $run->code_client), 'what' => $run->type_label.' · '.$run->ref,
 					'url' => dol_buildpath('/ittabelanderpdf/qs.php', 1).'?id='.((int) $run->rowid), 'since' => dol_print_date($this->db->jdate($run->date_creation), 'day'));
 			}
 		}
@@ -679,6 +652,23 @@ class WerkbankDocs
 			return $order[$a['kind']] <=> $order[$b['kind']];
 		});
 		return array_slice($items, 0, $max);
+	}
+
+	/**
+	 * A customer by name for the widget (getNomUrl() may lead with the
+	 * customer code, which says nothing in a narrow column); the code and
+	 * the name in full as tooltip.
+	 *
+	 * @param int    $id   Customer
+	 * @param string $name Name
+	 * @param string $code Customer code
+	 * @return string      HTML
+	 */
+	private function customerLink($id, $name, $code = '')
+	{
+		$tip = $code !== '' ? $code.' · '.$name : $name;
+		return '<a href="'.DOL_URL_ROOT.'/societe/card.php?socid='.((int) $id).'" title="'.dol_escape_htmltag($tip).'">'
+			.img_picto('', 'company', 'class="paddingright"').dol_escape_htmltag($name).'</a>';
 	}
 
 	/**

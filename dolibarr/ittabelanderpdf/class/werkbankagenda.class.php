@@ -59,17 +59,26 @@ class WerkbankAgenda
 	/**
 	 * The event type "Unterlage" in Dolibarr's dictionary, once.
 	 *
+	 * Without a module: CActionComm::liste_array() leaves out every type of
+	 * kind "systemauto" that names a module, and the timeline of the third
+	 * party (messaging.php, with AGENDA_USE_EVENT_TYPE) then shows the bare
+	 * code "AC_ITTAB_DOC". 2.0.0 wrote 'ittabelanderpdf' there; it is cleared.
+	 *
 	 * @param DoliDB $db Database
 	 * @return int       1 there, -1 error
 	 */
 	public static function ensureType($db)
 	{
-		$resql = $db->query("SELECT id FROM ".MAIN_DB_PREFIX."c_actioncomm WHERE code = '".self::TYPE."'");
-		if ($resql && $db->num_rows($resql) > 0) {
+		$resql = $db->query("SELECT id, module FROM ".MAIN_DB_PREFIX."c_actioncomm WHERE code = '".self::TYPE."'");
+		$row = $resql ? $db->fetch_object($resql) : null;
+		if ($row) {
+			if ((string) $row->module !== '') {
+				$db->query("UPDATE ".MAIN_DB_PREFIX."c_actioncomm SET module = NULL WHERE code = '".self::TYPE."'");
+			}
 			return 1;
 		}
 		return $db->query("INSERT INTO ".MAIN_DB_PREFIX."c_actioncomm (id, code, type, libelle, module, active, position)"
-			." VALUES (".self::TYPE_ID.", '".self::TYPE."', 'systemauto', 'Unterlage', 'ittabelanderpdf', 1, 60)") ? 1 : -1;
+			." VALUES (".self::TYPE_ID.", '".self::TYPE."', 'systemauto', 'Unterlage', NULL, 1, 60)") ? 1 : -1;
 	}
 
 	/**
@@ -95,7 +104,8 @@ class WerkbankAgenda
 		$docs = new WerkbankDocs($this->db);
 		$documents = $docs->documents();
 		$title = isset($documents[$event->slug]) ? $documents[$event->slug]['title'] : $event->slug;
-		$stand = (string) $event->version !== '' ? ' ('.$langs->transnoentities('WerkbankDocsStand', dol_print_date(dol_stringtotime($event->version.' 00:00:00'), 'day')).')' : '';
+		// The date always as TT.MM.JJJJ: the REST API and the cron job may run with another language.
+		$stand = (string) $event->version !== '' ? ' ('.$langs->transnoentities('WerkbankDocsStand', dol_print_date(dol_stringtotime($event->version.' 00:00:00'), '%d.%m.%Y')).')' : '';
 		$label = $langs->transnoentities(self::STATES[$event->state]).': '.$title.$stand;
 		// The object it belongs to; a document generated for a contract counts for the contract.
 		list($element, $objectId) = $this->objectOf($docs, $event);
@@ -204,6 +214,32 @@ class WerkbankAgenda
 			$ticket = new Ticket($this->db);
 			if ($ticket->fetch((int) $row->fk_object) > 0) {
 				$count += $this->logIntake($ticket, $this->db->jdate($row->last_sign), $this->userOf((int) $row->fk_user)) > 0 ? 1 : 0;
+			}
+		}
+		return $count;
+	}
+
+	/**
+	 * Titles of 2.0.0 written with the date as MM/DD/YYYY ("Stand 11/26/2026",
+	 * "As of 11/26/2026") get TT.MM.JJJJ (on activation, idempotent).
+	 *
+	 * @return int Events corrected, -1 error
+	 */
+	public function fixDates()
+	{
+		$resql = $this->db->query("SELECT id, label FROM ".MAIN_DB_PREFIX."actioncomm WHERE code LIKE 'AC_ITTAB_DOC_%' AND label LIKE '%/%/%'");
+		if (!$resql) {
+			return -1;
+		}
+		$rows = array();
+		while ($row = $this->db->fetch_object($resql)) {
+			$rows[] = $row;
+		}
+		$count = 0;
+		foreach ($rows as $row) {
+			$label = preg_replace('#\(((?:Stand|As of) )(\d{2})/(\d{2})/(\d{4})\)#', '(${1}${3}.${2}.${4})', (string) $row->label);
+			if ($label !== null && $label !== $row->label) {
+				$count += $this->db->query("UPDATE ".MAIN_DB_PREFIX."actioncomm SET label = '".$this->db->escape($label)."' WHERE id = ".((int) $row->id)) ? 1 : 0;
 			}
 		}
 		return $count;

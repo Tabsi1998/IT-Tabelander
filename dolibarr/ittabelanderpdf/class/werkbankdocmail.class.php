@@ -11,6 +11,7 @@
 
 require_once __DIR__.'/werkbankdocs.class.php';
 require_once __DIR__.'/werkbanksignature.class.php';
+require_once __DIR__.'/werkbankmaildata.class.php';
 
 /**
  * The text of an e-mail with company documents ("Unterlagen zusenden"):
@@ -78,14 +79,19 @@ class WerkbankDocMail
 	 */
 	public static function substitutions($db, $socid, array $paths)
 	{
-		return self::fromItems(self::items($db, $socid, $paths));
+		return self::fromItems(self::items($db, $socid, $paths), WerkbankMailData::portalOpenFor($db, $socid));
 	}
 
 	/**
-	 * @param array<int,array<string,mixed>> $items From items()
+	 * With the customer area (portalOpenFor()) the customer is asked to
+	 * confirm or sign there first, with a button below the list; a reply,
+	 * a scan or the signature on the device stay the other ways.
+	 *
+	 * @param array<int,array<string,mixed>> $items  From items()
+	 * @param bool                           $portal The customer can do it in the customer area
 	 * @return array<string,string>
 	 */
-	public static function fromItems(array $items)
+	public static function fromItems(array $items, $portal = false)
 	{
 		global $mysoc, $langs;
 		require_once __DIR__.'/werkbankmailtemplates.class.php';
@@ -107,16 +113,25 @@ class WerkbankDocMail
 			} else {
 				$intro = $du ? 'anbei bekommst du folgende Unterlagen als PDF:' : 'anbei erhalten Sie folgende Unterlagen als PDF:';
 			}
-			$todo = array(
-				'accept' => $du ? 'bitte lies sie durch und bestätige sie kurz mit einer Antwort auf diese Mail.' : 'bitte lesen Sie sie durch und bestätigen Sie sie kurz mit einer Antwort auf diese E-Mail.',
-				'sign' => $du ? 'bitte unterschreib sie und schick sie zurück (Scan oder Foto genügt) oder unterschreib bei mir am Handy.'
-					: 'bitte unterschreiben Sie sie und schicken Sie sie zurück (Scan oder Foto genügt) oder unterschreiben Sie bei mir am Handy.',
-				'handover' => $du ? 'zu deiner Information.' : 'zu Ihrer Information.',
-			);
+			if ($portal) {
+				$todo = array(
+					'accept' => $du ? 'bitte lies sie durch und bestätige sie mit einem Klick im Kundenbereich (Knopf unten) oder kurz mit einer Antwort auf diese Mail.'
+						: 'bitte lesen Sie sie durch und bestätigen Sie sie mit einem Klick im Kundenbereich (Knopf unten) oder kurz mit einer Antwort auf diese E-Mail.',
+					'sign' => $du ? 'bitte unterschreib sie direkt im Kundenbereich am Bildschirm (Knopf unten) oder schick sie unterschrieben zurück (Scan oder Foto genügt).'
+						: 'bitte unterschreiben Sie sie direkt im Kundenbereich am Bildschirm (Knopf unten) oder schicken Sie sie unterschrieben zurück (Scan oder Foto genügt).',
+				);
+			} else {
+				$todo = array(
+					'accept' => $du ? 'bitte lies sie durch und bestätige sie kurz mit einer Antwort auf diese Mail.' : 'bitte lesen Sie sie durch und bestätigen Sie sie kurz mit einer Antwort auf diese E-Mail.',
+					'sign' => $du ? 'bitte unterschreib sie und schick sie zurück (Scan oder Foto genügt) oder unterschreib bei mir am Handy.'
+						: 'bitte unterschreiben Sie sie und schicken Sie sie zurück (Scan oder Foto genügt) oder unterschreiben Sie bei mir am Handy.',
+				);
+			}
+			$todo['handover'] = $du ? 'zu deiner Information.' : 'zu Ihrer Information.';
 			$list = '';
 			$asks = false;
 			foreach ($items as $item) {
-				$stand = $item['stand'] !== '' ? ' (Stand '.dol_print_date(dol_stringtotime($item['stand'].' 00:00:00'), 'day', 'tzuser', $langs).')' : '';
+				$stand = $item['stand'] !== '' ? ' (Stand '.dol_print_date(dol_stringtotime($item['stand'].' 00:00:00'), '%d.%m.%Y', 'tzuser', $langs).')' : '';
 				$made = $item['generated'] ? ($du ? ', für dich ausgefüllt' : ', für Sie ausgefüllt') : '';
 				$list .= '<li style="margin:0 0 8px 0;">'.WerkbankMailTemplates::text('<strong>'.dol_escape_htmltag($item['title'], 0, 0, '', 1).'</strong>'
 					.dol_escape_htmltag($stand.$made, 0, 0, '', 1).': '.dol_escape_htmltag($todo[$item['action']] ?? $todo['handover'], 0, 0, '', 1)).'</li>';
@@ -125,6 +140,10 @@ class WerkbankDocMail
 			$values['__ITTAB_UNTERLAGEN_BETREFF'.$suffix.'__'] = $subject;
 			$values['__ITTAB_UNTERLAGEN_EINLEITUNG'.$suffix.'__'] = '<p style="'.$p.'">'.WerkbankMailTemplates::text(dol_escape_htmltag($intro, 0, 0, '', 1)).'</p>';
 			$values['__ITTAB_UNTERLAGEN_LISTE'.$suffix.'__'] = $list !== '' ? '<ul style="margin:0 0 16px 0;padding:0 0 0 22px;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;">'.$list.'</ul>' : '';
+			// The easy way first: the documents page of the customer area (the website asks to sign in and comes back).
+			if ($portal && $asks) {
+				$values['__ITTAB_UNTERLAGEN_LISTE'.$suffix.'__'] .= WerkbankMailTemplates::button(WerkbankMailData::portalUrl(null).'/unterlagen', 'Im Kundenbereich erledigen');
+			}
 			$values['__ITTAB_UNTERLAGEN_SCHLUSS'.$suffix.'__'] = $asks
 				? '<p style="'.$p.'">'.WerkbankMailTemplates::text($du ? 'Danke, dass du dir kurz Zeit dafür nimmst.' : 'Vielen Dank, dass Sie sich kurz Zeit dafür nehmen.').'</p>' : '';
 		}

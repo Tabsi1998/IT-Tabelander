@@ -279,6 +279,30 @@ class WerkbankMailData
 	}
 
 	/**
+	 * The customer can confirm and sign documents in the website's customer
+	 * area: the customer area is switched on (ITTABPDF_PORTAL_ENABLED) and
+	 * the website lets this third party in (active customer or prospect, not
+	 * "Kundenbereich gesperrt"; the same rule as the website's portal.py).
+	 *
+	 * @param DoliDB $db    Database
+	 * @param int    $socid Third party
+	 * @return bool
+	 */
+	public static function portalOpenFor($db, $socid)
+	{
+		if (!getDolGlobalInt('ITTABPDF_PORTAL_ENABLED') || $socid <= 0) {
+			return false;
+		}
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		$soc = new Societe($db);
+		if ($soc->fetch($socid) <= 0 || (int) $soc->status !== 1 || !in_array((int) $soc->client, array(1, 2, 3), true)) {
+			return false;
+		}
+		$blocked = isset($soc->array_options['options_kundenbereich_gesperrt']) ? strtolower(trim((string) $soc->array_options['options_kundenbereich_gesperrt'])) : '';
+		return !in_array($blocked, array('1', 'true', 'yes', 'ja', 'on'), true);
+	}
+
+	/**
 	 * Where the customer finds the document in the website's customer area.
 	 *
 	 * @param CommonObject $object Document

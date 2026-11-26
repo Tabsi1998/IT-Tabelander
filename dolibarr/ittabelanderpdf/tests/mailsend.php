@@ -105,6 +105,25 @@ $check('several documents: plural subject and opening (Du)', $several['__ITTAB_U
 $check('the generated one says it is filled in and asks to sign', strpos($several['__ITTAB_UNTERLAGEN_LISTE_DU__'], 'für dich ausgefüllt') !== false
 	&& strpos($several['__ITTAB_UNTERLAGEN_LISTE_DU__'], 'unterschreib') !== false, strip_tags($several['__ITTAB_UNTERLAGEN_LISTE_DU__']));
 $check('the text passes the WAF', !preg_match('/<style|<svg|=\s*["\']?data:|\son[a-z]+\s*=/i', implode('', $several)));
+// Without the customer area: answer or scan as in 2.0.0. With it (2.0.1): confirm or sign there first, with the button.
+$portalBefore = getDolGlobalString('ITTABPDF_PORTAL_ENABLED', '0');
+rt_const($db, 'ITTABPDF_PORTAL_ENABLED', '0');
+$without = WerkbankDocMail::substitutions($db, $firmId, $paths)['__ITTAB_UNTERLAGEN_LISTE__'];
+$check('without the customer area: answer or scan, no button', strpos($without, 'Kundenbereich') === false && strpos($without, 'Antwort auf diese E-Mail') !== false, strip_tags($without));
+rt_const($db, 'ITTABPDF_PORTAL_ENABLED', '1');
+$one = WerkbankDocMail::substitutions($db, $firmId, $paths);
+$list = $one['__ITTAB_UNTERLAGEN_LISTE__'];
+$check('customer area: confirm there first, then by answer, with the button to the documents page', strpos($list, 'im Kundenbereich') !== false
+	&& strpos($list, 'im Kundenbereich') < strpos($list, 'Antwort auf diese E-Mail') && strpos($list, '/kundenbereich/unterlagen"') !== false
+	&& strpos($list, 'Im Kundenbereich erledigen') !== false, strip_tags($list));
+$several = WerkbankDocMail::substitutions($db, $privateId, array($paths[0], WerkbankSignature::thirdpartyDir($privateId).'/'.$generated->filename));
+$list = $several['__ITTAB_UNTERLAGEN_LISTE_DU__'];
+$check('customer area: sign there first, scan as the other way (Du)', strpos($list, 'unterschreib sie direkt im Kundenbereich') !== false
+	&& strpos($list, 'Scan oder Foto') > strpos($list, 'im Kundenbereich'), strip_tags($list));
+$check('customer area: the button is text in a span (kept by the editor) and passes the WAF', preg_match('#<a href="[^"]+/kundenbereich/unterlagen"[^>]*><span[^>]*>#', $list) === 1
+	&& !preg_match('/<style|<svg|=\s*["\']?data:|\son[a-z]+\s*=/i', implode('', $several)));
+$check('only for a customer the website lets in', !WerkbankMailData::portalOpenFor($db, 0) && WerkbankMailData::portalOpenFor($db, $firmId));
+rt_const($db, 'ITTABPDF_PORTAL_ENABLED', $portalBefore);
 
 // A template with a required field and no values yet for the company: the mail form asks to fill in first.
 $must = $store->bySlug('gen-test-pflicht');

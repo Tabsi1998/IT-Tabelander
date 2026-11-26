@@ -891,7 +891,7 @@ def docs() -> None:
     status, html, _ = get(f"/contrat/card.php?id={result['contract']}")
     check("contract card shows it too", status == 200 and "ittabpdf-docs-missing" in html)
     status, html, _ = get("/index.php?mainmenu=home")
-    check("start page widget", status == 200 and "Fehlende Unterlagen" in html)
+    check("start page widget Offen, the old one is gone", status == 200 and "Offen (" in html and "Fehlende Unterlagen (" not in html)
     status, html, _ = get(f"{base}/admin/docrules.php")
     check("rules page lists the rules", status == 200 and "auftragsverarbeitung" in html and "products_" in html)
     status, html, _ = post(f"{base}/admin/docrules.php", [("token", token(html)), ("action", "save_rules"), ("label_new", "Datenblatt erhalten"),
@@ -1234,6 +1234,11 @@ def agenda() -> None:
     check("third party agenda shows the document events", "Unterlage hinzugefügt" in html and "Unterlage abgehakt" in html)
     html = get(f"/contrat/agenda.php?id={result['contract']}")
     check("contract agenda shows the event of its document", "Unterlage abgehakt" in html)
+    html = get(f"/societe/messaging.php?socid={result['firm']}")
+    titles = [re.sub(r"<[^>]+>", "", title).strip() for title in re.findall(r'class="messaging-title[^"]*">(.*?)</div>', html, re.S)]
+    ours = [title for title in titles if "Unterlage " in title]
+    check("timeline of the third party: the type by name, not the code AC_ITTAB_DOC", bool(ours) and not any("AC_ITTAB" in title for title in titles)
+          and all(title.startswith("Unterlage - ") for title in ours), "; ".join(ours[:3]))
     html = get(f"/societe/card.php?socid={result['firm']}")
     tab = re.search(r'id="ittabpdfdocs"[^>]*>(.*?)</a>', html, re.S) or re.search(r'Unterlagen<span class="badge[^"]*">(\d+)</span>', html)
     check("the tab Unterlagen carries the number of open documents", bool(tab), html[html.find("ittabpdfdocs") - 200:html.find("ittabpdfdocs") + 300] if "ittabpdfdocs" in html else "")

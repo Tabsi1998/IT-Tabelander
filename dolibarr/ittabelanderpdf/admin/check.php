@@ -38,6 +38,16 @@ if (!$user->admin) {
 }
 
 $check = new WerkbankSystemCheck($db);
+// Which API user is the website's (ITTABPDF_WEBSITE_USER; 0 = found by itself).
+if (GETPOST('action', 'aZ09') === 'websiteuser') {
+	$chosen = GETPOSTINT('ITTABPDF_WEBSITE_USER');
+	if ($chosen === 0 || isset($check->apiUsers()[$chosen])) {
+		dolibarr_set_const($db, 'ITTABPDF_WEBSITE_USER', (string) $chosen, 'chaine', 0, '', $conf->entity);
+		setEventMessages($langs->trans('SetupSaved'), null);
+	}
+	header('Location: '.$_SERVER['PHP_SELF']);
+	exit;
+}
 $items = $check->run();
 $counts = array_count_values(array_column($items, 'state'));
 
@@ -63,6 +73,19 @@ foreach ($items as $item) {
 	print '<td class="right nowraponall">'.($item['link'] !== '' ? '<a href="'.dol_escape_htmltag($item['link']).'">'.img_picto('', 'fa-external-link-alt', 'class="paddingright"').$langs->trans($item['state'] === 'ok' ? 'WerkbankHelpGo' : 'WerkbankCheckGo').'</a>' : '').'</td></tr>';
 }
 print '</table></div>';
+
+// The website's user: chosen here when it is not clear by itself.
+$apiUsers = $check->apiUsers();
+if ($apiUsers) {
+	print '<br><form method="POST" action="'.$_SERVER['PHP_SELF'].'" id="websiteuser">';
+	print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="websiteuser">';
+	print '<table class="noborder centpercent"><tr class="liste_titre"><td colspan="2">'.$langs->trans('WerkbankCheckApiUser').'</td></tr>';
+	print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('WerkbankCheckWebsiteUser').'</td><td>';
+	$options = array(0 => $langs->trans('WerkbankCheckWebsiteUserAuto')) + $apiUsers;
+	print Form::selectarray('ITTABPDF_WEBSITE_USER', $options, getDolGlobalInt('ITTABPDF_WEBSITE_USER'), 0, 0, 0, '', 0, 0, 0, '', 'minwidth200');
+	print ' <input type="submit" class="button small" value="'.dol_escape_htmltag($langs->trans('Save')).'">';
+	print '<br><span class="opacitymedium small">'.$langs->trans('WerkbankCheckWebsiteUserHelp').'</span></td></tr></table></form>';
+}
 
 print dol_get_fiche_end();
 llxFooter();

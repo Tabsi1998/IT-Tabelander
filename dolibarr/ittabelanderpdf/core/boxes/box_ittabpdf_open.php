@@ -48,13 +48,15 @@ class box_ittabpdf_open extends ModeleBoxes
 		$items = $docs->openItems($max);
 		$this->info_box_head = array('text' => $langs->trans('WerkbankOpenBoxTitle', count($items)));
 		$badges = array('missing' => 'status8', 'waiting' => 'status1', 'signing' => 'status3', 'qs' => 'status4');
+		// Three columns that fit half a column of the start page and a phone:
+		// kind, then customer above the document (each cut with a tooltip),
+		// the days on the right. Nothing scrolls sideways.
 		foreach ($items as $line => $item) {
-			$this->info_box_contents[$line][] = array('td' => 'class="nowraponall"', 'text' => '<span class="badge badge-'.$badges[$item['kind']].'">'
+			$this->info_box_contents[$line][] = array('td' => 'class="nowraponall" style="width:1%"', 'text' => '<span class="badge badge-'.$badges[$item['kind']].'">'
 				.$langs->trans('WerkbankOpenKind_'.$item['kind']).'</span>', 'asis' => 1);
-			$this->info_box_contents[$line][] = array('td' => 'class="tdoverflowmax150"', 'text' => $item['who'], 'asis' => 1);
-			$this->info_box_contents[$line][] = array('td' => 'class="tdoverflowmax300"', 'text' => '<a href="'.$item['url'].'" title="'.dol_escape_htmltag($item['what']).'">'
-				.dol_escape_htmltag($item['what']).'</a>', 'asis' => 1);
-			$this->info_box_contents[$line][] = array('td' => 'class="right nowraponall opacitymedium"', 'text' => dol_escape_htmltag($item['since']), 'asis' => 1);
+			$this->info_box_contents[$line][] = array('td' => 'style="max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"',
+				'text' => $item['who'].'<br><a href="'.$item['url'].'" class="small" title="'.dol_escape_htmltag($item['what']).'">'.dol_escape_htmltag($item['what']).'</a>', 'asis' => 1);
+			$this->info_box_contents[$line][] = array('td' => 'class="right nowraponall opacitymedium small" style="width:1%"', 'text' => dol_escape_htmltag($item['since']), 'asis' => 1);
 		}
 		if (!$items) {
 			$this->info_box_contents[0][] = array('td' => 'class="center"', 'text' => '<span class="opacitymedium">'.$langs->trans('WerkbankOpenBoxNone').'</span>', 'asis' => 1);
