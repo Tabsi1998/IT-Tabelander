@@ -68,7 +68,6 @@ if ($action === 'save_unterlagen') {
 	$error += dolibarr_set_const($db, 'ITTABPDF_UNTERLAGEN_CATEGORIES', $ids ? implode(',', $ids) : '0', 'chaine', 0, '', $conf->entity) > 0 ? 0 : 1;
 	$dir = trim(str_replace('\\', '/', GETPOST('ITTABPDF_UNTERLAGEN_DIR', 'alphanohtml')), '/');
 	$error += dolibarr_set_const($db, 'ITTABPDF_UNTERLAGEN_DIR', $dir !== '' ? $dir : WerkbankUnterlagen::DEFAULT_DIR, 'chaine', 0, '', $conf->entity) > 0 ? 0 : 1;
-	$error += dolibarr_set_const($db, 'ITTABPDF_UNTERLAGEN_AUTO', GETPOST('ITTABPDF_UNTERLAGEN_AUTO') ? '1' : '0', 'chaine', 0, '', $conf->entity) > 0 ? 0 : 1;
 	$names = array();
 	foreach (array_keys(WerkbankUnterlagen::MAIL_CONTEXTS) as $context) {
 		foreach (array('B2B', 'B2C') as $kind) {
@@ -87,24 +86,29 @@ if ($action === 'save_unterlagen') {
 	exit;
 }
 if ($action === 'regenerate_unterlagen') {
-	require_once DOL_DOCUMENT_ROOT.'/knowledgemanagement/class/knowledgerecord.class.php';
+	dol_include_once('/ittabelanderpdf/class/werkbankdoc.class.php');
+	$store = new WerkbankDoc($db);
 	$done = 0;
 	$failed = array();
-	foreach ($unterlagen->articles() as $article) {
-		if ($article['status'] !== 1) {
+	foreach ($store->all(array('released' => 1)) as $doc) {
+		if ($doc->kind === 'customer') {
 			continue;
 		}
-		$record = new KnowledgeRecord($db);
-		if ($record->fetch($article['id']) > 0) {
-			$record->fetch_optionals();
-			if ($unterlagen->generate($record, $user) !== '') {
-				$done++;
-			} else {
-				$failed[] = $article['ref'].': '.$unterlagen->error;
-			}
+		if ($store->writePdf($doc, $user) !== '') {
+			$done++;
+		} else {
+			$failed[] = $doc->slug.': '.$store->error;
 		}
 	}
 	setEventMessages($langs->trans('WerkbankDocsRegenerated', $done), $failed, $failed ? 'warnings' : 'mesgs');
+	header('Location: '.$_SERVER['PHP_SELF'].'#unterlagen');
+	exit;
+}
+if ($action === 'takeover_unterlagen') {
+	dol_include_once('/ittabelanderpdf/class/werkbankdoc.class.php');
+	$store = new WerkbankDoc($db);
+	$taken = $store->importKnowledge($user);
+	setEventMessages($taken < 0 ? $langs->trans('WerkbankDocTakeoverFailed', $store->error) : $langs->trans('WerkbankDocTakenOver', $taken), null, $taken < 0 ? 'errors' : 'mesgs');
 	header('Location: '.$_SERVER['PHP_SELF'].'#unterlagen');
 	exit;
 }
@@ -233,15 +237,15 @@ print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?action=update_templat
 
 // ------------------------------------------------------------ company documents
 print '<br><br><a id="unterlagen"></a>'.load_fiche_titre($langs->trans('WerkbankDocsTitle'), '', 'pdf');
-if (!isModEnabled('knowledgemanagement')) {
-	print '<div class="warning">'.$langs->trans('WerkbankDocsNeedsKnowledge').'</div>';
-} else {
+{
 	$files = $unterlagen->files();
-	// Names of articles not written yet can be chosen too.
+	// Names of documents released later can be chosen too.
 	$choosable = $files;
-	foreach ($unterlagen->articles() as $article) {
-		if (!isset($choosable[$article['slug'].'.pdf'])) {
-			$choosable[$article['slug'].'.pdf'] = $article['title'];
+	dol_include_once('/ittabelanderpdf/class/werkbankdoc.class.php');
+	$store = new WerkbankDoc($db);
+	foreach ($store->all() as $doc) {
+		if ($doc->kind !== 'customer' && !isset($choosable[$doc->slug.'.pdf'])) {
+			$choosable[$doc->slug.'.pdf'] = $doc->title;
 		}
 	}
 	$form = new Form($db);
@@ -250,11 +254,10 @@ if (!isModEnabled('knowledgemanagement')) {
 	print '<input type="hidden" name="action" value="save_unterlagen">';
 	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
 	print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankDocsSource').'</td><td>'.$langs->trans('Value').'</td></tr>';
-	print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('WerkbankDocsCategories').'</td><td>';
+	print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('WerkbankDocsCategories').(isModEnabled('knowledgemanagement') ? '' : ' '.img_warning($langs->trans('WerkbankDocsNeedsKnowledge'))).'</td><td>';
 	print $form->multiselectarray('ITTABPDF_UNTERLAGEN_CATEGORIES', $unterlagen->categories(), $unterlagen->categoryIds(), 0, 0, 'minwidth300', 0, 0, '', '', '');
 	print '<div class="opacitymedium">'.$langs->trans('WerkbankDocsCategoriesHelp', implode(', ', WerkbankUnterlagen::DEFAULT_CATEGORIES)).'</div></td></tr>';
 	print '<tr class="oddeven"><td>'.$langs->trans('WerkbankDocsDir').'</td><td>documents/ecm/ <input type="text" name="ITTABPDF_UNTERLAGEN_DIR" class="minwidth300" value="'.dol_escape_htmltag(WerkbankUnterlagen::relativeDir()).'"></td></tr>';
-	print '<tr class="oddeven"><td>'.$langs->trans('WerkbankDocsAuto').'</td><td><input type="checkbox" name="ITTABPDF_UNTERLAGEN_AUTO" value="1"'.(getDolGlobalInt('ITTABPDF_UNTERLAGEN_AUTO', 1) ? ' checked' : '').'> '.$langs->trans('WerkbankDocsAutoHelp').'</td></tr>';
 
 	print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankDocsDefaults').'</td><td>'.$langs->trans('WerkbankDocsDefaultsHelp').'</td></tr>';
 	foreach (WerkbankUnterlagen::MAIL_CONTEXTS as $context => $label) {
@@ -294,26 +297,16 @@ if (!isModEnabled('knowledgemanagement')) {
 	print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans('Save').'"></div>';
 	print '</form><br>';
 
-	// What is there: every article of the chosen categories with its file.
-	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
-	print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankDocsArticle').'</td><td>'.$langs->trans('WerkbankDocsFile').'</td><td class="center">'.$langs->trans('Status').'</td><td class="right">'.$langs->trans('WerkbankDocsWrittenAt').'</td></tr>';
-	$articles = $unterlagen->articles();
-	if (!$articles) {
-		print '<tr class="oddeven"><td colspan="4"><span class="opacitymedium">'.$langs->trans('WerkbankDocsNone').'</span></td></tr>';
-	}
-	foreach ($articles as $article) {
-		$name = $article['slug'].'.pdf';
-		$path = WerkbankUnterlagen::dir().'/'.$name;
-		$relative = WerkbankUnterlagen::relativeDir().'/'.$name;
-		print '<tr class="oddeven"><td><a href="'.DOL_URL_ROOT.'/knowledgemanagement/knowledgerecord_card.php?id='.$article['id'].'">'.dol_escape_htmltag($article['ref']).'</a> '.dol_escape_htmltag($article['title']).'</td>';
-		print '<td>'.(is_file($path) ? '<a href="'.DOL_URL_ROOT.'/document.php?modulepart=ecm&amp;file='.urlencode($relative).'">'.img_picto('', 'pdf', 'class="pictofixedwidth"').dol_escape_htmltag($name).'</a>' : '<span class="opacitymedium">'.dol_escape_htmltag($name).'</span>').'</td>';
-		print '<td class="center">'.dol_escape_htmltag($langs->trans($article['status'] === 1 ? 'Validated' : ($article['status'] === 9 ? 'Obsolete' : 'Draft'))).'</td>';
-		print '<td class="right">'.(is_file($path) ? dol_print_date(dol_filemtime($path), 'dayhour', 'tzuser') : '').'</td></tr>';
-	}
-	print '</table></div>';
-	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'#unterlagen" class="center">';
+	// The documents themselves are kept under "Unterlagen"; here only writing all PDFs again and the takeover.
+	print '<p><a class="butAction" href="'.dol_buildpath('/ittabelanderpdf/unterlagen_list.php', 1).'">'.$langs->trans('WerkbankDocListTitle').'</a></p>';
+	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'#unterlagen" class="inline-block">';
 	print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="regenerate_unterlagen">';
-	print '<input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankDocsRegenerate')).'"></form>';
+	print '<input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankDocsRegenerate')).'"></form> ';
+	if (isModEnabled('knowledgemanagement')) {
+		print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'#unterlagen" class="inline-block">';
+		print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="takeover_unterlagen">';
+		print '<input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankDocTakeover')).'"></form>';
+	}
 	print '<div class="opacitymedium">'.$langs->trans('WerkbankDocsSetupHelp').'</div>';
 }
 

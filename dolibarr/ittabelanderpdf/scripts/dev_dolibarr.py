@@ -425,7 +425,7 @@ def unterlagen() -> None:
     (checked in Mailpit); the ticket message gets them from the box above it;
     every form passes Dolibarr's WAF. Example PDFs go to beispiele/.
     """
-    php("enable", script="unterlagen.php")
+    apikey = php("enable", script="unterlagen.php")["apikey"]
     result = php("run", script="unterlagen.php")
     checks = [dict(entry, page="php") for entry in result["checks"]]
     EXAMPLES.mkdir(parents=True, exist_ok=True)
@@ -449,15 +449,53 @@ def unterlagen() -> None:
     def check(name: str, ok: bool, detail: str = "") -> None:
         checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
 
-    # Article card: box with the file, button, and the file itself.
-    card = f"/knowledgemanagement/knowledgerecord_card.php?id={result['article']}"
-    html = get(card)
-    check("article card shows the PDF", "ittabpdf-unterlage" in html and "nutzungsbedingungen.pdf" in html)
-    button = re.search(r'href="([^"]*action=ittabpdf_unterlage_pdf[^"]*)"', html)
-    check("article card has PDF erzeugen", bool(button))
-    if button:
-        html = get(unescape(button.group(1)).replace(URL, ""))
-        check("PDF erzeugen saves it again", "Unterlagen/nutzungsbedingungen.pdf" in html and "</html>" in html)
+    # The knowledge article that was taken over points to the module.
+    html = get(f"/knowledgemanagement/knowledgerecord_card.php?id={result['article']}")
+    check("taken-over article points to the document in the module", "ittabpdf-unterlage" in html and "unterlage_card.php?id=" in html)
+
+    # List and card: create, release with a note, preview, versions.
+    base = "/custom/ittabelanderpdf"
+    html = get(f"{base}/unterlagen_list.php")
+    check("list shows the documents with version and state", "Nutzungsbedingungen" in html and "datenschutz.pdf" in html and "v3" in html)
+    html = get(f"{base}/unterlage_card.php?action=create")
+    token = re.search(r'name="token" value="([^"]+)"', html).group(1)
+    status, html = post(f"{base}/unterlage_card.php", [("token", token), ("action", "add"), ("title", "Preisaushang Werkstatt"), ("slug", ""),
+                                                      ("kind", "internal"), ("text", "<h2>Preise</h2><p>Diagnose 29 €.</p><ul><li>Express</li></ul>"), ("position", "5")])
+    check("new document from the card (WAF passes)", status == 200 and "Preisaushang Werkstatt" in html and "preisaushang-werkstatt" in html, str(status))
+    found = re.search(r"[?&]id=(\d+)&(?:amp;)?action=preview", html)
+    if found:
+        doc_id = found.group(1)
+        page = get(f"{base}/unterlage_card.php?id={doc_id}")
+        token = re.search(r'name="token" value="([^"]+)"', page).group(1)
+        page = get(f"{base}/unterlage_card.php?id={doc_id}&action=askrelease&token={token}")
+        token = re.search(r'name="token" value="([^"]+)"', page).group(1)
+        html = get(f"{base}/unterlage_card.php?id={doc_id}&action=confirm_release&confirm=yes&note=Erste%20Fassung&token={token}")
+        check("release from the card writes version 1 and the PDF", "v1" in html and "Erste Fassung" in html)
+        token = re.search(r'name="token" value="([^"]+)"', html).group(1)
+        with opener.open(f"{URL}{base}/unterlage_card.php?id={doc_id}&action=preview&token={token}", timeout=60) as answer:
+            check("preview of the draft is a PDF", answer.read(4) == b"%PDF")
+    else:
+        check("release from the card writes version 1 and the PDF", False, "no document id")
+
+    # The module's REST API for the website: public legal texts, HTML and PDF.
+    def api(path: str) -> tuple:
+        request = urllib.request.Request(f"{URL}/api/index.php/ittabelanderpdf/{path}", headers={"DOLAPIKEY": apikey, "Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(request, timeout=60) as answer:
+                return answer.status, json.loads(answer.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            return error.code, {}
+    status, listed = api("unterlagen")
+    slugs = sorted(entry.get("slug") for entry in listed) if isinstance(listed, list) else []
+    check("API lists the public legal texts only", status == 200 and "datenschutz" in slugs and "nutzungsbedingungen" in slugs
+          and "checkliste-uebergabe" not in slugs and "avv-vorlage" not in slugs, f"{status} {slugs}")
+    status, one = api("unterlagen/datenschutz")
+    check("API gives the HTML of the released version", status == 200 and "IT-Tabelander" in one.get("html", "") and one.get("version") == 1, str(status))
+    status, pdf = api("unterlagen/datenschutz/pdf")
+    import base64
+    check("API gives the PDF", status == 200 and base64.b64decode(pdf.get("content", "")).startswith(b"%PDF"), str(status))
+    status, _ = api("unterlagen/checkliste-uebergabe")
+    check("API hides internal documents", status == 404, str(status))
     with opener.open(f"{URL}/document.php?modulepart=ecm&file=IT-Tabelander/Unterlagen/nutzungsbedingungen.pdf", timeout=60) as answer:
         check("PDF downloads from Documents", answer.status == 200 and answer.read(4) == b"%PDF")
 
@@ -805,9 +843,9 @@ def docs() -> None:
     status, html, _ = get("/index.php?mainmenu=home")
     check("start page widget", status == 200 and "Fehlende Unterlagen" in html)
     status, html, _ = get(f"{base}/admin/docrules.php")
-    check("rules page lists the rules", status == 200 and "auftragsverarbeitung" in html and "scope_contract_" in html)
+    check("rules page lists the rules", status == 200 and "auftragsverarbeitung" in html and "products_" in html)
     status, html, _ = post(f"{base}/admin/docrules.php", [("token", token(html)), ("action", "save_rules"), ("label_new", "Datenblatt erhalten"),
-                                                          ("slug_new", "firmendatenblatt"), ("action_new", "handover"), ("scope_new", "all"),
+                                                          ("slug_new", "firmendatenblatt"), ("action_new", "handover"), ("customertype_new", ""),
                                                           ("required_new", "1"), ("position_new", "90"), ("ITTABPDF_DOCS_CONTRACT_CHECK", "warn"),
                                                           ("ITTABPDF_DOCS_BANNER", "1")])
     check("new rule without code (WAF passes)", status == 200 and "Datenblatt erhalten" in html, str(status))
