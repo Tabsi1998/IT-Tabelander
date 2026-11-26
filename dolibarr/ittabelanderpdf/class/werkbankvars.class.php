@@ -30,7 +30,7 @@ class WerkbankVars
 		'__ITTAB_FIRMA_WEB__', '__ITTAB_FIRMA_UID__', '__ITTAB_GESCHAEFTSZEITEN__',
 		'__ITTAB_DATUM__', '__ITTAB_ORT__',
 		'__ITTAB_VERTRAG_REF__', '__ITTAB_VERTRAG_DATUM__', '__ITTAB_VERTRAG_BEGINN__', '__ITTAB_VERTRAG_LAUFZEIT__', '__ITTAB_VERTRAG_KUENDIGUNG__',
-		'__ITTAB_LEISTUNGEN__', '__ITTAB_LEISTUNGEN_VERTRAG__', '__ITTAB_PREIS:<REF>__',
+		'__ITTAB_LEISTUNGEN__', '__ITTAB_LEISTUNGEN_VERTRAG__', '__ITTAB_PREIS:<REF>__', '__ITTAB_PREISLISTE__',
 	);
 
 	/** Dolibarr's own placeholders shown in the help (there are more). */
@@ -174,11 +174,20 @@ class WerkbankVars
 	 * @param string[]             $raw    Placeholders whose value is HTML already
 	 * @return string
 	 */
-	public static function fill($html, array $values, array $raw = array('__ITTAB_LEISTUNGEN__', '__ITTAB_LEISTUNGEN_VERTRAG__'))
+	public static function fill($html, array $values, array $raw = array('__ITTAB_LEISTUNGEN__', '__ITTAB_LEISTUNGEN_VERTRAG__', '__ITTAB_PREISLISTE__'))
 	{
 		global $db;
 		// Prices of products and services by reference: __ITTAB_PREIS:DL-PC-DIAG__.
 		$values += self::prices($db, (string) $html);
+		// The price list from the products, only when the text asks for it.
+		if (strpos((string) $html, '__ITTAB_PREISLISTE__') !== false && !isset($values['__ITTAB_PREISLISTE__'])) {
+			require_once __DIR__.'/werkbankpricelist.class.php';
+			$values['__ITTAB_PREISLISTE__'] = WerkbankPricelist::html($db);
+		}
+		// A block placeholder alone in a paragraph replaces the paragraph (no <h3> inside <p>).
+		foreach ($raw as $key) {
+			$html = preg_replace('#<p>\s*'.preg_quote($key, '#').'\s*</p>#i', $key, (string) $html);
+		}
 		$empty = array();
 		foreach ($values as $key => $value) {
 			if (trim(strip_tags((string) $value)) === '') {

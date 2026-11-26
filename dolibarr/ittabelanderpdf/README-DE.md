@@ -81,6 +81,13 @@ Unternehmensunterlagen und Rechtstexte sind ein eigener Bereich des Moduls (Men�
 - **An das Beleg-PDF anhängen:** Je Angebot, Auftragsbestätigung und Rechnung lässt sich eine Unterlage hinter das Werkbank-PDF hängen; ohne Auswahl gilt Dolibarrs **Einstellungen → PDF → „AGB/Verkaufsbedingungen anhängen“**.
 - **Rechte:** „Unterlagen lesen“ (beim Aktivieren für alle an), „Unterlagen bearbeiten und freigeben“.
 
+## Preisliste aus den Produkten
+
+- **Platzhalter `__ITTAB_PREISLISTE__`** in einer Unterlage (mitgeliefert: `docs/unterlagen/preisliste.html`) setzt die Preisliste aus Dolibarr ein: je gewählter **Produkt-Kategorie** ein Abschnitt (Reihenfolge des Kategorienbaums), darin „Bezeichnung: Preis“ mit Einheit („pro Stunde“, „pro Monat“, „pro km“ aus Einheit oder Dauer der Leistung). Nur Produkte/Leistungen **im Verkauf** und mit Preis **über 0 €** (Vorlagezeilen wie „Festpreis nach Angebot“ fallen weg).
+- **Einstellungen** → IT-Tabelander PDF → Allgemein → „Preisliste aus den Produkten“: Kategorien wählen (ein-/ausblenden je Kategorie), Abschnitt „Weitere Leistungen“ für Produkte ohne gewählte Kategorie, Beschreibung zeigen, automatisch neu erzeugen (Vorgabe an). Knopf „Preis-Unterlagen jetzt neu erzeugen“.
+- **Automatisch:** Ändert sich ein Produkt (Preis, Bezeichnung, im Verkauf, Kategorie), schreibt das Modul jede freigegebene Unterlage mit `__ITTAB_PREISLISTE__` oder `__ITTAB_PREIS:<Referenz>__` neu, **Stand heute**. Die Archiv-Kopie der freigegebenen Version bleibt, wie sie war.
+- Platzhalter der Firma und `__ITTAB_DATUM__` gelten jetzt auch in allgemeinen Unterlagen.
+
 ## Unterlagen je Kunde: was unterschrieben ist und was fehlt
 
 - **Reiter „Unterlagen“ beim Geschäftspartner:** jede Unterlage, die dieser Kunde braucht (Pflicht) oder bekommen kann (optional), mit Zustand: **Fehlt**, **Verschickt** (am …, Bestätigung fehlt), **Unterschrift läuft**, **Erledigt** (unterschrieben / hochgeladen / abgehakt am …, wie, von wem, Stand der Fassung, Datei), **Neue Fassung** (bestätigt war eine ältere). Oben die Zusammenfassung („2 Pflicht-Unterlagen offen“), unten der Verlauf. Am Handy bedienbar.
