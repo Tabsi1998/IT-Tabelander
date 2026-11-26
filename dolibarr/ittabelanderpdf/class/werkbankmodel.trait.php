@@ -123,6 +123,9 @@ trait WerkbankModel
 		try {
 			$doc = $builder->build();
 			$this->watermark = $doc['watermark'];
+			require_once __DIR__.'/werkbankunterlagen.class.php';
+			$unterlagen = new WerkbankUnterlagen($this->db);
+			$doc['append'] = $unterlagen->appendFor($object);
 			$renderer = new WerkbankRenderer(pdf_getInstance($this->format), $outputlangs);
 			$renderer->render($doc, $target);
 		} catch (Throwable $exception) {

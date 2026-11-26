@@ -123,13 +123,20 @@ class WerkbankRenderer
 
 		$pdf->AddPage();
 		$this->drawFirstHead();
-		$y = $this->drawTitle(98.0);
+		// A sheet (company document, form) has no address field: the title moves up.
+		$y = $this->drawTitle($this->isSheet() ? 42.0 : 98.0);
+		if (!empty($doc['blocks'])) {
+			$y = $this->drawBlocks($y + 4.0, $doc['blocks']);
+		}
 		$y = $this->drawTable($y + 8.0);
 		$this->drawBottom($y + 6.0);
 
 		$pages = $pdf->getNumPages();
 		for ($page = 1; $page <= $pages; $page++) {
 			$pdf->setPage($page);
+			// setPage() restores the page break setting of the page; pages
+			// that flowing HTML opened carry "on" and would break in the footer.
+			$pdf->setAutoPageBreak(false, 0);
 			if ($page > 1) {
 				$this->drawFollowHead();
 			}
@@ -139,9 +146,104 @@ class WerkbankRenderer
 				pdf_watermark($pdf, $this->langs, self::PAGE_H, self::PAGE_W, 'mm', $doc['watermark']);
 			}
 		}
+		// Company documents behind the document (terms with a proposal): their
+		// own pages, head and page numbers, after "Seite x / y" of this one.
+		foreach (!empty($doc['append']) ? $doc['append'] : array() as $extra) {
+			$this->appendPdf($extra);
+		}
 		$pdf->lastPage();
 		$pdf->Close();
 		$pdf->Output($file, 'F');
+	}
+
+	/**
+	 * @return bool A sheet without address field and info block
+	 */
+	private function isSheet()
+	{
+		return isset($this->doc['layout']) && $this->doc['layout'] === 'sheet';
+	}
+
+	/**
+	 * Every page of another PDF, as it is. A protected or broken file is left
+	 * out with a log line; the document itself must not fail for it.
+	 *
+	 * @param string $file Path of the PDF
+	 * @return void
+	 */
+	private function appendPdf($file)
+	{
+		$pdf = $this->pdf;
+		if (!is_readable($file) || !method_exists($pdf, 'setSourceFile')) {
+			dol_syslog('ittabelanderpdf: cannot append '.$file, LOG_WARNING);
+			return;
+		}
+		try {
+			$count = $pdf->setSourceFile($file);
+			for ($page = 1; $page <= $count; $page++) {
+				$template = $pdf->importPage($page);
+				$size = $pdf->getTemplatesize($template);
+				$width = isset($size['w']) ? $size['w'] : $size['width'];
+				$height = isset($size['h']) ? $size['h'] : $size['height'];
+				$pdf->AddPage($width > $height ? 'L' : 'P', array($width, $height));
+				$pdf->useTemplate($template);
+			}
+		} catch (Throwable $exception) {
+			dol_syslog('ittabelanderpdf: cannot append '.$file.': '.$exception->getMessage(), LOG_WARNING);
+		}
+	}
+
+	// ------------------------------------------------------------ blocks
+
+	/**
+	 * Content blocks between the title and the table.
+	 *
+	 * @param float                          $y      Top
+	 * @param array<int,array<string,mixed>> $blocks Blocks: type html (flows over pages)
+	 * @return float                                 Y below
+	 */
+	private function drawBlocks($y, array $blocks)
+	{
+		foreach ($blocks as $block) {
+			if ($block['type'] === 'html') {
+				$y = $this->drawFlowingHtml($y, $block['html']);
+			}
+		}
+		return $y;
+	}
+
+	/**
+	 * Long HTML (a company document) that breaks onto new pages by itself:
+	 * the follow-up pages get their small head and the footer afterwards.
+	 *
+	 * @param float  $y    Top
+	 * @param string $html HTML with inline styles (WerkbankBuilderUnterlage::html)
+	 * @return float       Y below on the last page
+	 */
+	private function drawFlowingHtml($y, $html)
+	{
+		$pdf = $this->pdf;
+		$pdf->setHtmlVSpace(array(
+			'p' => array(array('h' => 0, 'n' => 0), array('h' => 2.2, 'n' => 1)),
+			'div' => array(array('h' => 0, 'n' => 0), array('h' => 0, 'n' => 0)),
+			'h2' => array(array('h' => 3.2, 'n' => 1), array('h' => 1.2, 'n' => 1)),
+			'h3' => array(array('h' => 2.4, 'n' => 1), array('h' => 0.8, 'n' => 1)),
+			'h4' => array(array('h' => 1.6, 'n' => 1), array('h' => 0.6, 'n' => 1)),
+			'ul' => array(array('h' => 0, 'n' => 0), array('h' => 2.2, 'n' => 1)),
+			'ol' => array(array('h' => 0, 'n' => 0), array('h' => 2.2, 'n' => 1)),
+			'li' => array(array('h' => 0.6, 'n' => 1), array('h' => 0, 'n' => 0)),
+			'table' => array(array('h' => 0, 'n' => 0), array('h' => 2.2, 'n' => 1)),
+		));
+		$pdf->setListIndentWidth(5);
+		$pdf->SetTopMargin(self::NEXT_PAGE_TOP);
+		$pdf->setAutoPageBreak(true, self::PAGE_H - self::BOTTOM);
+		$this->font('itsans', '', 9.5, self::BODY, 1.45);
+		$pdf->SetXY(self::LEFT, $y);
+		$pdf->writeHTML($html, true, false, true, false, 'L');
+		$y = $pdf->GetY();
+		$pdf->setAutoPageBreak(false, 0);
+		$pdf->SetTopMargin(10);
+		return $y;
 	}
 
 	// ------------------------------------------------------------ primitives
@@ -262,6 +364,9 @@ class WerkbankRenderer
 		}
 
 		$this->drawRule(30.0);
+		if ($this->isSheet()) {
+			return;
+		}
 
 		// Address field (DIN 5008, type B), sender line with a hairline below.
 		$this->font('itsans', '', 6.5, self::MUTED, 1.3);
@@ -398,6 +503,9 @@ class WerkbankRenderer
 		}
 		$pdf->setFontSpacing(0);
 		$y = $pdf->GetY() + $height;
+		if (!empty($doc['meta'])) {
+			$y = $this->caption(self::LEFT, $y + 1.6, self::RIGHT - self::LEFT, $doc['meta']);
+		}
 		if ($doc['intro'] !== '') {
 			$this->font('itsans', '', 9.5, self::BODY, 1.4);
 			$y = $this->html(self::LEFT, $y + 2.5, 150, $doc['intro']);

@@ -2,7 +2,7 @@
 
 Belege im Werkbank-Design von IT-Tabelander, mit den echten Markenschriften, dazu passende E-Mail-Vorlagen und ein verzögerter, abbrechbarer automatischer Versand.
 
-Modulnummer **756230** · Version 1.0.9 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
+Modulnummer **756230** · Version 1.1.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
 
 ![Entwurf](docs/entwurf/mockup.png)
 
@@ -30,14 +30,17 @@ Ist die Firma nicht umsatzsteuerpflichtig (Firmeneinstellung „Umsatzsteuer: ne
 
 **Automatischer Versand** für: Angebot freigegeben (mit PDF), Rechnung freigegeben (mit PDF; Gutschrift und Anzahlungsrechnung mit eigener Vorlage), Rechnung vollständig bezahlt (Zahlungsbestätigung ohne Anhang). Der Versand geht erst nach einer Verzögerung (Standard 5 Minuten) hinaus und lässt sich bis dahin auf der Karte des Belegs abbrechen.
 
+**Unterlagen** (Nutzungsbedingungen, Widerruf, AGB, interne Checklisten …) kommen aus dem Wissensmanagement von Dolibarr und werden zu PDFs im selben Design – siehe [Unterlagen](#unterlagen).
+
 ## Installation
 
-1. `module_ittabelanderpdf-1.0.9.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
+1. `module_ittabelanderpdf-1.1.0.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
 2. In der Modulliste **IT-Tabelander PDF** aktivieren. Dabei passiert:
    - die Vorlage `werkbank` wird für alle neun Belegarten eingeschaltet (noch nicht als Standard),
    - Zusatzfelder: Kunde/Lieferant „Anrede per Du“ (`ittab_du`), Vertrag „Mindestlaufzeit (Monate)“ (`ittab_mindestlaufzeit`) und „Kündigungsfrist“ (`ittab_kuendigungsfrist`),
    - 23 E-Mail-Vorlagen, die Tabelle `llx_ittabpdf_mailqueue`, der geplante Job „IT-Tabelander PDF: automatic e-mails“ (alle 5 Minuten),
-   - Menüeintrag **Rechnungen → Automatischer Versand**.
+   - Menüeintrag **Rechnungen → Automatischer Versand**,
+   - mit eingeschaltetem Wissensmanagement das Zusatzfeld „Dateiname der Unterlage“ (`ittab_slug`) an Artikeln. Wird das Wissensmanagement erst später eingeschaltet: dieses Modul danach einmal aus- und wieder einschalten.
 
 ## Aktivierung als Standardvorlage
 
@@ -62,6 +65,24 @@ Damit die Rechnung Kontodaten und QR-Code zeigt, muss bei den Rechnungseinstellu
 - Kleinunternehmer-Hinweis unter dem Gesamtbetrag (Standard: „Umsatzsteuerbefreit – Kleinunternehmer gem. § 6 Abs. 1 Z 27 UStG“)
 - **Modul-Vorlagen auf aktuellen Stand bringen** (mit Rückfrage): ersetzt Betreff und Inhalt aller Vorlagen dieses Moduls; eigene Vorlagen und die anderer Module bleiben unberührt. Beim Aktivieren werden Modul-Vorlagen, die noch den Text einer früheren Version haben, automatisch erneuert.
 - Automatischer Versand je Anlass ein/aus (Standard: aus), Verzögerung in Minuten (Standard 5), Blindkopie an (Standard: E-Mail der Firma), Adresse des Kundenbereichs, Vorlage je Anlass für Sie und Du (Standard: die Vorlagen des Moduls).
+
+## Unterlagen
+
+Unternehmensunterlagen entstehen aus Artikeln im **Wissensmanagement** (Modul „Wissensmanagement“ und „Kategorien“):
+
+| Kategorie | Wofür | PDF |
+| --- | --- | --- |
+| Rechtstexte | öffentlich: Impressum-Ergänzung, Datenschutz, Nutzungsbedingungen, Widerruf, AGB Unternehmer; die Website lädt die PDFs herunter | ja |
+| Unterlagen | intern: Checklisten, Infoblätter zum Mitschicken | ja |
+| FAQ | nur Website-FAQ | nein |
+
+- **Ablage:** Dokumente (ECM) → `IT-Tabelander/Unterlagen/<dateiname>.pdf`. Der Dateiname kommt aus dem Zusatzfeld **„Dateiname der Unterlage“** am Artikel, leer aus dem Titel (Kleinbuchstaben, Umlaute als ae/oe/ue/ss, Bindestriche). Die Website erwartet für die Rechtstexte genau `nutzungsbedingungen`, `widerruf`, `datenschutz`, `agb-unternehmer` und `impressum-ergaenzung`. Zwei Artikel mit demselben Namen: der zweite wird abgelehnt, die vorhandene Datei bleibt.
+- **Wann:** beim Freigeben, bei jeder Änderung eines freigegebenen Artikels und wenn ein freigegebener Artikel in eine der Kategorien kommt. Von Hand: **PDF erzeugen** auf der Artikelkarte (dort steht auch, wo die Datei liegt) oder **Alle freigegebenen Unterlagen neu erzeugen** in den Moduleinstellungen. Entwürfe bekommen kein PDF; wird ein Artikel zurück auf Entwurf gesetzt oder veraltet, bleibt die letzte Datei liegen.
+- **Aussehen:** Kopf mit Logo und Kontakt, Titel mit orangem Punkt, „Stand TT.MM.JJJJ“ (Tag der letzten Änderung), Text in den Markenschriften (Überschriften, Absätze, Listen, Fettes, Links, einfache Tabellen; Bilder, Skripte und eigene Formatierungen fallen weg), Fuß mit Firmendaten und „Seite x / y“, Folgeseiten mit kleinem Kopf.
+- **Mitschicken:** Im Mailformular von Angebot, Auftrag, Rechnung, Vertrag, Serviceauftrag, Lieferung und Geschäftspartner steht über den Anhängen **„Unterlagen beilegen“**: Unterlagen wählen, **Beilegen**, der Text bleibt erhalten. Bei Tickets steht dasselbe als Kasten über dem Nachrichtenformular (vor dem Schreiben auswählen). **Standard-Anhänge** je Belegart, getrennt für Firmen und Privatpersonen (Geschäftspartner-Typ „Privatperson“), kommen beim Öffnen des Formulars und beim Wechsel der Vorlage dazu. Vorgabe: Angebot an Firmen `agb-unternehmer.pdf`, an Privatpersonen `nutzungsbedingungen.pdf` und `widerruf.pdf`; fehlende Dateien werden übersprungen.
+- **An das Beleg-PDF anhängen:** Je Angebot, Auftragsbestätigung und Rechnung lässt sich eine Unterlage hinter das Werkbank-PDF hängen (eigene Seiten mit eigenem Kopf und eigener Seitenzählung). Ist dort nichts gewählt, gilt Dolibarrs eigene Einstellung **Einstellungen → PDF → „AGB/Verkaufsbedingungen anhängen“** (`MAIN_PDF_ADD_TERMSOFSALE_PROPAL` usw. mit hochgeladener Datei); `werkbank` hängt diese Datei genauso an wie `cyan`.
+- **Einstellungen** (Abschnitt „Unterlagen“ in den Moduleinstellungen): Kategorien mit PDF (Vorgabe: „Rechtstexte“ und „Unterlagen“ per Name, gespeichert wird die ID), Ordner, automatisch neu erzeugen, Standard-Anhänge, Anhang ans Beleg-PDF, Liste aller Artikel mit Datei und Stand.
+- **Website:** lädt die PDFs über die REST-API (`GET /documents/download?modulepart=ecm&original_file=IT-Tabelander/Unterlagen/<name>.pdf`); der API-Benutzer braucht dafür das Recht „Dokumente (ECM) lesen/herunterladen“.
 
 ## Automatischer Versand im Betrieb
 
@@ -107,14 +128,14 @@ Die Vorlagen nutzen bewusst keinen Online-Zahlungslink (`__ONLINE_PAYMENT_URL__`
 
 - Eine einzelne Tabellenzeile, die länger als eine ganze Seite ist, wird nicht geteilt.
 - Titel- und Zwischensummenzeilen des Moduls „Subtotal“ erscheinen als einfache Textzeilen ohne Beträge.
-- Nicht übernommen aus `cyan`/`sponge`: Produktfotos, Incoterms, zweite Belegsprache (`PDF_USE_ALSO_LANGUAGE_CODE`), angehängte AGB-PDFs, Zusatzfelder der Zeilen, Fremdwährungsbeträge (alle Beträge in der Firmenwährung).
+- Nicht übernommen aus `cyan`/`sponge`: Produktfotos, Incoterms, zweite Belegsprache (`PDF_USE_ALSO_LANGUAGE_CODE`), Zusatzfelder der Zeilen, Fremdwährungsbeträge (alle Beträge in der Firmenwährung).
 - Der Fußtext darf allein auf eine neue Seite rutschen, wenn er nicht mehr passt (der Summenblock nicht).
 - Die E-Mail-Vorlagen sind deutsch (gelten für alle Sprachen).
 
 ## Entwicklung
 
 ```bash
-python scripts/dev_dolibarr.py all     # Dolibarr 23.0.3 + MariaDB + Mailpit, Modul aus dem ZIP, Testdaten, PDFs, Mails, Oberfläche
+python scripts/dev_dolibarr.py all     # Dolibarr 23.0.3 + MariaDB + Mailpit, Modul aus dem ZIP, Testdaten, PDFs, Mails, Oberfläche, Tickets, Unterlagen
 python scripts/dev_dolibarr.py down    # Container wieder weg
 python scripts/build_release.py        # dist/module_ittabelanderpdf-x.y.z.zip + .sha256
 python scripts/build_fonts.py          # fonts/ neu aus den WOFF-Dateien (nur bei Schriftwechsel)

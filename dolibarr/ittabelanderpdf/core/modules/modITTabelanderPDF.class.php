@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '1.0.9';
+		$this->version = '1.1.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -55,8 +55,9 @@ class modITTabelanderPDF extends DolibarrModules
 			'models' => 1,
 			'printing' => 0,
 			'theme' => 0,
-			// Banner "automatic e-mail planned / failed" on the cards.
-			'hooks' => array('propalcard', 'invoicecard'),
+			// Banner "automatic e-mail planned / failed" on the cards; company
+			// documents: article card, mail form, ticket message.
+			'hooks' => array('propalcard', 'invoicecard', 'knowledgerecordcard', 'formmail', 'ticketcard'),
 			'moduleforexternal' => 0,
 		);
 
@@ -82,6 +83,11 @@ class modITTabelanderPDF extends DolibarrModules
 			// The website's customer area is not live yet: off until the owner switches it on.
 			7 => array('ITTABPDF_PORTAL_ENABLED', 'yesno', '0', 'Customer area of the website is live', 0, 'current', 0),
 			9 => array('ITTABPDF_MAIL_LOGO_DARK', 'chaine', 'IT-Tabelander/Bilder/Logo/IT-Tabelander Banner Hell Transparent.png', 'Logo for dark mode e-mails, path below documents/ecm', 0, 'current', 0),
+			10 => array('ITTABPDF_UNTERLAGEN_DIR', 'chaine', 'IT-Tabelander/Unterlagen', 'ECM folder of the company documents (Unterlagen)', 0, 'current', 0),
+			11 => array('ITTABPDF_UNTERLAGEN_AUTO', 'chaine', '1', 'Write the PDF of a company document when its article is released or changed', 0, 'current', 0),
+			// Default attachments of the mail form, file names in the folder; missing files are skipped.
+			12 => array('ITTABPDF_DOCS_PROPAL_SEND_B2B', 'chaine', 'agb-unternehmer.pdf', 'Company documents attached to proposal e-mails to companies', 0, 'current', 0),
+			13 => array('ITTABPDF_DOCS_PROPAL_SEND_B2C', 'chaine', 'nutzungsbedingungen.pdf,widerruf.pdf', 'Company documents attached to proposal e-mails to private customers', 0, 'current', 0),
 			8 => array('ITTABPDF_ACCEPT_TEXT_NOPORTAL', 'chaine', 'Bitte kurz per E-Mail an __MYCOMPANY_EMAIL__ bestätigen. Gearbeitet wird erst nach Zusage.', 'How a customer accepts a proposal without the customer area (Werkbank PDF)', 0, 'current', 0),
 		);
 
@@ -142,8 +148,15 @@ class modITTabelanderPDF extends DolibarrModules
 			array('ittab_kuendigungsfrist', 'WerkbankExtraNoticePeriod', 'varchar', 101, '128', 'contrat', ''),
 			array('ittab_du', 'WerkbankExtraDu', 'boolean', 100, '', 'societe', '0'),
 		);
+		// The file name of a company document; only with the knowledge base,
+		// whose extra field table exists only once it is switched on (checked
+		// by the table: a module switched on in the same request is not
+		// visible to isModEnabled() yet).
+		if ($this->db->DDLListTables($GLOBALS['conf']->db->name, MAIN_DB_PREFIX.'knowledgemanagement_knowledgerecord_extrafields')) {
+			$fields[] = array('ittab_slug', 'WerkbankExtraSlug', 'varchar', 100, '64', 'knowledgemanagement_knowledgerecord', '', 'WerkbankExtraSlugHelp');
+		}
 		foreach ($fields as $field) {
-			$result = $extrafields->addExtraField($field[0], $field[1], $field[2], $field[3], $field[4], $field[5], 0, 0, $field[6], '', 1, '', '1', '', '', '', 'ittabelanderpdf@ittabelanderpdf', 'isModEnabled("ittabelanderpdf")');
+			$result = $extrafields->addExtraField($field[0], $field[1], $field[2], $field[3], $field[4], $field[5], 0, 0, $field[6], '', 1, '', '1', isset($field[7]) ? $field[7] : '', '', '', 'ittabelanderpdf@ittabelanderpdf', 'isModEnabled("ittabelanderpdf")');
 			if ($result < 0) {
 				$this->error = $extrafields->error;
 				return -1;

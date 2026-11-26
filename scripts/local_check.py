@@ -1550,6 +1550,8 @@ def module_steps() -> list:
         Step(group, "ui", "Card banner, queue page, logo endpoint and the WAF", module_stage("ui"), ("rollout",)),
         Step(group, "tickets", "Own ticket confirmation and owner notice", module_stage("tickets"),
              ("fixtures",)),
+        Step(group, "unterlagen", "Company documents: knowledge base PDFs, mail attachments, setup",
+             module_stage("unterlagen", 1800), ("fixtures",)),
     ]
 
 
