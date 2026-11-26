@@ -9,6 +9,13 @@
 - Tab "Hilfe": short guides (send, generate, sign, documents, rules, following up, QS, intake, price list, templates, system check) with links.
 - Clean-up: the old mail building blocks (sheet with logo on top, orange line, footer) are gone; English texts complete.
 
+### Customer area (#187)
+
+- REST API for the website's customer area (right "Unterlagen lesen" only): `GET kunden/{socid}/unterlagen` lists the documents of the customer with state, Stand, whether to confirm or to sign and which file there is; `GET kunden/{socid}/unterlagen/{slug}/pdf` gives the signed file, else the one generated for the customer, else the general PDF, never a blank template per customer; only documents in the customer's own status rows, only files from the customer's own folder.
+- `POST …/bestaetigen` (AGB, Nutzungsbedingungen): done at once, source "im Kundenbereich", the proof (name, e-mail, IP, Stand) in the history and the agenda. `POST …/unterschreiben` (AVV, Fernwartung): the customer's signature on the generated document (base64 PNG without `data:` and `=`, checked before anything is written, the customer's IP kept with it); the document stays "Unterschrift läuft" until the counter signature on the device. A newer Stand in between, a second click or the wrong action is refused (409).
+- Source "im Kundenbereich" instead of "im Kundenbereich angenommen" (also proposals accepted there).
+- New test stage `kundenbereich` (`tests/portal_docs.php`): an API user with only that right, the WAF, refusals, proof, counter signature.
+
 ### Following up (#178)
 
 - Start page widget "Offen": required documents missing, documents sent and not answered for N days (with the days), signatures begun on the device, QS checklists not closed – each with a link to where to act.

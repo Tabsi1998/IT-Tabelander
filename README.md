@@ -428,7 +428,8 @@ Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie
      Dauer der Leistung, z. B. „1 Monat“ = monatlich). Ohne dieses Recht fehlt
      nur das Intervall,
    - IT-Tabelander PDF: **Unterlagen und Rechtstexte lesen** (Rechtstexte
-     und ihre PDFs aus dem Modul, ab Modul 1.5.0),
+     und ihre PDFs aus dem Modul, ab Modul 1.5.0; ab Modul 2.0.0 auch die
+     **Unterlagen** im Kundenbereich: ansehen, bestätigen, unterschreiben),
    - Dokumente (ECM): **lesen/herunterladen** (Rechtstexte als PDF aus
      `IT-Tabelander/Unterlagen/`, `GET /documents/download` mit
      `modulepart=ecm`). Hochladen oder Einrichten braucht die Website nicht.
@@ -727,6 +728,29 @@ Zusatzfeldern des Moduls „IT-Tabelander PDF“ (`ittab_mindestlaufzeit`,
 Vertrag mit PDF. Die nächste Abrechnung zeigt die Website nicht: Die
 Schnittstelle von Dolibarr verbindet Rechnungsvorlagen nicht verlässlich mit
 dem Vertrag, und raten soll die Seite nicht.
+
+**Unterlagen** (`/kundenbereich/unterlagen`, ab Modul „IT-Tabelander PDF“ 2.0.0):
+AGB, Nutzungsbedingungen, AVV, Leistungsbeschreibung, Einverständnis
+Fernwartung – was der Kunde laut den Regeln im Modul braucht, mit Stand und
+Zustand („wartet auf dich“, „Gegenzeichnung folgt“, „erledigt“, „zum
+Nachlesen“). Was auf ihn wartet, steht vorne, in der Übersicht und als Zahl am
+Reiter. Das PDF ist die unterschriebene Fassung, sonst die für ihn erzeugte,
+sonst die allgemeine.
+
+- **Bestätigen** (AGB, Nutzungsbedingungen): Haken „gelesen und
+  einverstanden“ und Name. In Dolibarr ist die Unterlage sofort erledigt; im
+  Verlauf und in der Agenda stehen Name, angemeldete E-Mail-Adresse, IP und
+  Stand.
+- **Online unterschreiben** (AVV, Fernwartung – die für den Kunden erzeugte
+  Fassung): Unterschrift mit Finger, Stift oder Maus und Name in
+  Druckbuchstaben. Die Unterschrift landet im PDF, die Unterlage steht auf
+  „Unterschrift läuft“ (Widget „Offen“). Du unterschreibst im Reiter
+  **Unterlagen** des Kunden mit **Weiter unterschreiben** gegen; danach
+  bekommt der Kunde hier das unterschriebene PDF.
+- Hat die Unterlage inzwischen einen neuen Stand, lehnt das Modul ab und der
+  Kunde liest sie neu. Je Stunde und Adresse gehen 10 Bestätigungen und 10
+  Unterschriften. Du bekommst jeweils einen Hinweis an die Warn-Adresse mit
+  dem Knopf **Unterlagen in Dolibarr öffnen**.
 
 **Belege:** Der Kunde sieht nur freigegebene Belege, nie Entwürfe. Das PDF
 ist das, das Dolibarr zuletzt erzeugt hat (mit dem Modul „IT-Tabelander PDF“

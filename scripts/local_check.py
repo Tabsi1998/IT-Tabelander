@@ -101,7 +101,7 @@ NODE_MAJOR = 24
 UNIT_TEST_FILES = ("tests/test_unit_runtime.py", "tests/test_inquiry_dolibarr.py", "tests/test_handover.py",
                  "tests/test_site_data.py", "tests/test_review_label.py", "tests/test_legal_texts.py",
                  "tests/test_portal.py", "tests/test_portal_inquiries.py", "tests/test_mail_certificate.py",
-                 "tests/test_unterlagen.py", "tests/test_withdrawals.py")
+                 "tests/test_unterlagen.py", "tests/test_withdrawals.py", "tests/test_portal_docs.py")
 INTEGRATION_TEST_FILES = ("tests/test_api.py", "tests/test_regression_iter2.py")
 DOLIBARR_TEST_FILES = ("tests/test_dolibarr_runtime.py", "tests/test_dolibarr_unterlagen.py")
 
@@ -1574,6 +1574,8 @@ def module_steps() -> list:
              module_stage("erinnerung", 1800), ("agenda",)),
         Step(group, "betrieb", "System check, help and texts outside the module",
              module_stage("betrieb", 1800), ("erinnerung",)),
+        Step(group, "kundenbereich", "Customer area documents over the REST API: list, PDF, confirm, sign",
+             module_stage("kundenbereich", 1800), ("betrieb",)),
     ]
 
 

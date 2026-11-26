@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, Path, Request, Response, UploadFile
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from .. import portal, portal_files, portal_inquiries
+from .. import portal, portal_docs, portal_files, portal_inquiries
 from ..db import get_db
 from ..models import TOPIC_MAX
 
@@ -110,6 +110,53 @@ class AnswerInput(BaseModel):
         if self.accept and len(self.name) < 2:
             raise ValueError("Bitte gib zur Bestätigung deinen Namen an.")
         return self
+
+
+class DocumentNameInput(BaseModel):
+    """Who confirms or signs a document (#187): the name, the Stand shown, the customer."""
+    name: str = Field(max_length=128)
+    version: str = Field(default="", pattern=r"^(\d{4}-\d{2}-\d{2})?$")
+    customer_id: Optional[int] = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def strip_name(cls, value):
+        return " ".join(value.split()) if isinstance(value, str) else value
+
+    @field_validator("name")
+    @classmethod
+    def a_real_name(cls, value):
+        if len(value) < 2 or "<" in value or ">" in value:
+            raise ValueError("Bitte gib zur Bestätigung deinen Namen an.")
+        return value
+
+
+class ConfirmInput(DocumentNameInput):
+    """AGB or Nutzungsbedingungen: the name and the tick (#187)."""
+    accepted: bool
+
+    @field_validator("accepted")
+    @classmethod
+    def ticked(cls, value):
+        if value is not True:
+            raise ValueError("Bitte bestätige, dass du die Unterlage gelesen hast.")
+        return value
+
+
+class SignInput(DocumentNameInput):
+    """AVV or Fernwartung: the name and the signature drawn on the screen,
+    as PNG in base64 without "data:" and "=" (Dolibarr's WAF, #187)."""
+    png: str = Field(min_length=60, max_length=portal_docs.PNG_MAX)
+
+    @field_validator("png")
+    @classmethod
+    def plain_base64(cls, value):
+        if not portal_docs.PNG_BASE64.fullmatch(value):
+            raise ValueError("Die Unterschrift ist nicht angekommen. Bitte unterschreib noch einmal.")
+        return value
+
+
+DocumentSlug = Path(pattern=r"^[a-z0-9-]{1,64}$")
 
 
 async def _switched_on() -> None:
@@ -301,6 +348,48 @@ async def close_inquiry(request: Request, ticket_id: int = TicketId):
     session = await _session(request)
     try:
         return await portal_inquiries.close(session, ticket_id)
+    except (portal.PortalError, httpx.HTTPError) as exc:
+        raise _problem(exc) from None
+
+
+@router.get("/unterlagen")
+async def documents_list(request: Request):
+    """AGB, AVV and the other documents of the customer, with their state (#187)."""
+    session = await _session(request)
+    try:
+        return await portal_docs.documents(session)
+    except (portal.PortalError, httpx.HTTPError) as exc:
+        raise _problem(exc) from None
+
+
+@router.get("/unterlagen/{slug}/pdf")
+async def documents_pdf(request: Request, slug: str = DocumentSlug, kunde: Optional[int] = None):
+    session = await _session(request)
+    try:
+        name, media_type, content = await portal_docs.pdf(session, slug, kunde)
+    except (portal.PortalError, httpx.HTTPError) as exc:
+        raise _problem(exc) from None
+    return Response(content=content, media_type=media_type, headers={
+        "Content-Disposition": f'inline; filename="{name}"', "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff"})
+
+
+@router.post("/unterlagen/{slug}/bestaetigen")
+async def documents_confirm(payload: ConfirmInput, request: Request, slug: str = DocumentSlug):
+    session = await _session(request)
+    try:
+        return await portal_docs.confirm(session, slug, name=payload.name, version=payload.version,
+                                         ip=request.client.host if request.client else "", customer_id=payload.customer_id)
+    except (portal.PortalError, httpx.HTTPError) as exc:
+        raise _problem(exc) from None
+
+
+@router.post("/unterlagen/{slug}/unterschreiben")
+async def documents_sign(payload: SignInput, request: Request, slug: str = DocumentSlug):
+    session = await _session(request)
+    try:
+        return await portal_docs.sign(session, slug, name=payload.name, png=payload.png, version=payload.version,
+                                      ip=request.client.host if request.client else "", customer_id=payload.customer_id)
     except (portal.PortalError, httpx.HTTPError) as exc:
         raise _problem(exc) from None
 

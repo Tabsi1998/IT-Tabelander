@@ -69,6 +69,11 @@ class PublicRequestGuardMiddleware:
         ("POST", re.compile(r"^/api/portal/inquiries/\d{1,10}/close$"), (10, 60 * 60, 4 * 1024)),
         # One photo or PDF per request (#123): 15 MB plus the form around it.
         ("POST", re.compile(r"^/api/portal/inquiries/\d{1,10}/files$"), (60, 60 * 60, 16 * 1024 * 1024)),
+        # Documents (#187): each confirmation or signature is a proof in Dolibarr
+        # and a mail to the owner; a customer has a handful of documents. A
+        # signature is a PNG of at most about 600 kB as base64.
+        ("POST", re.compile(r"^/api/portal/unterlagen/[a-z0-9-]{1,64}/bestaetigen$"), (10, 60 * 60, 4 * 1024)),
+        ("POST", re.compile(r"^/api/portal/unterlagen/[a-z0-9-]{1,64}/unterschreiben$"), (10, 60 * 60, 1024 * 1024)),
     )
 
     def __init__(self, application):

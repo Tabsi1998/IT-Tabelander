@@ -11,6 +11,7 @@ import { OfferDetail, Offers } from "./pages/Offers.jsx";
 import { DocumentDetail, Documents } from "./pages/Documents.jsx";
 import { InvoiceDetail } from "./pages/Invoices.jsx";
 import Overview from "./pages/Overview.jsx";
+import Unterlagen, { waitsForYou } from "./pages/Unterlagen.jsx";
 
 const PortalContext = createContext(null);
 export const usePortal = () => useContext(PortalContext);
@@ -23,6 +24,8 @@ const NAV = [
   // Invoices, credit notes and every other document under one tab (#100);
   // /kundenbereich/rechnungen stays the address of the invoices from the mails.
   { to: "/kundenbereich/belege", label: "Belege", count: "invoices_open", also: "/kundenbereich/rechnungen" },
+  // AGB, AVV and the like to confirm or sign (#187).
+  { to: "/kundenbereich/unterlagen", label: "Unterlagen", count: "documents_waiting" },
 ];
 
 function Header({ email, onSignOut }) {
@@ -170,10 +173,10 @@ function Nav({ counts }) {
           </Link>
         ))}
       </nav>
-      <nav aria-label="Kundenbereich unten" className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-4 border-t border-line bg-surface lg:hidden">
+      <nav aria-label="Kundenbereich unten" className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-line bg-surface lg:hidden">
         {NAV.map((entry) => (
           <Link key={entry.to} to={entry.to} aria-current={on(entry) ? "page" : undefined}
-            className={`flex items-center justify-center text-sm font-bold no-underline ${on(entry) ? "text-link-hover" : "text-muted"}`}>
+            className={`flex items-center justify-center px-0.5 text-[13px] font-bold no-underline sm:text-sm ${on(entry) ? "text-link-hover" : "text-muted"}`}>
             {entry.label}
           </Link>
         ))}
@@ -184,11 +187,13 @@ function Nav({ counts }) {
 
 function SignedIn({ me, onSignOut }) {
   const overview = usePortalData("/overview");
+  const documents = usePortalData("/unterlagen");
+  const counts = overview.data?.counts && { ...overview.data.counts, documents_waiting: (documents.data || []).filter(waitsForYou).length };
   return (
-    <PortalContext.Provider value={{ me, overview }}>
+    <PortalContext.Provider value={{ me, overview, documents }}>
       <Frame email={me.email} onSignOut={onSignOut} padded>
         <div className="mx-auto w-full max-w-[1440px] flex-1 lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
-          <Nav counts={overview.data?.counts} />
+          <Nav counts={counts} />
           <main id="inhalt" className="flex min-w-0 flex-col gap-6 px-4 pb-24 pt-6 md:px-8 lg:px-14 lg:pb-14 lg:pt-10">
             <Routes>
               <Route index element={<Overview />} />
@@ -202,6 +207,7 @@ function SignedIn({ me, onSignOut }) {
               <Route path="belege" element={<Documents />} />
               <Route path="belege/:art" element={<Documents />} />
               <Route path="belege/:art/:id" element={<DocumentDetail />} />
+              <Route path="unterlagen" element={<Unterlagen />} />
               <Route path="*" element={<Overview />} />
             </Routes>
           </main>

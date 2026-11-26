@@ -54,6 +54,23 @@ const SERVICE = {
 const CREDIT_NOTE = { id: 44, ref: "AV2609-0001", status: 1, state: "bezahlt", open: false, credit_note: true,
   date: "2026-09-21T08:00:00+00:00", due: null, total: "-20.00000000", remain: "0", has_pdf: true };
 
+// Documents (#187): AGB to confirm, an AVV to sign, one done, one to read, one being prepared.
+const DOCUMENT = { customer_id: 7, customer: "Max Muster", required: true, can_confirm: false, can_sign: false,
+  waiting_countersign: false, done_at: "", has_pdf: true, signed_pdf: false };
+export function documents() {
+  return [
+    { ...DOCUMENT, slug: "fernwartung-einverstaendnis", title: "Einverständnis Fernwartung", stand: "2026-11-02", state: "done",
+      action: "sign", done_at: "2026-11-10", signed_pdf: true },
+    { ...DOCUMENT, slug: "agb-unternehmer", title: "AGB für Unternehmer", stand: "2026-11-20", state: "sent", action: "accept", can_confirm: true },
+    { ...DOCUMENT, slug: "auftragsverarbeitung", title: "Vereinbarung zur Auftragsverarbeitung (AVV)", stand: "2026-11-18",
+      state: "generated", action: "sign", can_sign: true },
+    { ...DOCUMENT, slug: "leistungsbeschreibung-betreuung-wartung", title: "Leistungsbeschreibung IT-Betreuung und Wartung",
+      stand: "2026-10-01", state: "missing", action: "handover", required: false },
+    { ...DOCUMENT, slug: "datenschutz-zusatz", title: "Zusatzvereinbarung Datenschutz", stand: "2026-11-01", state: "missing",
+      action: "sign", has_pdf: false },
+  ];
+}
+
 // Inquiries with their history (#122): one waits for the customer, one has an offer, one is closed.
 const WAITING = {
   id: 8, ref: "TS2609-0008", title: "Reparatur: PlayStation 5", inquiry_ref: "ANF-9Z8Y7X6W", step: "wartet_auf_dich",
@@ -113,9 +130,10 @@ export function portalState(overrides = {}) {
       services: [{ ...SERVICE }],
       orders: [{ ...ORDER }], shipments: [{ ...SHIPMENT }], interventions: [{ ...INTERVENTION }], contracts: [{ ...CONTRACT }],
     },
-    documents: { "orders/51": ORDER, "shipments/61": SHIPMENT, "interventions/71": INTERVENTION, "contracts/81": CONTRACT },
+    receipts: { "orders/51": ORDER, "shipments/61": SHIPMENT, "interventions/71": INTERVENTION, "contracts/81": CONTRACT },
     offers: { 31: { ...OFFER } },
     invoices: { 41: { ...INVOICE } },
+    documents: documents(),
     sent: [],
     ...overrides,
   };
@@ -149,6 +167,19 @@ export async function mockPortal(page, state = portalState()) {
     if (path === "/me") return json(route, state.me);
     if (path === "/overview") return json(route, state.overview);
 
+    if (path === "/unterlagen") return json(route, state.documents);
+    const paper = path.match(/^\/unterlagen\/([a-z0-9-]+)\/(pdf|bestaetigen|unterschreiben)$/);
+    if (paper) {
+      const index = state.documents.findIndex((item) => item.slug === paper[1]);
+      if (index < 0) return json(route, { detail: "Diese Unterlage gibt es hier nicht." }, 404);
+      if (paper[2] === "pdf") return route.fulfill({ status: 200, contentType: "application/pdf", body: "%PDF-1.4\n%%EOF\n" });
+      const item = state.documents[index];
+      const updated = paper[2] === "bestaetigen"
+        ? { ...item, state: "done", can_confirm: false, done_at: "2026-11-26" }
+        : { ...item, state: "signing", can_sign: false, waiting_countersign: true };
+      state.documents = state.documents.map((entry, at) => (at === index ? updated : entry));
+      return json(route, updated);
+    }
     const pdf = path.match(/^\/(offers|invoices|documents\/[a-z]+)\/(\d+)\/pdf$/);
     if (pdf) return route.fulfill({ status: 200, contentType: "application/pdf", body: "%PDF-1.4\n%%EOF\n" });
     const offer = path.match(/^\/offers\/(\d+)(\/answer)?$/);
@@ -164,7 +195,7 @@ export async function mockPortal(page, state = portalState()) {
     }
     const found = path.match(/^\/documents\/([a-z]+\/\d+)$/);
     if (found) {
-      const item = state.documents[found[1]];
+      const item = state.receipts[found[1]];
       return item ? json(route, item) : json(route, { detail: "Das gibt es hier nicht." }, 404);
     }
     const track = path.match(/^\/inquiries\/track\/([A-Za-z0-9]+)$/);
