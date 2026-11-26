@@ -575,3 +575,25 @@ WerkbankVar_MYCOMPANY_NAME = Dolibarr: company name
 WerkbankVar_MYCOMPANY_EMAIL = Dolibarr: company e-mail
 WerkbankVarsHours = Business hours for __ITTAB_GESCHAEFTSZEITEN__
 WerkbankVarsHoursHelp = empty: from Company → opening hours
+
+# Price list from the products (__ITTAB_PREISLISTE__)
+WerkbankPricelistTitle = Price list from the products
+WerkbankPricelistCategories = Sections (product categories)
+WerkbankPricelistCategoriesHelp = One section per chosen category, in the order of the category tree. Only products and services for sale with a price above 0.
+WerkbankPricelistNeedsCategories = Module Categories is off
+WerkbankPricelistOthersSetting = Section "More services" for products without a chosen category
+WerkbankPricelistOthers = More services
+WerkbankPricelistDesc = Show the description under the label
+WerkbankPricelistAuto = Write the PDFs again when a product changes
+WerkbankPricelistHelp = The placeholder __ITTAB_PREISLISTE__ in a document (e.g. the price list) inserts the list, __ITTAB_PREIS:<reference>__ a single price. Such documents get today's date as "Stand".
+WerkbankPricelistRefresh = Write the documents with prices again now
+WerkbankPricelistWritten = %s documents with prices written again.
+WerkbankPricelistFailed = Not every document with prices could be written (see the log).
+WerkbankPricelistPer = per %s
+WerkbankPricelistPerMinute = per minute
+WerkbankPricelistPerHour = per hour
+WerkbankPricelistPerDay = per day
+WerkbankPricelistPerWeek = per week
+WerkbankPricelistPerMonth = per month
+WerkbankPricelistPerYear = per year
+WerkbankVar_ITTAB_PREISLISTE = Price list from the products (sections per category, setup → general)

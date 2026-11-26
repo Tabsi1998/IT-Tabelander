@@ -241,21 +241,34 @@ class WerkbankDoc
 
 	/**
 	 * PDF of the latest version into the Unterlagen folder (<slug>.pdf) and
-	 * the archive (Archiv/<slug>-v<n>.pdf).
+	 * the archive (Archiv/<slug>-v<n>.pdf). Placeholders of the company and
+	 * the prices are filled; with prices the "Stand" is today.
 	 *
-	 * @param object $doc  Document
-	 * @param User   $user User
-	 * @return string      Path in the folder, '' on error
+	 * @param object $doc     Document
+	 * @param User   $user    User
+	 * @param bool   $archive Also the archive copy (not when only prices changed)
+	 * @return string         Path in the folder, '' on error
 	 */
-	public function writePdf($doc, $user)
+	public function writePdf($doc, $user, $archive = true)
 	{
 		$record = $this->asRecord($doc);
 		if (!$record) {
 			$this->error = 'WerkbankDocNotReleased';
 			return '';
 		}
+		$stand = (int) $record->tms;
+		// Placeholders of the company, the date and the prices (a document for
+		// a customer is filled when it is generated for one).
+		if ($doc->kind !== 'customer' && strpos((string) $record->answer, '__') !== false) {
+			require_once __DIR__.'/werkbankvars.class.php';
+			require_once __DIR__.'/werkbankpricelist.class.php';
+			if (WerkbankPricelist::usesPrices($record->answer)) {
+				$stand = dol_now();
+			}
+			$record->answer = WerkbankVars::fill((string) $record->answer, WerkbankVars::values($this->db, null));
+		}
 		$unterlagen = new WerkbankUnterlagen($this->db);
-		$path = $unterlagen->generate($record, $user, (int) $record->tms);
+		$path = $unterlagen->generate($record, $user, $stand);
 		if ($path === '') {
 			$this->error = $unterlagen->error;
 			return '';
@@ -264,6 +277,9 @@ class WerkbankDoc
 		$unterlagen->removeOldFiles('ittabpdf_doc', (int) $doc->rowid, basename($path));
 		if (!empty($doc->fk_km)) {
 			$unterlagen->removeOldFiles('knowledgemanagement_knowledgerecord', (int) $doc->fk_km, basename($path));
+		}
+		if (!$archive) {
+			return $path;
 		}
 		$archive = WerkbankUnterlagen::dir().'/Archiv';
 		if ($unterlagen->ensureEcmDirectory($user, WerkbankUnterlagen::relativeDir().'/Archiv') > 0) {

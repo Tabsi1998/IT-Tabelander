@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0] - 2026-11-26
+
+- Price list from Dolibarr's products: placeholder `__ITTAB_PREISLISTE__` with one section per chosen product category (order of the category tree), only products and services for sale above 0 €, price with unit (unit or duration of a service). Setup block "Preisliste aus den Produkten": categories, section for the others, descriptions, automatic rewrite (on by default), button to write them now.
+- When a product changes (created, modified, price, deleted, put into or out of a category), the released documents with `__ITTAB_PREISLISTE__` or `__ITTAB_PREIS:<REF>__` get their PDF written again with today as "Stand"; the archive copy of the released version stays.
+- Company placeholders and the date are filled in general documents too; a block placeholder alone in a paragraph replaces the paragraph.
+- `docs/unterlagen/preisliste.html` uses the placeholder instead of fixed prices.
+
 ## [1.6.0] - 2026-11-26
 
 - Documents made for one customer: a document of the kind "template per customer" gets a button "Erzeugen" on the customer's "Unterlagen" tab. Contract, contact and the template's input fields (`[[FELD:name*|label|type|defaults]]`: text, textarea, choice of several, choice of one, date, number) are asked, prefilled from last time; missing required fields or placeholders left over block with a message. The PDF lands with the customer and the contract, with both signature lines, state "Erzeugt"; sending it marks it sent, signing on the device signs the generated document itself. Generating again later makes it "Erzeugt" again, so the new version has to go out or be signed again.
