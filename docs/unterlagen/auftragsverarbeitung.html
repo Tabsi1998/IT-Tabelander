@@ -81,7 +81,7 @@ Für IT-Tabelander: ______________________________</p>
 <h3>Vertraulichkeit</h3>
 <ul>
 <li><strong>Zutritt:</strong> Die Server stehen in einem abschließbaren Raum in meinen Räumen in Telfs, der abgeschlossen ist, wenn ich nicht da bin. Zutritt habe nur ich. Andere Personen kommen nur in meiner Begleitung hinein.</li>
-<li><strong>Zugang:</strong> Verwaltungszugänge zu den Servern nur über SSH-Schlüssel, nicht über Passwörter. Alle anderen Zugänge sind mit starken, einzigartigen Passwörtern aus einem Passwortmanager und, wo verfügbar, mit einem zweiten Faktor geschützt. Verwaltungsoberflächen sind nicht öffentlich erreichbar, sondern nur aus meinem eigenen Netz oder über eine verschlüsselte VPN-Verbindung. Meine Arbeitsgeräte haben verschlüsselte Datenträger und sperren sich nach wenigen Minuten ohne Benutzung.</li>
+<li><strong>Zugang:</strong> Verwaltungszugänge zu den Servern nur über SSH-Schlüssel, nicht über Passwörter. Alle anderen Zugänge sind mit starken, einzigartigen Passwörtern aus einem Passwortmanager und, wo verfügbar, mit einem zweiten Faktor geschützt. Verwaltungsoberflächen sind nur verschlüsselt (HTTPS) erreichbar, mit persönlichem Konto, starkem Passwort und einer Sperre nach mehreren fehlgeschlagenen Anmeldungen; Server-Verwaltung und Datenbanken sind nicht öffentlich erreichbar. Meine Arbeitsgeräte haben verschlüsselte Datenträger und sperren sich nach wenigen Minuten ohne Benutzung.</li>
 <li><strong>Zugriff:</strong> Nur ich habe Zugriff auf die Daten der Kunden. Jeder Kunde hat eigene Konten; Kunden sehen nur ihre eigenen Daten.</li>
 <li><strong>Trennung:</strong> Die Daten verschiedener Kunden liegen getrennt, mit eigenen Datenbanken, Verzeichnissen und Benutzerkonten. Ein Kunde hat keinen Zugriff auf die Daten eines anderen.</li>
 <li><strong>Verschlüsselung:</strong> Alle Verbindungen laufen verschlüsselt (HTTPS mit aktuellem TLS, SSH). Datenträger, auf denen Daten von Kunden oder Sicherungen liegen, sind verschlüsselt. Sicherungen verlassen den Server nur verschlüsselt.</li>
@@ -111,11 +111,11 @@ Für IT-Tabelander: ______________________________</p>
 <h3>Fernwartung</h3>
 <ul>
 <li>Eine Verbindung gibt es nur, wenn der Kunde sie am Gerät freigibt; die Sitzung ist am Bildschirm sichtbar und kann jederzeit beendet werden. Ausnahme: ein ausdrücklich vereinbarter Zugang für die IT-Wartung.</li>
-<li>Die Verbindung ist durchgehend verschlüsselt. Läuft sie über Server des Software-Herstellers, kann der Hersteller die Inhalte der Sitzung nicht lesen und bekommt nur Verbindungsdaten wie IP-Adresse, Gerätekennung und Zeitpunkt; der Hersteller steht dann in Anlage 3.</li>
+<li>Ich nutze RustDesk mit einem eigenen Verbindungsserver in Telfs, Österreich. Die Verbindung ist durchgehend Ende-zu-Ende verschlüsselt; kein Software-Hersteller oder anderer Dritter ist daran beteiligt.</li>
 </ul>
 
 <h2>Anlage 3: Unterauftragsverarbeiter</h2>
-<p>Derzeit ziehe ich keine Unterauftragsverarbeiter bei. Website, Cloud, Sicherungen und E-Mail laufen auf meinen eigenen Servern in Telfs, Österreich.</p>
+<p>Derzeit ziehe ich keine Unterauftragsverarbeiter bei. Website, Cloud, Sicherungen, E-Mail und Fernwartung laufen auf meinen eigenen Servern in Telfs, Österreich; die Sicherungskopie liegt verschlüsselt auf einem eigenen Datenträger an einem zweiten Ort in Österreich.</p>
 <p>Ziehe ich später einen Unterauftragsverarbeiter bei, etwa einen Hersteller, über dessen Server Fernwartungsverbindungen laufen, oder einen Speicher für die Sicherungskopie, kündige ich ihn nach Abschnitt 5 an und trage ihn hier mit Name, Anschrift, Leistung und Ort der Verarbeitung ein. Ich wähle dafür nur Anbieter mit Sitz und Verarbeitung in der EU oder im EWR.</p>
 
 <p>Stand: 26.11.2026</p>
