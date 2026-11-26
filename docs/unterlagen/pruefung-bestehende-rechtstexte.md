@@ -51,9 +51,10 @@ die Kopie in `backend/app/legal_drafts/` bei Gelegenheit nachziehen.
    > **Fernwartung und Daten auf deinem Gerät.** Repariere oder warte ich ein
    > Gerät, auch per Fernwartung, sehe ich Daten darauf nur, soweit der Auftrag
    > es verlangt. Ich kopiere sie nur, wenn wir das vereinbaren (etwa für eine
-   > Datenübernahme), und lösche die Kopie nach dem Auftrag. Für die
-   > Fernwartung nutze ich [BITTE ERGÄNZEN: Programm]. (Rechtsgrundlage:
-   > Vertrag, Art. 6 Abs. 1 lit. b DSGVO)
+   > Datenübernahme), und lösche die Kopie nach dem Auftrag. Eine
+   > Fernwartung gibt es nur nach deiner Freigabe am Gerät; die Verbindung ist
+   > durchgehend verschlüsselt. (Rechtsgrundlage: Vertrag, Art. 6 Abs. 1 lit.
+   > b DSGVO)
 
    Läuft das Fernwartungsprogramm über Server des Herstellers, gehört der
    Hersteller in die Empfängerliste.
@@ -64,7 +65,7 @@ die Kopie in `backend/app/legal_drafts/` bei Gelegenheit nachziehen.
 8. **Zahlungen prüfen.** Laut Leistungskatalog bleibt Stripe in Dolibarr
    eingeschaltet. Gehen Zahlungslinks oder Online-Zahlungen über Stripe an
    Kunden, muss Stripe (mit Übermittlung in die USA) in die
-   Empfängerliste. [BITTE PRÜFEN: Wird Stripe gegenüber Kunden genutzt?]
+   Empfängerliste. Fabian prüft, ob Stripe gegenüber Kunden genutzt wird.
    Die Bank für Überweisungen ebenfalls nennen.
 9. Der Satz „auch nicht in Länder außerhalb der EU“ stimmt nur, solange
    Punkt 6 und 8 keinen Anbieter außerhalb der EU bringen.
@@ -106,6 +107,15 @@ die Kopie in `backend/app/legal_drafts/` bei Gelegenheit nachziehen.
    > Tagen ohne Angabe von Gründen zurücktreten. Wie das geht, wann die
    > Frist beginnt und wann es kein Rücktrittsrecht gibt, steht in der
    > [Widerrufsbelehrung](/rechtliches/widerruf) mit dem Muster-Formular.
+
+   Die heutige Ausnahme „bei einem nach deinen Wünschen zusammengestellten
+   und gebauten PC“ fällt dabei weg: Ein PC aus handelsüblichen Teilen bleibt
+   rücktrittsfähig, ausgenommen sind nur eigens angepasste oder angefertigte
+   Teile (Begründung in der README, Abschnitt „Freigabefähig gemacht“).
+
+   Seit 1.10.2026 braucht es für online geschlossene Verträge zusätzlich die
+   Rücktrittsfunktion „Vertrag widerrufen“ (§ 13a FAGG); die Widerrufsbelehrung
+   nennt sie, die Website baut sie in #142.
 
    Achtung: Die Belehrung muss dem Kunden vor der Zusage vorliegen (§ 4 FAGG).
    Steht sie nur noch auf einer eigenen Seite, muss die Bestätigungsmail
