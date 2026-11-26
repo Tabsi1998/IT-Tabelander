@@ -264,7 +264,7 @@ class ActionsIttabelanderpdf
 		$attached = $object->get_attached_files();
 		$paths = isset($attached['paths']) ? (array) $attached['paths'] : array();
 		$items = WerkbankDocMail::items($this->db, $socid, $paths);
-		$object->substit = array_merge(is_array($object->substit) ? $object->substit : array(), WerkbankDocMail::fromItems($items));
+		$object->substit = array_merge(is_array($object->substit) ? $object->substit : array(), WerkbankDocMail::fromItems($items, WerkbankMailData::portalOpenFor($this->db, $socid)));
 		$retext = $this->chooseTemplate($object, $socid, $items);
 		$this->chooseRecipient($object);
 		$this->greetRecipient($object);
