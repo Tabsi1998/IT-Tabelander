@@ -19,7 +19,8 @@ the IT-Tabelander repository; run this from that folder.
     python scripts/dev_dolibarr.py qs         QS checklists, test report, intake slip (tests/qs.php), phone page, setup, rights
     python scripts/dev_dolibarr.py sign       signatures on the device and sending (tests/sign.php), signing page
     python scripts/dev_dolibarr.py docs       documents per customer (tests/docs.php), tab, cards, widget, rules
-    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets, unterlagen, qs, sign, docs
+    python scripts/dev_dolibarr.py kundenbereich the customer area's documents over the REST API (tests/portal_docs.php)
+    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets, unterlagen, qs, sign, docs, ..., kundenbereich
     python scripts/dev_dolibarr.py down       remove containers, volumes and network
 
 Standard library only. Passwords are new on every start; the local test
@@ -1271,19 +1272,128 @@ def erinnerung() -> None:
     print(f"{len(checks)} reminder checks passed")
 
 
+def kundenbereich() -> None:
+    """The customer area's documents over the REST API (tests/portal_docs.php), as the website calls them.
+
+    An API user with only "Unterlagen lesen" lists the firm's documents,
+    downloads them (never another customer's or a blank template), confirms
+    the AGB and signs the agreement made for the firm, the image as base64
+    without "data:" and "=" like the website sends it; Dolibarr's WAF lets it
+    pass. Refusals: unknown customer or document, wrong Stand, bad image,
+    nothing to confirm or sign, no right.
+    """
+    import base64
+
+    keys = php("enable", script="portal_docs.php")
+    result = php("run", script="portal_docs.php")
+    checks = []
+    firm, slug = result["firm"], result["slug"]
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "api", "check": name, "ok": bool(ok), "detail": detail})
+
+    def api(method: str, path: str, body: dict | None = None, key: str = keys["apikey"]) -> tuple:
+        data = json.dumps(body).encode() if body is not None else None
+        request = urllib.request.Request(f"{URL}/api/index.php/ittabelanderpdf/{path}", data=data, method=method,
+                                         headers={"DOLAPIKEY": key, "Accept": "application/json", "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(request, timeout=120) as answer:
+                return answer.status, json.loads(answer.read().decode("utf-8") or "null")
+        except urllib.error.HTTPError as error:
+            return error.code, {}
+
+    def row(listed, wanted: str) -> dict:
+        return next((entry for entry in listed if entry.get("slug") == wanted), {}) if isinstance(listed, list) else {}
+
+    status, listed = api("GET", f"kunden/{firm}/unterlagen")
+    agb, deal = row(listed, "agb-unternehmer"), row(listed, slug)
+    check("the website's user lists the firm's documents", status == 200 and bool(agb) and bool(deal),
+          f"{status} {[entry.get('slug') for entry in listed or []] if isinstance(listed, list) else listed}")
+    check("nothing of another customer type", status == 200 and not row(listed, "nutzungsbedingungen"))
+    check("AGB to confirm, general PDF", agb.get("can_confirm") is True and agb.get("can_sign") is False and agb.get("pdf") == "general"
+          and agb.get("stand") == result["agb_stand"], json.dumps(agb, ensure_ascii=False))
+    check("the agreement to sign, made for the firm", deal.get("can_sign") is True and deal.get("can_confirm") is False and deal.get("pdf") == "generated"
+          and deal.get("state") == "generated" and deal.get("files", {}).get("generated") is True, json.dumps(deal, ensure_ascii=False))
+    check("only what the page needs", set(agb) == {"slug", "title", "label", "stand", "state", "action", "required", "can_confirm", "can_sign",
+                                                   "waiting_countersign", "done", "pdf", "files"}, str(sorted(agb)))
+
+    status, pdf = api("GET", f"kunden/{firm}/unterlagen/agb-unternehmer/pdf")
+    check("AGB as PDF", status == 200 and base64.b64decode(pdf.get("content", "")).startswith(b"%PDF") and pdf.get("filename") == "agb-unternehmer.pdf", str(status))
+    status, pdf = api("GET", f"kunden/{firm}/unterlagen/{slug}/pdf")
+    check("the agreement as made for the firm, not the blank template", status == 200 and pdf.get("filename", "").startswith(f"{slug}-")
+          and base64.b64decode(pdf.get("content", "")).startswith(b"%PDF"), f"{status} {pdf.get('filename')}")
+    for path, why in ((f"kunden/{firm}/unterlagen/nutzungsbedingungen/pdf", "a document that is not the firm's"),
+                      (f"kunden/{firm}/unterlagen/..%2F..%2Fconf/pdf", "a path instead of a slug"),
+                      ("kunden/999999/unterlagen", "an unknown customer"),
+                      (f"kunden/{result['private']}/unterlagen/{slug}/pdf", "the firm's document for someone else")):
+        status, _ = api("GET", path)
+        check(f"{why} is not there", status == 404, str(status))
+    status, _ = api("GET", f"kunden/{firm}/unterlagen", key=keys["apikey_without"])
+    check("without the right Unterlagen lesen: refused", status == 403, str(status))
+
+    who = {"name": "Maria Muster", "email": "office@musterfirma.example", "ip": "203.0.113.7"}
+    confirm = f"kunden/{firm}/unterlagen/agb-unternehmer/bestaetigen"
+    status, _ = api("POST", confirm, {**who, "version": "2001-01-01"})
+    check("a confirmation of an older Stand is refused", status == 409, str(status))
+    status, _ = api("POST", confirm, {**who, "email": "kein-mail", "version": result["agb_stand"]})
+    check("a confirmation without a valid e-mail is refused", status == 400, str(status))
+    status, _ = api("POST", confirm, {**who, "name": "<b>x</b>", "version": result["agb_stand"]})
+    check("a name with markup is refused", status == 400, str(status))
+    status, _ = api("POST", f"kunden/{firm}/unterlagen/{slug}/bestaetigen", {**who, "version": result["stand"]})
+    check("a document to sign cannot just be confirmed", status == 409, str(status))
+    status, answer = api("POST", confirm, {**who, "version": result["agb_stand"]})
+    check("AGB confirmed (WAF passes)", status == 200 and answer.get("state") == "done" and answer.get("can_confirm") is False
+          and (answer.get("done") or {}).get("source") == "portal", f"{status} {answer}")
+    status, _ = api("POST", confirm, {**who, "version": result["agb_stand"]})
+    check("confirming twice is refused", status == 409, str(status))
+
+    # A drawn line, base64 without "data:" and "=" like the website's pad sends it.
+    drawn = docker("exec", WEB, "php", "-r", "$i=imagecreatetruecolor(420,120);imagesavealpha($i,true);"
+                   "imagefill($i,0,0,imagecolorallocatealpha($i,255,255,255,127));imagesetthickness($i,4);"
+                   "imageline($i,10,90,400,30,imagecolorallocate($i,27,51,72));ob_start();imagepng($i);echo rtrim(base64_encode(ob_get_clean()),'=');")
+    png = drawn.stdout.strip()
+    sign = f"kunden/{firm}/unterlagen/{slug}/unterschreiben"
+    signer = {"name": "Maria Muster", "email": "office@musterfirma.example", "ip": "198.51.100.24", "version": result["stand"]}
+    status, _ = api("POST", sign, {**signer, "png": "data:image/png;base64," + png})
+    check("a data: URL is refused", status in (400, 403), str(status))
+    status, _ = api("POST", sign, {**signer, "png": base64.b64encode(b"GIF89a nicht wirklich").decode().rstrip("=")})
+    check("something else than a PNG is refused", status == 400, str(status))
+    status, _ = api("POST", f"kunden/{firm}/unterlagen/agb-unternehmer/unterschreiben", {**signer, "png": png, "version": result["agb_stand"]})
+    check("a document to confirm cannot be signed", status == 409, str(status))
+    status, answer = api("POST", sign, {**signer, "png": png})
+    check("the customer signs (WAF passes); the counter signature follows", status == 200 and answer.get("state") == "signing"
+          and answer.get("waiting_countersign") is True and answer.get("can_sign") is False, f"{status} {answer}")
+    status, _ = api("POST", sign, {**signer, "png": png})
+    check("signing twice is refused", status == 409, str(status))
+
+    verified = php("check", script="portal_docs.php")
+    checks += [dict(entry, page="php") for entry in verified["checks"]]
+    status, pdf = api("GET", f"kunden/{firm}/unterlagen/{slug}/pdf")
+    check("after the counter signature the customer gets the signed file", status == 200 and f"{slug}-unterschrieben-" in pdf.get("filename", ""),
+          f"{status} {pdf.get('filename')}")
+    EXAMPLES.mkdir(parents=True, exist_ok=True)
+    docker("cp", f"{WEB}:/tmp/ittpdf-out/kundenbereich-unterschrieben.pdf", str(EXAMPLES / "kundenbereich-unterschrieben.pdf"), check=False)
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"kundenbereich check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} customer area checks passed")
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "editor": editor, "agenda": agenda, "erinnerung": erinnerung, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "editor": editor, "agenda": agenda, "erinnerung": erinnerung, "kundenbereich": kundenbereich, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand", "editor", "agenda", "erinnerung"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand", "editor", "agenda", "erinnerung", "kundenbereich"):
                 steps[name]()
         elif step in steps:
             steps[step]()
