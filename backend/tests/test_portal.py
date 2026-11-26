@@ -194,11 +194,11 @@ def test_the_mail_sheet_looks_like_the_dolibarr_mails():
     assert sheet.index("Hallo,") < sheet.index("maillogo.php"), "the mail starts with the text"
     assert 'src="https://erp.tabelander.co.at/custom/ittabelanderpdf/public/maillogo.php"' in html
     assert 'src="https://erp.tabelander.co.at/custom/ittabelanderpdf/public/maillogo.php?variant=dark"' in html
-    assert "width:180px" in html and "<hr />" in html and "border-top:2px" not in html and "width:56px" not in html
+    assert "width:180px" in html and "border-top:1px solid #D6DEE7" in html and "font-size:14px" in html and "border-top:2px" not in html and "width:56px" not in html
     assert "max-width:560px" in html and "font-size:16px" in html and "color:#3B4D63" in html and "color:#1B3348" in html
     assert "Liebe Grüße" in html and "<strong" in html and "Fabian Tabelander" in text and "color:#4A5B6E" in html
     _text, notice = mail_layout.render([mail_layout.paragraph("Neu")], closing=False)
-    assert "Liebe Grüße" not in notice and "<hr />" in notice
+    assert "Liebe Grüße" not in notice and "<hr " in notice
     for line in ("Spridrichstraße 17, 6410 Telfs", "office@tabelander.co.at", "it.tabelander.co.at", "+43 676 6039945"):
         assert line in html and line in text
     # Exactly one style block; its dark rules address classes only, because

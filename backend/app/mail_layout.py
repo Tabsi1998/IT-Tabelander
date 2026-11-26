@@ -145,13 +145,16 @@ def _logo() -> str:
 def _signature(closing: bool) -> str:
     """As in the owner's own signature (Dolibarr sender profile)."""
     quiet = f"color:{MUTED};text-decoration:none;"
+    # Every block carries its font, like the module's signature in hand-sent mails.
+    font = f"font-family:{FONT};line-height:1.6;"
     words = f'<p class="wb-tx" style="{TEXT}margin:24px 0 16px 0;">{CLOSING}</p>' if closing else ""
     return (words
-            + '<div class="wb-tx" style="color:#3b4d63">'
-            + f'<p style="margin:0 0 10px 0"><strong class="wb-ink" style="color:{INK};">{OWNER}</strong><br>{COMPANY}</p>'
-            + '<hr />'
-            + f'<p style="margin:0 0 8px 0">{_logo()}</p>'
-            + f'<p style="margin:0">{escape(ADDRESS)}<br>'
+            + f'<div class="wb-tx" style="color:#3b4d63;{font}font-size:16px;">'
+            + f'<p class="wb-tx" style="margin:0 0 10px 0;{font}font-size:16px;color:#3b4d63;">'
+              f'<strong class="wb-ink" style="color:{INK};">{OWNER}</strong><br>{COMPANY}</p>'
+            + f'<hr class="wb-ln" style="border:0;border-top:1px solid {LINE};" />'
+            + f'<p style="margin:0 0 8px 0;">{_logo()}</p>'
+            + f'<p class="wb-tx" style="margin:0;{font}font-size:14px;color:#3b4d63;">{escape(ADDRESS)}<br>'
               f'<a class="wb-mu" href="mailto:{EMAIL}" style="{quiet}">{EMAIL}</a> · '
               f'<a class="wb-mu" href="{WEB_URL}" style="{quiet}">{WEB}</a><br>'
               f'<a class="wb-mu" href="tel:{PHONE_DIAL}" style="{quiet}white-space:nowrap;">{PHONE}</a></p>'
