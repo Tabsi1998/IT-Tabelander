@@ -268,18 +268,24 @@ def run(api: Dolibarr, documents: list[Document], dry_run: bool, out=None) -> in
     return 1 if errors else 0
 
 
-def print_open_points(documents: list[Document], out=None) -> None:
+def print_open_points(documents: list[Document], out=None) -> int:
+    """Only the files with open places; nothing at all when every text is ready."""
     out = out or sys.stdout
+    count = 0
     for document in documents:
-        print(f"{document.path.name} ({len(document.open_points)})", file=out)
+        if document.open_points:
+            print(f"{document.path.name} ({len(document.open_points)})", file=out)
         for point in document.open_points:
             print(f"  - {point}", file=out)
+            count += 1
+    return count
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Unterlagen als Entwürfe ins Dolibarr-Wissensmanagement bringen")
     parser.add_argument("--dry-run", action="store_true", help="nur zeigen, was passieren würde")
-    parser.add_argument("--offene-punkte", action="store_true", help="die [BITTE …]-Stellen auflisten, ohne Dolibarr")
+    parser.add_argument("--offene-punkte", action="store_true",
+                        help="die [BITTE …]-Stellen auflisten, ohne Dolibarr; Rückgabe 1, solange es welche gibt")
     parser.add_argument("--ordner", type=Path, default=FOLDER, help="Ordner mit den HTML-Dateien")
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252: no "→" there
@@ -291,8 +297,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"FEHLER {exc}", file=sys.stderr)
         return 2
     if args.offene_punkte:
-        print_open_points(documents)
-        return 0
+        return 1 if print_open_points(documents) else 0
     base, key = os.environ.get("DOLIBARR_URL", "").strip(), os.environ.get("DOLIBARR_API_KEY", "").strip()
     if not base or not key:
         print("FEHLER DOLIBARR_URL und DOLIBARR_API_KEY setzen (API-Benutzer mit „Wissensmanagement: "
