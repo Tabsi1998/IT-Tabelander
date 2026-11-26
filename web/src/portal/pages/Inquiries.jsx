@@ -59,7 +59,7 @@ export default function Inquiries() {
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <PageTitle text="Alle deine Anfragen und Reparaturen. Öffne eine, um den Verlauf zu sehen und mir zu antworten.">Anfragen</PageTitle>
-        <a href={NEW_INQUIRY} className="btn-outline min-h-[48px] border-line">Neue Anfrage</a>
+        <Link to={NEW_INQUIRY} className="btn-primary min-h-[48px]">Neue Anfrage</Link>
       </div>
       {track === "unknown" && (
         <p role="status" className="card m-0 p-5 text-body">

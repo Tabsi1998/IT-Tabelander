@@ -10,6 +10,7 @@ const browser = {
   AbortController: "readonly", crypto: "readonly", console: "readonly", setTimeout: "readonly",
   clearTimeout: "readonly", matchMedia: "readonly", HTMLElement: "readonly", Event: "readonly",
   requestAnimationFrame: "readonly", IntersectionObserver: "readonly", getComputedStyle: "readonly",
+  XMLHttpRequest: "readonly",
 };
 const node = { process: "readonly", console: "readonly", URL: "readonly", Buffer: "readonly" };
 

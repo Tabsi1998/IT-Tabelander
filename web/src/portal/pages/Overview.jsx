@@ -86,7 +86,7 @@ export default function Overview() {
       {waiting.length + offers.length + invoices.length + repairs.length === 0 ? (
         <div className="card flex flex-col items-start gap-3 p-6">
           <p className="m-0 text-[17px] text-body">Gerade ist nichts offen.</p>
-          <a href={NEW_INQUIRY} className="btn-primary">Neue Anfrage starten</a>
+          <Link to={NEW_INQUIRY} className="btn-primary">Neue Anfrage starten</Link>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

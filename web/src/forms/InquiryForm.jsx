@@ -13,15 +13,15 @@ export const REQUEST_TYPES = [
   { key: "consulting", label: "Beratung", text: "Ehrliche Empfehlung vorab." },
   { key: "other", label: "Sonstiges", text: "Passt nirgends dazu." },
 ];
-const DEVICES = [
+export const DEVICES = [
   ["pc", "Desktop-PC"], ["notebook", "Notebook"], ["playstation", "PlayStation"], ["xbox", "Xbox"],
   ["switch", "Switch"], ["controller", "Controller"], ["other", "Sonstiges"],
 ];
-const SOURCES = [["new_controller", "Neuen Controller mitbestellen"], ["send_in", "Eigenen einsenden"], ["unsure", "Noch unsicher"]];
-const NEEDS_DEVICE = new Set(["repair", "pc_upgrade", "other"]);
+export const SOURCES = [["new_controller", "Neuen Controller mitbestellen"], ["send_in", "Eigenen einsenden"], ["unsure", "Noch unsicher"]];
+export const NEEDS_DEVICE = new Set(["repair", "pc_upgrade", "other"]);
 // No device needed: these say in a few words what it is about, for the ticket subject (#107).
-const WITHOUT_DEVICE = new Set(["pc_build", "consulting"]);
-const WITH_BUDGET = new Set(["pc_build", "pc_upgrade", "controller_custom"]);
+export const WITHOUT_DEVICE = new Set(["pc_build", "consulting"]);
+export const WITH_BUDGET = new Set(["pc_build", "pc_upgrade", "controller_custom"]);
 const STEPS = ["Anliegen", "Gerät & Fotos", "Kontakt"];
 const MAX_PHOTOS = 5;
 

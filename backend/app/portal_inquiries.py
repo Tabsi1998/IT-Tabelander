@@ -17,15 +17,20 @@ An answer becomes a ticket message of the website's Dolibarr user, signed
 "– geschrieben im Kundenbereich von <name> (<e-mail>)", so the workshop sees
 who wrote it; the owner gets a short mail. "Hat sich erledigt" closes the
 ticket. A closed ticket stays readable and takes no more answers.
+
+Since #123 the customer can add photos and PDFs (portal_files) and start a
+new inquiry here, on his own customer, without typing his details again.
 """
 import html
 import logging
 import re
+import secrets
+import string
 from urllib.parse import quote
 
 import httpx
 
-from . import dolibarr, mail_layout, mailer, portal
+from . import dolibarr, mail_layout, mailer, portal, portal_files
 from .db import get_db, now_utc
 
 logger = logging.getLogger("it-tabelander.portal")
@@ -118,6 +123,11 @@ def _mail_sender(value) -> str:
     text = str(value or "").strip()
     found = re.fullmatch(r'"?([^"<]*?)"?\s*<[^>]+>', text)
     return (found.group(1).strip() if found and found.group(1).strip() else text.strip("<>"))[:120]
+
+
+def public_ids(events: list[dict]) -> set[str]:
+    """The events the customer may see; a file linked to one of them he may see too."""
+    return {str(event.get("id")) for event in events if str(event.get("code") or "") in PUBLIC_CODES}
 
 
 def history(raw: dict, events: list[dict]) -> list[dict]:
@@ -233,21 +243,25 @@ async def detail(session: dict, ticket_id: int) -> dict:
         code = _status(raw)
         waiting = code not in CLOSED and await dolibarr._offer_waiting(client, cfg, str(raw.get("id")), portal._socid(raw))
         events = await _events(client, cfg, raw.get("id"))
+        files = portal_files.visible(await portal_files.ticket_files(client, cfg, raw.get("id")), public_ids(events))
     return {**portal._ticket(raw, waiting), "closed_at": dolibarr._iso_time(raw.get("date_close")),
-            "can_reply": code not in CLOSED, "messages": history(raw, events)}
+            "can_reply": code not in CLOSED, "messages": history(raw, events), "files": files}
 
 
 # ------------------------------------------------------------------ the owner
 
-def owner_mail(*, what: str, raw: dict, author: str, text: str = "", site_base: str = "") -> tuple[str, str, str]:
+def owner_mail(*, what: str, raw: dict, author: str, text: str = "", files=(), site_base: str = "") -> tuple[str, str, str]:
     """The owner's notice about something the customer did (#122)."""
     ref = str(raw.get("ref") or raw.get("id") or "")
     title = portal._ticket(raw, False)["title"] or "Anfrage"
     link = f"{mail_layout.ERP_URL}/ticket/card.php?track_id={quote(str(raw.get('track_id') or ''), safe='')}"
     if what == "answer":
         subject = f"Kundenbereich: Antwort zu {ref}"
-        parts = [mail_layout.paragraph(f"{author} hat im Kundenbereich zur Anfrage „{title}“ ({ref}) geschrieben:"),
-                 mail_layout.quote(text)]
+        parts = [mail_layout.paragraph(f"{author} hat im Kundenbereich zur Anfrage „{title}“ ({ref}) geschrieben:")]
+        if text:
+            parts.append(mail_layout.quote(text))
+        if files:
+            parts += [mail_layout.paragraph("Angehängt (am Ticket unter „Dokumente“):"), mail_layout.items(*files)]
     else:
         subject = f"Kundenbereich: {ref} als erledigt geschlossen"
         parts = [mail_layout.paragraph(f"{author} hat die Anfrage „{title}“ ({ref}) im Kundenbereich als erledigt "
@@ -271,7 +285,11 @@ async def _notify_owner(cfg: dict, **mail) -> None:
 
 # ------------------------------------------------------------------ answers
 
-async def reply(session: dict, ticket_id: int, text: str) -> dict:
+def _with_files(text: str, files) -> str:
+    return "\n\n".join(part for part in (text, f"Angehängt: {', '.join(files)}" if files else "") if part)
+
+
+async def reply(session: dict, ticket_id: int, text: str, files=()) -> dict:
     """The customer's answer as a ticket message; a ticket that waited for
     the customer goes back to the workshop, as Dolibarr's e-mail collector
     does with an answer by mail."""
@@ -286,15 +304,21 @@ async def reply(session: dict, ticket_id: int, text: str) -> dict:
             raise portal.PortalError("Auf diese Anfrage kannst du hier nicht antworten. Antworte einfach auf meine "
                                      "letzte E-Mail dazu.")
         author = await _author(client, cfg, session)
+        if files:
+            # Only files this customer put on this very ticket can be named.
+            there = {portal_files._name(item) for item in await portal_files.ticket_files(client, cfg, raw.get("id"))}
+            files = [name for name in files if name in there]
+        if not text and not files:
+            raise portal.PortalError("Bitte schreib kurz, was du mitteilen möchtest.")
         await dolibarr.post_ticket_message(client, cfg, track_id=track,
-                                           message=dolibarr.as_note(f"{text}\n\n{SIGNATURE}{author}"))
+                                           message=dolibarr.as_note(f"{_with_files(text, files)}\n\n{SIGNATURE}{author}"))
         if code == STATUS_NEED_MORE_INFO:
             back = STATUS_ASSIGNED if portal._int(raw.get("fk_user_assign")) > 0 else STATUS_NOT_READ
             try:
                 await _set_status(client, cfg, raw.get("id"), {"status": back})
             except httpx.HTTPError as exc:  # the answer is there; the owner sees it in the mail
                 logger.warning("Ticket state not reset after an answer: %s", type(exc).__name__)
-    await _notify_owner(cfg, what="answer", raw=raw, author=author, text=text)
+    await _notify_owner(cfg, what="answer", raw=raw, author=author, text=text, files=files)
     return await detail(session, ticket_id)
 
 
@@ -325,3 +349,45 @@ async def close(session: dict, ticket_id: int) -> dict:
         {"$set": {"review.stopped": "Der Kunde hat die Anfrage im Kundenbereich selbst geschlossen."}})
     await _notify_owner(cfg, what="closed", raw=raw, author=author)
     return await detail(session, ticket_id)
+
+
+# ------------------------------------------------------------------ a new inquiry
+
+def _new_ref() -> str:
+    alphabet = string.ascii_uppercase + string.digits
+    return "ANF-" + "".join(secrets.choice(alphabet) for _ in range(8))
+
+
+def _new_track_id() -> str:
+    alphabet = string.ascii_uppercase + string.digits
+    return "IT" + "".join(secrets.choice(alphabet) for _ in range(14))
+
+
+async def create(session: dict, inquiry: dict, customer_id: int | None = None) -> dict:
+    """A new inquiry of a signed-in customer (#123): the same kinds as the form
+    on the website, the ticket on his own customer, no contact details asked.
+    Dolibarr confirms it to the customer and tells the workshop, as with the
+    form. With a lost answer the tracking id finds the ticket again."""
+    ids = portal._ids(session)
+    socid = customer_id if customer_id in ids else ids[0]
+    cfg = await portal._config()
+    data = {**inquiry, "ref": _new_ref(), "source": "kundenbereich"}
+    track_id = _new_track_id()
+    async with httpx.AsyncClient(timeout=max(cfg["timeout"], 20)) as client:
+        author = await _author(client, cfg, session)
+        try:
+            ticket_id = await dolibarr._create_ticket(
+                client, cfg, subject=dolibarr.inquiry_subject(data), message=dolibarr.format_inquiry_message(data),
+                email=session["email"], thirdparty_id=str(socid), track_id=track_id,
+                classification=dolibarr._ticket_classification(data, cfg))
+        except httpx.TransportError:
+            found = await dolibarr._lookup_ticket_by_track_id(client, cfg, track_id)
+            if not found:
+                raise
+            ticket_id = found.get("id")
+        try:
+            await dolibarr.post_ticket_message(client, cfg, track_id=track_id, private=True, message=dolibarr.as_note(
+                f"Im Kundenbereich angelegt von {author}. Anfrage-Nummer {data['ref']}."))
+        except httpx.HTTPError as exc:  # the inquiry is there; the note is a courtesy
+            logger.warning("No note on a new inquiry from the customer area: %s", type(exc).__name__)
+    return {"id": portal._int(ticket_id), "ref": data["ref"]}

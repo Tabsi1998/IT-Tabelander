@@ -275,33 +275,47 @@ async def _store_image(file: UploadFile, optimize: bool = True) -> dict:
     return await run_in_threadpool(_convert_image, raw, optimize)
 
 
+class ImageTooLarge(ValueError):
+    """More pixels than MAX_PIXELS."""
+
+
+IMAGE_FORMATS = ("JPEG", "PNG", "WEBP", "GIF")
+
+
+def webp_bytes(raw: bytes, *, optimize: bool = True, max_dim: int = 1600, formats=IMAGE_FORMATS) -> bytes:
+    """A photo as WebP, decided by its content: turned upright, without EXIF
+    (no location leaves with it), at most max_dim pixels on its long side.
+    Only the named formats are decoded - never one that needs an outside
+    program (#123). ImageTooLarge or another error if it is no such image."""
+    with Image.open(io.BytesIO(raw), formats=list(formats)) as source:
+        if source.width * source.height > MAX_PIXELS:
+            raise ImageTooLarge("Bildauflösung ist zu groß (max. 25 Megapixel)")
+        source.seek(0)
+        source.load()
+        img = ImageOps.exif_transpose(source)
+        img = img.convert("RGBA") if img.mode in ("P", "LA", "RGBA") else img.convert("RGB")
+    if max(img.size) > max_dim:
+        img.thumbnail((max_dim, max_dim))
+    out = io.BytesIO()
+    img.save(out, "WEBP", **({"quality": 82, "method": 6} if optimize else {}))
+    return out.getvalue()
+
+
 def _convert_image(raw: bytes, optimize: bool) -> dict:
-    ext = "webp"
-    fid = uuid.uuid4().hex
-    fname = f"{fid}.{ext}"
+    fname = f"{uuid.uuid4().hex}.webp"
+    try:
+        data = webp_bytes(raw, optimize=optimize)
+    except ImageTooLarge as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    except Exception:
+        raise HTTPException(status_code=400, detail="Bild konnte nicht verarbeitet werden") from None
     path = os.path.join(UPLOAD_DIR, fname)
     try:
-        with Image.open(io.BytesIO(raw)) as source:
-            if source.width * source.height > MAX_PIXELS:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Bildauflösung ist zu groß (max. 25 Megapixel)",
-                )
-            source.seek(0)
-            source.load()
-            img = ImageOps.exif_transpose(source)
-            img = img.convert("RGBA") if img.mode in ("P", "LA", "RGBA") else img.convert("RGB")
-        max_dim = 1600
-        if max(img.size) > max_dim:
-            img.thumbnail((max_dim, max_dim))
-        save_kwargs = {"quality": 82, "method": 6} if optimize else {}
-        img.save(path, "WEBP", **save_kwargs)
-    except HTTPException:
-        _remove_upload(fname)
-        raise
+        with open(path, "wb") as target:
+            target.write(data)
     except Exception:
         _remove_upload(fname)
-        raise HTTPException(status_code=400, detail="Bild konnte nicht verarbeitet werden")
+        raise
     return {"filename": fname, "size": os.path.getsize(path)}
 
 
