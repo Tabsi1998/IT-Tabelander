@@ -31,7 +31,7 @@ Kontrolle: ein Angebot und eine Rechnung öffnen, „Erzeugen“ mit `werkbank`,
 **Einstellungen → E-Mails → E-Mail-Vorlagen** (`admin/mails_templates.php`):
 
 1. Die alten Vorlagen **„Angebot senden“**, **„Rechnung Senden“** und **„Auftragsbestätigung senden“** auf **inaktiv** stellen (nicht löschen).
-2. Optional bei „Angebot (Sie)“, „Rechnung (Sie)“, „Auftragsbestätigung (Sie)“ „Standard für diesen Typ“ setzen, damit sie beim händischen Versand vorausgewählt sind.
+2. Optional bei „Angebot · Sie“, „Rechnung · Sie“, „Auftragsbestätigung · Sie“ „Standard für diesen Typ“ setzen, damit sie beim händischen Versand vorausgewählt sind.
 
 ## 5. Mahnwesen-Vorlagen im Werkbank-Look
 

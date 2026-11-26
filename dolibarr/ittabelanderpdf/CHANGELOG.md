@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.1] - 2026-11-26
+
+- Mail template labels without brackets: "Angebot · Sie", "Nachricht · Du" … Dolibarr's mail form shows only the text in brackets of a label (it takes it for a translation key), so the templates appeared as "Sie", "Du", "Sie", "Du". On activation (and with "update templates" in the setup) the module's templates of 1.7.0 and earlier get the new label; topic and text stay, also of edited templates; a second run changes nothing. Chosen templates in the setup keep working (they are stored by id).
+- Template "Nachricht": one empty line to write in between greeting and closing (`<p><br></p>`), the closing right below it; no placeholder text that could be sent by mistake. Untouched templates are brought up to date.
+
 ## [1.7.0] - 2026-11-26
 
 - Price list from Dolibarr's products: placeholder `__ITTAB_PREISLISTE__` with one section per chosen product category (order of the category tree), only products and services for sale above 0 €, price with unit (unit or duration of a service). Setup block "Preisliste aus den Produkten": categories, section for the others, descriptions, automatic rewrite (on by default), button to write them now.

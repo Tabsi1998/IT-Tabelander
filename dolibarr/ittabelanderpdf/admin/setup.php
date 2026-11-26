@@ -129,6 +129,7 @@ if ($action === 'takeover_unterlagen') {
 }
 // Only templates with module = ittabelanderpdf, after the confirmation below.
 if ($action === 'confirm_update_templates' && GETPOST('confirm', 'alpha') === 'yes') {
+	WerkbankMailTemplates::renameLabels($db, (int) $conf->entity);
 	$result = WerkbankMailTemplates::upgrade($db, (int) $conf->entity, true);
 	if ($result === -1) {
 		setEventMessages($db->lasterror(), null, 'errors');

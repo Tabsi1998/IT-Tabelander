@@ -61,7 +61,7 @@ $drawn = function ($seed) {
 };
 $out = '/tmp/ittpdf-out';
 @mkdir($out, 0777, true);
-$templates = (int) rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND label IN ('Prüfprotokoll (Sie)', 'Prüfprotokoll (Du)', 'Geräteannahme (Sie)', 'Geräteannahme (Du)')");
+$templates = (int) rt_value($db, "SELECT COUNT(*) FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND label IN ('Prüfprotokoll · Sie', 'Prüfprotokoll · Du', 'Geräteannahme · Sie', 'Geräteannahme · Du')");
 $check('templates Prüfprotokoll and Geräteannahme installed', $templates === 4, (string) $templates);
 $check('update_1.3.0.sql added date_sent', rt_value($db, "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '".MAIN_DB_PREFIX."ittabpdf_qs_run' AND column_name = 'date_sent'") > 0);
 
