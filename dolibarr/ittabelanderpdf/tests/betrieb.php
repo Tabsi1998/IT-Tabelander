@@ -41,6 +41,51 @@ $api = array_values(array_filter($items, function ($item) {
 }));
 // Without a website user of its own (here: none without admin rights) the check says so; with one, it names the missing rights.
 $check('the website user is checked', $api && in_array($api[0]['state'], array('ok', 'warn'), true) && $api[0]['detail'] !== '', $api ? $api[0]['detail'] : '');
+// The website user (2.0.1): a maintenance user with an API key is no website user.
+$apiItem = function () use ($system) {
+	$found = array_values(array_filter($system->run(), function ($item) {
+		return strpos($item['key'], 'api') === 0;
+	}));
+	return $found ? $found[0] : array('state' => '', 'title' => '', 'detail' => '');
+};
+rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."user SET api_key = NULL WHERE admin = 0");
+$made = array();
+foreach (array('checkweb' => true, 'checkwartung' => false) as $login => $right) {
+	$apiUser = new User($db);
+	if ($apiUser->fetch(0, $login) <= 0) {
+		$apiUser = new User($db);
+		$apiUser->login = $login;
+		$apiUser->lastname = 'Check '.$login;
+		$apiUser->email = $login.'@example.invalid';
+		if ($apiUser->create($admin) <= 0) {
+			rt_fail('user '.$login.': '.$apiUser->error);
+		}
+	}
+	rt_exec($db, "DELETE FROM ".MAIN_DB_PREFIX."user_rights WHERE fk_user = ".((int) $apiUser->id));
+	if ($right) {
+		$apiUser->addrights(75623003);
+	}
+	rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."user SET api_key = 'checkkey".$login."' WHERE rowid = ".((int) $apiUser->id));
+	$made[$login] = $apiUser;
+}
+rt_const($db, 'ITTABPDF_WEBSITE_USER', '0');
+$item = $apiItem();
+$check('the website user is the one API user with the customer area right, not the maintenance user',
+	$system->websiteUser() === (int) $made['checkweb']->id && strpos($item['title'], 'checkweb') !== false && strpos($item['title'].$item['detail'], 'checkwartung') === false, $item['title']);
+$made['checkwartung']->addrights(75623003);
+$item = $apiItem();
+$check('two candidates: a hint to choose, no user listed as the website user', $system->websiteUser() === 0 && $item['state'] === 'warn'
+	&& strpos($item['detail'], 'checkweb') !== false && strpos($item['title'], 'checkweb') === false, $item['detail']);
+rt_const($db, 'ITTABPDF_WEBSITE_USER', (string) $made['checkweb']->id);
+$item = $apiItem();
+$check('the chosen website user is checked', $system->websiteUser() === (int) $made['checkweb']->id && strpos($item['title'], 'checkweb') !== false, $item['title']);
+rt_const($db, 'ITTABPDF_WEBSITE_USER', '0');
+rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."user SET api_key = NULL WHERE login IN ('checkweb', 'checkwartung')");
+// The mail logo: the file is there; the public address cannot be reached from inside the container (like hairpin NAT): a hint, no warning.
+$logo = array_values(array_filter($items, function ($item) {
+	return $item['key'] === 'logo';
+}));
+$check('mail logo: there locally, the public address only as a hint', $logo && $logo[0]['state'] === 'ok' && strpos($logo[0]['detail'], 'maillogo.php') !== false, $logo ? $logo[0]['detail'] : '');
 // A rule pointing to a document that does not exist is reported.
 dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');
 $docs = new WerkbankDocs($db);
