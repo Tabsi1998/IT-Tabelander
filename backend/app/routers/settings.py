@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, field_validator
 
-from .. import mailer, site_data
+from .. import legal_pdf, mailer, site_data
 from ..db import get_db, now_utc, serialize
 from ..models import SettingsInput
 from ..security import require_admin
 
 router = APIRouter(prefix="/api", tags=["settings"])
-CONTENT_FIELDS = ("dolibarr_content_category_id", "dolibarr_imprint_article_id",
-                  "dolibarr_privacy_article_id", "dolibarr_terms_article_id")
+CONTENT_FIELDS = ("dolibarr_content_category_id", "dolibarr_legal_category_id", "dolibarr_internal_category_id",
+                  *site_data.LEGAL_ARTICLES.values())
 
 # What the website itself reads; company data, hours and legal texts come
 # through /api/site-info and /api/legal from Dolibarr (#74).
@@ -112,6 +112,7 @@ async def update_settings(payload: SettingsInput, admin: dict = Depends(require_
     await db.settings.update_one({"_id": "site"}, update, upsert=True)
     if any(field in data for field in CONTENT_FIELDS) or "dolibarr_base_url" in data or "dolibarr_api_key" in data:
         await site_data.forget(db)
+        legal_pdf.forget()
     doc = await db.settings.find_one({"_id": "site"})
     return _admin_response(doc)
 

@@ -76,8 +76,10 @@ module's own `dev_dolibarr.py` 18051/18151.
 ## Code map
 
 - `backend/app/`: `dolibarr.py` (client), `handover.py` (queue to Dolibarr),
-  `site_data.py` (company data, opening hours, knowledge articles, cache),
-  `legal_texts.py` + `legal_drafts/`, `portal.py` (customer area),
+  `site_data.py` (company data, opening hours, knowledge articles, cache;
+  the categories FAQ, Rechtstexte and Unterlagen decide, never a title),
+  `legal_texts.py` + `legal_drafts/`, `legal_pdf.py` (legal PDFs from the
+  ECM folder `IT-Tabelander/Unterlagen`, fixed names), `portal.py` (customer area),
   `portal_inquiries.py` (inquiries in the customer area: history, answers, closing, new inquiry),
   `portal_files.py` (their files: which the customer sees, uploads checked by content),
   `review_invites.py`, `mailer.py`, `mail_layout.py` (HTML + text of customer
@@ -87,6 +89,10 @@ module's own `dev_dolibarr.py` 18051/18151.
 - `web/`: one Vite app - website (prerendered), admin `src/admin/`, customer
   area `src/portal/` (lazy chunks, empty shells from `scripts/prerender.mjs`).
 - `dolibarr/ittabelanderpdf/`: the Dolibarr module (below).
+- `docs/unterlagen/`: company documents as HTML for Dolibarr's knowledge base
+  (drafts for the WKO review, see its README); `scripts/import_unterlagen.py`
+  brings them in as drafts, standard library only. Both are part of the
+  backend snapshot for their tests.
 - Customer data lives only in Dolibarr; the website never changes an existing
   third party. Public output goes through field whitelists.
 - The Content-Security-Policy is enforced everywhere; a Vitest test keeps the

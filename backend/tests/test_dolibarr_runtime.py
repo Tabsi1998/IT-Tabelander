@@ -498,6 +498,8 @@ class TestSiteDataFromDolibarr:
         assert terms["draft"] is True and "Test-Nutzungsbedingungen" in terms["html"]
 
     def test_faq_shows_only_released_website_articles(self, website_content):
+        # "AGB für Unternehmer" and "Preisliste" are released and tagged FAQ as well, but
+        # their categories Rechtstexte and Unterlagen keep them off the FAQ (#128).
         faqs = requests.get(f"{BASE_URL}/api/faqs", timeout=60).json()
         assert [faq["question"] for faq in faqs] == ["Holt ihr Geräte auch ab?"], faqs
         assert "<script" not in faqs[0]["answer_html"] and faqs[0]["answer"] == "Ja, im Raum Innsbruck."
@@ -505,7 +507,10 @@ class TestSiteDataFromDolibarr:
     def test_the_website_user_has_no_admin_rights(self, admin_client, website_content):
         assert int(dolibarr_get(f"users/{WEB_USER}")["admin"]) == 0
         overview = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/content", timeout=60).json()
-        assert {"id": CONTENT["category"], "label": "Website"} in overview["categories"]
+        assert {"id": CONTENT["category"], "label": "FAQ"} in overview["categories"]
+        # Rechtstexte and Unterlagen are found by their names (#128).
+        assert overview["category_ids"] == {"faq": CONTENT["category"], "legal": CONTENT["legal_category"],
+                                            "internal": CONTENT["internal_category"]}
         by_id = {article["id"]: article for article in overview["articles"]}
         assert by_id[CONTENT["terms"]]["status"] == 0 and CONTENT["internal"] not in by_id
         assert overview["faq_count"] == 1
@@ -549,10 +554,59 @@ class TestLegalTexts:
             page = requests.get(f"{BASE_URL}/api/legal/datenschutz", timeout=60).json()
             assert page["draft"] is False and "Ausgefüllt und geprüft." in page["html"]
             todo = admin_client.get(f"{BASE_URL}/api/admin/dashboard", timeout=60).json()["legal_todo"]
-            assert not any("Datenschutz" in item for item in todo), todo
+            # Left: the category, which Dolibarr's API cannot give a knowledge article (#128).
+            assert [item for item in todo if "Datenschutz" in item] == [
+                "Datenschutzerklärung steht in Dolibarr nicht in der Kategorie „Rechtstexte“"], todo
         finally:
             admin_client.put(f"{BASE_URL}/api/admin/settings", json={"dolibarr_privacy_article_id": CONTENT["privacy"]},
                              timeout=30)
+
+
+class TestLegalPdf:
+    """#128: the Dolibarr module files the legal texts as PDF in the documents (ECM);
+    the website offers released pages for download, with the website user's
+    right "Dokumente (ECM): lesen/herunterladen" only."""
+
+    def test_released_pages_offer_their_pdf_and_nothing_else(self, admin_client, website_content):
+        import base64
+        filed = run_fixture("ecm")
+        picked = admin_client.put(f"{BASE_URL}/api/admin/settings", json={
+            "dolibarr_b2b_terms_article_id": CONTENT["b2b"], "dolibarr_withdrawal_article_id": CONTENT["b2b"]}, timeout=30)
+        assert picked.status_code == 200, picked.text
+        try:
+            overview = admin_client.get(f"{BASE_URL}/api/admin/dolibarr/content", timeout=60).json()
+            assert overview["pdf"]["problem"] is None, overview["pdf"]
+            assert overview["pdf"]["available"] == {"impressum": False, "datenschutz": True, "nutzungsbedingungen": True,
+                                                    "widerruf": False, "agb-unternehmer": True}, overview["pdf"]
+            texts = {text["kind"]: text for text in overview["legal"]["texts"]}
+            assert texts["nutzungsbedingungen"]["outside_category"] is True
+            assert texts["datenschutz"]["outside_category"] is False and texts["agb-unternehmer"]["state"] == "released"
+            assert "Nutzungsbedingungen steht in Dolibarr nicht in der Kategorie „Rechtstexte“" in overview["legal"]["todo"]
+
+            privacy = requests.get(f"{BASE_URL}/api/legal/datenschutz", timeout=60).json()
+            assert privacy["pdf"] is True
+            assert [page["kind"] for page in privacy["pages"]] == [
+                "impressum", "datenschutz", "nutzungsbedingungen", "widerruf", "agb-unternehmer"]
+            response = requests.get(f"{BASE_URL}/api/legal/datenschutz/pdf", timeout=60)
+            assert response.status_code == 200, response.text
+            assert response.content == base64.b64decode(filed["datenschutz"])
+            assert response.headers["content-type"] == "application/pdf"
+            assert response.headers["content-disposition"] == 'attachment; filename="IT-Tabelander-datenschutz.pdf"'
+            assert requests.get(f"{BASE_URL}/api/legal/agb-unternehmer/pdf", timeout=60).content.startswith(b"%PDF-")
+
+            # A draft never, even with its file there; no file, no PDF; a file that is no PDF neither.
+            terms = requests.get(f"{BASE_URL}/api/legal/nutzungsbedingungen", timeout=60).json()
+            assert terms["draft"] is True and terms["pdf"] is False
+            for kind in ("nutzungsbedingungen", "impressum", "widerruf", "gibt-es-nicht", "..%2F..%2Fconf"):
+                assert requests.get(f"{BASE_URL}/api/legal/{kind}/pdf", timeout=60).status_code == 404, kind
+            assert requests.get(f"{BASE_URL}/api/legal/impressum", timeout=60).json()["pdf"] is False
+            sitemap = requests.get(f"{BASE_URL}/sitemap.xml", timeout=60).text
+            assert "/rechtliches/agb-unternehmer" in sitemap
+        finally:
+            admin_client.put(f"{BASE_URL}/api/admin/settings", json={
+                "dolibarr_b2b_terms_article_id": 0, "dolibarr_withdrawal_article_id": 0}, timeout=30)
+        assert requests.get(f"{BASE_URL}/api/legal/agb-unternehmer", timeout=60).status_code == 404
+        assert requests.get(f"{BASE_URL}/api/legal/agb-unternehmer/pdf", timeout=60).status_code == 404
 
 
 class TestStatusSteps:

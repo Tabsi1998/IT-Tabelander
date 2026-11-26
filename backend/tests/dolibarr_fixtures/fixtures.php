@@ -6,6 +6,7 @@
  *   php fixtures.php customer  an existing customer the website must never change
  *   php fixtures.php content   knowledge articles: FAQ, legal texts, internal notes
  *   php fixtures.php move      the company moves (new address in the setup)
+ *   php fixtures.php ecm       PDFs of the legal texts in the documents (ECM)
  *
  * Every stage prints one JSON object; scripts/local_check.py passes it to the
  * scenarios in backend/tests/test_dolibarr_runtime.py.
@@ -59,6 +60,8 @@ if ($stage === 'base') {
 
     rt_modules(array('modSociete', 'modTicket', 'modApi', 'modPropale', 'modFacture', 'modAgenda',
         'modCategorie', 'modKnowledgeManagement',
+        // The legal texts as PDF in the documents (#128).
+        'modECM',
         // All documents of a customer in the customer area (#100).
         'modCommande', 'modExpedition', 'modFicheinter', 'modContrat',
         // The billing interval of a running service is the service's duration (#101).
@@ -134,6 +137,8 @@ if ($stage === 'base') {
         array('commande', 'lire'), array('expedition', 'lire'), array('ficheinter', 'lire'), array('contrat', 'lire'),
         // The billing interval of running services (#101): the service's duration.
         array('produit', 'lire'),
+        // The legal texts as PDF from the documents (#128): read/download only.
+        array('ecm', 'read'),
     ));
     // The scenarios read what the website created through an administrator.
     $adminKey = bin2hex(random_bytes(20));
@@ -174,21 +179,32 @@ if ($stage === 'customer') {
 if ($stage === 'content') {
     require_once DOL_DOCUMENT_ROOT.'/knowledgemanagement/class/knowledgerecord.class.php';
     require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
-    $category = new Categorie($db);
-    $category->label = 'Website';
-    $category->type = Categorie::TYPE_KNOWLEDGEMANAGEMENT;
-    if ($category->create($admin) <= 0) {
-        rt_fail('category: '.$category->error);
+    // The three categories of the owner's knowledge base (#128): FAQ (once
+    // called "Website"), Rechtstexte and Unterlagen.
+    $categories = array();
+    foreach (array('faq' => 'FAQ', 'legal' => 'Rechtstexte', 'internal' => 'Unterlagen') as $role => $label) {
+        $categories[$role] = new Categorie($db);
+        $categories[$role]->label = $label;
+        $categories[$role]->type = Categorie::TYPE_KNOWLEDGEMANAGEMENT;
+        if ($categories[$role]->create($admin) <= 0) {
+            rt_fail('category '.$label.': '.$categories[$role]->error);
+        }
     }
+    // question, answer, released, categories. As in production, the legal
+    // texts also still carry the FAQ category; the terms lack "Rechtstexte".
     $articles = array(
-        'faq' => array('Holt ihr Geräte auch ab?', '<p>Ja, im Raum Innsbruck.</p><script>alert(1)</script>', true, true),
-        'faq_draft' => array('Eine Frage im Entwurf?', '<p>Noch nicht fertig.</p>', false, true),
-        'internal' => array('Interne Notiz: Lieferant', '<p>Nur für die Werkstatt.</p>', true, false),
-        'privacy' => array('Datenschutzerklärung', '<h2>Datenschutz</h2><p>Test-Datenschutztext.</p>', true, true),
-        'terms' => array('Nutzungsbedingungen', '<p>Test-Nutzungsbedingungen.</p>', false, true),
-        'imprint' => array('Impressum-Ergänzung', '<p>Aufsichtsbehörde: Test-BH</p>', true, true),
+        'faq' => array('Holt ihr Geräte auch ab?', '<p>Ja, im Raum Innsbruck.</p><script>alert(1)</script>', true, array('faq')),
+        'faq_draft' => array('Eine Frage im Entwurf?', '<p>Noch nicht fertig.</p>', false, array('faq')),
+        'internal' => array('Interne Notiz: Lieferant', '<p>Nur für die Werkstatt.</p>', true, array()),
+        'privacy' => array('Datenschutzerklärung', '<h2>Datenschutz</h2><p>Test-Datenschutztext.</p>', true, array('faq', 'legal')),
+        'terms' => array('Nutzungsbedingungen', '<p>Test-Nutzungsbedingungen.</p>', false, array('faq')),
+        'imprint' => array('Impressum-Ergänzung', '<p>Aufsichtsbehörde: Test-BH</p>', true, array('faq', 'legal')),
+        // Released and tagged FAQ by mistake: the other category keeps them off the FAQ.
+        'b2b' => array('AGB für Unternehmer', '<p>Test-AGB für Firmen.</p>', true, array('faq', 'legal')),
+        'paper' => array('Preisliste', '<p>Nur intern.</p>', true, array('faq', 'internal')),
     );
-    $ids = array('category' => (int) $category->id);
+    $ids = array('category' => (int) $categories['faq']->id, 'legal_category' => (int) $categories['legal']->id,
+        'internal_category' => (int) $categories['internal']->id);
     foreach ($articles as $key => $spec) {
         $record = new KnowledgeRecord($db);
         $record->question = $spec[0];
@@ -200,12 +216,44 @@ if ($stage === 'content') {
         if ($spec[2] && $record->validate($admin) <= 0) {
             rt_fail('validate '.$key.': '.$record->error);
         }
-        if ($spec[3] && $category->add_type($record, Categorie::TYPE_KNOWLEDGEMANAGEMENT) < 0) {
-            rt_fail('tag '.$key.': '.$category->error);
+        foreach ($spec[3] as $role) {
+            if ($categories[$role]->add_type($record, Categorie::TYPE_KNOWLEDGEMANAGEMENT) < 0) {
+                rt_fail('tag '.$key.': '.$categories[$role]->error);
+            }
         }
         $ids[$key] = (int) $record->id;
     }
     print json_encode($ids, JSON_PRETTY_PRINT)."\n";
+    exit(0);
+}
+
+if ($stage === 'ecm') {
+    // What the module "IT-Tabelander PDF" files in Dolibarr's documents (#128):
+    // two real PDFs, the one of a draft, and a file that only claims to be one.
+    $dir = (!empty($conf->ecm->dir_output) ? $conf->ecm->dir_output : DOL_DATA_ROOT.'/ecm').'/IT-Tabelander/Unterlagen';
+    if (dol_mkdir($dir) < 0) {
+        rt_fail('ecm folder: '.$dir);
+    }
+    $files = array(
+        'datenschutz' => "%PDF-1.4\n% Datenschutz IT-Tabelander\n%%EOF\n",
+        'nutzungsbedingungen' => "%PDF-1.4\n% Entwurf\n%%EOF\n",
+        'agb-unternehmer' => "%PDF-1.4\n% AGB IT-Tabelander\n%%EOF\n",
+        'widerruf' => "<html>kein PDF</html>\n",
+    );
+    foreach ($files as $slug => $content) {
+        $file = $dir.'/'.$slug.'.pdf';
+        if (file_put_contents($file, $content) === false) {
+            rt_fail('ecm file: '.$file);
+        }
+        @chmod($file, 0644);
+        @chown($file, 'www-data');
+    }
+    foreach (array($dir, dirname($dir)) as $folder) {
+        @chmod($folder, 0755);
+        @chown($folder, 'www-data');
+    }
+    print json_encode(array('folder' => 'IT-Tabelander/Unterlagen', 'files' => array_keys($files),
+        'datenschutz' => base64_encode($files['datenschutz'])), JSON_PRETTY_PRINT)."\n";
     exit(0);
 }
 
