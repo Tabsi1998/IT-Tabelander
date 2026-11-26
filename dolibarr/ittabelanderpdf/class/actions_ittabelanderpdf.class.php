@@ -44,8 +44,17 @@ class ActionsIttabelanderpdf
 	public function doActions($parameters, &$object, &$action, $hookmanager)
 	{
 		global $user, $langs;
-		if ($action === 'ittabpdf_unterlage_pdf' && is_object($object) && $object->element === 'knowledgerecord') {
-			return $this->writeUnterlage($object);
+		if ($action === 'ittabpdf_takeover' && is_object($object) && $object->element === 'knowledgerecord') {
+			if (GETPOST('token', 'alphanohtml') !== currentToken() || !$user->hasRight('ittabelanderpdf', 'unterlagen', 'write')) {
+				accessforbidden();
+			}
+			dol_include_once('/ittabelanderpdf/class/werkbankdoc.class.php');
+			$langs->load('ittabelanderpdf@ittabelanderpdf');
+			$store = new WerkbankDoc($this->db);
+			$taken = $store->importKnowledge($user);
+			setEventMessages($taken < 0 ? $langs->trans('WerkbankDocTakeoverFailed', $store->error) : $langs->trans('WerkbankDocTakenOver', $taken), null, $taken < 0 ? 'errors' : 'mesgs');
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.((int) $object->id));
+			exit;
 		}
 		if ($action === 'ittabpdf_intake' && is_object($object) && $object->element === 'ticket') {
 			return $this->writeIntake($object);
@@ -180,18 +189,30 @@ class ActionsIttabelanderpdf
 		if (!is_object($object) || empty($object->id) || $object->element !== 'knowledgerecord') {
 			return 0;
 		}
+		// Company documents live in the module now: an article of the old
+		// categories can be taken over (once); the article itself stays.
 		dol_include_once('/ittabelanderpdf/class/werkbankunterlagen.class.php');
 		$unterlagen = new WerkbankUnterlagen($this->db);
-		if (!$unterlagen->inCategories($object)) {
+		if (!$unterlagen->inCategories($object) || $this->takenOver($object)) {
 			return 0;
 		}
 		$langs->load('ittabelanderpdf@ittabelanderpdf');
-		$allowed = $user->hasRight('knowledgemanagement', 'knowledgerecord', 'write');
-		$released = WerkbankUnterlagen::isReleased($object);
-		$url = $_SERVER['PHP_SELF'].'?id='.((int) $object->id).'&action=ittabpdf_unterlage_pdf&token='.newToken();
-		$title = !$allowed ? $langs->trans('NotEnoughPermissions') : ($released ? '' : $langs->trans('WerkbankDocsOnlyReleased'));
-		print dolGetButtonAction($title, $langs->trans('WerkbankDocsGenerate'), 'default', $url, 'ittabpdf-unterlage-pdf', $allowed && $released);
+		$allowed = $user->hasRight('ittabelanderpdf', 'unterlagen', 'write');
+		$url = $_SERVER['PHP_SELF'].'?id='.((int) $object->id).'&action=ittabpdf_takeover&token='.newToken();
+		print dolGetButtonAction($allowed ? '' : $langs->trans('NotEnoughPermissions'), $langs->trans('WerkbankDocTakeover'), 'default', $url, 'ittabpdf-takeover', $allowed);
 		return 0;
+	}
+
+	/**
+	 * The module document an article was taken over into, or null.
+	 *
+	 * @param KnowledgeRecord $record Article
+	 * @return object|null
+	 */
+	private function takenOver($record)
+	{
+		$resql = $this->db->query("SELECT rowid, title FROM ".MAIN_DB_PREFIX."ittabpdf_doc WHERE fk_km = ".((int) $record->id));
+		return $resql ? ($this->db->fetch_object($resql) ?: null) : null;
 	}
 
 	/**
@@ -408,8 +429,8 @@ class ActionsIttabelanderpdf
 	}
 
 	/**
-	 * Where the article's PDF is, on its card; nothing for articles outside
-	 * the chosen categories.
+	 * On the card of an article of the old categories: company documents are
+	 * kept in the module now (with a link to it), or the way to take it over.
 	 *
 	 * @param KnowledgeRecord $record Article
 	 * @return string
@@ -423,22 +444,12 @@ class ActionsIttabelanderpdf
 			return '';
 		}
 		$langs->load('ittabelanderpdf@ittabelanderpdf');
-		if (empty($record->array_options) && method_exists($record, 'fetch_optionals')) {
-			$record->fetch_optionals();
+		$doc = $this->takenOver($record);
+		if ($doc) {
+			return '<div class="info ittabpdf-unterlage">'.img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans('WerkbankDocKnowledgeMoved')
+				.' <a href="'.dol_buildpath('/ittabelanderpdf/unterlage_card.php', 1).'?id='.((int) $doc->rowid).'">'.dol_escape_htmltag($doc->title).'</a></div>';
 		}
-		$name = WerkbankUnterlagen::slugOf($record).'.pdf';
-		$relative = WerkbankUnterlagen::relativeDir().'/'.$name;
-		$path = WerkbankUnterlagen::dir().'/'.$name;
-		if (is_file($path)) {
-			$link = '<a href="'.DOL_URL_ROOT.'/document.php?modulepart=ecm&amp;file='.urlencode($relative).'">'.img_picto('', 'pdf', 'class="pictofixedwidth"').dol_escape_htmltag($relative).'</a>';
-			$text = $langs->trans('WerkbankDocsBoxFile').' '.$link.' <span class="opacitymedium">('.dol_print_date(dol_filemtime($path), 'dayhour', 'tzuser').')</span>';
-		} else {
-			$text = $langs->trans('WerkbankDocsBoxNone').' <span class="opacitymedium">'.dol_escape_htmltag($relative).'</span>';
-		}
-		if (!WerkbankUnterlagen::isReleased($record)) {
-			$text .= ' – '.$langs->trans('WerkbankDocsOnlyReleased');
-		}
-		return '<div class="info ittabpdf-unterlage">'.$text.'</div>';
+		return '<div class="warning ittabpdf-unterlage">'.$langs->trans('WerkbankDocKnowledgeNotMoved').'</div>';
 	}
 
 	/**
@@ -470,38 +481,6 @@ class ActionsIttabelanderpdf
 				.dol_escape_htmltag(basename($path)).'</a>', null, 'mesgs');
 		}
 		header('Location: '.$_SERVER['PHP_SELF'].'?track_id='.urlencode((string) $ticket->track_id));
-		exit;
-	}
-
-	/**
-	 * Button "PDF erzeugen" on the article card.
-	 *
-	 * @param KnowledgeRecord $record Article
-	 * @return int
-	 */
-	private function writeUnterlage($record)
-	{
-		global $user, $langs;
-		if (GETPOST('token', 'alphanohtml') !== currentToken() || !$user->hasRight('knowledgemanagement', 'knowledgerecord', 'write')) {
-			accessforbidden();
-		}
-		dol_include_once('/ittabelanderpdf/class/werkbankunterlagen.class.php');
-		$langs->load('ittabelanderpdf@ittabelanderpdf');
-		$unterlagen = new WerkbankUnterlagen($this->db);
-		if (method_exists($record, 'fetch_optionals')) {
-			$record->fetch_optionals();
-		}
-		if (!WerkbankUnterlagen::isReleased($record) || !$unterlagen->inCategories($record)) {
-			setEventMessages($langs->trans('WerkbankDocsOnlyReleased'), null, 'warnings');
-		} else {
-			$path = $unterlagen->generate($record, $user);
-			if ($path === '') {
-				setEventMessages($langs->trans('WerkbankDocsFailed', $unterlagen->error), null, 'errors');
-			} else {
-				setEventMessages($langs->trans('WerkbankDocsWritten', WerkbankUnterlagen::relativeDir().'/'.basename($path)), null, 'mesgs');
-			}
-		}
-		header('Location: '.$_SERVER['PHP_SELF'].'?id='.((int) $record->id));
 		exit;
 	}
 

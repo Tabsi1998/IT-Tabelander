@@ -45,8 +45,8 @@ if ($action === 'save_rules') {
 	$error = 0;
 	$read = function ($suffix) {
 		return array('label' => GETPOST('label_'.$suffix, 'alphanohtml'), 'slug' => GETPOST('slug_'.$suffix, 'alphanohtml'),
-			'action' => GETPOST('action_'.$suffix, 'aZ09'), 'scope' => GETPOST('scope_'.$suffix, 'aZ09'),
-			'scope_value' => GETPOST('scope_'.GETPOST('scope_'.$suffix, 'aZ09').'_'.$suffix, 'alphanohtml'),
+			'action' => GETPOST('action_'.$suffix, 'aZ09'), 'customer_type' => GETPOST('customertype_'.$suffix, 'aZ09'),
+			'products' => GETPOST('products_'.$suffix, 'alphanohtml'), 'fk_category' => GETPOSTINT('category_'.$suffix),
 			'required' => GETPOST('required_'.$suffix), 'renew' => GETPOST('renew_'.$suffix), 'position' => GETPOSTINT('position_'.$suffix),
 			'active' => GETPOST('active_'.$suffix));
 	};
@@ -77,11 +77,8 @@ $actions = array();
 foreach (WerkbankDocs::ACTIONS as $key) {
 	$actions[$key] = $langs->trans('WerkbankDocsAction_'.$key);
 }
-$scopes = array();
-foreach (WerkbankDocs::SCOPES as $key) {
-	$scopes[$key] = $langs->trans('WerkbankDocsScope_'.$key);
-}
-$categories = array('' => '');
+$scopes = array('' => $langs->trans('WerkbankDocsTypeAny'), 'company' => $langs->trans('WerkbankDocsScope_company'), 'private' => $langs->trans('WerkbankDocsScope_private'));
+$categories = array(0 => $langs->trans('WerkbankDocsTypeAny'));
 $resql = $db->query("SELECT rowid, label FROM ".MAIN_DB_PREFIX."categorie WHERE type = 2 AND entity IN (".getEntity('category').") ORDER BY label");
 while ($resql && ($obj = $db->fetch_object($resql))) {
 	$categories[(int) $obj->rowid] = $obj->label;
@@ -108,7 +105,6 @@ function ittabpdf_rule_row($suffix, $rule, $actions, $scopes, $categories, $docu
 	$value = function ($field, $default = '') use ($rule) {
 		return $rule ? (string) $rule->$field : $default;
 	};
-	$scope = $value('scope', 'all');
 	print '<tr class="oddeven'.($rule && !(int) $rule->active ? ' opacitymedium' : '').'">';
 	print '<td><input type="number" name="position_'.$suffix.'" class="width50" value="'.((int) $value('position', '100')).'"></td>';
 	print '<td><input type="text" name="label_'.$suffix.'" class="minwidth200" value="'.dol_escape_htmltag($value('label')).'"'.($rule ? '' : ' placeholder="'.dol_escape_htmltag($langs->trans('WerkbankDocsNewRule')).'"').'>';
@@ -119,9 +115,10 @@ function ittabpdf_rule_row($suffix, $rule, $actions, $scopes, $categories, $docu
 	}
 	print '</td>';
 	print '<td>'.Form::selectarray('action_'.$suffix, $actions, $value('action', 'accept')).'</td>';
-	print '<td>'.Form::selectarray('scope_'.$suffix, $scopes, $scope);
-	print '<br><input type="text" name="scope_contract_'.$suffix.'" class="minwidth150" placeholder="DL-HOST*,DL-WART*" value="'.dol_escape_htmltag($scope === 'contract' ? $value('scope_value') : '').'" title="'.dol_escape_htmltag($langs->trans('WerkbankDocsScopeContractHelp')).'">';
-	print '<br>'.Form::selectarray('scope_category_'.$suffix, $categories, $scope === 'category' ? $value('scope_value') : '', 0, 0, 0, '', 0, 0, 0, '', 'minwidth150').'</td>';
+	// Conditions, all optional, all must hold.
+	print '<td class="nowraponall"><span class="opacitymedium small">'.$langs->trans('WerkbankDocsCondType').'</span> '.Form::selectarray('customertype_'.$suffix, $scopes, $value('customer_type'));
+	print '<br><span class="opacitymedium small">'.$langs->trans('WerkbankDocsCondProducts').'</span> <input type="text" name="products_'.$suffix.'" class="minwidth150" placeholder="DL-HOST*,DL-WART*" value="'.dol_escape_htmltag($value('products')).'" title="'.dol_escape_htmltag($langs->trans('WerkbankDocsScopeContractHelp')).'">';
+	print '<br><span class="opacitymedium small">'.$langs->trans('WerkbankDocsCondCategory').'</span> '.Form::selectarray('category_'.$suffix, $categories, $value('fk_category', '0'), 0, 0, 0, '', 0, 0, 0, '', 'minwidth150').'</td>';
 	print '<td class="center"><input type="checkbox" name="required_'.$suffix.'" value="1"'.($value('required', '1') ? ' checked' : '').'></td>';
 	print '<td class="center"><input type="checkbox" name="renew_'.$suffix.'" value="1"'.($value('renew', '0') ? ' checked' : '').'></td>';
 	print '<td class="center">'.($rule ? '<input type="checkbox" name="active_'.$suffix.'" value="1"'.((int) $rule->active ? ' checked' : '').'>' : '').'</td>';

@@ -425,7 +425,7 @@ def unterlagen() -> None:
     (checked in Mailpit); the ticket message gets them from the box above it;
     every form passes Dolibarr's WAF. Example PDFs go to beispiele/.
     """
-    php("enable", script="unterlagen.php")
+    apikey = php("enable", script="unterlagen.php")["apikey"]
     result = php("run", script="unterlagen.php")
     checks = [dict(entry, page="php") for entry in result["checks"]]
     EXAMPLES.mkdir(parents=True, exist_ok=True)
@@ -449,15 +449,67 @@ def unterlagen() -> None:
     def check(name: str, ok: bool, detail: str = "") -> None:
         checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
 
-    # Article card: box with the file, button, and the file itself.
-    card = f"/knowledgemanagement/knowledgerecord_card.php?id={result['article']}"
-    html = get(card)
-    check("article card shows the PDF", "ittabpdf-unterlage" in html and "nutzungsbedingungen.pdf" in html)
-    button = re.search(r'href="([^"]*action=ittabpdf_unterlage_pdf[^"]*)"', html)
-    check("article card has PDF erzeugen", bool(button))
-    if button:
-        html = get(unescape(button.group(1)).replace(URL, ""))
-        check("PDF erzeugen saves it again", "Unterlagen/nutzungsbedingungen.pdf" in html and "</html>" in html)
+    # The knowledge article that was taken over points to the module.
+    html = get(f"/knowledgemanagement/knowledgerecord_card.php?id={result['article']}")
+    check("taken-over article points to the document in the module", "ittabpdf-unterlage" in html and "unterlage_card.php?id=" in html)
+
+    # List and card: create, release with a note, preview, versions.
+    base = "/custom/ittabelanderpdf"
+    html = get(f"{base}/unterlagen_list.php")
+    check("list shows the documents with version and state", "Nutzungsbedingungen" in html and "datenschutz.pdf" in html and "v3" in html)
+    html = get(f"{base}/unterlage_card.php?action=create")
+    token = re.search(r'name="token" value="([^"]+)"', html).group(1)
+    status, html = post(f"{base}/unterlage_card.php", [("token", token), ("action", "add"), ("title", "Preisaushang Werkstatt"), ("slug", ""),
+                                                      ("kind", "internal"), ("text", "<h2>Preise</h2><p>Diagnose 29 €.</p><ul><li>Express</li></ul>"), ("position", "5")])
+    check("new document from the card (WAF passes)", status == 200 and "Preisaushang Werkstatt" in html and "preisaushang-werkstatt" in html, str(status))
+    found = re.search(r"[?&]id=(\d+)&(?:amp;)?action=preview", html)
+    if found:
+        doc_id = found.group(1)
+        page = get(f"{base}/unterlage_card.php?id={doc_id}")
+        token = re.search(r'name="token" value="([^"]+)"', page).group(1)
+        page = get(f"{base}/unterlage_card.php?id={doc_id}&action=askrelease&token={token}")
+        token = re.search(r'name="token" value="([^"]+)"', page).group(1)
+        html = get(f"{base}/unterlage_card.php?id={doc_id}&action=confirm_release&confirm=yes&note=Erste%20Fassung&token={token}")
+        check("release from the card writes version 1 and the PDF", "v1" in html and "Erste Fassung" in html)
+        token = re.search(r'name="token" value="([^"]+)"', html).group(1)
+        with opener.open(f"{URL}{base}/unterlage_card.php?id={doc_id}&action=preview&token={token}", timeout=60) as answer:
+            check("preview of the draft is a PDF", answer.read(4) == b"%PDF")
+    else:
+        check("release from the card writes version 1 and the PDF", False, "no document id")
+
+    # The module's REST API for the website: public legal texts, HTML and PDF.
+    def api(path: str) -> tuple:
+        request = urllib.request.Request(f"{URL}/api/index.php/ittabelanderpdf/{path}", headers={"DOLAPIKEY": apikey, "Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(request, timeout=60) as answer:
+                return answer.status, json.loads(answer.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            return error.code, {}
+    status, listed = api("unterlagen")
+    slugs = sorted(entry.get("slug") for entry in listed) if isinstance(listed, list) else []
+    check("API lists the public legal texts only", status == 200 and "datenschutz" in slugs and "nutzungsbedingungen" in slugs
+          and "checkliste-uebergabe" not in slugs and "avv-vorlage" not in slugs, f"{status} {slugs}")
+    status, one = api("unterlagen/datenschutz")
+    check("API gives the HTML of the released version", status == 200 and "IT-Tabelander" in one.get("html", "") and one.get("version") == 1, str(status))
+    status, pdf = api("unterlagen/datenschutz/pdf")
+    import base64
+    check("API gives the PDF", status == 200 and base64.b64decode(pdf.get("content", "")).startswith(b"%PDF"), str(status))
+    status, _ = api("unterlagen/checkliste-uebergabe")
+    check("API hides internal documents", status == 404, str(status))
+
+    # scripts/import_unterlagen.py of the repository brings docs/unterlagen as drafts into the module.
+    script = ROOT.parents[1] / "scripts" / "import_unterlagen.py"
+    folder = ROOT.parents[1] / "docs" / "unterlagen"
+    if script.exists() and folder.exists():
+        env = {**os.environ, "DOLIBARR_URL": URL, "DOLIBARR_API_KEY": apikey, "PYTHONIOENCODING": "utf-8"}
+        first = subprocess.run([sys.executable, str(script), "--ordner", str(folder)], env=env, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace")
+        second = subprocess.run([sys.executable, str(script), "--ordner", str(folder)], env=env, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace")
+        check("import script writes the drafts into the module, a second run changes nothing",
+              first.returncode == 0 and "widerruf:" in first.stdout and second.returncode == 0
+              and "anlegen" not in second.stdout and "aktualisieren" not in second.stdout and "unverändert" in second.stdout,
+              (second.stdout + second.stderr)[-300:])
     with opener.open(f"{URL}/document.php?modulepart=ecm&file=IT-Tabelander/Unterlagen/nutzungsbedingungen.pdf", timeout=60) as answer:
         check("PDF downloads from Documents", answer.status == 200 and answer.read(4) == b"%PDF")
 
@@ -565,13 +617,13 @@ def qs() -> None:
     check("new intervention from the phone (WAF passes)", status == 200 and bool(created) and "ittabqs-kind" in html, url)
     kinds = re.findall(r'name="type" value="(\d+)"', html)
     status, html, url = post(f"{base}/qs.php?fichinter={created.group(1) if created else 0}", [("token", token(html)), ("action", "start"), ("type", kinds[-1] if kinds else "0")])
-    check("kind of job starts a QS", status == 200 and "id=" in url and 'class="ittabqs-list"' in html, url)
+    check("kind of job starts a QS", status == 200 and "id=" in url and 'ittabqs-list' in html, url)
 
     # Autosave on the open PC build run: tick, value, text, note.
     status, html, _ = get(f"{base}/qs.php?id={result['open_run']}")
     form = re.search(r'data-endpoint="([^"]+)" data-token="([^"]+)"', html)
-    items = re.findall(r'<li class="ittabqs-item[^"]*" data-id="(\d+)" data-kind="(\w+)" data-required="(\d)"', html)
-    check("checklist shows every point with big targets", status == 200 and bool(form) and len(items) >= 10 and "ittabqs-box" in html and "ittabqs-status" in html,
+    items = re.findall(r'<tr class="oddeven ittabqs-item[^"]*" data-id="(\d+)" data-kind="(\w+)" data-required="(\d)"', html)
+    check("checklist shows every point", status == 200 and bool(form) and len(items) >= 10 and "ittabqs-check" in html and "ittabqs-status" in html,
           f"{len(items)} points")
     saved = []
     for item, kind, required in items:
@@ -774,7 +826,12 @@ def docs() -> None:
             return error.code, "", ""
 
     def token(html: str) -> str:
-        return re.search(r'name="token" value="([^"]+)"', html).group(1)
+        found = re.search(r'name="token" value="([^"]+)"', html)
+        if found:
+            return found.group(1)
+        # The tab shows its forms only on demand (?action=checkform…).
+        page = get(f"{base}/docs.php?socid={result['firm']}&action=checkform&rule={result['rule_receipt']}")[1]
+        return re.search(r'name="token" value="([^"]+)"', page).group(1)
 
     def check(name: str, ok: bool, detail: str = "") -> None:
         checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
@@ -805,9 +862,9 @@ def docs() -> None:
     status, html, _ = get("/index.php?mainmenu=home")
     check("start page widget", status == 200 and "Fehlende Unterlagen" in html)
     status, html, _ = get(f"{base}/admin/docrules.php")
-    check("rules page lists the rules", status == 200 and "auftragsverarbeitung" in html and "scope_contract_" in html)
+    check("rules page lists the rules", status == 200 and "auftragsverarbeitung" in html and "products_" in html)
     status, html, _ = post(f"{base}/admin/docrules.php", [("token", token(html)), ("action", "save_rules"), ("label_new", "Datenblatt erhalten"),
-                                                          ("slug_new", "firmendatenblatt"), ("action_new", "handover"), ("scope_new", "all"),
+                                                          ("slug_new", "firmendatenblatt"), ("action_new", "handover"), ("customertype_new", ""),
                                                           ("required_new", "1"), ("position_new", "90"), ("ITTABPDF_DOCS_CONTRACT_CHECK", "warn"),
                                                           ("ITTABPDF_DOCS_BANNER", "1")])
     check("new rule without code (WAF passes)", status == 200 and "Datenblatt erhalten" in html, str(status))
@@ -820,6 +877,9 @@ def docs() -> None:
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
              "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "down": down}
     wanted = sys.argv[1:] or ["all"]

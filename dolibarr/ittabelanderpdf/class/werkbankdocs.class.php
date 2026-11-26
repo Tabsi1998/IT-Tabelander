@@ -23,8 +23,8 @@ class WerkbankDocs
 	/** What the customer does with a document. */
 	const ACTIONS = array('accept', 'sign', 'handover');
 
-	/** When a rule applies. */
-	const SCOPES = array('all', 'company', 'private', 'contract', 'category');
+	/** Customer type of a rule: any, companies, private persons. */
+	const CUSTOMER_TYPES = array('', 'company', 'private');
 
 	/** Events that count as done. */
 	const DONE = array('signed', 'uploaded', 'checked');
@@ -53,7 +53,8 @@ class WerkbankDocs
 
 	/**
 	 * The rules the module ships, written only when an entity has none:
-	 * label, slug, action, scope, scope value, required, renew.
+	 * label, slug, action, customer type, contract products, tag, required, renew.
+	 * All conditions of a rule must hold; an empty one does not restrict.
 	 *
 	 * @return array<int,array<int,mixed>>
 	 */
@@ -61,11 +62,12 @@ class WerkbankDocs
 	{
 		$hosting = 'DL-HOST*,DL-WART*';
 		return array(
-			array('AGB für Unternehmer akzeptiert', 'agb-unternehmer', 'accept', 'company', '', 1, 1),
-			array('Nutzungsbedingungen akzeptiert', 'nutzungsbedingungen', 'accept', 'private', '', 1, 1),
-			array('Auftragsverarbeitung (AVV) unterschrieben', 'auftragsverarbeitung', 'sign', 'contract', $hosting, 1, 1),
-			array('Leistungsbeschreibung Hosting/Wartung übergeben', 'leistungsbeschreibung-hosting-wartung', 'handover', 'contract', $hosting, 1, 0),
-			array('Einverständnis Fernwartung unterschrieben', 'fernwartung-einverstaendnis', 'sign', 'category', '', 1, 1),
+			array('AGB für Unternehmer akzeptiert', 'agb-unternehmer', 'accept', 'company', '', 'none', 1, 1),
+			array('Nutzungsbedingungen akzeptiert', 'nutzungsbedingungen', 'accept', 'private', '', 'none', 1, 1),
+			array('Auftragsverarbeitung (AVV) unterschrieben', 'auftragsverarbeitung', 'sign', 'company', $hosting, 'none', 1, 1),
+			array('Leistungsbeschreibung Hosting/Wartung übergeben', 'leistungsbeschreibung-hosting-wartung', 'handover', 'company', $hosting, 'none', 1, 0),
+			array('Leistungsbeschreibung Hosting/Wartung (privat) übergeben', 'leistungsbeschreibung-hosting-wartung-privat', 'handover', 'private', $hosting, 'none', 1, 0),
+			array('Einverständnis Fernwartung unterschrieben', 'fernwartung-einverstaendnis', 'sign', '', '', 'Fernwartung', 1, 1),
 		);
 	}
 
@@ -91,10 +93,10 @@ class WerkbankDocs
 			$category = (int) $row->rowid;
 		}
 		foreach (self::defaults() as $index => $rule) {
-			$values = array('label' => $rule[0], 'slug' => $rule[1], 'action' => $rule[2], 'scope' => $rule[3], 'scope_value' => $rule[4],
-				'required' => $rule[5], 'renew' => $rule[6], 'position' => ($index + 1) * 10, 'active' => 1);
-			if ($rule[3] === 'category') {
-				$values['scope_value'] = $category ? (string) $category : '';
+			$values = array('label' => $rule[0], 'slug' => $rule[1], 'action' => $rule[2], 'customer_type' => $rule[3], 'products' => $rule[4],
+				'fk_category' => 0, 'required' => $rule[6], 'renew' => $rule[7], 'position' => ($index + 1) * 10, 'active' => 1);
+			if ($rule[5] !== 'none') {
+				$values['fk_category'] = $category;
 				$values['active'] = $category ? 1 : 0;
 			}
 			if ($this->saveRule(0, $values, $entity) < 0) {
@@ -130,7 +132,7 @@ class WerkbankDocs
 	 * Insert ($id 0) or update a rule.
 	 *
 	 * @param int                 $id     Row id or 0
-	 * @param array<string,mixed> $values label, slug, action, scope, scope_value, required, renew, position, active
+	 * @param array<string,mixed> $values label, slug, action, customer_type, products, fk_category, required, renew, position, active
 	 * @param int|null            $entity Entity, null = current
 	 * @return int                        Row id, -1 on error
 	 */
@@ -148,8 +150,10 @@ class WerkbankDocs
 			'label' => "'".$this->db->escape(dol_trunc($label, 128, 'right', 'UTF-8', 1))."'",
 			'slug' => "'".$this->db->escape($slug)."'",
 			'action' => "'".$this->db->escape(in_array($values['action'], self::ACTIONS, true) ? $values['action'] : 'accept')."'",
-			'scope' => "'".$this->db->escape(in_array($values['scope'], self::SCOPES, true) ? $values['scope'] : 'all')."'",
-			'scope_value' => "'".$this->db->escape(dol_trunc(trim((string) $values['scope_value']), 255, 'right', 'UTF-8', 1))."'",
+			'customer_type' => "'".$this->db->escape(in_array((string) $values['customer_type'], self::CUSTOMER_TYPES, true) ? (string) $values['customer_type'] : '')."'",
+			'products' => "'".$this->db->escape(dol_trunc(trim((string) $values['products']), 255, 'right', 'UTF-8', 1))."'",
+			'fk_category' => (int) $values['fk_category'],
+			'migrated' => 1,
 			'required' => empty($values['required']) ? 0 : 1,
 			'renew' => empty($values['renew']) ? 0 : 1,
 			'position' => (int) $values['position'],
@@ -179,24 +183,23 @@ class WerkbankDocs
 	 */
 	public function applies($rule, $soc)
 	{
-		switch ($rule->scope) {
-			case 'all':
-				return true;
-			case 'company':
-				return !self::isPrivate($this->db, $soc);
-			case 'private':
-				return self::isPrivate($this->db, $soc);
-			case 'contract':
-				return (bool) $this->contractMatches((int) $soc->id, (string) $rule->scope_value);
-			case 'category':
-				$category = (int) $rule->scope_value;
-				if ($category <= 0) {
-					return false;
-				}
-				$resql = $this->db->query("SELECT 1 FROM ".MAIN_DB_PREFIX."categorie_societe WHERE fk_soc = ".((int) $soc->id)." AND fk_categorie = ".$category);
-				return $resql && $this->db->num_rows($resql) > 0;
+		// Every condition that is set must hold (customer type AND product AND tag).
+		if ($rule->customer_type === 'company' && self::isPrivate($this->db, $soc)) {
+			return false;
 		}
-		return false;
+		if ($rule->customer_type === 'private' && !self::isPrivate($this->db, $soc)) {
+			return false;
+		}
+		if (trim((string) $rule->products) !== '' && !$this->contractMatches((int) $soc->id, (string) $rule->products)) {
+			return false;
+		}
+		if ((int) $rule->fk_category > 0) {
+			$resql = $this->db->query("SELECT 1 FROM ".MAIN_DB_PREFIX."categorie_societe WHERE fk_soc = ".((int) $soc->id)." AND fk_categorie = ".((int) $rule->fk_category));
+			if (!$resql || $this->db->num_rows($resql) === 0) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**

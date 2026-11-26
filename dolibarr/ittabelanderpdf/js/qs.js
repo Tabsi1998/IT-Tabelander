@@ -52,8 +52,6 @@
 				return;
 			}
 			var text = status.querySelector('.ittabqs-status-text');
-			var bar = status.querySelector('.ittabqs-meter span');
-			var meter = status.querySelector('.ittabqs-meter');
 			var line = text.getAttribute('data-done-label').replace('%d', counts.done).replace('%t', counts.total);
 			text.textContent = line;
 			if (counts.required_open > 0) {
@@ -62,8 +60,6 @@
 				text.appendChild(document.createTextNode(' · '));
 				text.appendChild(strong);
 			}
-			bar.style.width = (counts.total ? Math.round(100 * counts.done / counts.total) : 0) + '%';
-			meter.setAttribute('aria-valuenow', counts.done);
 		}
 
 		function save(item) {

@@ -41,7 +41,6 @@ if ($stage !== 'run') {
 	rt_fail('unknown stage '.$stage);
 }
 
-require_once DOL_DOCUMENT_ROOT.'/knowledgemanagement/class/knowledgerecord.class.php';
 require_once DOL_DOCUMENT_ROOT.'/comm/propal/class/propal.class.php';
 require_once DOL_DOCUMENT_ROOT.'/contrat/class/contrat.class.php';
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
@@ -71,26 +70,24 @@ foreach ($docs->rules() as $rule) {
 $check('shipped rules are installed', count(array_intersect(array('agb-unternehmer', 'nutzungsbedingungen', 'auftragsverarbeitung', 'leistungsbeschreibung-hosting-wartung', 'fernwartung-einverstaendnis'), array_keys($rules))) === 5, implode(',', array_keys($rules)));
 // Activated before the tag existed: the rule waits switched off; the owner picks the tag in the setup.
 $consent = $rules['fernwartung-einverstaendnis'];
-$check('Fernwartung rule waits for a customer tag', (int) $consent->active === 1 ? (int) $consent->scope_value > 0 : $consent->scope_value === '');
+$check('Fernwartung rule waits for a customer tag', (int) $consent->active === 1 ? (int) $consent->fk_category > 0 : (int) $consent->fk_category === 0);
 $tagId = (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."categorie WHERE type = 2 AND label = 'Fernwartung'");
-$docs->saveRule((int) $consent->rowid, array('label' => $consent->label, 'slug' => $consent->slug, 'action' => $consent->action, 'scope' => 'category',
-	'scope_value' => (string) $tagId, 'required' => 1, 'renew' => 1, 'position' => $consent->position, 'active' => 1));
+$docs->saveRule((int) $consent->rowid, array('label' => $consent->label, 'slug' => $consent->slug, 'action' => $consent->action, 'customer_type' => '',
+	'products' => '', 'fk_category' => $tagId, 'required' => 1, 'renew' => 1, 'position' => $consent->position, 'active' => 1));
 $rules['fernwartung-einverstaendnis'] = $docs->rule((int) $consent->rowid);
 $check('installing again adds nothing', $docs->installDefaults(1) === 0);
 
-// The documents of the rules as released articles (Unterlagen), so their PDFs exist.
-$internal = (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."categorie WHERE type = 13 AND label = 'Unterlagen'");
+// The documents of the rules as released module documents, so their PDFs exist.
+dol_include_once('/ittabelanderpdf/class/werkbankdoc.class.php');
+$store = new WerkbankDoc($db);
 foreach (array('auftragsverarbeitung' => 'Vereinbarung zur Auftragsverarbeitung', 'leistungsbeschreibung-hosting-wartung' => 'Leistungsbeschreibung Hosting und Wartung',
-	'fernwartung-einverstaendnis' => 'Einverständnis Fernwartung') as $slug => $title) {
-	if (!rt_value($db, "SELECT fk_object FROM ".MAIN_DB_PREFIX."knowledgemanagement_knowledgerecord_extrafields WHERE ittab_slug = '".$slug."'")) {
-		$record = new KnowledgeRecord($db);
-		$record->question = $title;
-		$record->answer = '<h2>1. Gegenstand</h2><p>Text der Unterlage '.$title.'.</p>';
-		$record->lang = 'de_DE';
-		$record->array_options['options_ittab_slug'] = $slug;
-		$record->create($admin);
-		$record->setCategories(array($internal));
-		$record->validate($admin);
+	'leistungsbeschreibung-hosting-wartung-privat' => 'Leistungsbeschreibung Hosting und Wartung (privat)', 'fernwartung-einverstaendnis' => 'Einverständnis Fernwartung') as $slug => $title) {
+	$existing = $store->bySlug($slug);
+	$id = $existing ? (int) $existing->rowid : $store->save(0, array('slug' => $slug, 'title' => $title, 'kind' => 'internal', 'public' => 0,
+		'text' => '<h2>1. Gegenstand</h2><p>Text der Unterlage '.$title.'.</p>', 'position' => 0), $admin);
+	// Imported drafts (scripts/import_unterlagen.py) are released for the test.
+	if (!$existing || (int) $existing->version === 0) {
+		$store->release($id, '', $admin);
 	}
 }
 $check('documents of the rules exist', is_file(WerkbankUnterlagen::dir().'/auftragsverarbeitung.pdf') && is_file(WerkbankUnterlagen::dir().'/agb-unternehmer.pdf'));
@@ -138,7 +135,7 @@ $contract->addline('Hosting S', 15, 1, 0, 0, 0, $product->id, 0, dol_now(), dol_
 $contract->validate($admin);
 $check('hosting contract asks for AVV and Leistungsbeschreibung', $state($firm, 'auftragsverarbeitung') === 'missing' && $state($firm, 'leistungsbeschreibung-hosting-wartung') === 'missing');
 $tag = new Categorie($db);
-$tag->fetch((int) $rules['fernwartung-einverstaendnis']->scope_value);
+$tag->fetch((int) $rules['fernwartung-einverstaendnis']->fk_category);
 $tag->add_type($firm, Categorie::TYPE_CUSTOMER);
 $check('tag Fernwartung asks for the consent', $state($firm, 'fernwartung-einverstaendnis') === 'missing');
 
@@ -217,7 +214,8 @@ $second->fetch($second->id);
 $second->fetch_lines();
 rt_const($db, 'ITTABPDF_DOCS_CONTRACT_CHECK', 'block');
 $blocked = $second->active_line($admin, $lineId, dol_now());
-$check('activation without AVV is refused when set to block', $blocked < 0 && strpos($second->error.implode(' ', (array) $second->errors), 'AVV') !== false, $second->error);
+$check('activation without the private service description is refused when set to block', $blocked < 0 && strpos($second->error.implode(' ', (array) $second->errors), '(privat)') !== false, $second->error);
+$check('AVV is for companies only (type AND product)', $state($private, 'auftragsverarbeitung') === 'none' && $state($private, 'leistungsbeschreibung-hosting-wartung-privat') === 'missing');
 rt_const($db, 'ITTABPDF_DOCS_CONTRACT_CHECK', 'warn');
 $second->fetch($second->id);
 $second->fetch_lines();
