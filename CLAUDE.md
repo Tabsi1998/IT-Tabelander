@@ -149,5 +149,6 @@ templates arrive, and follow `docs/ROLLOUT.md` for texts outside the module.
   layout tables, inline styles only.
 - Never test against erp.tabelander.co.at; `dev_dolibarr.py` and the check use
   throwaway containers.
-- Portal links: `WerkbankMailData::portalUrl()` knows proposals and invoices
-  only; the customer area's document pages (#108) are #115.
+- Portal links: `WerkbankMailData::portalUrl()` maps each customer document
+  to its customer-area page (`angebote`, `rechnungen`, `belege/...`). A new
+  page on the website needs its path there too.

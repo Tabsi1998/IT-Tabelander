@@ -1,9 +1,13 @@
 # Changelog
 
+## [1.0.8] - 2026-11-26
+
+- Customer area links for every customer document: orders, shipments, interventions and contracts now open their own page of the website's customer area (`/kundenbereich/belege/auftraege|lieferscheine|arbeitsberichte|vertraege/<id>`), not just its start page.
+- The button "Im Kundenbereich ansehen" (`__ITTAB_KUNDENBEREICH_BLOCK__`, only with `ITTABPDF_PORTAL_ENABLED`) is in every customer template now (invoice, down payment, credit note, payment confirmation, order, shipment, intervention, contract), after the transfer and tracking blocks. Templates that still hold the 1.0.7 text are renewed on activation; edited ones stay and get the variable by hand.
+
 ## [1.0.7] - 2026-11-24
 
-- Ticket confirmation: line breaks of plain-text tickets were shown as a literal `
-` (escaping without keeping them). The customer's confirmation no longer repeats the ticket text, which may carry internal notes from the website; it shows number, subject and status link. Subject without the company suffix.
+- Ticket confirmation: line breaks of plain-text tickets were shown as a literal `\n` (escaping without keeping them). The customer's confirmation no longer repeats the ticket text, which may carry internal notes from the website; it shows number, subject and status link. Subject without the company suffix.
 - New: the owner's notice for a new ticket (`TICKET_NOTIFICATION_EMAIL_TO`) in German in the same sheet: facts box (ticket, type, group, severity, customer, e-mail), the full text and a button into Dolibarr. Replaces Dolibarr's English list in the API user's language. Dolibarr's own notice still goes out if sending fails, if the customer confirmation failed, or if the ticket has an assignee.
 - Recipient of the confirmation taken from `context['contact_id']` like Dolibarr.
 

@@ -277,11 +277,17 @@ class WerkbankMailData
 		if (!is_object($object) || empty($object->id)) {
 			return $base;
 		}
-		if ($object->element === 'propal') {
-			return $base.'/angebote/'.((int) $object->id);
-		}
-		if ($object->element === 'facture') {
-			return $base.'/rechnungen/'.((int) $object->id);
+		// The customer area's pages per document (website, #100/#108).
+		$paths = array(
+			'propal' => 'angebote',
+			'facture' => 'rechnungen',
+			'commande' => 'belege/auftraege',
+			'shipping' => 'belege/lieferscheine',
+			'fichinter' => 'belege/arbeitsberichte',
+			'contrat' => 'belege/vertraege',
+		);
+		if (isset($paths[$object->element])) {
+			return $base.'/'.$paths[$object->element].'/'.((int) $object->id);
 		}
 		return $base;
 	}

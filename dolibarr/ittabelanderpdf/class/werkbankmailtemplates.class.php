@@ -133,28 +133,28 @@ class WerkbankMailTemplates
 
 	/**
 	 * Hashes (md5 of topic, newline, content) of the module's earlier default
-	 * templates (1.0.0, 1.0.1, 1.0.2). A template that still has one of them was never changed by
+	 * templates (1.0.0 to 1.0.7). A template that still has one of them was never changed by
 	 * the owner and may be brought up to date without asking (upgrade()).
 	 */
 	const PREVIOUS = array(
 		'Angebot (Sie)' => array('2c854085ac0c32e001fa3de2828a9f53', '080d2b7005a417b657cbf8a3b7ed9c53', '686a4e515523035d24f656957af888cc'),
 		'Angebot (Du)' => array('76c569235b26af58fdf5a94805b7f187', '3a93504d5ccd3930bdf2140da5506d62', '3c9473892d7ea61f6fae23f636634035'),
-		'Rechnung (Sie)' => array('447e59a45bcb1fa86d7d2e1b2e4317fd', '110e2ad76098a8080043c2c1411cf236', 'd37d5990d0bce4a20b855fe3f674e1e4'),
-		'Rechnung (Du)' => array('3827562f6fff6e2365ec0eeede22fe92', '0c525f787cc1f34a25c125923117c191', 'f5d5279631ce5b7dac7f3db1ef881ecb'),
-		'Anzahlungsrechnung (Sie)' => array('cddea59d502c24ed4a04f7ee97a875d4', 'e36a8afeaa5187cc07ea20af3521af1d', '3b2f3f94d062a6beee48c8806e4284b0'),
-		'Anzahlungsrechnung (Du)' => array('0fd4640a53d3f471fc644dd2b5a9a836', '3b2dbeec83d74774dad6bd1fee837833', 'ba479e50ab76a84c5998c962ba3bd5a4'),
-		'Gutschrift (Sie)' => array('275f9ce09a59526e7ac4d16048404b05', '9c6b547285856a7fb5e4f3f1bcfc4e85', '96a31e23d39e2352522f00279f41dea5'),
-		'Gutschrift (Du)' => array('549cca1e45fed1517bc2f8adfd5457a6', 'c004c69efd41e9d41adc1fe270540f8e', 'c3bd33952ea057c8a20243b0ac8ea098'),
-		'Zahlungsbestätigung (Sie)' => array('f7dfceafbfd9aa1d7a7d26b4fd62f0a3', '6e391eae803713c30899b8c04b638979', 'eaf6a3eabd9d3a7eb3c671ad52940084'),
-		'Zahlungsbestätigung (Du)' => array('83cc70d6bc7085a06621bea78236781f', '861453fedfd4b9f345f620a272f5510f', 'a260d86feb58ca5f72ca42f9af72a30e'),
-		'Auftragsbestätigung (Sie)' => array('02735101ddc5dc45e100d570ae55ffac', '1539c48b08dc02efd14c95249a770152', 'f01c0245583a92d47cdfe445df7c7ef8'),
-		'Auftragsbestätigung (Du)' => array('aa5952774046351fd92d6656d88191c8', '1f55ed93f2f22ca31cf1d894481883a3', '58700b677a4a70afcb39e7c5b1971c63'),
-		'Lieferung (Sie)' => array('14e66c44aa976fa08db82f7580fc70c7', '5ae7833283f5bc38d8fd74d4b109ec5e', '8f4940f4dd4346e4bb0691026463b1cf'),
-		'Lieferung (Du)' => array('40504c48ccc61838084f944dea3fcdc7', '8593ea8c34801216ce9f045ebd2099f6', 'f3c4c588dcf15474e710e2fd6e306594'),
-		'Arbeitsbericht (Sie)' => array('f7b3ebc9d27cd2ca3b45ca78493ad06b', '84dfaafd5a91896801a934d0cd15ae2e', 'd37a84498669f01b2f9c5c6e1449f66a'),
-		'Arbeitsbericht (Du)' => array('b342bf7edfdd9323ec56a3b3770eaed5', '6ffbc72cbb66c2a4077cd7cba11aeb17', '243d7c055dc86575b0fbc2a63f14b88a'),
-		'Vertrag (Sie)' => array('913c7e628356699e1a72f5cccf4ba035', '83ed5c7baf59bb1f67f2aeff53aa3452', '087b9c296330f5ee19bc45abe1820d9a'),
-		'Vertrag (Du)' => array('e033242fb7aa2c54561c796319ce1a89', '30a5dac241d93407a4ca906eb70fb49d', 'a6d0569ef0ec9cee8032b3ce1598982e'),
+		'Rechnung (Sie)' => array('447e59a45bcb1fa86d7d2e1b2e4317fd', '110e2ad76098a8080043c2c1411cf236', 'd37d5990d0bce4a20b855fe3f674e1e4', '4d568dcef1900d219dbd93d4acc3ccdc'),
+		'Rechnung (Du)' => array('3827562f6fff6e2365ec0eeede22fe92', '0c525f787cc1f34a25c125923117c191', 'f5d5279631ce5b7dac7f3db1ef881ecb', '4b9d2d6edc47adb230afae899e3834d0'),
+		'Anzahlungsrechnung (Sie)' => array('cddea59d502c24ed4a04f7ee97a875d4', 'e36a8afeaa5187cc07ea20af3521af1d', '3b2f3f94d062a6beee48c8806e4284b0', 'e3309db89998b07167ab28915f9150e2'),
+		'Anzahlungsrechnung (Du)' => array('0fd4640a53d3f471fc644dd2b5a9a836', '3b2dbeec83d74774dad6bd1fee837833', 'ba479e50ab76a84c5998c962ba3bd5a4', '61e9ea82d7ee65f6f8c89033ad1e56ad'),
+		'Gutschrift (Sie)' => array('275f9ce09a59526e7ac4d16048404b05', '9c6b547285856a7fb5e4f3f1bcfc4e85', '96a31e23d39e2352522f00279f41dea5', '13218fa26dba21107b607f99505ba337'),
+		'Gutschrift (Du)' => array('549cca1e45fed1517bc2f8adfd5457a6', 'c004c69efd41e9d41adc1fe270540f8e', 'c3bd33952ea057c8a20243b0ac8ea098', 'a33c96057dbc398b74b118e3c677eeb1'),
+		'Zahlungsbestätigung (Sie)' => array('f7dfceafbfd9aa1d7a7d26b4fd62f0a3', '6e391eae803713c30899b8c04b638979', 'eaf6a3eabd9d3a7eb3c671ad52940084', '964eb0451587b530d26c9a24097a66f7'),
+		'Zahlungsbestätigung (Du)' => array('83cc70d6bc7085a06621bea78236781f', '861453fedfd4b9f345f620a272f5510f', 'a260d86feb58ca5f72ca42f9af72a30e', '0e212a84e0e647e9bd281c4c892e5b80'),
+		'Auftragsbestätigung (Sie)' => array('02735101ddc5dc45e100d570ae55ffac', '1539c48b08dc02efd14c95249a770152', 'f01c0245583a92d47cdfe445df7c7ef8', 'e47e55e39386c9700986bcd89ab326dc'),
+		'Auftragsbestätigung (Du)' => array('aa5952774046351fd92d6656d88191c8', '1f55ed93f2f22ca31cf1d894481883a3', '58700b677a4a70afcb39e7c5b1971c63', 'dd4a728afe9f685eedf7fc65186801e0'),
+		'Lieferung (Sie)' => array('14e66c44aa976fa08db82f7580fc70c7', '5ae7833283f5bc38d8fd74d4b109ec5e', '8f4940f4dd4346e4bb0691026463b1cf', '4c36aa9e3bc7dbf2a904fa3381b1282d'),
+		'Lieferung (Du)' => array('40504c48ccc61838084f944dea3fcdc7', '8593ea8c34801216ce9f045ebd2099f6', 'f3c4c588dcf15474e710e2fd6e306594', 'e7b2bb00a11b569b20bf61fa16044ccf'),
+		'Arbeitsbericht (Sie)' => array('f7b3ebc9d27cd2ca3b45ca78493ad06b', '84dfaafd5a91896801a934d0cd15ae2e', 'd37a84498669f01b2f9c5c6e1449f66a', '0b61cba4c886aac7ce3794c04dcf28d2'),
+		'Arbeitsbericht (Du)' => array('b342bf7edfdd9323ec56a3b3770eaed5', '6ffbc72cbb66c2a4077cd7cba11aeb17', '243d7c055dc86575b0fbc2a63f14b88a', '8ed055521899be433fb214fedf71b21a'),
+		'Vertrag (Sie)' => array('913c7e628356699e1a72f5cccf4ba035', '83ed5c7baf59bb1f67f2aeff53aa3452', '087b9c296330f5ee19bc45abe1820d9a', 'ebf5f57d1d6f1813cc45296692417dcb'),
+		'Vertrag (Du)' => array('e033242fb7aa2c54561c796319ce1a89', '30a5dac241d93407a4ca906eb70fb49d', 'a6d0569ef0ec9cee8032b3ce1598982e', '6d2dc895b6899d58d8cdac38f4dee41f'),
 		'Nachricht (Sie)' => array('bb8d44cc5d8cb1bcec6122f97e931f6b', 'ba29ff846bd2289d38591d21af1cd028', 'fc78ed7dab76930fe92ad497c1be2a31'),
 		'Nachricht (Du)' => array('72e9fc6264c480b439fb9e646aad93d7', 'fcf5e22c8672d8974a8389e8bb72c4c1', '8934af8c870b8fb2d58301138db43721'),
 		'Ticket-Antwort' => array('94ac499d4537e47f28b8fe68d4f9cea2', '5f242533ce3713418b9e8b092caef823'),
@@ -199,15 +199,15 @@ class WerkbankMailTemplates
 		if ($key !== 'thirdparty') {
 			$body .= '__ITTAB_FAKTEN__';
 		}
-		if ($key === 'propal') {
-			// Button or nothing, depending on ITTABPDF_PORTAL_ENABLED.
-			$body .= '__ITTAB_KUNDENBEREICH_BLOCK__';
-		}
 		if ($key === 'invoice' || $key === 'deposit') {
 			$body .= '__ITTAB_UEBERWEISUNG__';
 		}
 		if ($key === 'shipping') {
 			$body .= '__ITTAB_SENDUNG__';
+		}
+		if (!in_array($key, array('thirdparty', 'supplier_proposal', 'order_supplier'), true)) {
+			// Button into the customer area or nothing, depending on ITTABPDF_PORTAL_ENABLED.
+			$body .= '__ITTAB_KUNDENBEREICH_BLOCK__';
 		}
 		if ($key !== 'thirdparty') {
 			$body .= '<p style="'.$p.'">'.($form === 'du'
