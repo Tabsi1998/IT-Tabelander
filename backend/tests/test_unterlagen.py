@@ -14,7 +14,8 @@ sys.modules[_spec.name] = imp  # dataclasses look the module up there
 _spec.loader.exec_module(imp)
 
 PUBLIC = {"agb-unternehmer", "widerruf"}
-INTERNAL = {"leistungsbeschreibung-hosting-wartung", "auftragsverarbeitung", "fernwartung-einverstaendnis",
+INTERNAL = {"leistungsbeschreibung-hosting-wartung", "leistungsbeschreibung-hosting-wartung-privat",
+            "auftragsverarbeitung", "fernwartung-einverstaendnis",
             "geraeteannahme-bausteine", "qs-checklisten", "firmendatenblatt", "preisliste"}
 
 
@@ -52,6 +53,11 @@ class TestDocuments:
             assert not re.search(r"\bAT\d{2}(?:\s?\d{4}){4}\b", text), path.name
             assert "BIC:" not in text, path.name
         assert "__BANK__" in (ROOT / "docs" / "unterlagen" / "firmendatenblatt.html").read_text(encoding="utf-8")
+
+    def test_every_decision_is_made(self):
+        # Fabian took the recommendations on 26.11.2026; only facts to confirm stay open.
+        for doc in imp.load_documents():
+            assert not any(point.startswith("[BITTE ENTSCHEIDEN") for point in doc.open_points), doc.path.name
 
     def test_open_points_are_counted_like_the_admin_does(self):
         by_slug = {doc.slug: doc for doc in imp.load_documents()}
