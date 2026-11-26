@@ -18,7 +18,8 @@ the IT-Tabelander repository; run this from that folder.
     python scripts/dev_dolibarr.py unterlagen company documents from the knowledge base (tests/unterlagen.php), mail form, ticket, setup
     python scripts/dev_dolibarr.py qs         QS checklists, test report, intake slip (tests/qs.php), phone page, setup, rights
     python scripts/dev_dolibarr.py sign       signatures on the device and sending (tests/sign.php), signing page
-    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets, unterlagen, qs, sign
+    python scripts/dev_dolibarr.py docs       documents per customer (tests/docs.php), tab, cards, widget, rules
+    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets, unterlagen, qs, sign, docs
     python scripts/dev_dolibarr.py down       remove containers, volumes and network
 
 Standard library only. Passwords are new on every start; the local test
@@ -727,16 +728,107 @@ def sign() -> None:
     print(f"{len(checks)} signature checks passed")
 
 
+def multipart(fields: list, files: list) -> tuple:
+    """A multipart/form-data body (fields, then files as (name, filename, bytes, type))."""
+    boundary = "----ittabpdf" + secrets.token_hex(8)
+    body = b""
+    for name, value in fields:
+        body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n").encode()
+    for name, filename, data, kind in files:
+        body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"; filename=\"{filename}\"\r\n"
+                 f"Content-Type: {kind}\r\n\r\n").encode() + data + b"\r\n"
+    return body + f"--{boundary}--\r\n".encode(), f"multipart/form-data; boundary={boundary}"
+
+
+def docs() -> None:
+    """Company documents per customer (tests/docs.php), then the tab, the cards, the widget and the rules page.
+
+    Rules decide who needs what; e-mail, proposal acceptance, signature on the
+    device, upload and a tick by hand mark it; cards and the start page show
+    what is missing. Every form passes Dolibarr's WAF.
+    """
+    php("enable", script="docs.php")
+    result = php("run", script="docs.php")
+    checks = [dict(entry, page="php") for entry in result["checks"]]
+    EXAMPLES.mkdir(parents=True, exist_ok=True)
+    docker("cp", f"{WEB}:/tmp/ittpdf-out/avv-unterschrieben.pdf", str(EXAMPLES / "avv-unterschrieben.pdf"))
+    opener = browser()
+
+    def get(path: str) -> tuple:
+        try:
+            answer = opener.open(f"{URL}{path}", timeout=60)
+            return answer.status, answer.read().decode("utf-8", "replace"), answer.geturl()
+        except urllib.error.HTTPError as error:
+            return error.code, "", ""
+
+    def post(path: str, fields: list, files: list | None = None) -> tuple:
+        if files is not None:
+            body, kind = multipart(fields, files)
+            request = urllib.request.Request(f"{URL}{path}", data=body, headers={"Content-Type": kind})
+        else:
+            request = urllib.request.Request(f"{URL}{path}", data=urllib.parse.urlencode(fields).encode())
+        try:
+            answer = opener.open(request, timeout=120)
+            return answer.status, answer.read().decode("utf-8", "replace"), answer.geturl()
+        except urllib.error.HTTPError as error:
+            return error.code, "", ""
+
+    def token(html: str) -> str:
+        return re.search(r'name="token" value="([^"]+)"', html).group(1)
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
+
+    base = "/custom/ittabelanderpdf"
+    tab = f"{base}/docs.php?socid={result['firm']}"
+    status, html, _ = get(tab)
+    check("tab lists the documents with their state", status == 200 and "state-done" in html and "state-missing" in html and "ittabdocs-summary" in html)
+    status, html, _ = post(tab, [("token", token(html)), ("action", "check"), ("rule", str(result["rule_receipt"])), ("date", "2026-11-20"),
+                                 ("note", "Ausgedruckt übergeben")])
+    check("tick by hand with date and note (WAF passes)", status == 200 and "Abgehakt am 20.11.2026" in html and "Ausgedruckt" in html and f'id="rule-{result["rule_receipt"]}"' in html)
+    status, html, _ = post(tab, [("token", token(html)), ("action", "upload"), ("rule", str(result["rule_consent"])), ("note", "")],
+                           [("docfile", "scan.pdf", b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n", "application/pdf")])
+    check("upload of a signed scan ticks it", status == 200 and "fernwartung-einverstaendnis-unterschrieben-" in html, str(status))
+    status, html, _ = post(tab, [("token", token(html)), ("action", "upload"), ("rule", str(result["rule_consent"]))],
+                           [("docfile", "boese.php", b"<?php echo 1;", "text/plain")])
+    check("upload of something else is refused", status == 200 and "PDF-, JPG- oder PNG-Datei" in html, str(status))
+    status, html, url = post(tab, [("token", token(html)), ("action", "startsign"), ("rule", str(result["rule_receipt"]))])
+    check("sign on the device opens the signing page for the customer only", status == 200 and "kind=doc" in url and html.count("<canvas") == 1, url)
+    status, html, _ = get(f"/societe/card.php?socid={result['firm']}&action=presend&mode=init&ittabpdf_preselect=agb-unternehmer.pdf")
+    check("send from the tab preselects the document", status == 200 and re.search(r'attachfile_\d+">.*?agb-unternehmer\.pdf', html, re.S) is not None)
+    status, html, _ = get(f"/societe/card.php?socid={result['firm']}")
+    check("customer card shows what is missing", status == 200 and "ittabpdf-docs-missing" in html and "docs.php?socid=" in html)
+    status, html, _ = get(f"/comm/propal/card.php?id={result['propal']}")
+    check("proposal card shows it too", status == 200 and "ittabpdf-docs-missing" in html)
+    status, html, _ = get(f"/contrat/card.php?id={result['contract']}")
+    check("contract card shows it too", status == 200 and "ittabpdf-docs-missing" in html)
+    status, html, _ = get("/index.php?mainmenu=home")
+    check("start page widget", status == 200 and "Fehlende Unterlagen" in html)
+    status, html, _ = get(f"{base}/admin/docrules.php")
+    check("rules page lists the rules", status == 200 and "auftragsverarbeitung" in html and "scope_contract_" in html)
+    status, html, _ = post(f"{base}/admin/docrules.php", [("token", token(html)), ("action", "save_rules"), ("label_new", "Datenblatt erhalten"),
+                                                          ("slug_new", "firmendatenblatt"), ("action_new", "handover"), ("scope_new", "all"),
+                                                          ("required_new", "1"), ("position_new", "90"), ("ITTABPDF_DOCS_CONTRACT_CHECK", "warn"),
+                                                          ("ITTABPDF_DOCS_BANNER", "1")])
+    check("new rule without code (WAF passes)", status == 200 and "Datenblatt erhalten" in html, str(status))
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"docs check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} document checks passed")
+
+
 def main() -> int:
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs"):
                 steps[name]()
         elif step in steps:
             steps[step]()

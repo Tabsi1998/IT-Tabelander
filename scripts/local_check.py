@@ -1558,6 +1558,8 @@ def module_steps() -> list:
              module_stage("qs", 1800), ("fixtures",)),
         Step(group, "sign", "Signatures on the device, signed PDFs and sending",
              module_stage("sign", 1800), ("qs",)),
+        Step(group, "docs", "Documents per customer: rules, status, ticks, cards, widget",
+             module_stage("docs", 1800), ("sign", "unterlagen")),
     ]
 
 

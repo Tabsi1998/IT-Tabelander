@@ -2,7 +2,7 @@
 
 Belege im Werkbank-Design von IT-Tabelander, mit den echten Markenschriften, dazu passende E-Mail-Vorlagen und ein verzögerter, abbrechbarer automatischer Versand.
 
-Modulnummer **756230** · Version 1.3.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
+Modulnummer **756230** · Version 1.4.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
 
 ![Entwurf](docs/entwurf/mockup.png)
 
@@ -34,7 +34,7 @@ Ist die Firma nicht umsatzsteuerpflichtig (Firmeneinstellung „Umsatzsteuer: ne
 
 ## Installation
 
-1. `module_ittabelanderpdf-1.3.0.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
+1. `module_ittabelanderpdf-1.4.0.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
 2. In der Modulliste **IT-Tabelander PDF** aktivieren. Dabei passiert:
    - die Vorlage `werkbank` wird für alle neun Belegarten eingeschaltet (noch nicht als Standard),
    - Zusatzfelder: Kunde/Lieferant „Anrede per Du“ (`ittab_du`), Vertrag „Mindestlaufzeit (Monate)“ (`ittab_mindestlaufzeit`) und „Kündigungsfrist“ (`ittab_kuendigungsfrist`),
@@ -83,6 +83,14 @@ Unternehmensunterlagen entstehen aus Artikeln im **Wissensmanagement** (Modul �
 - **An das Beleg-PDF anhängen:** Je Angebot, Auftragsbestätigung und Rechnung lässt sich eine Unterlage hinter das Werkbank-PDF hängen (eigene Seiten mit eigenem Kopf und eigener Seitenzählung). Ist dort nichts gewählt, gilt Dolibarrs eigene Einstellung **Einstellungen → PDF → „AGB/Verkaufsbedingungen anhängen“** (`MAIN_PDF_ADD_TERMSOFSALE_PROPAL` usw. mit hochgeladener Datei); `werkbank` hängt diese Datei genauso an wie `cyan`.
 - **Einstellungen** (Abschnitt „Unterlagen“ in den Moduleinstellungen): Kategorien mit PDF (Vorgabe: „Rechtstexte“ und „Unterlagen“ per Name, gespeichert wird die ID), Ordner, automatisch neu erzeugen, Standard-Anhänge, Anhang ans Beleg-PDF, Liste aller Artikel mit Datei und Stand.
 - **Website:** lädt die PDFs über die REST-API (`GET /documents/download?modulepart=ecm&original_file=IT-Tabelander/Unterlagen/<name>.pdf`); der API-Benutzer braucht dafür das Recht „Dokumente (ECM) lesen/herunterladen“.
+
+## Unterlagen je Kunde: was unterschrieben ist und was fehlt
+
+- **Reiter „Unterlagen“ beim Geschäftspartner:** jede Unterlage, die dieser Kunde braucht (Pflicht) oder bekommen kann (optional), mit Zustand: **Fehlt**, **Verschickt** (am …, Bestätigung fehlt), **Unterschrift läuft**, **Erledigt** (unterschrieben / hochgeladen / abgehakt am …, wie, von wem, Stand der Fassung, Datei), **Neue Fassung** (bestätigt war eine ältere). Oben die Zusammenfassung („2 Pflicht-Unterlagen offen“), unten der Verlauf. Am Handy bedienbar.
+- **Je Zeile:** „Am Gerät unterschreiben“ bzw. „Empfang bestätigen lassen“ (Bestätigungsblatt mit Unterschrift, die Unterlage dahinter, liegt danach beim Kunden), „Per E-Mail senden“ (Mailformular des Kunden mit der Unterlage im Anhang), „Scan hochladen“ (PDF oder Foto, auch direkt mit der Handykamera), „Von Hand abhaken“ (Datum, Notiz), „Zurücksetzen“ (mit Grund; gilt wieder als offen, der Verlauf bleibt).
+- **Automatisch:** Geht eine Unterlage per Mail hinaus („Unterlagen beilegen“ oder Standard-Anhang), steht sie auf „Verschickt“. Wird das Angebot, mit dem sie ging oder an dessen PDF sie hängt, angenommen – auch im Kundenbereich der Website –, ist sie erledigt („im Kundenbereich angenommen“). Unterschrift am Gerät und Upload haken sie ebenfalls ab.
+- **Regeln** (Einstellungen → IT-Tabelander PDF → Reiter **Unterlagen je Kunde**): je Regel Bezeichnung, Unterlage (Dateiname im Ordner Unterlagen), was der Kunde tut (akzeptieren, unterschreiben – dann unterschreiben beide –, Empfang bestätigen), für wen (alle Kunden, Firmen, Privatpersonen, Vertrag mit Produkt-Referenz wie `DL-HOST*,DL-WART*`, Kunden-Kategorie), Pflicht/optional, „Neue Fassung neu bestätigen“ (ändert sich der Artikel, gilt eine ältere Bestätigung nicht mehr). Mitgeliefert: AGB Unternehmer (Firmen), Nutzungsbedingungen (Privat), AVV und Leistungsbeschreibung (Hosting-/Wartungsvertrag), Einverständnis Fernwartung (Kunden-Kategorie „Fernwartung“; ohne diese Kategorie ist die Regel aus, bis sie in den Einstellungen gewählt ist).
+- **Damit nichts vergessen wird:** Hinweis „2 Unterlagen fehlen: …“ mit Knopf auf Kunden-, Angebots-, Vertrags- und Serviceauftragskarte (abschaltbar); Startseiten-Widget **„Fehlende Unterlagen“** (Kunden mit offenen Pflicht-Unterlagen); beim Aktivieren einer Vertragsleistung, deren Produkt eine fehlende Pflicht-Unterlage verlangt, eine Warnung oder – einstellbar – eine Sperre.
 
 ## Werkstatt: QS-Checklisten und Prüfprotokoll
 

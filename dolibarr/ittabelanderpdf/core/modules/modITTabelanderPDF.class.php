@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '1.3.0';
+		$this->version = '1.4.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -57,14 +57,20 @@ class modITTabelanderPDF extends DolibarrModules
 			'theme' => 0,
 			// Banner "automatic e-mail planned / failed" on the cards; company
 			// documents: article card, mail form, ticket message.
-			'hooks' => array('propalcard', 'invoicecard', 'knowledgerecordcard', 'formmail', 'ticketcard'),
+			'hooks' => array('propalcard', 'invoicecard', 'knowledgerecordcard', 'formmail', 'ticketcard', 'thirdpartycard', 'contractcard', 'interventioncard'),
 			'moduleforexternal' => 0,
 		);
 
 		// QS on interventions and from the third party (qs.php works on a phone too).
 		$this->tabs = array(
 			'intervention:+ittabpdfqs:WerkbankQsTab:ittabelanderpdf@ittabelanderpdf:$user->hasRight("ittabelanderpdf", "qs", "run"):/ittabelanderpdf/qs.php?fichinter=__ID__',
+			'thirdparty:+ittabpdfdocs:WerkbankDocsTab:ittabelanderpdf@ittabelanderpdf:$user->hasRight("societe", "lire"):/ittabelanderpdf/docs.php?socid=__ID__',
 			'thirdparty:+ittabpdfqs:WerkbankQsTab:ittabelanderpdf@ittabelanderpdf:$user->hasRight("ittabelanderpdf", "qs", "run") && isModEnabled("ficheinter"):/ittabelanderpdf/qs.php?socid=__ID__',
+		);
+
+		// Start page: customers with required documents missing.
+		$this->boxes = array(
+			0 => array('file' => 'box_ittabpdf_docs.php@ittabelanderpdf', 'note' => 'Fehlende Unterlagen', 'enabledbydefaulton' => 'Home'),
 		);
 
 		$this->dirs = array();
@@ -96,6 +102,8 @@ class modITTabelanderPDF extends DolibarrModules
 			13 => array('ITTABPDF_DOCS_PROPAL_SEND_B2C', 'chaine', 'nutzungsbedingungen.pdf,widerruf.pdf', 'Company documents attached to proposal e-mails to private customers', 0, 'current', 0),
 			14 => array('ITTABPDF_QS_BLOCK_CLOSE', 'chaine', '1', 'An intervention cannot be closed while a QS of it has required points open', 0, 'current', 0),
 			15 => array('ITTABPDF_QS_APPEND_WORKREPORT', 'chaine', '0', 'Put the test reports behind the work report PDF', 0, 'current', 0),
+			16 => array('ITTABPDF_DOCS_CONTRACT_CHECK', 'chaine', 'warn', 'Activating a contract line without its required documents: off, warn or block', 0, 'current', 0),
+			17 => array('ITTABPDF_DOCS_BANNER', 'chaine', '1', 'Show missing required documents on customer, proposal, contract and intervention cards', 0, 'current', 0),
 			8 => array('ITTABPDF_ACCEPT_TEXT_NOPORTAL', 'chaine', 'Bitte kurz per E-Mail an __MYCOMPANY_EMAIL__ bestätigen. Gearbeitet wird erst nach Zusage.', 'How a customer accepts a proposal without the customer area (Werkbank PDF)', 0, 'current', 0),
 		);
 
@@ -241,6 +249,13 @@ class modITTabelanderPDF extends DolibarrModules
 		}
 
 		if ($this->_load_tables('/ittabelanderpdf/sql/') < 0) {
+			return -1;
+		}
+		// The shipped rules for company documents, only when there are none yet.
+		dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');
+		$docs = new WerkbankDocs($this->db);
+		if ($docs->installDefaults((int) $GLOBALS['conf']->entity) < 0) {
+			$this->error = $docs->error;
 			return -1;
 		}
 		// The shipped QS checklists, only when there are none yet.

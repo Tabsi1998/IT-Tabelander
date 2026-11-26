@@ -95,7 +95,9 @@ class ActionsIttabelanderpdf
 			$this->resprints = $this->ticketAttachBox($object);
 			return 0;
 		}
+		$missing = $this->missingBanner($object);
 		if (!is_object($object) || empty($object->id) || !in_array($object->element, array('propal', 'facture'), true)) {
+			$this->resprints = $missing;
 			return 0;
 		}
 		dol_include_once('/ittabelanderpdf/class/werkbankmailqueue.class.php');
@@ -114,8 +116,44 @@ class ActionsIttabelanderpdf
 				$html .= '<div class="error ittabpdf-autosend">'.img_picto('', 'warning', 'class="pictofixedwidth"').dol_escape_htmltag($text).$button.'</div>';
 			}
 		}
-		$this->resprints = $html;
+		$this->resprints = $missing.$html;
 		return 0;
+	}
+
+	/**
+	 * "2 Unterlagen fehlen: AVV, …" with the way to the customer's tab, on the
+	 * cards of the customer, proposals, contracts and interventions.
+	 *
+	 * @param CommonObject $object Card object
+	 * @return string
+	 */
+	private function missingBanner($object)
+	{
+		global $langs, $user;
+		if (!is_object($object) || empty($object->id) || !in_array($object->element, array('societe', 'propal', 'contrat', 'fichinter'), true)
+			|| !$user->hasRight('societe', 'lire') || !empty($user->socid) || !getDolGlobalInt('ITTABPDF_DOCS_BANNER', 1)) {
+			return '';
+		}
+		$socid = $object->element === 'societe' ? (int) $object->id : (int) (!empty($object->socid) ? $object->socid : 0);
+		if ($socid <= 0) {
+			return '';
+		}
+		dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		$soc = $object->element === 'societe' ? $object : new Societe($this->db);
+		if ($object->element !== 'societe' && $soc->fetch($socid) <= 0) {
+			return '';
+		}
+		$docs = new WerkbankDocs($this->db);
+		$missing = $docs->missing($soc);
+		if (!$missing) {
+			return '';
+		}
+		$langs->load('ittabelanderpdf@ittabelanderpdf');
+		$url = dol_buildpath('/ittabelanderpdf/docs.php', 1).'?socid='.$socid;
+		return '<div class="warning ittabpdf-docs-missing">'.img_picto('', 'warning', 'class="pictofixedwidth"')
+			.dol_escape_htmltag($langs->transnoentities(count($missing) === 1 ? 'WerkbankDocsBannerOne' : 'WerkbankDocsBanner', count($missing), implode(', ', $missing)))
+			.' <a class="butAction smallpaddingimp" href="'.$url.'">'.$langs->trans('WerkbankDocsBannerButton').'</a></div>';
 	}
 
 	/**
@@ -222,6 +260,12 @@ class ActionsIttabelanderpdf
 		}
 		$fresh = GETPOST('mode', 'alpha') === 'init' || (GETPOST('modelselected') && GETPOST('modelmailselected', 'alpha') && GETPOST('modelmailselected', 'alpha') != '-1');
 		$context = isset($formmail->param['models']) ? (string) $formmail->param['models'] : '';
+		if ($fresh && GETPOST('ittabpdf_preselect', 'alphanohtml') !== '') {
+			$path = $unterlagen->path(GETPOST('ittabpdf_preselect', 'alphanohtml'));
+			if ($path !== '') {
+				$paths[] = $path;
+			}
+		}
 		if ($fresh && isset(WerkbankUnterlagen::MAIL_CONTEXTS[$context])) {
 			$kind = $this->isPrivateCustomer() ? 'B2C' : 'B2B';
 			$paths = array_merge($paths, $unterlagen->pathsFrom('ITTABPDF_DOCS_'.strtoupper($context).'_'.$kind));

@@ -208,7 +208,7 @@ class WerkbankUnterlagen
 		if (!$wanted) {
 			return array();
 		}
-		$sql = "SELECT DISTINCT k.rowid, k.ref, k.question, k.status, e.".self::SLUG_FIELD." AS slug"
+		$sql = "SELECT DISTINCT k.rowid, k.ref, k.question, k.status, k.tms, k.date_creation, e.".self::SLUG_FIELD." AS slug"
 			." FROM ".MAIN_DB_PREFIX."knowledgemanagement_knowledgerecord AS k"
 			." INNER JOIN ".MAIN_DB_PREFIX."categorie_knowledgemanagement AS c ON c.fk_knowledgemanagement = k.rowid"
 			." LEFT JOIN ".MAIN_DB_PREFIX."knowledgemanagement_knowledgerecord_extrafields AS e ON e.fk_object = k.rowid"
@@ -218,10 +218,48 @@ class WerkbankUnterlagen
 		$list = array();
 		while ($resql && ($obj = $this->db->fetch_object($resql))) {
 			$slug = self::slugify((string) $obj->slug);
+			$changed = max((int) $this->db->jdate($obj->tms), (int) $this->db->jdate($obj->date_creation));
 			$list[] = array('id' => (int) $obj->rowid, 'ref' => (string) $obj->ref, 'title' => (string) $obj->question,
-				'slug' => $slug !== '' ? $slug : self::slugify((string) $obj->question), 'status' => (int) $obj->status);
+				'slug' => $slug !== '' ? $slug : self::slugify((string) $obj->question), 'status' => (int) $obj->status,
+				'stand' => $changed ? dol_print_date($changed, '%Y-%m-%d') : '');
 		}
 		return $list;
+	}
+
+	/**
+	 * The released documents by file name without .pdf: title and "Stand"
+	 * (YYYY-MM-DD, last change of the article), for the status per customer.
+	 *
+	 * @return array<string,array{title:string,stand:string,id:int}>
+	 */
+	public function documents()
+	{
+		$list = array();
+		foreach ($this->articles() as $article) {
+			if ($article['status'] === 1) {
+				$list[$article['slug']] = array('title' => $article['title'], 'stand' => $article['stand'], 'id' => $article['id']);
+			}
+		}
+		return $list;
+	}
+
+	/**
+	 * File names (without .pdf) of the paths that lie in the Unterlagen folder.
+	 *
+	 * @param string[] $paths Full paths (e.g. the attachments of an e-mail)
+	 * @return string[]
+	 */
+	public static function slugsIn(array $paths)
+	{
+		$dir = realpath(self::dir());
+		$slugs = array();
+		foreach ($paths as $path) {
+			$real = realpath((string) $path);
+			if ($dir && $real && dirname($real) === $dir && preg_match('/^([a-z0-9-]+)\.pdf$/', basename($real), $match)) {
+				$slugs[] = $match[1];
+			}
+		}
+		return array_values(array_unique($slugs));
 	}
 
 	// ------------------------------------------------------------ files
