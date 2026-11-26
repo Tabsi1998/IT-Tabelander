@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { mkdirSync } from "node:fs";
 import { expect, expectNoSidewaysScroll, test } from "./fixtures.js";
-import { SIGN_IN_LINK, TRACK_ID, mockPortal, portalState } from "./portal-fixtures.js";
+import { PHOTO, SIGN_IN_LINK, TRACK_ID, mockPortal, portalState } from "./portal-fixtures.js";
 
 async function signedIn(page, path = "/kundenbereich") {
   const state = await mockPortal(page, portalState({ signedIn: true }));
@@ -151,8 +151,62 @@ test("answer an inquiry: the message lands in the history (#122)", async ({ page
   await form.getByRole("button", { name: "Nachricht senden" }).click();
   await expect(form.getByRole("status")).toContainText("Danke, deine Nachricht ist da.");
   await expect(page.getByRole("region", { name: "Verlauf" }).getByRole("listitem").last()).toContainText("Die mit Laufwerk, gekauft 2021.");
-  expect(state.sent.find((item) => item.path === "/inquiries/8/messages").body).toEqual({ message: "Die mit Laufwerk, gekauft 2021." });
+  expect(state.sent.find((item) => item.path === "/inquiries/8/messages").body).toEqual({ message: "Die mit Laufwerk, gekauft 2021.", files: [] });
   await expect(form.getByLabel(/Deine Nachricht/)).toHaveValue("");
+});
+
+test("the ticket's files show and open; a photo and a PDF go with an answer (#123)", async ({ page }) => {
+  const state = await signedIn(page, "/kundenbereich/anfragen/8");
+  const files = page.getByRole("region", { name: "Dateien" });
+  await expect(files.getByRole("link", { name: /kostenvoranschlag\.pdf/ })).toHaveAttribute("href",
+    "/api/portal/inquiries/8/files/kostenvoranschlag.pdf");
+  await expect(files.getByRole("link", { name: /laufwerk\.webp/ })).toContainText("von dir");
+
+  const form = page.getByRole("form", { name: "Antworten" });
+  await form.getByLabel("Datei hinzufügen").setInputFiles([
+    { name: "notiz.txt", mimeType: "text/plain", buffer: Buffer.from("nein") },
+  ]);
+  await expect(form.getByRole("alert")).toContainText("nur Fotos (JPG, PNG, WebP) oder PDF-Dateien");
+  await form.getByLabel("Datei hinzufügen").setInputFiles([
+    { name: "seriennummer.png", mimeType: "image/png", buffer: PHOTO },
+    { name: "kaufbeleg.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%%EOF\n") },
+  ]);
+  const picked = form.getByRole("list", { name: "Ausgewählte Dateien" });
+  await expect(picked.getByRole("listitem")).toHaveCount(2);
+  await form.getByRole("button", { name: "Nachricht senden" }).click();
+  await expect(form.getByRole("status")).toContainText("Danke, deine Nachricht ist da.");
+  const uploads = state.sent.filter((item) => item.path === "/inquiries/8/files");
+  expect(uploads).toHaveLength(2);
+  const message = state.sent.find((item) => item.path === "/inquiries/8/messages").body;
+  expect(message.message).toBe("");
+  expect(message.files).toHaveLength(2);
+  await expect(page.getByRole("region", { name: "Verlauf" }).getByRole("listitem").last()).toContainText("Angehängt:");
+  await expect(files.getByRole("listitem")).toHaveCount(4);
+  await expectNoSidewaysScroll(page);
+});
+
+test("a new inquiry in the customer area, with a file, then straight to it (#123)", async ({ page }) => {
+  const state = await signedIn(page, "/kundenbereich/anfragen");
+  await page.getByRole("link", { name: "Neue Anfrage" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Neue Anfrage" })).toBeVisible();
+  const form = page.getByRole("form", { name: "Neue Anfrage" });
+  await form.getByRole("button", { name: "Anfrage senden" }).click();
+  await expect(form.getByRole("alert")).toHaveText("Bitte wähle, worum es geht.");
+  await form.getByRole("button", { name: /^Reparatur/ }).click();
+  await form.getByRole("button", { name: "Notebook" }).click();
+  await form.getByLabel("Hersteller").fill("Lenovo");
+  await form.getByLabel("Was ist passiert?").fill("Der Bildschirm flackert seit dem Sturz.");
+  await form.getByLabel("Datei hinzufügen").setInputFiles({ name: "display.png", mimeType: "image/png", buffer: PHOTO });
+  await form.getByRole("button", { name: "Anfrage senden" }).click();
+  await expect(page).toHaveURL(/\/kundenbereich\/anfragen\/9$/);
+  await expect(page.getByRole("status")).toContainText("Danke, deine Anfrage ist da.");
+  expect(state.sent.find((item) => item.path === "/inquiries" && item.method === "POST").body).toEqual({
+    request_type: "repair", device_type: "notebook", manufacturer: "Lenovo", model: "",
+    description: "Der Bildschirm flackert seit dem Sturz.",
+  });
+  expect(state.sent.filter((item) => item.path === "/inquiries/9/files")).toHaveLength(1);
+  await expect(page.getByRole("region", { name: "Dateien" }).getByRole("listitem")).toHaveCount(1);
+  await expectNoSidewaysScroll(page);
 });
 
 test("close an inquiry after a question; closed stays readable (#122)", async ({ page }) => {
@@ -271,6 +325,7 @@ for (const scheme of ["light", "dark"]) {
     ["anfrage", "/kundenbereich/anfragen/8", "Reparatur: PlayStation 5", true],
     ["anfrage-geschlossen", "/kundenbereich/anfragen/3", "Controller-Umbau: Controller", true],
     ["anfragen", "/kundenbereich/anfragen", "Anfragen", true],
+    ["neue-anfrage", "/kundenbereich/anfragen/neu", "Neue Anfrage", true],
     ["uebersicht", "/kundenbereich", "Dein Kundenbereich", true],
     ["angebot", "/kundenbereich/angebote/31", "Angebot PR2609-0007", true],
     ["rechnung", "/kundenbereich/rechnungen/41", "Rechnung FA2609-0012", true],

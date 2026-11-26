@@ -61,6 +61,14 @@ function Message({ message }) {
   );
 }
 
+/** "kunde-20260925-080000-a1b2c3-laufwerk.webp" -> "laufwerk.webp": the name the customer gave it. */
+export function fileLabel(file) {
+  if (file.name.startsWith("anfrage-foto-")) return "Foto aus der Anfrage";
+  const own = file.name.match(/^kunde-\d{8}-\d{6}-[a-f0-9]{6}(?:-(.+))?\.(\w+)$/);
+  if (!own) return file.name;
+  return own[1] ? `${own[1]}.${own[2]}` : file.kind === "pdf" ? "PDF" : "Foto";
+}
+
 /** The ticket's photos and PDFs the customer may see (#123); a tap opens one. */
 function Files({ item }) {
   if (!item.files?.length) return null;
@@ -79,7 +87,7 @@ function Files({ item }) {
                 <span className="flex aspect-[4/3] w-full items-center justify-center bg-subtle text-muted"><DocumentIcon /></span>
               )}
               <span className="flex flex-col gap-0.5 p-3">
-                <span className="truncate text-sm font-semibold text-ink">{file.name}</span>
+                <span className="truncate text-sm font-semibold text-ink">{fileLabel(file)}</span>
                 <span className="text-[13px] text-muted">
                   {[file.from === "customer" ? "von dir" : "von IT-Tabelander", file.size && size(file.size)].filter(Boolean).join(" · ")}
                 </span>
