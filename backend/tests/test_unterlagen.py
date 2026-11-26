@@ -54,15 +54,16 @@ class TestDocuments:
             assert "BIC:" not in text, path.name
         assert "__BANK__" in (ROOT / "docs" / "unterlagen" / "firmendatenblatt.html").read_text(encoding="utf-8")
 
-    def test_every_decision_is_made(self):
-        # Fabian took the recommendations on 26.11.2026; only facts to confirm stay open.
+    def test_nothing_is_left_open(self):
+        # Every text can be released (#141): no [BITTE …] place anywhere.
         for doc in imp.load_documents():
-            assert not any(point.startswith("[BITTE ENTSCHEIDEN") for point in doc.open_points), doc.path.name
+            assert doc.open_points == [], doc.path.name
+            assert "[BITTE" not in doc.body, doc.path.name
 
-    def test_open_points_are_counted_like_the_admin_does(self):
-        by_slug = {doc.slug: doc for doc in imp.load_documents()}
-        assert any("WKO" in point for point in by_slug["widerruf"].open_points)
-        assert by_slug["geraeteannahme-bausteine"].open_points == []
+    def test_open_points_are_counted_like_the_admin_does(self, tmp_path):
+        path = write(tmp_path, "a.html", "<p>Zeit: [BITTE ERGÄNZEN: Uhrzeit] und [BITTE MIT DER WKO KLÄREN: x]</p>\n"
+                                          "<p>Stand: 01.01.2026</p>")
+        assert imp.parse_document(path).open_points == ["[BITTE ERGÄNZEN: Uhrzeit]", "[BITTE MIT DER WKO KLÄREN: x]"]
 
     def test_the_readme_names_every_document(self):
         readme = (ROOT / "docs" / "unterlagen" / "README.md").read_text(encoding="utf-8")
@@ -211,6 +212,12 @@ def test_without_url_and_key_the_script_explains_itself(monkeypatch, capsys):
     assert "DOLIBARR_URL" in capsys.readouterr().err
 
 
-def test_open_points_need_no_dolibarr(capsys):
+def test_open_points_need_no_dolibarr_and_there_are_none(capsys):
     assert imp.main(["--offene-punkte"]) == 0
-    assert "widerruf.html" in capsys.readouterr().out
+    assert capsys.readouterr().out == ""
+
+
+def test_open_points_fail_the_listing_while_there_are_some(tmp_path, capsys):
+    write(tmp_path, "a.html", "<p>[BITTE PRÜFEN: Raum]</p>\n<p>Stand: 01.01.2026</p>")
+    assert imp.main(["--offene-punkte", "--ordner", str(tmp_path)]) == 1
+    assert "a.html (1)" in capsys.readouterr().out

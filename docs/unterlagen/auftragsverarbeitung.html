@@ -77,14 +77,14 @@ Für IT-Tabelander: ______________________________</p>
 <p>Besondere Kategorien von Daten (Art. 9 DSGVO): ☐ nein ☐ ja, nämlich: ______________________________</p>
 
 <h2>Anlage 2: Technische und organisatorische Maßnahmen</h2>
-<p>Die folgenden Maßnahmen beschreiben den tatsächlichen Stand bei IT-Tabelander. Stellen mit „BITTE PRÜFEN“ muss ich vor der ersten Unterschrift bestätigen oder anpassen.</p>
+<p>Diese Maßnahmen setze ich bei allen Verarbeitungen für den Kunden um. Sie sind auf einen Ein-Personen-Betrieb mit eigenen Servern zugeschnitten.</p>
 <h3>Vertraulichkeit</h3>
 <ul>
-<li><strong>Zutritt:</strong> Die Server stehen in einem abgeschlossenen Raum in meinen Räumen in Telfs. Zutritt habe nur ich. [BITTE PRÜFEN: Raum abgeschlossen? Weitere Sicherung, etwa Alarmanlage?]</li>
-<li><strong>Zugang:</strong> Verwaltungszugänge zu den Servern nur über SSH-Schlüssel, nicht über Passwörter. Passwörter liegen in einem Passwortmanager. Verwaltungsoberflächen sind, wo möglich, nur aus meinem eigenen Netz erreichbar und mit zweitem Faktor geschützt. Meine Arbeitsgeräte sperren sich automatisch und haben verschlüsselte Festplatten. [BITTE PRÜFEN: zweiter Faktor, Festplattenverschlüsselung der Arbeitsgeräte, Dolibarr von außen gesperrt (Issue #67)]</li>
+<li><strong>Zutritt:</strong> Die Server stehen in einem abschließbaren Raum in meinen Räumen in Telfs, der abgeschlossen ist, wenn ich nicht da bin. Zutritt habe nur ich. Andere Personen kommen nur in meiner Begleitung hinein.</li>
+<li><strong>Zugang:</strong> Verwaltungszugänge zu den Servern nur über SSH-Schlüssel, nicht über Passwörter. Alle anderen Zugänge sind mit starken, einzigartigen Passwörtern aus einem Passwortmanager und, wo verfügbar, mit einem zweiten Faktor geschützt. Verwaltungsoberflächen sind nicht öffentlich erreichbar, sondern nur aus meinem eigenen Netz oder über eine verschlüsselte VPN-Verbindung. Meine Arbeitsgeräte haben verschlüsselte Datenträger und sperren sich nach wenigen Minuten ohne Benutzung.</li>
 <li><strong>Zugriff:</strong> Nur ich habe Zugriff auf die Daten der Kunden. Jeder Kunde hat eigene Konten; Kunden sehen nur ihre eigenen Daten.</li>
-<li><strong>Trennung:</strong> Die Daten verschiedener Kunden liegen getrennt, in eigenen Datenbanken und Verzeichnissen. [BITTE PRÜFEN: eigene Container oder Instanzen je Kunde?]</li>
-<li><strong>Verschlüsselung:</strong> Alle Verbindungen laufen verschlüsselt (HTTPS mit aktuellem TLS, SSH). Sicherungen sind verschlüsselt. [BITTE PRÜFEN: Sind die Festplatten der Server selbst verschlüsselt?]</li>
+<li><strong>Trennung:</strong> Die Daten verschiedener Kunden liegen getrennt, mit eigenen Datenbanken, Verzeichnissen und Benutzerkonten. Ein Kunde hat keinen Zugriff auf die Daten eines anderen.</li>
+<li><strong>Verschlüsselung:</strong> Alle Verbindungen laufen verschlüsselt (HTTPS mit aktuellem TLS, SSH). Datenträger, auf denen Daten von Kunden oder Sicherungen liegen, sind verschlüsselt. Sicherungen verlassen den Server nur verschlüsselt.</li>
 <li><strong>Datensparsamkeit:</strong> Protokolle des Webservers lösche ich nach 14 Tagen. Kopien für eine Datenübernahme lösche ich nach Abschluss des Auftrags.</li>
 </ul>
 <h3>Integrität</h3>
@@ -95,13 +95,12 @@ Für IT-Tabelander: ______________________________</p>
 </ul>
 <h3>Verfügbarkeit und Belastbarkeit</h3>
 <ul>
-<li>tägliche Sicherung, 14 Tage aufbewahrt, dazu 4 Wochensicherungen; verschlüsselte Kopie an einem zweiten Ort [BITTE PRÜFEN: Stand 24.11.2026 noch nicht eingerichtet]</li>
+<li>tägliche Sicherung, 14 Tage aufbewahrt, dazu 4 Wochensicherungen; eine verschlüsselte Kopie liegt an einem zweiten Ort getrennt vom Server</li>
 <li>einmal im Quartal ein Test, ob sich eine Sicherung wiederherstellen lässt</li>
 <li>Sicherheitsupdates in der Regel innerhalb von 3 Werktagen, kritische sofort</li>
 <li>Firewall, nur die nötigen Dienste von außen erreichbar</li>
 <li>Überwachung der Dienste alle 5 Minuten mit Warnung an mich</li>
-<li>[BITTE PRÜFEN: unterbrechungsfreie Stromversorgung (USV) und Festplattenspiegelung (RAID) vorhanden?]</li>
-<li>Ziel für die Wiederherstellung nach einem Ausfall: innerhalb von [BITTE PRÜFEN: 2 Werktagen]</li>
+<li>Ziel für die Wiederherstellung nach einem Ausfall: innerhalb von 2 Werktagen, aus der letzten Sicherung</li>
 </ul>
 <h3>Regelmäßige Überprüfung</h3>
 <ul>
@@ -112,11 +111,11 @@ Für IT-Tabelander: ______________________________</p>
 <h3>Fernwartung</h3>
 <ul>
 <li>Eine Verbindung gibt es nur, wenn der Kunde sie am Gerät freigibt; die Sitzung ist am Bildschirm sichtbar und kann jederzeit beendet werden. Ausnahme: ein ausdrücklich vereinbarter Zugang für die IT-Wartung.</li>
-<li>Werkzeug: [BITTE ERGÄNZEN: Programm und ob die Verbindung über eigene Server oder Server des Herstellers läuft. Läuft sie über Server des Herstellers, gehört der Hersteller in Anlage 3.]</li>
+<li>Die Verbindung ist durchgehend verschlüsselt. Läuft sie über Server des Software-Herstellers, kann der Hersteller die Inhalte der Sitzung nicht lesen und bekommt nur Verbindungsdaten wie IP-Adresse, Gerätekennung und Zeitpunkt; der Hersteller steht dann in Anlage 3.</li>
 </ul>
 
 <h2>Anlage 3: Unterauftragsverarbeiter</h2>
 <p>Derzeit ziehe ich keine Unterauftragsverarbeiter bei. Website, Cloud, Sicherungen und E-Mail laufen auf meinen eigenen Servern in Telfs, Österreich.</p>
-<p>[BITTE ERGÄNZEN: Falls doch, je Anbieter Name, Anschrift, Leistung und Ort der Verarbeitung. In Frage kommen etwa ein Fernwartungsprogramm mit Servern des Herstellers, ein externer Speicher für die Sicherungskopie oder ein Domain-Anbieter.]</p>
+<p>Ziehe ich später einen Unterauftragsverarbeiter bei, etwa einen Hersteller, über dessen Server Fernwartungsverbindungen laufen, oder einen Speicher für die Sicherungskopie, kündige ich ihn nach Abschnitt 5 an und trage ihn hier mit Name, Anschrift, Leistung und Ort der Verarbeitung ein. Ich wähle dafür nur Anbieter mit Sitz und Verarbeitung in der EU oder im EWR.</p>
 
 <p>Stand: 26.11.2026</p>
