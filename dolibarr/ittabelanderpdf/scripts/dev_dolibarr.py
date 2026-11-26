@@ -276,8 +276,25 @@ def ui() -> None:
             status = error.code
         checks.append({"page": f"POST {sample.name} passes the WAF", "ok": status == 200, "missing": [str(status)]})
     look("queue", "/custom/ittabelanderpdf/queue.php", ["Automatischer Versand", "Gesendet"])
-    look("setup", "/custom/ittabelanderpdf/admin/setup.php", ["ITTABPDF_AUTOSEND_DELAY", "Angebot (Sie)", "action=update_templates"])
+    look("setup", "/custom/ittabelanderpdf/admin/setup.php", ["ITTABPDF_AUTOSEND_DELAY", "Angebot · Sie", "action=update_templates"])
+    # The template choice in Dolibarr's own mail form: readable labels, each once
+    # (a label in brackets showed only "Sie"/"Du" there, #162).
+    def template_options(path: str) -> list[str]:
+        html = opener.open(f"{URL}{path}", timeout=60).read().decode("utf-8", "replace")
+        found = re.search(r'<select[^>]*id="modelmailselected"[^>]*>(.*?)</select>', html, re.S)
+        options = re.findall(r"<option[^>]*>(.*?)</option>", found.group(1), re.S) if found else []
+        return [unescape(re.sub(r"<[^>]+>", "", option)).strip() for option in options]
+
     if state.get("planned_propal"):
+        card_html = opener.open(f"{URL}/comm/propal/card.php?id={state['planned_propal']}", timeout=60).read().decode("utf-8", "replace")
+        socid = re.search(r"socid=(\d+)", card_html)
+        for name, path, wanted in (("proposal", f"/comm/propal/card.php?id={state['planned_propal']}&action=presend&mode=init", ["Angebot · Sie", "Angebot · Du"]),
+                                   ("third party", f"/societe/card.php?socid={socid.group(1) if socid else 0}&action=presend&mode=init",
+                                    ["Nachricht · Sie", "Nachricht · Du", "Unterlage · Sie", "Unterlage · Du"])):
+            labels = [label for label in template_options(path) if label]
+            ok = (all(label in labels for label in wanted) and not any(label in ("Sie", "Du") for label in labels)
+                  and len(labels) == len(set(labels)))
+            checks.append({"page": f"mail form of the {name}: template labels readable and unique", "ok": ok, "missing": labels})
         card = f"/comm/propal/card.php?id={state['planned_propal']}"
         look("propal-card", card, ["Automatischer Versand geplant um", "ittabpdf_cancel"])
         # Press "Abbrechen" like a person would; afterwards the banner is gone.

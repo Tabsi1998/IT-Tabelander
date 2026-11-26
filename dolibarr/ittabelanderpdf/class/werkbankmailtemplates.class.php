@@ -109,9 +109,10 @@ class WerkbankMailTemplates
 				array('anbei der Vertrag __REF__ für die laufenden Leistungen.',
 					'Bitte lies ihn in Ruhe durch und schick ihn unterschrieben zurück, gern als Scan oder Foto.'),
 				1),
+			// One empty paragraph to write in (<br>, the way CKEditor keeps an empty line).
 			'thirdparty' => array('thirdparty', 'Nachricht', 'Nachricht von __MYCOMPANY_NAME__',
-				array('&nbsp;'),
-				array('&nbsp;'),
+				array('<br>'),
+				array('<br>'),
 				0),
 			// A ticket reply: Dolibarr puts TICKET_MESSAGE_MAIL_INTRO ("Guten Tag,")
 			// before it; closing and signature (__USER_SIGNATURE__) are part of the
@@ -134,7 +135,9 @@ class WerkbankMailTemplates
 	}
 
 	/**
-	 * Label as shown in Dolibarr: "Angebot (Sie)", "Angebot (Du)", "Preisanfrage".
+	 * Label as shown in Dolibarr: "Angebot · Sie", "Angebot · Du", "Preisanfrage".
+	 * No brackets: Dolibarr's mail form shows only the text in brackets of a
+	 * label (it is meant for a translation key), "Angebot (Sie)" became "Sie".
 	 *
 	 * @param string $key Template key
 	 * @param string $form 'sie', 'du' or '' for neutral
@@ -144,35 +147,84 @@ class WerkbankMailTemplates
 	{
 		$definitions = self::definitions();
 		$base = $definitions[$key][1];
+		return $form === '' ? $base : $base.' · '.($form === 'du' ? 'Du' : 'Sie');
+	}
+
+	/**
+	 * The label up to 1.7.0, with the form in brackets.
+	 *
+	 * @param string $key  Template key
+	 * @param string $form 'sie', 'du' or ''
+	 * @return string
+	 */
+	public static function oldLabel($key, $form)
+	{
+		$definitions = self::definitions();
+		$base = $definitions[$key][1];
 		return $form === '' ? $base : $base.' ('.($form === 'du' ? 'Du' : 'Sie').')';
+	}
+
+	/**
+	 * Give the module's templates (module = ittabelanderpdf) of 1.7.0 and
+	 * earlier their new label; topic and text stay as they are, edited ones
+	 * too. A template whose new label exists already keeps its old one.
+	 *
+	 * @param DoliDB $db     Database
+	 * @param int    $entity Entity
+	 * @return int           Templates renamed, -1 on error
+	 */
+	public static function renameLabels($db, $entity)
+	{
+		$renamed = 0;
+		foreach (self::variants() as $label => $row) {
+			$old = self::oldLabel($row[0], $row[1]);
+			if ($old === $label) {
+				continue;
+			}
+			$resql = $db->query("SELECT rowid FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf'"
+				." AND label = '".$db->escape($label)."' AND entity = ".((int) $entity));
+			if (!$resql) {
+				return -1;
+			}
+			if ($db->num_rows($resql) > 0) {
+				continue;
+			}
+			if (!$db->query("UPDATE ".MAIN_DB_PREFIX."c_email_templates SET label = '".$db->escape($label)."'"
+				." WHERE module = 'ittabelanderpdf' AND label = '".$db->escape($old)."' AND entity = ".((int) $entity))) {
+				return -1;
+			}
+			$renamed += (int) $db->affected_rows(true);
+		}
+		return $renamed;
 	}
 
 	/**
 	 * Hashes (md5 of topic, newline, content) of the module's earlier default
 	 * templates (1.0.0 to 1.0.8). A template that still has one of them was never changed by
 	 * the owner and may be brought up to date without asking (upgrade()).
+	 * Keyed by the label since 1.7.1 (renameLabels() runs first).
 	 */
 	const PREVIOUS = array(
-		'Angebot (Sie)' => array('2c854085ac0c32e001fa3de2828a9f53', '080d2b7005a417b657cbf8a3b7ed9c53', '686a4e515523035d24f656957af888cc', 'e1dd97ea733f339f518f488a7fddf187'),
-		'Angebot (Du)' => array('76c569235b26af58fdf5a94805b7f187', '3a93504d5ccd3930bdf2140da5506d62', '3c9473892d7ea61f6fae23f636634035', 'da1493aa288754f5868e71a6abcfef7e'),
-		'Rechnung (Sie)' => array('447e59a45bcb1fa86d7d2e1b2e4317fd', '110e2ad76098a8080043c2c1411cf236', 'd37d5990d0bce4a20b855fe3f674e1e4', '4d568dcef1900d219dbd93d4acc3ccdc', 'fb3202f47da121f61ee6566641fbf4bd'),
-		'Rechnung (Du)' => array('3827562f6fff6e2365ec0eeede22fe92', '0c525f787cc1f34a25c125923117c191', 'f5d5279631ce5b7dac7f3db1ef881ecb', '4b9d2d6edc47adb230afae899e3834d0', '65ac37c0bde73a4c0b560bf7c0e15f2a'),
-		'Anzahlungsrechnung (Sie)' => array('cddea59d502c24ed4a04f7ee97a875d4', 'e36a8afeaa5187cc07ea20af3521af1d', '3b2f3f94d062a6beee48c8806e4284b0', 'e3309db89998b07167ab28915f9150e2', 'deab9dea2be76f22602c85c2195e448d'),
-		'Anzahlungsrechnung (Du)' => array('0fd4640a53d3f471fc644dd2b5a9a836', '3b2dbeec83d74774dad6bd1fee837833', 'ba479e50ab76a84c5998c962ba3bd5a4', '61e9ea82d7ee65f6f8c89033ad1e56ad', '23833eb309f16a6b6ea5f8047056f5bc'),
-		'Gutschrift (Sie)' => array('275f9ce09a59526e7ac4d16048404b05', '9c6b547285856a7fb5e4f3f1bcfc4e85', '96a31e23d39e2352522f00279f41dea5', '13218fa26dba21107b607f99505ba337', 'b41adb749e6dc2c365b38b1629e8a3fb'),
-		'Gutschrift (Du)' => array('549cca1e45fed1517bc2f8adfd5457a6', 'c004c69efd41e9d41adc1fe270540f8e', 'c3bd33952ea057c8a20243b0ac8ea098', 'a33c96057dbc398b74b118e3c677eeb1', '925d7707f935d79fa065310b5cdb9883'),
-		'Zahlungsbestätigung (Sie)' => array('f7dfceafbfd9aa1d7a7d26b4fd62f0a3', '6e391eae803713c30899b8c04b638979', 'eaf6a3eabd9d3a7eb3c671ad52940084', '964eb0451587b530d26c9a24097a66f7', 'ef0084a2ced0a0aabdcff781df117aea'),
-		'Zahlungsbestätigung (Du)' => array('83cc70d6bc7085a06621bea78236781f', '861453fedfd4b9f345f620a272f5510f', 'a260d86feb58ca5f72ca42f9af72a30e', '0e212a84e0e647e9bd281c4c892e5b80', '4aaa87a7d75be765407f24fd5eea2e8c'),
-		'Auftragsbestätigung (Sie)' => array('02735101ddc5dc45e100d570ae55ffac', '1539c48b08dc02efd14c95249a770152', 'f01c0245583a92d47cdfe445df7c7ef8', 'e47e55e39386c9700986bcd89ab326dc', 'b265cc6453cd3584340c91291af958fb'),
-		'Auftragsbestätigung (Du)' => array('aa5952774046351fd92d6656d88191c8', '1f55ed93f2f22ca31cf1d894481883a3', '58700b677a4a70afcb39e7c5b1971c63', 'dd4a728afe9f685eedf7fc65186801e0', '87adf4f13b66cff51d0de9facea06d3f'),
-		'Lieferung (Sie)' => array('14e66c44aa976fa08db82f7580fc70c7', '5ae7833283f5bc38d8fd74d4b109ec5e', '8f4940f4dd4346e4bb0691026463b1cf', '4c36aa9e3bc7dbf2a904fa3381b1282d', 'df4e7aac30d0e4aef43d9d02778dbf30'),
-		'Lieferung (Du)' => array('40504c48ccc61838084f944dea3fcdc7', '8593ea8c34801216ce9f045ebd2099f6', 'f3c4c588dcf15474e710e2fd6e306594', 'e7b2bb00a11b569b20bf61fa16044ccf', 'c3419cbe1a22d6ad6433b6620a048e09'),
-		'Arbeitsbericht (Sie)' => array('f7b3ebc9d27cd2ca3b45ca78493ad06b', '84dfaafd5a91896801a934d0cd15ae2e', 'd37a84498669f01b2f9c5c6e1449f66a', '0b61cba4c886aac7ce3794c04dcf28d2', 'd5325b42b7902e837767e992ce0dd7f7'),
-		'Arbeitsbericht (Du)' => array('b342bf7edfdd9323ec56a3b3770eaed5', '6ffbc72cbb66c2a4077cd7cba11aeb17', '243d7c055dc86575b0fbc2a63f14b88a', '8ed055521899be433fb214fedf71b21a', '8042831663dd002e274ab08377b66acb'),
-		'Vertrag (Sie)' => array('913c7e628356699e1a72f5cccf4ba035', '83ed5c7baf59bb1f67f2aeff53aa3452', '087b9c296330f5ee19bc45abe1820d9a', 'ebf5f57d1d6f1813cc45296692417dcb', 'd5b202757e2c1e6c773b160e6d3a262d'),
-		'Vertrag (Du)' => array('e033242fb7aa2c54561c796319ce1a89', '30a5dac241d93407a4ca906eb70fb49d', 'a6d0569ef0ec9cee8032b3ce1598982e', '6d2dc895b6899d58d8cdac38f4dee41f', '7fe84aa5b60ae6b9087a30b826ab3f71'),
-		'Nachricht (Sie)' => array('bb8d44cc5d8cb1bcec6122f97e931f6b', 'ba29ff846bd2289d38591d21af1cd028', 'fc78ed7dab76930fe92ad497c1be2a31'),
-		'Nachricht (Du)' => array('72e9fc6264c480b439fb9e646aad93d7', 'fcf5e22c8672d8974a8389e8bb72c4c1', '8934af8c870b8fb2d58301138db43721'),
+		'Angebot · Sie' => array('2c854085ac0c32e001fa3de2828a9f53', '080d2b7005a417b657cbf8a3b7ed9c53', '686a4e515523035d24f656957af888cc', 'e1dd97ea733f339f518f488a7fddf187'),
+		'Angebot · Du' => array('76c569235b26af58fdf5a94805b7f187', '3a93504d5ccd3930bdf2140da5506d62', '3c9473892d7ea61f6fae23f636634035', 'da1493aa288754f5868e71a6abcfef7e'),
+		'Rechnung · Sie' => array('447e59a45bcb1fa86d7d2e1b2e4317fd', '110e2ad76098a8080043c2c1411cf236', 'd37d5990d0bce4a20b855fe3f674e1e4', '4d568dcef1900d219dbd93d4acc3ccdc', 'fb3202f47da121f61ee6566641fbf4bd'),
+		'Rechnung · Du' => array('3827562f6fff6e2365ec0eeede22fe92', '0c525f787cc1f34a25c125923117c191', 'f5d5279631ce5b7dac7f3db1ef881ecb', '4b9d2d6edc47adb230afae899e3834d0', '65ac37c0bde73a4c0b560bf7c0e15f2a'),
+		'Anzahlungsrechnung · Sie' => array('cddea59d502c24ed4a04f7ee97a875d4', 'e36a8afeaa5187cc07ea20af3521af1d', '3b2f3f94d062a6beee48c8806e4284b0', 'e3309db89998b07167ab28915f9150e2', 'deab9dea2be76f22602c85c2195e448d'),
+		'Anzahlungsrechnung · Du' => array('0fd4640a53d3f471fc644dd2b5a9a836', '3b2dbeec83d74774dad6bd1fee837833', 'ba479e50ab76a84c5998c962ba3bd5a4', '61e9ea82d7ee65f6f8c89033ad1e56ad', '23833eb309f16a6b6ea5f8047056f5bc'),
+		'Gutschrift · Sie' => array('275f9ce09a59526e7ac4d16048404b05', '9c6b547285856a7fb5e4f3f1bcfc4e85', '96a31e23d39e2352522f00279f41dea5', '13218fa26dba21107b607f99505ba337', 'b41adb749e6dc2c365b38b1629e8a3fb'),
+		'Gutschrift · Du' => array('549cca1e45fed1517bc2f8adfd5457a6', 'c004c69efd41e9d41adc1fe270540f8e', 'c3bd33952ea057c8a20243b0ac8ea098', 'a33c96057dbc398b74b118e3c677eeb1', '925d7707f935d79fa065310b5cdb9883'),
+		'Zahlungsbestätigung · Sie' => array('f7dfceafbfd9aa1d7a7d26b4fd62f0a3', '6e391eae803713c30899b8c04b638979', 'eaf6a3eabd9d3a7eb3c671ad52940084', '964eb0451587b530d26c9a24097a66f7', 'ef0084a2ced0a0aabdcff781df117aea'),
+		'Zahlungsbestätigung · Du' => array('83cc70d6bc7085a06621bea78236781f', '861453fedfd4b9f345f620a272f5510f', 'a260d86feb58ca5f72ca42f9af72a30e', '0e212a84e0e647e9bd281c4c892e5b80', '4aaa87a7d75be765407f24fd5eea2e8c'),
+		'Auftragsbestätigung · Sie' => array('02735101ddc5dc45e100d570ae55ffac', '1539c48b08dc02efd14c95249a770152', 'f01c0245583a92d47cdfe445df7c7ef8', 'e47e55e39386c9700986bcd89ab326dc', 'b265cc6453cd3584340c91291af958fb'),
+		'Auftragsbestätigung · Du' => array('aa5952774046351fd92d6656d88191c8', '1f55ed93f2f22ca31cf1d894481883a3', '58700b677a4a70afcb39e7c5b1971c63', 'dd4a728afe9f685eedf7fc65186801e0', '87adf4f13b66cff51d0de9facea06d3f'),
+		'Lieferung · Sie' => array('14e66c44aa976fa08db82f7580fc70c7', '5ae7833283f5bc38d8fd74d4b109ec5e', '8f4940f4dd4346e4bb0691026463b1cf', '4c36aa9e3bc7dbf2a904fa3381b1282d', 'df4e7aac30d0e4aef43d9d02778dbf30'),
+		'Lieferung · Du' => array('40504c48ccc61838084f944dea3fcdc7', '8593ea8c34801216ce9f045ebd2099f6', 'f3c4c588dcf15474e710e2fd6e306594', 'e7b2bb00a11b569b20bf61fa16044ccf', 'c3419cbe1a22d6ad6433b6620a048e09'),
+		'Arbeitsbericht · Sie' => array('f7b3ebc9d27cd2ca3b45ca78493ad06b', '84dfaafd5a91896801a934d0cd15ae2e', 'd37a84498669f01b2f9c5c6e1449f66a', '0b61cba4c886aac7ce3794c04dcf28d2', 'd5325b42b7902e837767e992ce0dd7f7'),
+		'Arbeitsbericht · Du' => array('b342bf7edfdd9323ec56a3b3770eaed5', '6ffbc72cbb66c2a4077cd7cba11aeb17', '243d7c055dc86575b0fbc2a63f14b88a', '8ed055521899be433fb214fedf71b21a', '8042831663dd002e274ab08377b66acb'),
+		'Vertrag · Sie' => array('913c7e628356699e1a72f5cccf4ba035', '83ed5c7baf59bb1f67f2aeff53aa3452', '087b9c296330f5ee19bc45abe1820d9a', 'ebf5f57d1d6f1813cc45296692417dcb', 'd5b202757e2c1e6c773b160e6d3a262d'),
+		'Vertrag · Du' => array('e033242fb7aa2c54561c796319ce1a89', '30a5dac241d93407a4ca906eb70fb49d', 'a6d0569ef0ec9cee8032b3ce1598982e', '6d2dc895b6899d58d8cdac38f4dee41f', '7fe84aa5b60ae6b9087a30b826ab3f71'),
+		'Nachricht · Sie' => array('bb8d44cc5d8cb1bcec6122f97e931f6b', 'ba29ff846bd2289d38591d21af1cd028', 'fc78ed7dab76930fe92ad497c1be2a31', 'd872cc822a07cc54e4a36ca88af72ab3'),
+		'Nachricht · Du' => array('72e9fc6264c480b439fb9e646aad93d7', 'fcf5e22c8672d8974a8389e8bb72c4c1', '8934af8c870b8fb2d58301138db43721', '3b4bd725d0cded1ae76ac37f8956be90'),
 		'Ticket-Antwort' => array('94ac499d4537e47f28b8fe68d4f9cea2', '5f242533ce3713418b9e8b092caef823'),
 		'Preisanfrage' => array('89f601ecf0f9a750bf43c91fa70d8cb6', '5a577b89b3ba20582cad6027a58ea294', 'f0276b6caf46f39182484550914d80e5', 'e37133974650aa8e5fefc8da131da462'),
 		'Bestellung' => array('9b600d84b9ae6c691e1d255f66ed8314', '2afdfa1b31c555e7edf380abfadf5053', 'e6e3b35c40870d6712bc8da195c371f0', 'f1f13a936df39fd711f0f9654bd72994'),
@@ -232,7 +284,7 @@ class WerkbankMailTemplates
 		} elseif ($key !== 'thirdparty') {
 			$body .= '<p style="'.$p.'">'.($form === 'du' ? '__ITTAB_FRAGEN_SATZ_DU__' : '__ITTAB_FRAGEN_SATZ__').'</p>';
 		}
-		$body .= self::closing($form === 'du' ? 'Liebe Grüße' : 'Mit freundlichen Grüßen', '__ITTAB_INHABER__', '__MYCOMPANY_NAME__');
+		$body .= self::closing($form === 'du' ? 'Liebe Grüße' : 'Mit freundlichen Grüßen', '__ITTAB_INHABER__', '__MYCOMPANY_NAME__', $key === 'thirdparty' ? 8 : 24);
 
 		return self::sheet('__ITTAB_LOGO__', $body, self::footerLines(
 			'__MYCOMPANY_NAME__', '__ITTAB_INHABER__', '__ITTAB_ADRESSE__', '__MYCOMPANY_EMAIL__', '__MYCOMPANY_URL__', '__ITTAB_WEB__', '__ITTAB_TELEFON_LINK__'
@@ -275,11 +327,12 @@ class WerkbankMailTemplates
 	 * @param string $words   "Mit freundlichen Grüßen" / "Liebe Grüße"
 	 * @param string $name    Name (HTML)
 	 * @param string $company Company (HTML)
+	 * @param int    $gap     Space above in px (the message has its writing line right before)
 	 * @return string
 	 */
-	public static function closing($words, $name, $company)
+	public static function closing($words, $name, $company, $gap = 24)
 	{
-		return '<p style="'.self::P.'margin:24px 0 0 0;">'.$words.'<br><strong style="color:'.self::INK.';">'.$name.'</strong><br>'.$company.'</p>';
+		return '<p style="'.self::P.'margin:'.((int) $gap).'px 0 0 0;">'.$words.'<br><strong style="color:'.self::INK.';">'.$name.'</strong><br>'.$company.'</p>';
 	}
 
 	/**
