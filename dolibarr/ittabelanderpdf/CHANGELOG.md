@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.0] - 2026-11-26
+
+- Documents made for one customer: a document of the kind "template per customer" gets a button "Erzeugen" on the customer's "Unterlagen" tab. Contract, contact and the template's input fields (`[[FELD:name*|label|type|defaults]]`: text, textarea, choice of several, choice of one, date, number) are asked, prefilled from last time; missing required fields or placeholders left over block with a message. The PDF lands with the customer and the contract, with both signature lines, state "Erzeugt"; sending it marks it sent, signing on the device signs the generated document itself. Generating again later makes it "Erzeugt" again, so the new version has to go out or be signed again.
+- Placeholders `__ITTAB_…__` for customer, company, contract, services, business hours (setting, else the company's opening hours), date and prices by product reference (`__ITTAB_PREIS:<REF>__`), plus Dolibarr's own; a line whose value is empty (e.g. no VAT number) disappears. The same placeholders work in the notices of the intake slip and the test report. A list to copy from in the setup tab "Unterlagen je Kunde" and on each document's card.
+- `docs/unterlagen`: AVV and Fernwartung consent use the placeholders and input fields; the header line `Art: Vorlage je Kunde` makes the import script create a template per customer.
+
 ## [1.5.0] - 2026-11-26
 
 - Company documents and legal texts are the module's own object now (menu Geschäftspartner → "Unterlagen", list and card in Dolibarr's look), apart from the knowledge base, which stays for the FAQ. A document has title, file name, kind (legal text, internal, template per customer), public yes/no and a text; "Freigeben" makes the draft a version that never changes (date, who, note), writes `IT-Tabelander/Unterlagen/<slug>.pdf` and archives `Archiv/<slug>-v<n>.pdf`, so the version a customer got can always be shown. PDF preview of the draft. Tables `llx_ittabpdf_doc`, `llx_ittabpdf_docversion`; rights "Unterlagen lesen" (on by default) and "Unterlagen bearbeiten und freigeben".

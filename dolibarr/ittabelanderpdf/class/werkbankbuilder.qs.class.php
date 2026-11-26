@@ -122,7 +122,9 @@ class WerkbankBuilderQs extends WerkbankBuilder
 			$notes[] = trim((string) $run->note);
 		}
 		if (trim((string) $run->notice) !== '') {
-			$notes[] = trim((string) $run->notice);
+			// The same placeholders as company documents (WerkbankVars).
+			require_once __DIR__.'/werkbankvars.class.php';
+			$notes[] = trim(make_substitutions((string) $run->notice, WerkbankVars::values($this->db, $object->thirdparty)));
 		}
 		if ($notes) {
 			$doc['blocks'][] = array('type' => 'section', 'cap' => $langs->transnoentities('WerkbankQsRemarks'));

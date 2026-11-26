@@ -90,7 +90,10 @@ foreach (array('auftragsverarbeitung' => 'Vereinbarung zur Auftragsverarbeitung'
 		$store->release($id, '', $admin);
 	}
 }
-$check('documents of the rules exist', is_file(WerkbankUnterlagen::dir().'/auftragsverarbeitung.pdf') && is_file(WerkbankUnterlagen::dir().'/agb-unternehmer.pdf'));
+// docs/unterlagen makes AVV and Fernwartung templates per customer (no general PDF, generated per customer).
+$avvDoc = $store->bySlug('auftragsverarbeitung');
+$check('documents of the rules exist', is_file(WerkbankUnterlagen::dir().'/agb-unternehmer.pdf')
+	&& ($avvDoc->kind === 'customer' ? !is_file(WerkbankUnterlagen::dir().'/auftragsverarbeitung.pdf') : is_file(WerkbankUnterlagen::dir().'/auftragsverarbeitung.pdf')), $avvDoc->kind);
 
 $firmId = (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."societe WHERE email = 'office@musterfirma.example'");
 $privateId = (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."societe WHERE email = 'max@mustermann.example'");
@@ -161,7 +164,19 @@ foreach ($docs->status($firm) as $entry) {
 $check('accepting the proposal online accepts the AGB', $state($firm, 'agb-unternehmer') === 'done' && $done && $done->source === 'portal', $done ? $done->source : '');
 
 // 3. AVV signed on the device by both: done, PDF with the confirmation sheet first.
-$event = $docs->record($firmId, 'auftragsverarbeitung', 'signing', 'device', $admin, array('fk_rule' => (int) $rules['auftragsverarbeitung']->rowid));
+$extra = array('fk_rule' => (int) $rules['auftragsverarbeitung']->rowid);
+if ($avvDoc->kind === 'customer') {
+	// A template per customer is generated first and signed on itself.
+	dol_include_once('/ittabelanderpdf/class/werkbankfields.class.php');
+	$answers = array();
+	foreach (WerkbankFields::parse((string) $docs->template('auftragsverarbeitung')->answer) as $name => $field) {
+		$answers[$name] = $field['kind'] === 'multi' ? ($field['options'] ? array($field['options'][0]) : array('Test')) : ($field['default'] !== '' ? $field['default'] : 'Maria Muster');
+	}
+	$generatedAvv = $docs->generate($firm, $rules['auftragsverarbeitung'], $answers, $contract, null, $admin);
+	$check('AVV is generated for the customer first', $generatedAvv > 0, $docs->error);
+	$extra += array('element' => 'docgen', 'fk_object' => $generatedAvv);
+}
+$event = $docs->record($firmId, 'auftragsverarbeitung', 'signing', 'device', $admin, $extra);
 $signature = new WerkbankSignature($db);
 $loaded = $signature->load('doc', $event);
 $check('AVV needs both signatures', $loaded && WerkbankSignature::roles('doc', $loaded) === array('technician', 'customer'));
@@ -170,7 +185,7 @@ $check('one signature is not enough', $state($firm, 'auftragsverarbeitung') === 
 $signature->save('doc', $event, 'customer', 'Maria Muster', $drawn(), $admin);
 $pdf = WerkbankSignature::pdfPath('doc', $signature->load('doc', $event));
 $pages = preg_match_all('#/Type\s*/Page[^s]#', (string) file_get_contents($pdf));
-$check('AVV signed: done, sheet plus document with the customer', $state($firm, 'auftragsverarbeitung') === 'done' && is_file($pdf) && $pages >= 2, $pdf.' '.$pages);
+$check('AVV signed: done, signed document with the customer', $state($firm, 'auftragsverarbeitung') === 'done' && is_file($pdf) && $pages >= 2, $pdf.' '.$pages);
 @mkdir('/tmp/ittpdf-out', 0777, true);
 copy($pdf, '/tmp/ittpdf-out/avv-unterschrieben.pdf');
 $check('receipt needs only the customer', WerkbankSignature::roles('doc', array('rule' => $rules['leistungsbeschreibung-hosting-wartung'])) === array('customer'));

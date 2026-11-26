@@ -281,6 +281,21 @@ class ActionsIttabelanderpdf
 		}
 		$fresh = GETPOST('mode', 'alpha') === 'init' || (GETPOST('modelselected') && GETPOST('modelmailselected', 'alpha') && GETPOST('modelmailselected', 'alpha') != '-1');
 		$context = isset($formmail->param['models']) ? (string) $formmail->param['models'] : '';
+		if ($fresh && GETPOSTINT('ittabpdf_preselect_event') > 0) {
+			// A document generated for this customer (tab "Unterlagen").
+			dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');
+			dol_include_once('/ittabelanderpdf/class/werkbanksignature.class.php');
+			$docs = new WerkbankDocs($this->db);
+			$event = $docs->event(GETPOSTINT('ittabpdf_preselect_event'));
+			$card = isset($GLOBALS['object']) && is_object($GLOBALS['object']) ? $GLOBALS['object'] : null;
+			$socid = $card ? ($card->element === 'societe' ? (int) $card->id : (int) $card->socid) : 0;
+			if ($event && in_array($event->state, array('generated', 'signed'), true) && (int) $event->fk_soc === $socid && (string) $event->filename !== '') {
+				$file = WerkbankSignature::thirdpartyDir($socid).'/'.basename((string) $event->filename);
+				if (is_readable($file)) {
+					$paths[] = $file;
+				}
+			}
+		}
 		if ($fresh && GETPOST('ittabpdf_preselect', 'alphanohtml') !== '') {
 			$path = $unterlagen->path(GETPOST('ittabpdf_preselect', 'alphanohtml'));
 			if ($path !== '') {

@@ -876,19 +876,79 @@ def docs() -> None:
     print(f"{len(checks)} document checks passed")
 
 
+def gen() -> None:
+    """Documents made for one customer (tests/gen.php), then the tab's "Erzeugen" form in the browser.
+
+    A customer template with placeholders and input fields; required fields
+    block, every placeholder is replaced, the PDF lands with the customer and
+    the contract, and the state goes generated -> sent -> signed. The form is
+    prefilled from last time and passes Dolibarr's WAF.
+    """
+    result = php("run", script="gen.php")
+    checks = [dict(entry, page="php") for entry in result["checks"]]
+    EXAMPLES.mkdir(parents=True, exist_ok=True)
+    for name in ("vereinbarung-erzeugt.pdf", "vereinbarung-unterschrieben.pdf"):
+        docker("cp", f"{WEB}:/tmp/ittpdf-out/{name}", str(EXAMPLES / name))
+    opener = browser()
+
+    def get(path: str) -> tuple:
+        try:
+            answer = opener.open(f"{URL}{path}", timeout=60)
+            return answer.status, answer.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as error:
+            return error.code, ""
+
+    def post(path: str, fields: list) -> tuple:
+        try:
+            answer = opener.open(f"{URL}{path}", data=urllib.parse.urlencode(fields).encode(), timeout=120)
+            return answer.status, answer.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as error:
+            return error.code, ""
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
+
+    base = "/custom/ittabelanderpdf"
+    tab = f"{base}/docs.php?socid={result['firm']}"
+    status, html = get(tab)
+    check("tab offers Erzeugen for the customer template", status == 200 and f"action=generateform&amp;rule={result['rule']}" in html)
+    status, html = get(f"{tab}&action=generateform&rule={result['rule']}")
+    token = re.search(r'name="token" value="([^"]+)"><input type="hidden" name="action" value="generate">', html)
+    check("form shows contract, contact and the fields, prefilled from last time", status == 200 and bool(token) and 'name="contract"' in html
+          and 'name="field_ansprech" class="minwidth300" value="Maria Muster"' in html and 'name="field_datenkategorien[]"' in html)
+    fields = [("token", token.group(1) if token else ""), ("action", "generate"), ("rule", str(result["rule"])), ("contract", str(result["contract"])),
+              ("field_datenkategorien[]", "Kundendaten"), ("field_datenkategorien_more", "Fotos; Gesundheitsdaten")]
+    status, html = post(tab, fields + [("field_ansprech", "")])
+    check("a missing required field keeps the form with a message", status == 200 and "Bitte ausfüllen" in html and 'value="generate"' in html, str(status))
+    token = re.search(r'name="token" value="([^"]+)"', html)
+    fields[0] = ("token", token.group(1) if token else "")
+    status, html = post(tab, fields + [("field_ansprech", "Maria Muster & Co"), ("field_bemerkung", "Zugang über <VPN>")])
+    notes = re.findall(r'jnotify\("([^"]{0,200})', html) + re.findall(r'class="(?:error|warning)[^"]*">([^<]{0,200})', html)
+    check("generating through the form (WAF passes)", status == 200 and "erzeugt." in html and "state-generated" in html, f"{status} {notes} {html[:300] if not notes else ''}")
+    status, html = get(f"{base}/admin/docrules.php")
+    check("settings list the placeholders and the business hours", status == 200 and "__ITTAB_GESCHAEFTSZEITEN__" in html and "__ITTAB_PREIS:&lt;REF&gt;__" in html
+          and 'name="ITTABPDF_GESCHAEFTSZEITEN"' in html)
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"gen check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} generate checks passed")
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen"):
                 steps[name]()
         elif step in steps:
             steps[step]()

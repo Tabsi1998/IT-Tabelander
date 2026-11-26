@@ -155,7 +155,7 @@ class WerkbankBuilderIntake extends WerkbankBuilder
 		}
 		$doc['blocks'][] = array('type' => 'choices', 'rows' => array($questions['ittab_sicherung']));
 		$doc['blocks'][] = array('type' => 'section', 'cap' => $langs->transnoentities('WerkbankIntakeNotices'));
-		$doc['blocks'][] = array('type' => 'notices', 'rows' => self::notices($du));
+		$doc['blocks'][] = array('type' => 'notices', 'rows' => self::notices($du, $known ? $customer : null));
 		$doc['signatures'] = array(
 			'left' => $this->signedLine('technician', $langs->transnoentities('WerkbankIntakeSignTechnician', $this->mysoc->name)),
 			'right' => $this->signedLine('customer', $langs->transnoentities('WerkbankIntakeSignCustomer')),
@@ -167,14 +167,16 @@ class WerkbankBuilderIntake extends WerkbankBuilder
 	 * The notices of the setup (ITTABPDF_INTAKE_NOTICES or _DU), one per
 	 * line, variables such as __MYCOMPANY_NAME__ replaced.
 	 *
-	 * @param bool $du By Du
+	 * @param bool         $du  By Du
+	 * @param Societe|null $soc Customer for the placeholders (WerkbankVars)
 	 * @return string[]
 	 */
-	public static function notices($du)
+	public static function notices($du, $soc = null)
 	{
-		global $langs;
+		global $db;
+		require_once __DIR__.'/werkbankvars.class.php';
 		$text = $du ? getDolGlobalString('ITTABPDF_INTAKE_NOTICES_DU', self::DEFAULT_NOTICES_DU) : getDolGlobalString('ITTABPDF_INTAKE_NOTICES', self::DEFAULT_NOTICES);
-		$substitutions = getCommonSubstitutionArray($langs, 0, array('object', 'objectamount', 'user'));
+		$substitutions = WerkbankVars::values($db, $soc);
 		$lines = array();
 		foreach (preg_split('/\R/', $text) as $line) {
 			$line = trim(make_substitutions($line, $substitutions));

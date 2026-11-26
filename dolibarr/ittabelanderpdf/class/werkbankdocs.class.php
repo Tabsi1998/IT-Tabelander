@@ -35,6 +35,9 @@ class WerkbankDocs
 	/** @var string */
 	public $error = '';
 
+	/** @var string[] */
+	public $errors = array();
+
 	/** @var array<string,array<string,mixed>>|null slug => title, stand */
 	private $documents = null;
 
@@ -301,7 +304,7 @@ class WerkbankDocs
 				continue;
 			}
 			$stand = isset($documents[$rule->slug]) ? (string) $documents[$rule->slug]['stand'] : '';
-			$entry = array('rule' => $rule, 'state' => 'missing', 'done' => null, 'sent' => null, 'signing' => null,
+			$entry = array('rule' => $rule, 'state' => 'missing', 'done' => null, 'sent' => null, 'signing' => null, 'generated' => null, 'before' => array(),
 				'title' => isset($documents[$rule->slug]) ? $documents[$rule->slug]['title'] : $rule->slug, 'stand' => $stand,
 				'exists' => is_file(WerkbankUnterlagen::dir().'/'.$rule->slug.'.pdf'));
 			foreach ($events as $event) {
@@ -318,6 +321,18 @@ class WerkbankDocs
 					$entry['sent'] = $event;
 				} elseif (!$entry['signing'] && $event->state === 'signing') {
 					$entry['signing'] = $event;
+				} elseif (!$entry['generated'] && $event->state === 'generated') {
+					$entry['generated'] = $event;
+				}
+			}
+			// Generated again after it was sent, signed or done: the new version counts,
+			// what happened to an older one no longer does.
+			if ($entry['generated']) {
+				foreach (array('done', 'sent', 'signing') as $key) {
+					if ($entry[$key] && (int) $entry[$key]->rowid < (int) $entry['generated']->rowid) {
+						$entry['before'][$key] = $entry[$key];
+						$entry[$key] = null;
+					}
 				}
 			}
 			if ($entry['done']) {
@@ -327,6 +342,8 @@ class WerkbankDocs
 				$entry['state'] = 'signing';
 			} elseif ($entry['sent']) {
 				$entry['state'] = 'sent';
+			} elseif ($entry['generated']) {
+				$entry['state'] = 'generated';
 			}
 			$list[] = $entry;
 		}
@@ -459,6 +476,235 @@ class WerkbankDocs
 			}
 		}
 		return $marked;
+	}
+
+	/**
+	 * Document names of attachments: files of the Unterlagen folder, and
+	 * documents generated for this customer (by their file name).
+	 *
+	 * @param int      $socid Customer
+	 * @param string[] $paths Attached files
+	 * @return string[]       Slugs
+	 */
+	public function slugsForPaths($socid, array $paths)
+	{
+		$slugs = WerkbankUnterlagen::slugsIn($paths);
+		foreach ($paths as $path) {
+			$rows = $this->rows("SELECT slug FROM ".MAIN_DB_PREFIX."ittabpdf_docevent WHERE fk_soc = ".((int) $socid)." AND state = 'generated'"
+				." AND filename = '".$this->db->escape(basename((string) $path))."'");
+			foreach ($rows as $row) {
+				$slugs[] = (string) $row->slug;
+			}
+		}
+		return array_values(array_unique($slugs));
+	}
+
+	// ------------------------------------------------------------ generated for a customer
+
+	/**
+	 * The latest released version of a document as a record the PDF
+	 * builders take (question = title, answer = text).
+	 *
+	 * @param string $slug Document
+	 * @return object|null
+	 */
+	public function template($slug)
+	{
+		require_once __DIR__.'/werkbankdoc.class.php';
+		$store = new WerkbankDoc($this->db);
+		$doc = $store->bySlug($slug);
+		return $doc && (int) $doc->version > 0 ? $store->asRecord($doc) : null;
+	}
+
+	/**
+	 * What was entered last time for this customer and document.
+	 *
+	 * @param int    $socid Customer
+	 * @param string $slug  Document
+	 * @return array{fields:array<string,mixed>,contract:int,contact:int}
+	 */
+	public function lastValues($socid, $slug)
+	{
+		$rows = $this->rows("SELECT data FROM ".MAIN_DB_PREFIX."ittabpdf_docevent WHERE fk_soc = ".((int) $socid)." AND slug = '".$this->db->escape($slug)."'"
+			." AND state = 'generated' AND data IS NOT NULL ORDER BY rowid DESC");
+		$data = $rows ? json_decode((string) $rows[0]->data, true) : null;
+		return array('fields' => isset($data['fields']) && is_array($data['fields']) ? $data['fields'] : array(),
+			'contract' => isset($data['contract']) ? (int) $data['contract'] : 0, 'contact' => isset($data['contact']) ? (int) $data['contact'] : 0);
+	}
+
+	/**
+	 * Validated contracts of the customer, newest first; those with a line
+	 * matching the patterns first.
+	 *
+	 * @param int    $socid    Customer
+	 * @param string $patterns Product refs of the rule (contract scope), may be ''
+	 * @return array<int,string> id => label
+	 */
+	public function contracts($socid, $patterns = '')
+	{
+		$list = array();
+		$first = array();
+		foreach ($this->rows("SELECT c.rowid, c.ref, c.date_contrat FROM ".MAIN_DB_PREFIX."contrat AS c WHERE c.fk_soc = ".((int) $socid)." AND c.statut = 1"
+			." AND c.entity IN (".getEntity('contract').") ORDER BY c.date_contrat DESC, c.rowid DESC") as $row) {
+			$refs = array();
+			foreach ($this->rows("SELECT p.ref FROM ".MAIN_DB_PREFIX."contratdet AS d INNER JOIN ".MAIN_DB_PREFIX."product AS p ON p.rowid = d.fk_product"
+				." WHERE d.fk_contrat = ".((int) $row->rowid)." AND d.statut IN (0, 4)") as $line) {
+				$refs[] = (string) $line->ref;
+			}
+			$label = $row->ref.($refs ? ' ('.implode(', ', $refs).')' : '');
+			$match = $patterns !== '' && array_filter($refs, function ($ref) use ($patterns) {
+				return self::matches($ref, $patterns);
+			});
+			if ($match) {
+				$first[(int) $row->rowid] = $label;
+			} else {
+				$list[(int) $row->rowid] = $label;
+			}
+		}
+		return $first + $list;
+	}
+
+	/**
+	 * Make the document for a customer: input fields and placeholders
+	 * filled, PDF with the customer and in the contract's documents, event
+	 * "generated" with the answers for next time.
+	 *
+	 * @param Societe              $soc      Customer
+	 * @param object               $rule     Rule (slug)
+	 * @param array<string,mixed>  $answers  Input field values
+	 * @param Contrat|null         $contract Contract or null
+	 * @param Contact|null         $contact  Contact or null
+	 * @param User                 $user     User
+	 * @return int                           Event id, -1 error ($this->error, $this->errors with the details)
+	 */
+	public function generate($soc, $rule, array $answers, $contract, $contact, $user)
+	{
+		global $langs;
+		$this->errors = array();
+		$record = $this->template((string) $rule->slug);
+		if (!$record) {
+			$this->error = $langs->transnoentities('WerkbankGenNoTemplate', $rule->slug);
+			return -1;
+		}
+		require_once __DIR__.'/werkbankfields.class.php';
+		require_once __DIR__.'/werkbankvars.class.php';
+		$fields = WerkbankFields::parse((string) $record->answer);
+		$missing = WerkbankFields::missing($fields, $answers);
+		if ($missing) {
+			$this->error = $langs->transnoentities('WerkbankGenFieldsMissing', implode(', ', $missing));
+			return -1;
+		}
+		$filled = $this->fill($record, $fields, $answers, $soc, $contract, $contact);
+		$left = WerkbankVars::left($filled);
+		if ($left) {
+			$this->error = $langs->transnoentities('WerkbankGenPlaceholdersLeft', implode(', ', $left));
+			return -1;
+		}
+		$data = json_encode(array('fields' => $answers, 'contract' => $contract ? (int) $contract->id : 0, 'contact' => $contact ? (int) $contact->id : 0));
+		$event = $this->record((int) $soc->id, (string) $rule->slug, 'generated', 'hand', $user, array('fk_rule' => (int) $rule->rowid,
+			'element' => $contract ? 'contrat' : '', 'fk_object' => $contract ? (int) $contract->id : 0));
+		if ($event <= 0) {
+			return -1;
+		}
+		$this->db->query("UPDATE ".MAIN_DB_PREFIX."ittabpdf_docevent SET data = '".$this->db->escape((string) $data)."' WHERE rowid = ".((int) $event));
+		$path = $this->writeGenerated($soc, $rule, $this->event($event));
+		if ($path === '') {
+			$this->db->query("DELETE FROM ".MAIN_DB_PREFIX."ittabpdf_docevent WHERE rowid = ".((int) $event));
+			return -1;
+		}
+		$this->db->query("UPDATE ".MAIN_DB_PREFIX."ittabpdf_docevent SET filename = '".$this->db->escape(basename($path))."' WHERE rowid = ".((int) $event));
+		return $event;
+	}
+
+	/**
+	 * The article's text for this customer.
+	 *
+	 * @param object              $record   Template (WerkbankDoc::asRecord)
+	 * @param array               $fields   Input fields
+	 * @param array<string,mixed> $answers  Their values
+	 * @param Societe             $soc      Customer
+	 * @param Contrat|null        $contract Contract
+	 * @param Contact|null        $contact  Contact
+	 * @return string
+	 */
+	public function fill($record, array $fields, array $answers, $soc, $contract, $contact)
+	{
+		require_once __DIR__.'/werkbankfields.class.php';
+		require_once __DIR__.'/werkbankvars.class.php';
+		$values = WerkbankVars::values($this->db, $soc, $contract, $contact);
+		$values['__ITTAB_FELD_LEER__'] = '';
+		return WerkbankVars::fill(WerkbankFields::apply((string) $record->answer, $fields, $answers), $values);
+	}
+
+	/**
+	 * Write (again) the PDF of a "generated" event: to its own file, or to
+	 * $target with signatures (signed on the device).
+	 *
+	 * @param Societe                            $soc    Customer
+	 * @param object                             $rule   Rule
+	 * @param object                             $event  The "generated" event (data holds answers, contract, contact)
+	 * @param array<string,array<string,string>> $signed role => image, name, when
+	 * @param string                             $target Path, '' = <slug>-<date>-<event>.pdf with the customer
+	 * @return string                                    Path, '' on error
+	 */
+	public function writeGenerated($soc, $rule, $event, array $signed = array(), $target = '')
+	{
+		global $langs, $conf;
+		require_once __DIR__.'/werkbankfields.class.php';
+		require_once __DIR__.'/werkbankbuilder.personal.class.php';
+		require_once __DIR__.'/werkbankrenderer.class.php';
+		require_once __DIR__.'/werkbanksignature.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/contrat/class/contrat.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
+		$langs->loadLangs(array('main', 'companies', 'ittabelanderpdf@ittabelanderpdf'));
+		$record = $this->template((string) $rule->slug);
+		if (!$record) {
+			$this->error = $langs->transnoentities('WerkbankGenNoTemplate', $rule->slug);
+			return '';
+		}
+		$data = json_decode((string) $event->data, true);
+		$answers = isset($data['fields']) && is_array($data['fields']) ? $data['fields'] : array();
+		$contract = null;
+		if (!empty($data['contract'])) {
+			$contract = new Contrat($this->db);
+			if ($contract->fetch((int) $data['contract']) <= 0) {
+				$contract = null;
+			}
+		}
+		$contact = null;
+		if (!empty($data['contact'])) {
+			$contact = new Contact($this->db);
+			if ($contact->fetch((int) $data['contact']) <= 0) {
+				$contact = null;
+			}
+		}
+		$record->answer = $this->fill($record, WerkbankFields::parse((string) $record->answer), $answers, $soc, $contract, $contact);
+		if ($target === '') {
+			$target = WerkbankSignature::thirdpartyDir((int) $soc->id).'/'.$rule->slug.'-'.dol_print_date($this->db->jdate($event->date_event), '%Y%m%d').'-'.((int) $event->rowid).'.pdf';
+		}
+		if (!is_dir(dirname($target)) && dol_mkdir(dirname($target)) < 0) {
+			$this->error = 'ErrorCanNotCreateDir';
+			return '';
+		}
+		$stand = (string) $event->version !== '' ? dol_stringtotime($event->version.' 00:00:00') : null;
+		try {
+			$builder = new WerkbankBuilderPersonal($this->db, $record, $langs, $stand, $soc, $signed);
+			$renderer = new WerkbankRenderer(pdf_getInstance(array(WerkbankRenderer::PAGE_W, WerkbankRenderer::PAGE_H)), $langs);
+			$renderer->render($builder->build(), $target);
+		} catch (Throwable $exception) {
+			dol_syslog('ittabelanderpdf: '.$exception->getMessage(), LOG_ERR);
+			$this->error = $exception->getMessage();
+			return '';
+		}
+		dolChmod($target);
+		// A copy with the contract, when it belongs to one.
+		if ($contract) {
+			$dir = $conf->contrat->dir_output.'/'.dol_sanitizeFileName($contract->ref);
+			if (is_dir($dir) || dol_mkdir($dir) >= 0) {
+				dol_copy($target, $dir.'/'.basename($target), '0', 1);
+			}
+		}
+		return $target;
 	}
 
 	// ------------------------------------------------------------ helpers

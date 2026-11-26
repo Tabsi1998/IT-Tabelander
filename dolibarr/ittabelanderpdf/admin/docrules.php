@@ -26,6 +26,7 @@ if (!$res) {
 }
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 dol_include_once('/ittabelanderpdf/lib/ittabelanderpdf.lib.php');
+dol_include_once('/ittabelanderpdf/class/werkbankvars.class.php');
 dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');
 
 /** @var DoliDB $db */
@@ -63,6 +64,9 @@ if ($action === 'save_rules') {
 	$mode = GETPOST('ITTABPDF_DOCS_CONTRACT_CHECK', 'aZ09');
 	dolibarr_set_const($db, 'ITTABPDF_DOCS_CONTRACT_CHECK', in_array($mode, array('off', 'warn', 'block'), true) ? $mode : 'warn', 'chaine', 0, '', $conf->entity);
 	dolibarr_set_const($db, 'ITTABPDF_DOCS_BANNER', GETPOST('ITTABPDF_DOCS_BANNER') ? '1' : '0', 'chaine', 0, '', $conf->entity);
+	if (GETPOSTISSET('ITTABPDF_GESCHAEFTSZEITEN')) {
+		dolibarr_set_const($db, 'ITTABPDF_GESCHAEFTSZEITEN', trim(GETPOST('ITTABPDF_GESCHAEFTSZEITEN', 'alphanohtml')), 'chaine', 0, '', $conf->entity);
+	}
 	setEventMessages($error ? $langs->trans('WerkbankDocsRuleError', $langs->transnoentities($docs->error)) : $langs->trans('SetupSaved'), null, $error ? 'errors' : 'mesgs');
 	header('Location: '.$self);
 	exit;
@@ -149,8 +153,15 @@ print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('WerkbankDocsB
 print '<tr class="oddeven"><td>'.$langs->trans('WerkbankDocsContractCheck').'</td><td>'.Form::selectarray('ITTABPDF_DOCS_CONTRACT_CHECK', array(
 	'off' => $langs->trans('WerkbankDocsContractCheckOff'), 'warn' => $langs->trans('WerkbankDocsContractCheckWarn'), 'block' => $langs->trans('WerkbankDocsContractCheckBlock')),
 	getDolGlobalString('ITTABPDF_DOCS_CONTRACT_CHECK', 'warn')).'</td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('WerkbankVarsHours').'</td><td><input type="text" name="ITTABPDF_GESCHAEFTSZEITEN" class="minwidth300" value="'.dol_escape_htmltag(getDolGlobalString('ITTABPDF_GESCHAEFTSZEITEN')).'"'
+	.' placeholder="'.dol_escape_htmltag(WerkbankVars::openingHours()).'"> <span class="opacitymedium">'.$langs->trans('WerkbankVarsHoursHelp').'</span></td></tr>';
 print '</table></div>';
 print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans('Save').'"></div></form>';
+
+// Placeholders for documents per customer, to copy into the texts.
+print '<br>'.load_fiche_titre($langs->trans('WerkbankVarsTitle'), '', '');
+print '<div class="opacitymedium">'.$langs->trans('WerkbankVarsHelp').'</div>';
+print WerkbankVars::helpTable();
 
 print dol_get_fiche_end();
 llxFooter();

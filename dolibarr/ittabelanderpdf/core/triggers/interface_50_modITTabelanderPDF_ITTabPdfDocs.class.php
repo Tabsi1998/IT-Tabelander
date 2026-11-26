@@ -69,12 +69,12 @@ class InterfaceITTabPdfDocs extends DolibarrTriggers
 	private function sent($object, $user)
 	{
 		dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');
-		$slugs = WerkbankUnterlagen::slugsIn((array) $object->attachedfiles['paths']);
+		$socid = $object->element === 'societe' ? (int) $object->id : (int) (!empty($object->socid) ? $object->socid : (!empty($object->fk_soc) ? $object->fk_soc : 0));
+		$docs = new WerkbankDocs($this->db);
+		$slugs = $docs->slugsForPaths($socid, (array) $object->attachedfiles['paths']);
 		if (!$slugs) {
 			return 0;
 		}
-		$socid = $object->element === 'societe' ? (int) $object->id : (int) (!empty($object->socid) ? $object->socid : (!empty($object->fk_soc) ? $object->fk_soc : 0));
-		$docs = new WerkbankDocs($this->db);
 		foreach ($slugs as $slug) {
 			$docs->record($socid, $slug, 'sent', 'mail', $user, array('element' => $object->element, 'fk_object' => (int) $object->id,
 				'note' => !empty($object->email_to) ? (string) $object->email_to : ''));
