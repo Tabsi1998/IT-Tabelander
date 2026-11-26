@@ -314,8 +314,9 @@ foreach ($status as $entry) {
 		if ($open && $entry['signing']) {
 			$actions[] = array('WerkbankDocsActionContinueShort', dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=doc&id='.((int) $entry['signing']->rowid), 'fa-signature');
 		}
-		if ($template) {
-			$actions[] = array(empty($entry['generated']) ? 'WerkbankDocsActionGenerateShort' : 'WerkbankDocsActionGenerateAgainShort', $self.'&action=generateform&rule='.$id.'#docform', 'fa-file-signature');
+		// Not generated yet: generating is the next step; generated: it moves to the end.
+		if ($template && empty($entry['generated'])) {
+			$actions[] = array('WerkbankDocsActionGenerateShort', $self.'&action=generateform&rule='.$id.'#docform', 'fa-file-signature');
 		}
 		if ($signable && $rule->action === 'sign') {
 			$actions[] = array($signShort, $signUrl, 'fa-signature');
@@ -327,6 +328,9 @@ foreach ($status as $entry) {
 			$actions[] = array($signShort, $signUrl, 'fa-signature');
 		}
 		$actions[] = array('WerkbankDocsActionUploadShort', $self.'&action=uploadform&rule='.$id.'#docform', 'fa-upload');
+		if ($template && !empty($entry['generated'])) {
+			$actions[] = array('WerkbankDocsActionGenerateAgainShort', $self.'&action=generateform&rule='.$id.'#docform', 'fa-file-signature');
+		}
 		$actions[] = array('WerkbankDocsActionTickShort', $self.'&action=checkform&rule='.$id.'#docform', 'fa-check');
 		if (!$open) {
 			$actions[] = array('WerkbankDocsActionRevokeShort', $self.'&action=revokeform&rule='.$id.'#docform', 'fa-undo');
