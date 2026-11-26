@@ -128,7 +128,10 @@ class WerkbankRenderer
 		if (!empty($doc['blocks'])) {
 			$y = $this->drawBlocks($y + 4.0, $doc['blocks']);
 		}
-		$y = $this->drawTable($y + 8.0);
+		// Without a table (sheets, forms) its gap goes too.
+		if (!empty($doc['rows'])) {
+			$y = $this->drawTable($y + 8.0);
+		}
 		$this->drawBottom($y + 6.0);
 
 		$pages = $pdf->getNumPages();
@@ -154,6 +157,19 @@ class WerkbankRenderer
 		$pdf->lastPage();
 		$pdf->Close();
 		$pdf->Output($file, 'F');
+	}
+
+	/**
+	 * @return bool One of the signatures was given on the device
+	 */
+	private function hasSignatureImage()
+	{
+		foreach ($this->doc['signatures'] as $signature) {
+			if (is_array($signature) && !empty($signature['image'])) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -199,15 +215,260 @@ class WerkbankRenderer
 	 * Content blocks between the title and the table.
 	 *
 	 * @param float                          $y      Top
-	 * @param array<int,array<string,mixed>> $blocks Blocks: type html (flows over pages)
+	 * @param array<int,array<string,mixed>> $blocks Blocks: html (flows over pages), section (caption),
+	 *                                               fields (label/value, empty = line to write on),
+	 *                                               choices (boxes to tick), checks (QS points), notices
 	 * @return float                                 Y below
 	 */
 	private function drawBlocks($y, array $blocks)
 	{
-		foreach ($blocks as $block) {
-			if ($block['type'] === 'html') {
-				$y = $this->drawFlowingHtml($y, $block['html']);
+		foreach ($blocks as $index => $block) {
+			switch ($block['type']) {
+				case 'html':
+					$y = $this->drawFlowingHtml($y, $block['html']);
+					break;
+				case 'section':
+					// A caption never stands alone at the foot of a page.
+					if ($y + 22.0 > self::BOTTOM) {
+						$y = $this->newPage();
+					}
+					$y = $this->caption(self::LEFT, $y + ($index ? 4.6 : 2.0), self::RIGHT - self::LEFT, $block['cap']) + 1.2;
+					$this->hline(self::LEFT, $y, self::RIGHT, 0.212, self::INK);
+					$y += 1.0;
+					break;
+				case 'fields':
+					$y = $this->drawFields($y, $block['rows'], isset($block['cols']) ? (int) $block['cols'] : 2);
+					break;
+				case 'choices':
+					$y = $this->drawChoices($y, $block['rows']);
+					break;
+				case 'checks':
+					$y = $this->drawChecks($y, $block['rows']);
+					break;
+				case 'notices':
+					$y = $this->drawNotices($y, $block['rows']);
+					break;
 			}
+		}
+		return $y;
+	}
+
+	/**
+	 * Labelled values in columns; an empty value leaves a line to write on.
+	 *
+	 * @param float                $y    Top
+	 * @param array<int,string[]>  $rows Label, value; a third entry 'wide' spans the row
+	 * @param int                  $cols Columns
+	 * @return float                     Y below
+	 */
+	private function drawFields($y, array $rows, $cols)
+	{
+		$gap = 6.0;
+		$width = ((self::RIGHT - self::LEFT) - ($cols - 1) * $gap) / $cols;
+		$line = array();
+		$flush = function ($y, array $line) use ($gap, $width) {
+			$this->pdf->startTransaction();
+			$bottom = $this->drawFieldLine($y, $line, $width, $gap);
+			if ($bottom > self::BOTTOM) {
+				$this->pdf->rollbackTransaction(true);
+				$bottom = $this->drawFieldLine($this->newPage(), $line, $width, $gap);
+			} else {
+				$this->pdf->commitTransaction();
+			}
+			return $bottom;
+		};
+		foreach ($rows as $row) {
+			$wide = !empty($row[2]);
+			if ($wide && $line) {
+				$y = $flush($y, $line);
+				$line = array();
+			}
+			$line[] = $row;
+			if ($wide || count($line) === $cols) {
+				$y = $flush($y, $line);
+				$line = array();
+			}
+		}
+		return $line ? $flush($y, $line) : $y;
+	}
+
+	/**
+	 * @param float               $y     Top
+	 * @param array<int,string[]> $line  Fields of one line
+	 * @param float               $width Column width
+	 * @param float               $gap   Gap between columns
+	 * @return float                     Y below
+	 */
+	private function drawFieldLine($y, array $line, $width, $gap)
+	{
+		$bottom = $y;
+		$x = self::LEFT;
+		foreach ($line as $field) {
+			$w = !empty($field[2]) ? self::RIGHT - self::LEFT : $width;
+			$top = $this->caption($x, $y + 2.6, $w, $field[0]) + 0.5;
+			$value = trim((string) $field[1]);
+			if ($value === '') {
+				// Room for handwriting, the line where the pen goes.
+				$end = $top + 6.4;
+				$this->hline($x, $end, $x + $w, 0.18, self::MARK);
+			} else {
+				$this->font('itsans', '', 9.5, self::INK, 1.35);
+				$end = $this->text($x, $top, $w, $value) + 1.2;
+				$this->hline($x, $end, $x + $w, 0.088, self::LINE);
+			}
+			$bottom = max($bottom, $end);
+			$x += $w + $gap;
+		}
+		return $bottom;
+	}
+
+	/**
+	 * A tick box, ink filled with a white tick when chosen.
+	 *
+	 * @param float $x      Left
+	 * @param float $y      Top
+	 * @param bool  $on     Ticked
+	 * @param float $size   Edge in mm
+	 * @return void
+	 */
+	private function tickBox($x, $y, $on, $size = 3.4)
+	{
+		$pdf = $this->pdf;
+		if ($on) {
+			$pdf->RoundedRect($x, $y, $size, $size, 0.5, '1111', 'F', array(), self::INK);
+			$style = array('width' => 0.35, 'color' => self::WHITE, 'cap' => 'round', 'join' => 'round', 'dash' => 0);
+			$pdf->Line($x + $size * 0.22, $y + $size * 0.52, $x + $size * 0.42, $y + $size * 0.72, $style);
+			$pdf->Line($x + $size * 0.42, $y + $size * 0.72, $x + $size * 0.78, $y + $size * 0.3, $style);
+			return;
+		}
+		$pdf->RoundedRect($x, $y, $size, $size, 0.5, '1111', 'D', array('width' => 0.2, 'color' => self::INK, 'dash' => 0));
+	}
+
+	/**
+	 * Questions with boxes: "Zugangsdaten nötig  [ ] ja  [x] nein".
+	 *
+	 * @param float                          $y    Top
+	 * @param array<int,array<string,mixed>> $rows label, options (string[]), selected (index or null), hint
+	 * @return float                               Y below
+	 */
+	private function drawChoices($y, array $rows)
+	{
+		foreach ($rows as $row) {
+			if ($y + 12.0 > self::BOTTOM) {
+				$y = $this->newPage();
+			}
+			$top = $y + 2.6;
+			$this->font('itsans', '', 9.5, self::INK, 1.35);
+			$labelBottom = $this->text(self::LEFT, $top, 92.0, $row['label']);
+			// Boxes from x 120 on; more or longer options start further left, never wrap.
+			$widths = array();
+			foreach ($row['options'] as $option) {
+				$widths[] = 5.0 + $this->pdf->GetStringWidth($option) + 1.0;
+			}
+			$x = min(120.0, self::RIGHT - array_sum($widths) - 7.0 * (count($widths) - 1));
+			foreach ($row['options'] as $index => $option) {
+				$this->tickBox($x, $top + 0.4, isset($row['selected']) && $row['selected'] === $index);
+				$this->font('itsans', '', 9.5, self::INK, 1.35);
+				$this->text($x + 5.0, $top, $widths[$index] - 4.0, $option);
+				$x += $widths[$index] + 7.0;
+			}
+			$bottom = $labelBottom;
+			if (!empty($row['hint'])) {
+				$this->font('itsans', '', 7.6, self::MUTED, 1.35);
+				$bottom = $this->text(self::LEFT, $bottom + 0.4, 95.0, $row['hint']);
+			}
+			$y = $bottom + 1.6;
+			$this->hline(self::LEFT, $y, self::RIGHT, 0.088, self::LINE);
+		}
+		return $y;
+	}
+
+	/**
+	 * QS points: box, label with note and who/when, value on the right.
+	 *
+	 * @param float                          $y    Top
+	 * @param array<int,array<string,mixed>> $rows state (0 open, 1 done, 2 skipped), label, value, note, meta, required
+	 * @return float                               Y below
+	 */
+	private function drawChecks($y, array $rows)
+	{
+		$pdf = $this->pdf;
+		foreach ($rows as $row) {
+			$pdf->startTransaction();
+			$bottom = $this->drawCheck($y, $row);
+			if ($bottom > self::BOTTOM) {
+				$pdf->rollbackTransaction(true);
+				$bottom = $this->drawCheck($this->newPage(), $row);
+			} else {
+				$pdf->commitTransaction();
+			}
+			$y = $bottom;
+		}
+		return $y;
+	}
+
+	/**
+	 * @param float               $y   Top
+	 * @param array<string,mixed> $row One point
+	 * @return float                   Y below
+	 */
+	private function drawCheck($y, array $row)
+	{
+		$top = $y + 2.4;
+		$state = (int) $row['state'];
+		if ($state === 2) {
+			$this->pdf->RoundedRect(self::LEFT, $top + 0.5, 3.4, 3.4, 0.5, '1111', 'D', array('width' => 0.2, 'color' => self::MARK, 'dash' => 0));
+			$this->hline(self::LEFT + 0.9, $top + 2.2, self::LEFT + 2.5, 0.3, self::MUTED);
+		} elseif ($row['value'] === '' || $state === 1) {
+			$this->tickBox(self::LEFT, $top + 0.5, $state === 1);
+		}
+		$x = self::LEFT + 7.0;
+		$labelWidth = 112.0;
+		$this->font($state === 2 ? 'itsans' : 'itsanssb', '', 9.5, $state === 2 ? self::MUTED : self::INK, 1.35);
+		$cursor = $this->text($x, $top, $labelWidth, $row['label']);
+		if ($row['note'] !== '') {
+			$this->font('itsans', '', 8.3, self::BODY, 1.35);
+			$cursor = $this->text($x, $cursor + 0.3, $labelWidth, $row['note']);
+		}
+		if ($row['meta'] !== '') {
+			$this->font('itsans', '', 7.0, self::MUTED, 1.35);
+			$cursor = $this->text($x, $cursor + 0.3, $labelWidth, $row['meta']);
+		}
+		$right = $top;
+		if ($row['value'] !== '') {
+			$this->font('itsanssb', '', 9.5, self::INK, 1.35);
+			$right = $this->text($x + $labelWidth + 3.0, $top, self::RIGHT - $x - $labelWidth - 3.0, $row['value'], 'R');
+		}
+		$bottom = max($cursor, $right) + 2.2;
+		$this->hline(self::LEFT, $bottom, self::RIGHT, 0.088, self::LINE);
+		return $bottom;
+	}
+
+	/**
+	 * Small notices, one paragraph each, kept together.
+	 *
+	 * @param float    $y    Top
+	 * @param string[] $rows Texts
+	 * @return float         Y below
+	 */
+	private function drawNotices($y, array $rows)
+	{
+		$pdf = $this->pdf;
+		$y += 2.0;
+		foreach ($rows as $text) {
+			$pdf->startTransaction();
+			$this->font('itsans', '', 7.5, self::BODY, 1.36);
+			$bottom = $this->text(self::LEFT + 3.0, $y, self::RIGHT - self::LEFT - 3.0, $text);
+			if ($bottom > self::BOTTOM) {
+				$pdf->rollbackTransaction(true);
+				$y = $this->newPage();
+				$this->font('itsans', '', 7.5, self::BODY, 1.36);
+				$bottom = $this->text(self::LEFT + 3.0, $y, self::RIGHT - self::LEFT - 3.0, $text);
+			} else {
+				$pdf->commitTransaction();
+			}
+			$pdf->Rect(self::LEFT, $y + 1.1, 1.0, 1.0, 'F', array(), self::BRAND);
+			$y = $bottom + 0.9;
 		}
 		return $y;
 	}
@@ -717,7 +978,8 @@ class WerkbankRenderer
 		// customer signature tucks in under the totals.
 		$signatures = $doc['signatures'];
 		if (isset($signatures['left']) && isset($signatures['right'])) {
-			$line = max($left, $right) + 12.0;
+			// A sheet signed by hand or on the device needs room for the pen.
+			$line = max($left, $right) + (!empty($this->doc['sign_room']) || $this->hasSignatureImage() ? 20.0 : 12.0);
 			$left = $this->drawSignature(self::LEFT, $line, $signatures['left'], false);
 			$right = $this->drawSignature(self::RIGHT - 75.0, $line, $signatures['right'], true);
 		} elseif (isset($signatures['right'])) {
@@ -776,8 +1038,18 @@ class WerkbankRenderer
 	private function drawSignature($x, $y, $label, $customer)
 	{
 		$pdf = $this->pdf;
+		// A signature given on the device: the image sits on the line, the
+		// name in block letters and the time stand below the caption.
+		$signed = is_array($label) ? $label : array('label' => $label);
+		if (!empty($signed['image']) && is_readable($signed['image'])) {
+			$pdf->Image($signed['image'], $x + 1.0, $y - 15.0, 62.0, 14.5, 'PNG', '', '', true, 300, '', false, false, 0, 'LB');
+		}
 		$this->hline($x, $y, $x + 75.0, 0.18, self::INK);
-		$bottom = $this->caption($x, $y + 1.4, 75.0, $label);
+		$bottom = $this->caption($x, $y + 1.4, 75.0, $signed['label']);
+		if (!empty($signed['name']) || !empty($signed['when'])) {
+			$this->font('itsans', '', 7.0, self::BODY, 1.3);
+			$bottom = $this->text($x, $bottom + 0.4, 75.0, trim((!empty($signed['name']) ? $signed['name'] : '').(!empty($signed['when']) ? ' · '.$signed['when'] : ''), ' ·'));
+		}
 		if ($customer && !empty($this->doc['esign'])) {
 			$pdf->addEmptySignatureAppearance($x, $y - 12.0, 75.0, 12.0);
 		}

@@ -126,6 +126,11 @@ trait WerkbankModel
 			require_once __DIR__.'/werkbankunterlagen.class.php';
 			$unterlagen = new WerkbankUnterlagen($this->db);
 			$doc['append'] = $unterlagen->appendFor($object);
+			if ($element === 'fichinter' && getDolGlobalInt('ITTABPDF_QS_APPEND_WORKREPORT')) {
+				require_once __DIR__.'/werkbankqs.class.php';
+				$qs = new WerkbankQs($this->db);
+				$doc['append'] = array_merge($doc['append'], $qs->protocolFiles($object));
+			}
 			$renderer = new WerkbankRenderer(pdf_getInstance($this->format), $outputlangs);
 			$renderer->render($doc, $target);
 		} catch (Throwable $exception) {
