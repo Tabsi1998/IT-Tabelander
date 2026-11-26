@@ -285,6 +285,7 @@ class WerkbankMailData
 			'shipping' => 'belege/lieferscheine',
 			'fichinter' => 'belege/arbeitsberichte',
 			'contrat' => 'belege/vertraege',
+			'ticket' => 'anfragen',
 		);
 		if (isset($paths[$object->element])) {
 			return $base.'/'.$paths[$object->element].'/'.((int) $object->id);
