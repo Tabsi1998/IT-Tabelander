@@ -427,6 +427,8 @@ Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie
    - Produkte: **lesen** (Abrechnungsintervall der laufenden Leistungen aus der
      Dauer der Leistung, z. B. „1 Monat“ = monatlich). Ohne dieses Recht fehlt
      nur das Intervall,
+   - IT-Tabelander PDF: **Unterlagen und Rechtstexte lesen** (Rechtstexte
+     und ihre PDFs aus dem Modul, ab Modul 1.5.0),
    - Dokumente (ECM): **lesen/herunterladen** (Rechtstexte als PDF aus
      `IT-Tabelander/Unterlagen/`, `GET /documents/download` mit
      `modulepart=ecm`). Hochladen oder Einrichten braucht die Website nicht.
@@ -509,6 +511,17 @@ Kontobewegungen lesbar machen. Die IBAN steht auf den Rechnungen aus Dolibarr,
 die im Kundenportal (Meilenstein 5) abrufbar werden.
 
 ### Rechtstexte: Impressum, Datenschutz, Nutzungsbedingungen, Widerruf, AGB
+
+**Ab dem Dolibarr-Modul ittabelanderpdf 1.5.0** sind die Rechtstexte eigene
+**Unterlagen** des Moduls (Dolibarr: Geschäftspartner → Unterlagen, mit
+Versionen und Stand). Die Website liest einen freigegebenen, öffentlichen
+Rechtstext mit dem passenden Dateinamen (Tabelle unten) über die Schnittstelle
+des Moduls (`GET /ittabelanderpdf/unterlagen/<datei>`, PDF über
+`…/<datei>/pdf`); er geht vor dem gewählten Wissensartikel. Nötig ist das Recht
+**IT-Tabelander PDF: Unterlagen und Rechtstexte lesen** für den
+Website-Benutzer. Hat das Modul einen Text nicht oder ist es älter als 1.5.0,
+gilt weiter der gewählte Wissensartikel wie unten beschrieben. Im Admin steht
+bei jedem Text, woher er kommt.
 
 Unter `/admin/dolibarr` im Block **Rechtstexte** steht alles an einer Stelle:
 

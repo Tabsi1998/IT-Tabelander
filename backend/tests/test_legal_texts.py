@@ -261,12 +261,24 @@ def test_the_pdf_is_the_fixed_file_of_the_page_and_kept_for_a_while(monkeypatch)
     assert asyncio.run(legal_pdf.fetch("datenschutz")) == PDF
     assert asyncio.run(legal_pdf.fetch("datenschutz")) == PDF
     assert len(requests) == 1, "the second call comes from the copy"
-    params = requests[0].url.params
-    assert requests[0].url.path.endswith("/api/index.php/documents/download")
+    assert requests[0].url.path.endswith("/api/index.php/ittabelanderpdf/unterlagen/datenschutz/pdf")
+
+
+def test_with_an_older_module_the_pdf_comes_from_the_ecm(monkeypatch):
+    def older(request):
+        if "/ittabelanderpdf/" in request.url.path:
+            return httpx.Response(404, json={"error": {"message": "API not found"}})
+        return _filed(PDF)(request)
+
+    requests = _pdf_world(monkeypatch, older)
+    assert asyncio.run(legal_pdf.fetch("datenschutz")) == PDF
+    assert len(requests) == 2
+    params = requests[1].url.params
+    assert requests[1].url.path.endswith("/api/index.php/documents/download")
     assert params["modulepart"] == "ecm" and params["original_file"] == "IT-Tabelander/Unterlagen/datenschutz.pdf"
     assert legal_pdf.SLUGS["impressum"] == "impressum-ergaenzung"
     # Anything else is never asked for, whatever comes in.
-    assert asyncio.run(legal_pdf.fetch("../../conf/conf.php")) is None and len(requests) == 1
+    assert asyncio.run(legal_pdf.fetch("../../conf/conf.php")) is None and len(requests) == 2
 
 
 def test_a_missing_file_or_no_pdf_gives_no_pdf(monkeypatch):
@@ -300,3 +312,14 @@ def test_the_download_serves_only_released_pages(monkeypatch):
         with pytest.raises(site_router.HTTPException) as caught:
             asyncio.run(site_router.legal_pdf_download(kind))
         assert caught.value.status_code == 404, kind
+
+
+def test_the_admin_names_texts_kept_in_the_module():
+    module = {"id": "modul-datenschutz", "slug": "datenschutz", "question": "Datenschutzerklärung", "answer_html": "<p>Fertig.</p>",
+              "status": site_data.ARTICLE_VALIDATED, "source": "module", "version": 3, "updated_at": "2026-11-26"}
+    result = legal_texts.overview({"company": {"name": "X"}, "legal": {}, "module_legal": {"datenschutz": module}}, {})
+    texts = {text["kind"]: text for text in result["texts"]}
+    assert texts["datenschutz"]["source"] == "module" and texts["datenschutz"]["state"] == "released"
+    assert texts["datenschutz"]["module"]["version"] == 3
+    assert texts["nutzungsbedingungen"]["source"] == "article"
+    assert not any(line.startswith("Datenschutzerklärung") for line in result["todo"])

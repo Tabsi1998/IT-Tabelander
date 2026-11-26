@@ -93,11 +93,24 @@ def overview(data: dict, settings: dict) -> dict:
     legal_category = (data.get("category_ids") or {}).get("legal")
     in_category = {item["id"] for item in data.get("legal_articles") or []}
     texts = []
+    module_legal = data.get("module_legal") or {}
     for kind, (label, _title) in TEXTS.items():
         setting = site_data.LEGAL_ARTICLES[kind]
+        module = module_legal.get(kind)
+        if module:
+            # Kept in the module's documents (released there); the picked article no longer counts.
+            texts.append({
+                "kind": kind, "label": label, "setting": setting, "source": "module",
+                "article": {"id": module["id"], "question": module["question"], "status": module["status"]},
+                "module": {key: module.get(key) for key in ("slug", "version", "updated_at")},
+                "gone": False, "state": "released", "open_points": open_points(module["answer_html"]),
+                "can_draft": False, "optional": kind in OPTIONAL, "outside_category": False,
+            })
+            continue
         chosen = settings.get(setting)
         article = legal.get(kind) if chosen else None
         texts.append({
+            "source": "article",
             "kind": kind, "label": label, "setting": setting,
             "article": {key: article[key] for key in ("id", "question", "status")} if article else None,
             # Picked, but Dolibarr no longer has it (deleted or out of date).
