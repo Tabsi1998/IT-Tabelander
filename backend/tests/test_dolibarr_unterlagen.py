@@ -36,7 +36,8 @@ def imported() -> dict:
 
 def run_script(*args, folder: Path = FOLDER) -> subprocess.CompletedProcess:
     env = {**os.environ, "DOLIBARR_URL": DOLIBARR, "DOLIBARR_API_KEY": ADMIN_KEY, "PYTHONIOENCODING": "utf-8"}
-    completed = subprocess.run([sys.executable, str(SCRIPT), "--ordner", str(folder), *args], env=env,
+    # The 'dolibarr' group has no module ittabelanderpdf: the knowledge base target.
+    completed = subprocess.run([sys.executable, str(SCRIPT), "--wissensmanagement", "--ordner", str(folder), *args], env=env,
                                capture_output=True, text=True, encoding="utf-8", timeout=180)
     print(completed.stdout, completed.stderr)
     return completed

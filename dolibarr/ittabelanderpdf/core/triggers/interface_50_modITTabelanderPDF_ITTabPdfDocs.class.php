@@ -109,7 +109,7 @@ class InterfaceITTabPdfDocs extends DolibarrTriggers
 		$missing = array();
 		foreach ($docs->status($contract->thirdparty) as $entry) {
 			$rule = $entry['rule'];
-			if ((int) $rule->required && $rule->scope === 'contract' && WerkbankDocs::matches((string) $product->ref, (string) $rule->scope_value) && $entry['state'] !== 'done') {
+			if ((int) $rule->required && trim((string) $rule->products) !== '' && WerkbankDocs::matches((string) $product->ref, (string) $rule->products) && $entry['state'] !== 'done') {
 				$missing[] = (string) $rule->label;
 			}
 		}

@@ -12,9 +12,10 @@
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
 /**
- * Company documents (Unterlagen): knowledge base articles of chosen
- * categories as Werkbank PDFs in one ECM folder, <slug>.pdf, ready to be
- * attached to e-mails or appended to a proposal and downloaded by the website.
+ * Company documents (Unterlagen) as files: the ECM folder with <slug>.pdf of
+ * every released document (WerkbankDoc), the PDF writer, the lists for the
+ * mail form and the PDFs appended to proposals. Reads the knowledge base only
+ * to take over the articles of earlier versions (knowledgeArticles()).
  */
 class WerkbankUnterlagen
 {
@@ -181,64 +182,55 @@ class WerkbankUnterlagen
 	}
 
 	/**
-	 * The slug of another article that already uses it, or 0.
+	 * Articles of the knowledge base categories chosen for company documents,
+	 * for the takeover into the module's own documents (WerkbankDoc).
 	 *
-	 * @param KnowledgeRecord $record Article
-	 * @param string          $slug   File name
-	 * @return int                    Id of the other article
+	 * @return array<int,array<string,mixed>> id, ref, title, slug, status, changed, text, categories
 	 */
-	public function slugTakenBy($record, $slug)
-	{
-		foreach ($this->articles() as $article) {
-			if ((int) $article['id'] !== (int) $record->id && $article['slug'] === $slug) {
-				return (int) $article['id'];
-			}
-		}
-		return 0;
-	}
-
-	/**
-	 * Released articles of the chosen categories with their file name.
-	 *
-	 * @return array<int,array<string,mixed>> id, ref, title, slug, status
-	 */
-	public function articles()
+	public function knowledgeArticles()
 	{
 		$wanted = isModEnabled('knowledgemanagement') ? $this->categoryIds() : array();
 		if (!$wanted) {
 			return array();
 		}
-		$sql = "SELECT DISTINCT k.rowid, k.ref, k.question, k.status, k.tms, k.date_creation, e.".self::SLUG_FIELD." AS slug"
+		$described = $this->db->DDLDescTable(MAIN_DB_PREFIX.'knowledgemanagement_knowledgerecord_extrafields', self::SLUG_FIELD);
+		$slugColumn = $described && $this->db->num_rows($described) > 0 ? "e.".self::SLUG_FIELD : "''";
+		$sql = "SELECT k.rowid, k.ref, k.question, k.answer, k.status, k.tms, k.date_creation, ".$slugColumn." AS slug, c.fk_categorie"
 			." FROM ".MAIN_DB_PREFIX."knowledgemanagement_knowledgerecord AS k"
 			." INNER JOIN ".MAIN_DB_PREFIX."categorie_knowledgemanagement AS c ON c.fk_knowledgemanagement = k.rowid"
 			." LEFT JOIN ".MAIN_DB_PREFIX."knowledgemanagement_knowledgerecord_extrafields AS e ON e.fk_object = k.rowid"
 			." WHERE c.fk_categorie IN (".implode(',', array_map('intval', $wanted)).")"
-			." AND k.entity IN (".getEntity('knowledgemanagement').") ORDER BY k.question";
+			." AND k.entity IN (".getEntity('knowledgemanagement').") ORDER BY k.rowid";
 		$resql = $this->db->query($sql);
 		$list = array();
 		while ($resql && ($obj = $this->db->fetch_object($resql))) {
+			$id = (int) $obj->rowid;
+			if (isset($list[$id])) {
+				$list[$id]['categories'][] = (int) $obj->fk_categorie;
+				continue;
+			}
 			$slug = self::slugify((string) $obj->slug);
-			$changed = max((int) $this->db->jdate($obj->tms), (int) $this->db->jdate($obj->date_creation));
-			$list[] = array('id' => (int) $obj->rowid, 'ref' => (string) $obj->ref, 'title' => (string) $obj->question,
+			$list[$id] = array('id' => $id, 'ref' => (string) $obj->ref, 'title' => (string) $obj->question, 'text' => (string) $obj->answer,
 				'slug' => $slug !== '' ? $slug : self::slugify((string) $obj->question), 'status' => (int) $obj->status,
-				'stand' => $changed ? dol_print_date($changed, '%Y-%m-%d') : '');
+				'changed' => max((int) $this->db->jdate($obj->tms), (int) $this->db->jdate($obj->date_creation)), 'categories' => array((int) $obj->fk_categorie));
 		}
-		return $list;
+		return array_values($list);
 	}
 
 	/**
-	 * The released documents by file name without .pdf: title and "Stand"
-	 * (YYYY-MM-DD, last change of the article), for the status per customer.
+	 * The released documents by file name without .pdf: title, "Stand"
+	 * (YYYY-MM-DD of the latest release), version, kind, id.
 	 *
-	 * @return array<string,array{title:string,stand:string,id:int}>
+	 * @return array<string,array{title:string,stand:string,id:int,version:int,kind:string}>
 	 */
 	public function documents()
 	{
+		require_once __DIR__.'/werkbankdoc.class.php';
+		$store = new WerkbankDoc($this->db);
 		$list = array();
-		foreach ($this->articles() as $article) {
-			if ($article['status'] === 1) {
-				$list[$article['slug']] = array('title' => $article['title'], 'stand' => $article['stand'], 'id' => $article['id']);
-			}
+		foreach ($store->all(array('released' => 1)) as $doc) {
+			$list[$doc->slug] = array('title' => (string) $doc->title, 'stand' => dol_print_date($this->db->jdate($doc->date_release), '%Y-%m-%d'),
+				'id' => (int) $doc->rowid, 'version' => (int) $doc->version, 'kind' => (string) $doc->kind);
 		}
 		return $list;
 	}
@@ -273,8 +265,8 @@ class WerkbankUnterlagen
 	public function files()
 	{
 		$titles = array();
-		foreach ($this->articles() as $article) {
-			$titles[$article['slug'].'.pdf'] = $article['title'];
+		foreach ($this->documents() as $slug => $document) {
+			$titles[$slug.'.pdf'] = $document['title'];
 		}
 		$list = array();
 		foreach (dol_dir_list(self::dir(), 'files', 0, '\.pdf$', '', 'name', SORT_ASC) as $file) {
@@ -370,11 +362,6 @@ class WerkbankUnterlagen
 			$this->error = $langs->transnoentities('WerkbankDocsNoSlug');
 			return '';
 		}
-		$other = $this->slugTakenBy($record, $slug);
-		if ($other) {
-			$this->error = $langs->transnoentities('WerkbankDocsSlugTaken', $slug.'.pdf');
-			return '';
-		}
 		if ($this->ensureEcmDirectory($user) < 0) {
 			return '';
 		}
@@ -405,15 +392,17 @@ class WerkbankUnterlagen
 	 * The folder exists on disk and as ECM directories, so it shows in
 	 * Documents (manual section) like a folder made by hand.
 	 *
-	 * @param User $user User
-	 * @return int       >0 OK, <0 error
+	 * @param User        $user     User
+	 * @param string|null $relative Folder below documents/ecm, null = the Unterlagen folder
+	 * @return int                  >0 OK, <0 error
 	 */
-	public function ensureEcmDirectory($user)
+	public function ensureEcmDirectory($user, $relative = null)
 	{
 		global $conf;
 		require_once DOL_DOCUMENT_ROOT.'/ecm/class/ecmdirectory.class.php';
+		$relative = $relative === null ? self::relativeDir() : trim($relative, '/');
 		$parent = 0;
-		foreach (explode('/', self::relativeDir()) as $label) {
+		foreach (explode('/', $relative) as $label) {
 			$label = dol_sanitizeFileName($label);
 			$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."ecm_directories WHERE label = '".$this->db->escape($label)."'"
 				." AND entity = ".((int) $conf->entity)." AND ".($parent ? "fk_parent = ".((int) $parent) : "(fk_parent IS NULL OR fk_parent = 0)");
@@ -434,11 +423,43 @@ class WerkbankUnterlagen
 			}
 			$parent = (int) $id;
 		}
-		if (!is_dir(self::dir()) && dol_mkdir(self::dir()) < 0) {
+		$full = (!empty($conf->ecm->dir_output) ? $conf->ecm->dir_output : DOL_DATA_ROOT.'/ecm').'/'.$relative;
+		if (!is_dir($full) && dol_mkdir($full) < 0) {
 			$this->error = 'ErrorFailedToCreateDir';
 			return -1;
 		}
 		return 1;
+	}
+
+	/**
+	 * Remove PDFs in the Unterlagen folder that this module wrote for a
+	 * document (a knowledge article of earlier versions or a WerkbankDoc)
+	 * under another name than $keep: after a file name changed, the old file
+	 * would stay as a duplicate. Files someone uploaded are never touched;
+	 * only files the ECM index marks as generated from that source.
+	 *
+	 * @param string $sourceType llx_ecm_files.src_object_type
+	 * @param int    $sourceId   Its id
+	 * @param string $keep       File name that stays
+	 * @return int               Files removed
+	 */
+	public function removeOldFiles($sourceType, $sourceId, $keep)
+	{
+		$relative = 'ecm/'.self::relativeDir();
+		$sql = "SELECT rowid, filename FROM ".MAIN_DB_PREFIX."ecm_files WHERE filepath = '".$this->db->escape($relative)."'"
+			." AND src_object_type = '".$this->db->escape($sourceType)."' AND src_object_id = ".((int) $sourceId)
+			." AND gen_or_uploaded = 'generated' AND filename <> '".$this->db->escape($keep)."'";
+		$resql = $this->db->query($sql);
+		$removed = 0;
+		while ($resql && ($obj = $this->db->fetch_object($resql))) {
+			$file = self::dir().'/'.basename((string) $obj->filename);
+			if (is_file($file)) {
+				dol_delete_file($file, 0, 1);
+			}
+			$this->db->query("DELETE FROM ".MAIN_DB_PREFIX."ecm_files WHERE rowid = ".((int) $obj->rowid));
+			$removed++;
+		}
+		return $removed;
 	}
 
 	/**

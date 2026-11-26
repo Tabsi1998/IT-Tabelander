@@ -146,31 +146,20 @@ if ($action === 'reopen' && $run && $user->hasRight('ittabelanderpdf', 'qs', 'ma
  */
 
 $title = $langs->trans('WerkbankQsMenu');
-llxHeader('<meta name="viewport" content="width=device-width, initial-scale=1">', $title, '', '', 0, 0,
-	array('/ittabelanderpdf/js/qs.js'), array('/ittabelanderpdf/css/qs.css'), '', 'mod-ittabelanderpdf page-qs');
+llxHeader('', $title, '', '', 0, 0, array('/ittabelanderpdf/js/qs.js'), array('/ittabelanderpdf/css/qs.css'), '', 'mod-ittabelanderpdf page-qs');
 
 if ($fichinter) {
 	$head = fichinter_prepare_head($fichinter);
 	print dol_get_fiche_head($head, 'ittabpdfqs', $langs->trans('InterventionCard'), -1, 'intervention');
+	$linkback = '<a href="'.DOL_URL_ROOT.'/fichinter/list.php?restore_lastsearch_values=1">'.$langs->trans('BackToList').'</a>';
+	dol_banner_tab($fichinter, 'ref', $linkback, 1, 'ref', 'ref', '');
+	print dol_get_fiche_end();
 } elseif ($thirdparty) {
 	$head = societe_prepare_head($thirdparty);
 	print dol_get_fiche_head($head, 'ittabpdfqs', $langs->trans('ThirdParty'), -1, 'company');
+	dol_banner_tab($thirdparty, 'socid', '', ($user->socid ? 0 : 1), 'rowid', 'nom');
+	print dol_get_fiche_end();
 }
-
-print '<div class="ittabqs">';
-
-// Where we are: customer › intervention › kind of job, each a way back.
-$crumbs = array('<a href="'.$self.'">'.$langs->trans('WerkbankQsAllCustomers').'</a>');
-if ($thirdparty) {
-	$crumbs[] = '<a href="'.$self.'?socid='.((int) $thirdparty->id).'">'.dol_escape_htmltag($thirdparty->name).'</a>';
-}
-if ($fichinter) {
-	$crumbs[] = '<a href="'.$self.'?fichinter='.((int) $fichinter->id).'">'.dol_escape_htmltag($fichinter->ref).'</a>';
-}
-if ($run) {
-	$crumbs[] = '<span>'.dol_escape_htmltag($run->type_label).'</span>';
-}
-print '<nav class="ittabqs-crumbs" aria-label="'.dol_escape_htmltag($langs->trans('WerkbankQsMenu')).'">'.implode('<span class="ittabqs-sep" aria-hidden="true">›</span>', $crumbs).'</nav>';
 
 if ($run) {
 	ittabqs_show_run($db, $qs, $run, $fichinter, $self);
@@ -182,10 +171,6 @@ if ($run) {
 	ittabqs_show_start($db, $self);
 }
 
-print '</div>';
-if ($fichinter || $thirdparty) {
-	print dol_get_fiche_end();
-}
 llxFooter();
 $db->close();
 
@@ -203,12 +188,12 @@ function ittabqs_show_start($db, $self)
 	if (!is_object($form)) {
 		$form = new Form($db);
 	}
-	print '<h1 class="ittabqs-title">'.$langs->trans('WerkbankQsChooseCustomer').'</h1>';
-	print '<form method="GET" action="'.$self.'" class="ittabqs-panel">';
-	print '<label class="ittabqs-label" for="socid">'.$langs->trans('ThirdParty').'</label>';
-	print $form->select_company('', 'socid', '((s.client:IN:1,2,3) AND (s.status:=:1))', 'SelectThirdParty', 0, 0, array(), 0, 'ittabqs-wide');
-	print '<button type="submit" class="ittabqs-primary">'.$langs->trans('WerkbankQsNext').'</button>';
-	print '</form>';
+	print load_fiche_titre($langs->trans('WerkbankQsMenu'), '', 'intervention');
+	print '<form method="GET" action="'.$self.'">';
+	print '<table class="border centpercent tableforfield"><tr><td class="titlefield">'.$langs->trans('WerkbankQsChooseCustomer').'</td><td>';
+	print $form->select_company('', 'socid', '((s.client:IN:1,2,3) AND (s.status:=:1))', 'SelectThirdParty', 0, 0, array(), 0, 'minwidth300');
+	print ' <input type="submit" class="button smallpaddingimp" value="'.dol_escape_htmltag($langs->trans('WerkbankQsNext')).'">';
+	print '</td></tr></table></form>';
 }
 
 /**
@@ -222,36 +207,32 @@ function ittabqs_show_start($db, $self)
 function ittabqs_show_customer($db, $thirdparty, $self)
 {
 	global $langs, $user;
-	print '<h1 class="ittabqs-title">'.dol_escape_htmltag($thirdparty->name).'</h1>';
 	$sql = "SELECT rowid, ref, description, fk_statut, datec FROM ".MAIN_DB_PREFIX."fichinter"
 		." WHERE fk_soc = ".((int) $thirdparty->id)." AND entity IN (".getEntity('intervention').") AND fk_statut IN (0, 1)"
 		." ORDER BY datec DESC";
 	$resql = $db->query($db->plimit($sql, 20));
-	$rows = array();
-	while ($resql && ($obj = $db->fetch_object($resql))) {
-		$rows[] = $obj;
+	print load_fiche_titre($langs->trans('WerkbankQsOpenInterventions'), '', '');
+	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
+	print '<tr class="liste_titre"><td>'.$langs->trans('Ref').'</td><td>'.$langs->trans('Date').'</td><td>'.$langs->trans('Description').'</td><td></td></tr>';
+	$count = 0;
+	while ($resql && ($row = $db->fetch_object($resql))) {
+		$count++;
+		print '<tr class="oddeven"><td class="nowraponall"><a href="'.$self.'?fichinter='.((int) $row->rowid).'">'.img_picto('', 'intervention', 'class="pictofixedwidth"').dol_escape_htmltag($row->ref).'</a></td>';
+		print '<td>'.dol_print_date($db->jdate($row->datec), 'day').'</td>';
+		print '<td class="tdoverflowmax300">'.dol_escape_htmltag(dol_trunc(dol_string_nohtmltag((string) $row->description), 90)).'</td>';
+		print '<td class="right"><a class="butAction smallpaddingimp" href="'.$self.'?fichinter='.((int) $row->rowid).'">'.$langs->trans('WerkbankQsNext').'</a></td></tr>';
 	}
-	print '<h2 class="ittabqs-subtitle">'.$langs->trans('WerkbankQsOpenInterventions').'</h2>';
-	if (!$rows) {
-		print '<p class="ittabqs-empty">'.$langs->trans('WerkbankQsNoOpenIntervention').'</p>';
-	} else {
-		print '<ul class="ittabqs-choices">';
-		foreach ($rows as $row) {
-			$description = dol_trunc(dol_string_nohtmltag((string) $row->description), 90);
-			print '<li><a class="ittabqs-choice" href="'.$self.'?fichinter='.((int) $row->rowid).'">';
-			print '<span class="ittabqs-choice-main">'.dol_escape_htmltag($row->ref).'</span>';
-			print '<span class="ittabqs-choice-sub">'.dol_print_date($db->jdate($row->datec), 'day').($description !== '' ? ' · '.dol_escape_htmltag($description) : '').'</span>';
-			print '</a></li>';
-		}
-		print '</ul>';
+	if (!$count) {
+		print '<tr class="oddeven"><td colspan="4"><span class="opacitymedium">'.$langs->trans('WerkbankQsNoOpenIntervention').'</span></td></tr>';
 	}
+	print '</table></div>';
 	if ($user->hasRight('ficheinter', 'creer')) {
-		print '<form method="POST" action="'.$self.'?socid='.((int) $thirdparty->id).'" class="ittabqs-panel">';
+		print load_fiche_titre($langs->trans('WerkbankQsNewIntervention'), '', '');
+		print '<form method="POST" action="'.$self.'?socid='.((int) $thirdparty->id).'">';
 		print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="create_fichinter">';
-		print '<label class="ittabqs-label" for="ittabqs-description">'.$langs->trans('WerkbankQsNewIntervention').'</label>';
-		print '<textarea id="ittabqs-description" name="description" rows="2" class="ittabqs-input" placeholder="'.dol_escape_htmltag($langs->trans('WerkbankQsNewInterventionHint')).'"></textarea>';
-		print '<button type="submit" class="ittabqs-primary">'.$langs->trans('WerkbankQsCreateIntervention').'</button>';
-		print '</form>';
+		print '<table class="border centpercent tableforfield"><tr><td class="titlefield">'.$langs->trans('Description').'</td><td>';
+		print '<textarea name="description" rows="2" class="quatrevingtpercent" placeholder="'.dol_escape_htmltag($langs->trans('WerkbankQsNewInterventionHint')).'"></textarea></td></tr></table>';
+		print '<div class="center"><input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankQsCreateIntervention')).'"></div></form>';
 	}
 }
 
@@ -266,35 +247,34 @@ function ittabqs_show_customer($db, $thirdparty, $self)
 function ittabqs_show_fichinter($qs, $fichinter, $self)
 {
 	global $langs;
-	print '<h1 class="ittabqs-title">'.dol_escape_htmltag($fichinter->ref).' <span class="ittabqs-title-sub">'.dol_escape_htmltag($fichinter->thirdparty->name).'</span></h1>';
 	$runs = $qs->runsFor((int) $fichinter->id);
 	if ($runs) {
-		print '<h2 class="ittabqs-subtitle">'.$langs->trans('WerkbankQsRuns').'</h2><ul class="ittabqs-choices">';
+		print load_fiche_titre($langs->trans('WerkbankQsRuns'), '', '');
+		print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
+		print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankQsKind').'</td><td class="center">'.$langs->trans('Status').'</td><td class="right">'.$langs->trans('WerkbankQsPoints').'</td></tr>';
 		foreach ($runs as $run) {
 			$closed = (int) $run->status === 1;
-			print '<li><a class="ittabqs-choice'.($closed ? ' is-closed' : '').'" href="'.$self.'?id='.((int) $run->rowid).'">';
-			print '<span class="ittabqs-choice-main">'.dol_escape_htmltag($run->type_label).'</span>';
-			print '<span class="ittabqs-choice-sub">'.($closed ? $langs->trans('WerkbankQsStateClosed') : $langs->trans('WerkbankQsStateOpen'))
-				.' · '.$langs->trans('WerkbankQsProgress', $run->counts['done'], $run->counts['total']).'</span>';
-			print '</a></li>';
+			print '<tr class="oddeven"><td><a href="'.$self.'?id='.((int) $run->rowid).'">'.dol_escape_htmltag($run->type_label).'</a></td>';
+			print '<td class="center">'.dolGetStatus($langs->trans($closed ? 'WerkbankQsStateClosed' : 'WerkbankQsStateOpen'), '', '', $closed ? 'status4' : 'status1', 5).'</td>';
+			print '<td class="right">'.$langs->trans('WerkbankQsProgress', $run->counts['done'], $run->counts['total']).'</td></tr>';
 		}
-		print '</ul>';
+		print '</table></div>';
 	}
 	$types = $qs->types(true);
-	print '<h2 class="ittabqs-subtitle">'.$langs->trans('WerkbankQsStart').'</h2>';
+	print load_fiche_titre($langs->trans('WerkbankQsStart'), '', '');
 	if (!$types) {
-		print '<p class="ittabqs-empty">'.$langs->trans('WerkbankQsNoTypes').'</p>';
+		print '<div class="opacitymedium">'.$langs->trans('WerkbankQsNoTypes').'</div>';
 		return;
 	}
-	print '<form method="POST" action="'.$self.'?fichinter='.((int) $fichinter->id).'" class="ittabqs-kinds">';
+	print '<form method="POST" action="'.$self.'?fichinter='.((int) $fichinter->id).'">';
 	print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="start">';
+	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
+	print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankQsKind').'</td><td class="right">'.$langs->trans('WerkbankQsPoints').'</td><td></td></tr>';
 	foreach ($types as $type) {
-		$count = count($qs->items((int) $type->rowid, true));
-		print '<button type="submit" name="type" value="'.((int) $type->rowid).'" class="ittabqs-kind">';
-		print '<span class="ittabqs-choice-main">'.dol_escape_htmltag($type->label).'</span>';
-		print '<span class="ittabqs-choice-sub">'.$langs->trans('WerkbankQsPointCount', $count).'</span></button>';
+		print '<tr class="oddeven"><td>'.dol_escape_htmltag($type->label).'</td><td class="right">'.count($qs->items((int) $type->rowid, true)).'</td>';
+		print '<td class="right"><button type="submit" name="type" value="'.((int) $type->rowid).'" class="button smallpaddingimp ittabqs-kind">'.$langs->trans('WerkbankQsStartButton').'</button></td></tr>';
 	}
-	print '</form>';
+	print '</table></div></form>';
 }
 
 /**
@@ -316,45 +296,43 @@ function ittabqs_show_run($db, $qs, $run, $fichinter, $self)
 	$counts = $qs->counts((int) $run->rowid);
 	$missing = GETPOSTINT('missing') === 1;
 
-	print '<h1 class="ittabqs-title">'.dol_escape_htmltag($run->type_label).' <span class="ittabqs-title-sub">'.dol_escape_htmltag($fichinter->thirdparty->name).'</span></h1>';
-	print '<div class="ittabqs-status" id="ittabqs-status" aria-live="polite" data-total="'.$counts['total'].'">';
-	print '<div class="ittabqs-meter" role="progressbar" aria-valuemin="0" aria-valuemax="'.$counts['total'].'" aria-valuenow="'.$counts['done'].'">'
-		.'<span style="width:'.($counts['total'] ? round(100 * $counts['done'] / $counts['total']) : 0).'%"></span></div>';
-	print '<span class="ittabqs-status-text" data-done-label="'.dol_escape_htmltag($langs->transnoentities('WerkbankQsProgress', '%d', '%t')).'"'
+	print load_fiche_titre(dol_escape_htmltag($run->type_label), '', '');
+	print '<div class="ittabqs-status" id="ittabqs-status"><span class="ittabqs-status-text" data-done-label="'.dol_escape_htmltag($langs->transnoentities('WerkbankQsProgress', '%d', '%t')).'"'
 		.' data-required-label="'.dol_escape_htmltag($langs->transnoentities('WerkbankQsRequiredLeft', '%r')).'">'
 		.$langs->trans('WerkbankQsProgress', $counts['done'], $counts['total'])
-		.($counts['required_open'] ? ' · <strong>'.$langs->trans('WerkbankQsRequiredLeft', $counts['required_open']).'</strong>' : '').'</span>';
-	print '</div>';
+		.($counts['required_open'] ? ' · <strong>'.$langs->trans('WerkbankQsRequiredLeft', $counts['required_open']).'</strong>' : '').'</span></div>';
 
 	if ($closed) {
 		$file = $run->filename ? dol_sanitizeFileName($fichinter->ref).'/'.$run->filename : '';
-		print '<div class="ittabqs-done">';
-		print '<p>'.$langs->trans('WerkbankQsClosedOn', dol_print_date($db->jdate($run->date_close), 'dayhour', 'tzuser')).'</p>';
-		if ($file !== '' && is_file($GLOBALS['conf']->ficheinter->dir_output.'/'.$file)) {
-			print '<a class="ittabqs-secondary" href="'.DOL_URL_ROOT.'/document.php?modulepart=ficheinter&amp;file='.urlencode($file).'">'.img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans('WerkbankQsOpenPdf').'</a>';
-		}
-		print '<a class="ittabqs-primary" href="'.dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=qs&amp;id='.((int) $run->rowid).'">'.$langs->trans('WerkbankSignAndSend').'</a>';
+		print '<div class="info ittabqs-done">'.$langs->trans('WerkbankQsClosedOn', dol_print_date($db->jdate($run->date_close), 'dayhour', 'tzuser'));
 		if (!empty($run->date_sent)) {
-			print '<p>'.$langs->trans('WerkbankSignSentOn', dol_print_date($db->jdate($run->date_sent), 'dayhour', 'tzuser'), dol_escape_htmltag((string) $run->sent_to)).'</p>';
+			print ' '.$langs->trans('WerkbankSignSentOn', dol_print_date($db->jdate($run->date_sent), 'dayhour', 'tzuser'), dol_escape_htmltag((string) $run->sent_to));
 		}
+		print '</div><div class="tabsAction">';
+		if ($file !== '' && is_file($GLOBALS['conf']->ficheinter->dir_output.'/'.$file)) {
+			print '<a class="butAction" href="'.DOL_URL_ROOT.'/document.php?modulepart=ficheinter&amp;file='.urlencode($file).'">'.$langs->trans('WerkbankQsOpenPdf').'</a>';
+		}
+		print '<a class="butAction" href="'.dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=qs&amp;id='.((int) $run->rowid).'">'.$langs->trans('WerkbankSignAndSend').'</a>';
 		if ($user->hasRight('ittabelanderpdf', 'qs', 'manage')) {
-			print '<form method="POST" action="'.$self.'?id='.((int) $run->rowid).'"><input type="hidden" name="token" value="'.newToken().'">';
-			print '<input type="hidden" name="action" value="reopen"><button type="submit" class="ittabqs-secondary">'.$langs->trans('WerkbankQsReopen').'</button></form>';
+			print '<form method="POST" action="'.$self.'?id='.((int) $run->rowid).'" class="inline-block"><input type="hidden" name="token" value="'.newToken().'">';
+			print '<input type="hidden" name="action" value="reopen"><input type="submit" class="butActionDelete" value="'.dol_escape_htmltag($langs->trans('WerkbankQsReopen')).'"></form>';
 		}
 		print '</div>';
 	}
 
-	print '<form method="POST" action="'.$self.'?id='.((int) $run->rowid).'" id="ittabqs-form" class="ittabqs-form"'
+	print '<form method="POST" action="'.$self.'?id='.((int) $run->rowid).'" id="ittabqs-form"'
 		.' data-endpoint="'.dol_escape_htmltag(dol_buildpath('/ittabelanderpdf/ajax/qs.php', 1)).'" data-token="'.dol_escape_htmltag(currentToken()).'"'
 		.' data-run="'.((int) $run->rowid).'" data-saved="'.dol_escape_htmltag($langs->transnoentities('WerkbankQsSavedShort')).'"'
 		.' data-failed="'.dol_escape_htmltag($langs->transnoentities('WerkbankQsSaveFailed')).'">';
 	print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="save">';
-	print '<ol class="ittabqs-list">';
+	print '<div class="div-table-responsive"><table class="noborder centpercent ittabqs-list">';
+	print '<tr class="liste_titre"><td class="width25"></td><td>'.$langs->trans('WerkbankQsItemLabel').'</td><td>'.$langs->trans('Value').'</td>'
+		.'<td class="center">'.$langs->trans('WerkbankQsSkip').'</td><td>'.$langs->trans('WerkbankQsNote').'</td></tr>';
 	foreach ($results as $result) {
 		$id = (int) $result->rowid;
 		$done = WerkbankQs::isDone($result);
 		$skipped = (int) $result->checked === WerkbankQs::SKIPPED;
-		$classes = array('ittabqs-item', 'kind-'.$result->kind);
+		$classes = array('oddeven', 'ittabqs-item', 'kind-'.$result->kind);
 		if ($done) {
 			$classes[] = 'is-done';
 		}
@@ -367,45 +345,38 @@ function ittabqs_show_run($db, $qs, $run, $fichinter, $self)
 		$disabled = $closed ? ' disabled' : '';
 		$who = trim($result->firstname.' '.$result->lastname);
 		$meta = $result->date_check ? dol_escape_htmltag(($who !== '' ? $who : $result->login).' · '.dol_print_date($db->jdate($result->date_check), 'dayhour', 'tzuser')) : '';
-		print '<li class="'.implode(' ', $classes).'" data-id="'.$id.'" data-kind="'.dol_escape_htmltag($result->kind).'" data-required="'.((int) $result->required).'">';
-		$label = '<span class="ittabqs-item-label">'.dol_escape_htmltag($result->label)
-			.((int) $result->required ? ' <span class="ittabqs-required">'.$langs->trans('WerkbankQsRequired').'</span>' : '').'</span>';
+		print '<tr class="'.implode(' ', $classes).'" data-id="'.$id.'" data-kind="'.dol_escape_htmltag($result->kind).'" data-required="'.((int) $result->required).'">';
+		print '<td class="center">';
 		if ($result->kind === 'check') {
-			print '<label class="ittabqs-tick"><input type="checkbox" name="checked_'.$id.'" value="1"'.((int) $result->checked === WerkbankQs::DONE ? ' checked' : '').$disabled.'>'
-				.'<span class="ittabqs-box" aria-hidden="true"></span>'.$label.'</label>';
-		} else {
-			print '<label class="ittabqs-field" for="ittabqs-value-'.$id.'">'.$label.'</label>';
-			if ($result->kind === 'value') {
-				print '<span class="ittabqs-value"><input type="text" inputmode="decimal" autocomplete="off" id="ittabqs-value-'.$id.'" name="value_'.$id.'" class="ittabqs-input" value="'.dol_escape_htmltag((string) $result->value).'"'.$disabled.'>'
-					.($result->unit !== '' ? '<span class="ittabqs-unit">'.dol_escape_htmltag($result->unit).'</span>' : '').'</span>';
-			} else {
-				print '<textarea id="ittabqs-value-'.$id.'" name="value_'.$id.'" rows="2" class="ittabqs-input"'.$disabled.'>'.dol_escape_htmltag((string) $result->value, 0, 1).'</textarea>';
-			}
+			print '<input type="checkbox" id="ittabqs-check-'.$id.'" name="checked_'.$id.'" value="1" class="ittabqs-check"'.((int) $result->checked === WerkbankQs::DONE ? ' checked' : '').$disabled.'>';
 		}
+		print '</td><td><label for="'.($result->kind === 'check' ? 'ittabqs-check-' : 'ittabqs-value-').$id.'">'.dol_escape_htmltag($result->label).'</label>'
+			.((int) $result->required ? ' <span class="badge badge-status1">'.$langs->trans('WerkbankQsRequired').'</span>' : '');
 		if ((string) $result->help !== '') {
-			print '<p class="ittabqs-help">'.dol_escape_htmltag($result->help).'</p>';
+			print '<br><span class="opacitymedium small">'.dol_escape_htmltag($result->help).'</span>';
 		}
-		print '<div class="ittabqs-extra">';
-		print '<label class="ittabqs-pill"><input type="checkbox" name="skip_'.$id.'" value="1"'.($skipped ? ' checked' : '').$disabled.'><span>'.$langs->trans('WerkbankQsSkip').'</span></label>';
-		$note = (string) $result->note;
-		print '<details class="ittabqs-note"'.($note !== '' ? ' open' : '').'><summary>'.$langs->trans('WerkbankQsNote').'</summary>';
-		print '<textarea name="note_'.$id.'" rows="2" class="ittabqs-input" aria-label="'.dol_escape_htmltag($langs->trans('WerkbankQsNote').': '.$result->label).'"'.$disabled.'>'.dol_escape_htmltag($note, 0, 1).'</textarea></details>';
-		print '<span class="ittabqs-meta" aria-live="polite">'.$meta.'</span>';
-		print '</div></li>';
+		print '<br><span class="opacitymedium small ittabqs-meta">'.$meta.'</span></td><td>';
+		if ($result->kind === 'value') {
+			print '<input type="text" inputmode="decimal" autocomplete="off" id="ittabqs-value-'.$id.'" name="value_'.$id.'" class="width75" value="'.dol_escape_htmltag((string) $result->value).'"'.$disabled.'> '.dol_escape_htmltag((string) $result->unit);
+		} elseif ($result->kind === 'text') {
+			print '<textarea id="ittabqs-value-'.$id.'" name="value_'.$id.'" rows="2" class="minwidth200"'.$disabled.'>'.dol_escape_htmltag((string) $result->value, 0, 1).'</textarea>';
+		}
+		print '</td><td class="center"><input type="checkbox" name="skip_'.$id.'" value="1"'.($skipped ? ' checked' : '').$disabled.' aria-label="'.dol_escape_htmltag($langs->trans('WerkbankQsSkip').': '.$result->label).'"></td>';
+		print '<td><input type="text" name="note_'.$id.'" class="minwidth150" value="'.dol_escape_htmltag((string) $result->note).'"'.$disabled.' aria-label="'.dol_escape_htmltag($langs->trans('WerkbankQsNote').': '.$result->label).'"></td></tr>';
 	}
-	print '</ol>';
+	print '</table></div>';
 	if (!$closed) {
-		print '<noscript><button type="submit" class="ittabqs-secondary">'.$langs->trans('WerkbankQsSaveAll').'</button></noscript>';
+		print '<noscript><div class="center"><input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankQsSaveAll')).'"></div></noscript>';
 	}
 	print '</form>';
 
 	if (!$closed) {
-		print '<form method="POST" action="'.$self.'?id='.((int) $run->rowid).'" class="ittabqs-panel ittabqs-close" id="ittabqs-close">';
+		print '<form method="POST" action="'.$self.'?id='.((int) $run->rowid).'" id="ittabqs-close">';
 		print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="close">';
-		print '<label class="ittabqs-label" for="ittabqs-closing-note">'.$langs->trans('WerkbankQsClosingNote').'</label>';
-		print '<textarea id="ittabqs-closing-note" name="note" rows="2" class="ittabqs-input">'.dol_escape_htmltag((string) $run->note, 0, 1).'</textarea>';
-		print '<button type="submit" class="ittabqs-primary">'.$langs->trans('WerkbankQsClose').'</button>';
-		print '<p class="ittabqs-help">'.$langs->trans('WerkbankQsCloseHelp').'</p>';
+		print '<table class="border centpercent tableforfield"><tr><td class="titlefield">'.$langs->trans('WerkbankQsClosingNote').'</td><td>';
+		print '<textarea name="note" rows="2" class="quatrevingtpercent">'.dol_escape_htmltag((string) $run->note, 0, 1).'</textarea></td></tr></table>';
+		print '<div class="center"><input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankQsClose')).'"></div>';
+		print '<div class="center opacitymedium">'.$langs->trans('WerkbankQsCloseHelp').'</div>';
 		print '</form>';
 	}
 }

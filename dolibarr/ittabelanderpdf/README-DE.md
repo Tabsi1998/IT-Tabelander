@@ -2,7 +2,7 @@
 
 Belege im Werkbank-Design von IT-Tabelander, mit den echten Markenschriften, dazu passende E-Mail-Vorlagen und ein verzögerter, abbrechbarer automatischer Versand.
 
-Modulnummer **756230** · Version 1.4.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
+Modulnummer **756230** · Version 1.5.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
 
 ![Entwurf](docs/entwurf/mockup.png)
 
@@ -34,7 +34,7 @@ Ist die Firma nicht umsatzsteuerpflichtig (Firmeneinstellung „Umsatzsteuer: ne
 
 ## Installation
 
-1. `module_ittabelanderpdf-1.4.0.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
+1. `module_ittabelanderpdf-1.5.0.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
 2. In der Modulliste **IT-Tabelander PDF** aktivieren. Dabei passiert:
    - die Vorlage `werkbank` wird für alle neun Belegarten eingeschaltet (noch nicht als Standard),
    - Zusatzfelder: Kunde/Lieferant „Anrede per Du“ (`ittab_du`), Vertrag „Mindestlaufzeit (Monate)“ (`ittab_mindestlaufzeit`) und „Kündigungsfrist“ (`ittab_kuendigungsfrist`),
@@ -68,28 +68,25 @@ Damit die Rechnung Kontodaten und QR-Code zeigt, muss bei den Rechnungseinstellu
 
 ## Unterlagen
 
-Unternehmensunterlagen entstehen aus Artikeln im **Wissensmanagement** (Modul „Wissensmanagement“ und „Kategorien“):
+Unternehmensunterlagen und Rechtstexte sind ein eigener Bereich des Moduls (Menü **Geschäftspartner → Unterlagen**), getrennt von den FAQ im Wissensmanagement.
 
-| Kategorie | Wofür | PDF |
-| --- | --- | --- |
-| Rechtstexte | öffentlich: Impressum-Ergänzung, Datenschutz, Nutzungsbedingungen, Widerruf, AGB Unternehmer; die Website lädt die PDFs herunter | ja |
-| Unterlagen | intern: Checklisten, Infoblätter zum Mitschicken | ja |
-| FAQ | nur Website-FAQ | nein |
-
-- **Ablage:** Dokumente (ECM) → `IT-Tabelander/Unterlagen/<dateiname>.pdf`. Der Dateiname kommt aus dem Zusatzfeld **„Dateiname der Unterlage“** am Artikel, leer aus dem Titel (Kleinbuchstaben, Umlaute als ae/oe/ue/ss, Bindestriche). Die Website erwartet für die Rechtstexte genau `nutzungsbedingungen`, `widerruf`, `datenschutz`, `agb-unternehmer` und `impressum-ergaenzung`. Zwei Artikel mit demselben Namen: der zweite wird abgelehnt, die vorhandene Datei bleibt.
-- **Wann:** beim Freigeben, bei jeder Änderung eines freigegebenen Artikels und wenn ein freigegebener Artikel in eine der Kategorien kommt. Von Hand: **PDF erzeugen** auf der Artikelkarte (dort steht auch, wo die Datei liegt) oder **Alle freigegebenen Unterlagen neu erzeugen** in den Moduleinstellungen. Entwürfe bekommen kein PDF; wird ein Artikel zurück auf Entwurf gesetzt oder veraltet, bleibt die letzte Datei liegen.
-- **Aussehen:** Kopf mit Logo und Kontakt, Titel mit orangem Punkt, „Stand TT.MM.JJJJ“ (Tag der letzten Änderung), Text in den Markenschriften (Überschriften, Absätze, Listen, Fettes, Links, einfache Tabellen; Bilder, Skripte und eigene Formatierungen fallen weg), Fuß mit Firmendaten und „Seite x / y“, Folgeseiten mit kleinem Kopf.
-- **Mitschicken:** Im Mailformular von Angebot, Auftrag, Rechnung, Vertrag, Serviceauftrag, Lieferung und Geschäftspartner steht über den Anhängen **„Unterlagen beilegen“**: Unterlagen wählen, **Beilegen**, der Text bleibt erhalten. Bei Tickets steht dasselbe als Kasten über dem Nachrichtenformular (vor dem Schreiben auswählen). **Standard-Anhänge** je Belegart, getrennt für Firmen und Privatpersonen (Geschäftspartner-Typ „Privatperson“), kommen beim Öffnen des Formulars und beim Wechsel der Vorlage dazu. Vorgabe: Angebot an Firmen `agb-unternehmer.pdf`, an Privatpersonen `nutzungsbedingungen.pdf` und `widerruf.pdf`; fehlende Dateien werden übersprungen.
-- **An das Beleg-PDF anhängen:** Je Angebot, Auftragsbestätigung und Rechnung lässt sich eine Unterlage hinter das Werkbank-PDF hängen (eigene Seiten mit eigenem Kopf und eigener Seitenzählung). Ist dort nichts gewählt, gilt Dolibarrs eigene Einstellung **Einstellungen → PDF → „AGB/Verkaufsbedingungen anhängen“** (`MAIN_PDF_ADD_TERMSOFSALE_PROPAL` usw. mit hochgeladener Datei); `werkbank` hängt diese Datei genauso an wie `cyan`.
-- **Einstellungen** (Abschnitt „Unterlagen“ in den Moduleinstellungen): Kategorien mit PDF (Vorgabe: „Rechtstexte“ und „Unterlagen“ per Name, gespeichert wird die ID), Ordner, automatisch neu erzeugen, Standard-Anhänge, Anhang ans Beleg-PDF, Liste aller Artikel mit Datei und Stand.
-- **Website:** lädt die PDFs über die REST-API (`GET /documents/download?modulepart=ecm&original_file=IT-Tabelander/Unterlagen/<name>.pdf`); der API-Benutzer braucht dafür das Recht „Dokumente (ECM) lesen/herunterladen“.
+- **Liste und Karte:** Titel, Dateiname (der Name der PDF; die Website erwartet `nutzungsbedingungen`, `widerruf`, `datenschutz`, `agb-unternehmer`, `impressum-ergaenzung`), Art (**Rechtstext** – auf Wunsch öffentlich –, **Unterlage (intern)**, **Vorlage je Kunde**), Text im Editor. Speichern ändert nur den Entwurf.
+- **Freigeben** macht aus dem Entwurf eine neue **Fassung** (Stand, wer, „Was hat sich geändert?“). Eine Fassung ändert sich nie mehr: Text und PDF jeder Fassung bleiben abrufbar (Karte → Fassungen; PDF unter `IT-Tabelander/Unterlagen/Archiv/<name>-v<n>.pdf`). So lässt sich zeigen, welche AGB-Fassung ein Kunde bekommen hat. Die aktuelle PDF liegt unter `IT-Tabelander/Unterlagen/<name>.pdf`. Vorlagen je Kunde bekommen nur Fassungen, keine allgemeine PDF.
+- **PDF-Vorschau** des Entwurfs (mit „ENTWURF“ quer).
+- **Aussehen der PDF:** Kopf mit Logo und Kontakt, Titel mit orangem Punkt, „Stand TT.MM.JJJJ“, Text in den Markenschriften (Überschriften, Absätze, Listen, Fettes, Links, einfache Tabellen; Bilder, Skripte und eigene Formatierungen fallen weg), Fuß mit Firmendaten und „Seite x / y“.
+- **Übernahme aus dem Wissensmanagement:** Beim Aktivieren (solange es noch keine Unterlagen gibt), per Knopf in den Moduleinstellungen oder auf der Artikelkarte werden die Artikel der Kategorien „Rechtstexte“ und „Unterlagen“ übernommen: freigegebene als Fassung 1 mit ihrem Datum, Entwürfe als Entwurf, Rechtstexte öffentlich. Die Artikel bleiben stehen (löschen entscheidest du), ihre Karte zeigt, wo die Unterlage jetzt ist. PDFs, die das Modul früher unter einem anderen Namen geschrieben hat (z. B. `datenschutzerklaerung.pdf` neben `datenschutz.pdf`), werden entfernt; hochgeladene Dateien nie.
+- **Website:** holt die öffentlichen, freigegebenen Rechtstexte über die REST-API des Moduls: `GET /ittabelanderpdf/unterlagen` (Liste mit Stand und Fassung), `GET /ittabelanderpdf/unterlagen/<name>` (mit HTML), `GET /ittabelanderpdf/unterlagen/<name>/pdf` (PDF als Base64). Dafür reicht ein API-Benutzer mit Zugang; interne Unterlagen und Entwürfe gibt die API nicht heraus.
+- **Texte aus `docs/unterlagen/`:** `python scripts/import_unterlagen.py` (im Repository) legt sie als Entwürfe im Modul an oder aktualisiert den Entwurf derselben Datei; freigegeben wird nur in Dolibarr. API-Benutzer mit dem Recht „Unterlagen bearbeiten und freigeben“.
+- **Mitschicken:** Im Mailformular von Angebot, Auftrag, Rechnung, Vertrag, Serviceauftrag, Lieferung und Geschäftspartner steht über den Anhängen **„Unterlagen beilegen“**; bei Tickets als Kasten über dem Nachrichtenformular. **Standard-Anhänge** je Belegart, getrennt für Firmen und Privatpersonen (Moduleinstellungen).
+- **An das Beleg-PDF anhängen:** Je Angebot, Auftragsbestätigung und Rechnung lässt sich eine Unterlage hinter das Werkbank-PDF hängen; ohne Auswahl gilt Dolibarrs **Einstellungen → PDF → „AGB/Verkaufsbedingungen anhängen“**.
+- **Rechte:** „Unterlagen lesen“ (beim Aktivieren für alle an), „Unterlagen bearbeiten und freigeben“.
 
 ## Unterlagen je Kunde: was unterschrieben ist und was fehlt
 
 - **Reiter „Unterlagen“ beim Geschäftspartner:** jede Unterlage, die dieser Kunde braucht (Pflicht) oder bekommen kann (optional), mit Zustand: **Fehlt**, **Verschickt** (am …, Bestätigung fehlt), **Unterschrift läuft**, **Erledigt** (unterschrieben / hochgeladen / abgehakt am …, wie, von wem, Stand der Fassung, Datei), **Neue Fassung** (bestätigt war eine ältere). Oben die Zusammenfassung („2 Pflicht-Unterlagen offen“), unten der Verlauf. Am Handy bedienbar.
 - **Je Zeile:** „Am Gerät unterschreiben“ bzw. „Empfang bestätigen lassen“ (Bestätigungsblatt mit Unterschrift, die Unterlage dahinter, liegt danach beim Kunden), „Per E-Mail senden“ (Mailformular des Kunden mit der Unterlage im Anhang), „Scan hochladen“ (PDF oder Foto, auch direkt mit der Handykamera), „Von Hand abhaken“ (Datum, Notiz), „Zurücksetzen“ (mit Grund; gilt wieder als offen, der Verlauf bleibt).
 - **Automatisch:** Geht eine Unterlage per Mail hinaus („Unterlagen beilegen“ oder Standard-Anhang), steht sie auf „Verschickt“. Wird das Angebot, mit dem sie ging oder an dessen PDF sie hängt, angenommen – auch im Kundenbereich der Website –, ist sie erledigt („im Kundenbereich angenommen“). Unterschrift am Gerät und Upload haken sie ebenfalls ab.
-- **Regeln** (Einstellungen → IT-Tabelander PDF → Reiter **Unterlagen je Kunde**): je Regel Bezeichnung, Unterlage (Dateiname im Ordner Unterlagen), was der Kunde tut (akzeptieren, unterschreiben – dann unterschreiben beide –, Empfang bestätigen), für wen (alle Kunden, Firmen, Privatpersonen, Vertrag mit Produkt-Referenz wie `DL-HOST*,DL-WART*`, Kunden-Kategorie), Pflicht/optional, „Neue Fassung neu bestätigen“ (ändert sich der Artikel, gilt eine ältere Bestätigung nicht mehr). Mitgeliefert: AGB Unternehmer (Firmen), Nutzungsbedingungen (Privat), AVV und Leistungsbeschreibung (Hosting-/Wartungsvertrag), Einverständnis Fernwartung (Kunden-Kategorie „Fernwartung“; ohne diese Kategorie ist die Regel aus, bis sie in den Einstellungen gewählt ist).
+- **Regeln** (Einstellungen → IT-Tabelander PDF → Reiter **Unterlagen je Kunde**): je Regel Bezeichnung, Unterlage (Dateiname), was der Kunde tut (akzeptieren, unterschreiben – dann unterschreiben beide –, Empfang bestätigen), Bedingungen, die alle gelten müssen und einzeln leer bleiben dürfen: **Kunde** (egal / Firmen / Privatpersonen) UND **Vertrag mit** Produkt-Referenz (z. B. `DL-HOST*,DL-WART*`) UND **Kategorie** des Kunden; Pflicht/optional, „Neue Fassung neu bestätigen“ (ändert sich der Artikel, gilt eine ältere Bestätigung nicht mehr). Mitgeliefert: AGB Unternehmer (Firmen), Nutzungsbedingungen (Privat), AVV und Leistungsbeschreibung (Hosting-/Wartungsvertrag), Einverständnis Fernwartung (Kunden-Kategorie „Fernwartung“; ohne diese Kategorie ist die Regel aus, bis sie in den Einstellungen gewählt ist).
 - **Damit nichts vergessen wird:** Hinweis „2 Unterlagen fehlen: …“ mit Knopf auf Kunden-, Angebots-, Vertrags- und Serviceauftragskarte (abschaltbar); Startseiten-Widget **„Fehlende Unterlagen“** (Kunden mit offenen Pflicht-Unterlagen); beim Aktivieren einer Vertragsleistung, deren Produkt eine fehlende Pflicht-Unterlage verlangt, eine Warnung oder – einstellbar – eine Sperre.
 
 ## Werkstatt: QS-Checklisten und Prüfprotokoll

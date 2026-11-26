@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '1.4.0';
+		$this->version = '1.5.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -128,6 +128,8 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->rights = array(
 			array(75623001, 'Run QS checklists and close them with a test report', 'w', 0, 'qs', 'run'),
 			array(75623002, 'Manage the QS checklists (kinds of job and their points)', 'w', 0, 'qs', 'manage'),
+			array(75623003, 'Read company documents and legal texts (Unterlagen)', 'r', 1, 'unterlagen', 'read'),
+			array(75623004, 'Edit and release company documents and legal texts', 'w', 0, 'unterlagen', 'write'),
 		);
 		$this->menu = array();
 		$this->menu[0] = array(
@@ -142,6 +144,35 @@ class modITTabelanderPDF extends DolibarrModules
 			'position' => 1900,
 			'enabled' => 'isModEnabled("ittabelanderpdf")',
 			'perms' => '$user->hasRight("facture", "lire") || $user->hasRight("propal", "lire")',
+			'target' => '',
+			'user' => 0,
+		);
+		$this->menu[3] = array(
+			'fk_menu' => 'fk_mainmenu=companies',
+			'type' => 'left',
+			'titre' => 'WerkbankDocListTitle',
+			'prefix' => img_picto('', 'pdf', 'class="pictofixedwidth"'),
+			'mainmenu' => 'companies',
+			'leftmenu' => 'ittabpdf_unterlagen',
+			'url' => '/ittabelanderpdf/unterlagen_list.php',
+			'langs' => 'ittabelanderpdf@ittabelanderpdf',
+			'position' => 2900,
+			'enabled' => 'isModEnabled("ittabelanderpdf")',
+			'perms' => '$user->hasRight("ittabelanderpdf", "unterlagen", "read")',
+			'target' => '',
+			'user' => 0,
+		);
+		$this->menu[4] = array(
+			'fk_menu' => 'fk_mainmenu=companies,fk_leftmenu=ittabpdf_unterlagen',
+			'type' => 'left',
+			'titre' => 'WerkbankDocNew',
+			'mainmenu' => 'companies',
+			'leftmenu' => 'ittabpdf_unterlagen_new',
+			'url' => '/ittabelanderpdf/unterlage_card.php?action=create',
+			'langs' => 'ittabelanderpdf@ittabelanderpdf',
+			'position' => 2901,
+			'enabled' => 'isModEnabled("ittabelanderpdf")',
+			'perms' => '$user->hasRight("ittabelanderpdf", "unterlagen", "write")',
 			'target' => '',
 			'user' => 0,
 		);
@@ -250,6 +281,15 @@ class modITTabelanderPDF extends DolibarrModules
 
 		if ($this->_load_tables('/ittabelanderpdf/sql/') < 0) {
 			return -1;
+		}
+		// Company documents of earlier versions came from the knowledge base:
+		// take those articles over once (they stay where they are).
+		dol_include_once('/ittabelanderpdf/class/werkbankdoc.class.php');
+		$store = new WerkbankDoc($this->db);
+		if ($this->db->DDLListTables($GLOBALS['conf']->db->name, MAIN_DB_PREFIX.'knowledgemanagement_knowledgerecord') && !$store->all()) {
+			if ($store->importKnowledge($GLOBALS['user']) < 0) {
+				dol_syslog('ittabelanderpdf: takeover of knowledge articles failed: '.$store->error, LOG_WARNING);
+			}
 		}
 		// The shipped rules for company documents, only when there are none yet.
 		dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');

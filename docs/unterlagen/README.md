@@ -38,34 +38,41 @@ eigene Fassungen in einfacher Sprache, keine Abschriften.
 Nutzungsbedingungen, Datenschutzerklärung und Ergänzung zum Impressum liegen
 schon freigegeben in Dolibarr (Artikel 1 bis 3, Quelle der Wahrheit) und als
 Ausgangsentwürfe in `backend/app/legal_drafts/`. Sie gehören ebenfalls in die
-Kategorie „Rechtstexte“. Änderungsvorschläge dazu stehen in
+Kategorie „Rechtstexte“ und werden mit ihr zu Rechtstexten des Moduls (ab 1.5.0). Änderungsvorschläge dazu stehen in
 [`pruefung-bestehende-rechtstexte.md`](pruefung-bestehende-rechtstexte.md).
 
 Die Bankverbindung steht nur als Platzhalter `__BANK__` im Firmendatenblatt.
 Kontonummern gehören nicht ins Repo.
 
-## Kategorien in Dolibarr
+## Wo die Texte in Dolibarr liegen
 
-| Kategorie | Inhalt | Website |
+Ab Modul ittabelanderpdf 1.5.0 sind Rechtstexte und Unterlagen ein eigenes
+Objekt des Moduls (Menü Geschäftspartner → Unterlagen) mit Versionen, Stand und
+PDF. Das Wissensmanagement bleibt nur für die FAQ der Website.
+
+| Art im Modul | Inhalt | Website |
 | --- | --- | --- |
-| FAQ (früher „Website“) | Fragen und Antworten | als FAQ |
-| Rechtstexte | Impressum-Ergänzung, Datenschutz, Nutzungsbedingungen, Widerruf, AGB für Unternehmer | als Rechtsseite mit PDF |
-| Unterlagen | alles Interne aus dieser Tabelle | nie; nur als PDF aus Dolibarr, Versand per Mail |
+| Rechtstext (öffentlich) | Impressum-Ergänzung, Datenschutz, Nutzungsbedingungen, Widerruf, AGB für Unternehmer | als Rechtsseite mit PDF (REST-API des Moduls) |
+| Intern | Firmendatenblatt, Preisliste, QS-Checklisten, Bausteine | nie; nur als PDF aus Dolibarr, Versand per Mail |
+| Vorlage je Kunde | Auftragsverarbeitung, Leistungsbeschreibungen, Einverständnis Fernwartung | nie; je Kunde erzeugt (ab 1.6.0) |
+
+Die bisherigen Wissensartikel (Kategorien „Rechtstexte“ und „Unterlagen“)
+übernimmt das Modul beim Aktivieren oder per Knopf in den Einstellungen; die
+Artikel selbst bleiben stehen.
 
 ## Import nach Dolibarr
 
-`scripts/import_unterlagen.py` legt jedes Dokument als **Entwurf** im
-Wissensmanagement an. Es erkennt seine Artikel am Feld `import_key`
-(Schlüssel `u-…` aus dem Kopfkommentar), nicht am Titel.
+`scripts/import_unterlagen.py` legt jedes Dokument als **Entwurf** unter den
+Unterlagen des Moduls an (REST `ittabelanderpdf/unterlagen-entwuerfe`). Es
+erkennt die Unterlage am Dateinamen (= Slug).
 
 - Neu → als Entwurf anlegen.
-- Schon da und noch Entwurf → Titel und Text aktualisieren (oder „unverändert“).
-- Schon freigegeben → bleibt, wie es ist. Änderungen machst du dann in Dolibarr von Hand.
+- Schon da → nur den Entwurf aktualisieren (oder „unverändert“); die
+  freigegebene Fassung bleibt, bis du in Dolibarr freigibst.
 - Es gibt nie etwas frei.
-- Fehlende Kategorien „Rechtstexte“ und „Unterlagen“ legt es an, wenn der API-Benutzer darf.
-- **Kategorien zuordnen geht nicht per API** (Dolibarr 23.0.3 und 24.0.1 kennen den Typ
-  Wissensmanagement beim Verknüpfen nicht). Das Skript listet am Ende jede fehlende
-  Zuordnung mit Link zur Artikelkarte; das machst du in Dolibarr von Hand.
+- Öffentliche Texte (Spalte „Öffentlich“ = ja) werden als Rechtstext angelegt,
+  alle anderen als interne Unterlage; die Art „Vorlage je Kunde“ stellst du an
+  der Karte ein.
 
 ```bash
 # Probelauf: zeigt, was passieren würde, schreibt nichts
@@ -74,25 +81,28 @@ DOLIBARR_URL=https://erp.example.com DOLIBARR_API_KEY=... python scripts/import_
 DOLIBARR_URL=https://erp.example.com DOLIBARR_API_KEY=... python scripts/import_unterlagen.py
 # offene [BITTE …]-Stellen, ohne Dolibarr: keine Ausgabe und Rückgabe 0, wenn alles fertig ist
 python scripts/import_unterlagen.py --offene-punkte
+# früheres Ziel (Modul vor 1.5.0): Wissensartikel
+DOLIBARR_URL=... DOLIBARR_API_KEY=... python scripts/import_unterlagen.py --wissensmanagement
 ```
 
-Nötige Rechte des API-Benutzers: „Wissensmanagement: Artikel lesen“ und
-„Artikel anlegen/ändern“, „Kategorien: lesen“; zum Anlegen fehlender
-Kategorien zusätzlich „Kategorien: anlegen/ändern“. Danach die Schreibrechte
-wieder wegnehmen. Standardbibliothek reicht, kein venv nötig.
+Nötige Rechte des API-Benutzers: „Unterlagen und Rechtstexte lesen“ und
+„Unterlagen und Rechtstexte bearbeiten und freigeben“ (Modul IT-Tabelander PDF). Danach das Schreibrecht wieder wegnehmen.
+Standardbibliothek reicht, kein venv nötig.
 
 Getestet: Unit-Tests in `backend/tests/test_unterlagen.py`, Szenario gegen die
 Wegwerf-Dolibarr in `backend/tests/test_dolibarr_unterlagen.py` (Gruppe
-`dolibarr` von `scripts/local_check.py`).
+`dolibarr` von `scripts/local_check.py`) und im Modul-Test
+(`scripts/dev_dolibarr.py`, Stufe `unterlagen`).
 
 ## Ablauf bis zur Verwendung
 
 1. Die Punkte unter „Was Fabian dafür sicherstellen muss“ erledigen.
-2. Import laufen lassen, Kategorien zuordnen, in Dolibarr freigeben.
-3. Die Modul-Sitzung erzeugt die PDFs; die öffentlichen legt sie in Dokumente (ECM)
-   unter `IT-Tabelander/Unterlagen/<slug>.pdf` ab. Kundenfelder (Auftraggeber,
-   Anschrift, Leistungen) sind derzeit neutrale Formularzeilen (`____`); das Modul
-   stellt sie ab Version 1.4.0 auf seine Platzhalter um.
+2. Import laufen lassen, in Dolibarr unter Unterlagen prüfen und freigeben.
+3. Beim Freigeben erzeugt das Modul das PDF und legt es in Dokumente (ECM)
+   unter `IT-Tabelander/Unterlagen/<slug>.pdf` ab, ältere Fassungen unter
+   `Archiv/`. Kundenfelder (Auftraggeber, Anschrift, Leistungen) sind derzeit
+   neutrale Formularzeilen (`____`); ab Modul 1.6.0 werden sie zu Platzhaltern,
+   die das Modul je Kunde füllt.
 4. Empfohlen: vom WKO-Rechtsservice prüfen lassen (Tirol: Wirtschaftsrecht).
 5. Bei jeder Änderung: Datei hier ändern, „Stand“ anpassen, Import erneut (nur Entwürfe)
    oder in Dolibarr direkt ändern und die Datei hier nachziehen.

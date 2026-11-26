@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Bring the documents from docs/unterlagen into Dolibarr's knowledge base (#127).
+"""Bring the documents from docs/unterlagen into Dolibarr as drafts (#127, #146).
+
+Target since module ittabelanderpdf 1.5.0: the module's own company documents
+("Unterlagen", REST endpoints /ittabelanderpdf/unterlagen-entwuerfe). Every
+document becomes the draft of the document with the same file name, or a new
+one; a released version is never changed, only its draft (Fabian releases
+in Dolibarr). With --wissensmanagement the earlier target, the knowledge
+base, as described below.
 
 Every HTML file there starts with a comment that names its title, a short key,
 the slug of its PDF and its category ("Rechtstexte" for public texts,
@@ -170,6 +177,9 @@ class Dolibarr:
                 return items
             page += 1
 
+    def document_card(self, document_id: int) -> str:
+        return f"{self.base}/custom/ittabelanderpdf/unterlage_card.php?id={int(document_id)}"
+
     def card(self, article_id: int) -> str:
         return f"{self.base}/knowledgemanagement/knowledgerecord_card.php?id={int(article_id)}"
 
@@ -268,6 +278,50 @@ def run(api: Dolibarr, documents: list[Document], dry_run: bool, out=None) -> in
     return 1 if errors else 0
 
 
+def plan_module(documents: list[Document], drafts: list[dict]) -> list[tuple[Document, str, dict | None]]:
+    """What to do with each document in the module: create, update or unchanged (by file name)."""
+    by_slug = {str(item.get("slug") or ""): item for item in drafts}
+    steps = []
+    for document in documents:
+        draft = by_slug.get(document.slug)
+        if draft is None:
+            steps.append((document, "create", None))
+        elif _same(draft.get("title"), document.title) and _same(draft.get("text"), document.body):
+            steps.append((document, "unchanged", draft))
+        else:
+            steps.append((document, "update", draft))
+    return steps
+
+
+def run_module(api: Dolibarr, documents: list[Document], dry_run: bool, out=None) -> int:
+    """The documents as drafts of the module's company documents (never released here)."""
+    out = out or sys.stdout
+    print(f"Dolibarr: {api.base} → Unterlagen des Moduls" + ("  (Probelauf, es wird nichts geschrieben)" if dry_run else ""), file=out)
+    drafts = api.request("GET", "ittabelanderpdf/unterlagen-entwuerfe") or []
+    words = {"create": "neu als Entwurf anlegen", "update": "Entwurf aktualisieren (freigegebene Fassung bleibt, bis du freigibst)",
+             "unchanged": "unverändert"}
+    errors = 0
+    for document, action, draft in plan_module(documents, drafts):
+        label = f"{document.slug}: „{document.title}“"
+        number = int(draft["id"]) if draft else 0
+        try:
+            if action in ("create", "update") and not dry_run:
+                saved = api.request("PUT", f"ittabelanderpdf/unterlagen-entwuerfe/{urllib.parse.quote(document.slug)}",
+                                    body={"title": document.title, "text": document.body,
+                                          "kind": "legal" if document.public else "internal", "public": 1 if document.public else 0})
+                number = int(saved.get("id") or 0)
+        except DolibarrError as exc:
+            errors += 1
+            print(f"FEHLER {label}: {exc}", file=out)
+            continue
+        prefix = "würde " if dry_run and action in ("create", "update") else ""
+        where = f" {api.document_card(number)}" if number else ""
+        print(f"{label}: {prefix}{words[action]}{where}", file=out)
+    print("\nFreigeben machst du in Dolibarr selbst (Unterlagen → Karte → Freigeben), "
+          "erst nach der Prüfung durch den WKO-Rechtsservice.", file=out)
+    return 1 if errors else 0
+
+
 def print_open_points(documents: list[Document], out=None) -> int:
     """Only the files with open places; nothing at all when every text is ready."""
     out = out or sys.stdout
@@ -282,7 +336,9 @@ def print_open_points(documents: list[Document], out=None) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Unterlagen als Entwürfe ins Dolibarr-Wissensmanagement bringen")
+    parser = argparse.ArgumentParser(description="Unterlagen als Entwürfe nach Dolibarr bringen (Modul-Unterlagen)")
+    parser.add_argument("--wissensmanagement", action="store_true",
+                        help="früheres Ziel: Wissensartikel statt der Unterlagen des Moduls (vor ittabelanderpdf 1.5.0)")
     parser.add_argument("--dry-run", action="store_true", help="nur zeigen, was passieren würde")
     parser.add_argument("--offene-punkte", action="store_true",
                         help="die [BITTE …]-Stellen auflisten, ohne Dolibarr; Rückgabe 1, solange es welche gibt")
@@ -300,11 +356,14 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if print_open_points(documents) else 0
     base, key = os.environ.get("DOLIBARR_URL", "").strip(), os.environ.get("DOLIBARR_API_KEY", "").strip()
     if not base or not key:
-        print("FEHLER DOLIBARR_URL und DOLIBARR_API_KEY setzen (API-Benutzer mit „Wissensmanagement: "
-              "Artikel lesen und anlegen/ändern“ und „Kategorien: lesen“).", file=sys.stderr)
+        print("FEHLER DOLIBARR_URL und DOLIBARR_API_KEY setzen (API-Benutzer mit „IT-Tabelander PDF: Unterlagen "
+              "bearbeiten und freigeben“; mit --wissensmanagement „Wissensmanagement: Artikel lesen und anlegen/ändern“ "
+              "und „Kategorien: lesen“).", file=sys.stderr)
         return 2
     try:
-        return run(Dolibarr(base, key), documents, args.dry_run)
+        if args.wissensmanagement:
+            return run(Dolibarr(base, key), documents, args.dry_run)
+        return run_module(Dolibarr(base, key), documents, args.dry_run)
     except DolibarrError as exc:
         print(f"FEHLER {exc}", file=sys.stderr)
         return 1
