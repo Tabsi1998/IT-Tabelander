@@ -23,6 +23,8 @@ if ($stage === 'enable') {
 	rt_const($db, 'TICKET_ENABLE_PUBLIC_INTERFACE', '1');
 	rt_const($db, 'TICKET_NOTIFICATION_EMAIL_FROM', 'office@tabelander.co.at');
 	rt_const($db, 'TICKET_NOTIFICATION_EMAIL_TO', 'inhaber@tabelander.example');
+	// The confirmation links the ticket's page in the customer area.
+	rt_const($db, 'ITTABPDF_PORTAL_ENABLED', '1');
 	echo json_encode(array('enable' => 'ok')), "\n";
 	exit(0);
 }
@@ -59,7 +61,7 @@ foreach ($cases as $name => $case) {
 	if ($ticket->create($admin) <= 0) {
 		rt_fail('ticket '.$name.': '.$ticket->error.' '.implode(',', (array) $ticket->errors));
 	}
-	$out[$name] = array('ref' => $ticket->ref, 'notify_after' => (int) $ticket->notify_tiers_at_create, 'disabled_after' => (int) !empty($ticket->context['disableticketemail']));
+	$out[$name] = array('id' => (int) $ticket->id, 'ref' => $ticket->ref, 'notify_after' => (int) $ticket->notify_tiers_at_create, 'disabled_after' => (int) !empty($ticket->context['disableticketemail']));
 }
 echo json_encode($out), "\n";
 exit(0);

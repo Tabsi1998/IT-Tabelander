@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.9] - 2026-11-26
+
+- Questions by e-mail or through the customer area, not by phone: the templates no longer say "Bei Fragen erreichen Sie mich unter <Telefon>". New variables `__ITTAB_FRAGEN_SATZ__`/`__ITTAB_FRAGEN_SATZ_DU__` ("antworten Sie einfach auf diese E-Mail", with the customer area on also "oder schreiben Sie mir im Kundenbereich"); supplier templates ask for a reply by e-mail. The phone number stays in the footer. Templates holding the 1.0.8 text are renewed on activation.
+- Ticket confirmation: with the customer area on, a button to the ticket's page there (`/kundenbereich/anfragen/<id>`, `portalUrl()` knows tickets now) instead of the public status link, and "oder antworten Sie einfach auf diese E-Mail"; no phone sentence.
+- Owner notice: long values (customer name with its number) stand below their label instead of pushing it under them on a phone.
+
 ## [1.0.8] - 2026-11-26
 
 - Customer area links for every customer document: orders, shipments, interventions and contracts now open their own page of the website's customer area (`/kundenbereich/belege/auftraege|lieferscheine|arbeitsberichte|vertraege/<id>`), not just its start page.

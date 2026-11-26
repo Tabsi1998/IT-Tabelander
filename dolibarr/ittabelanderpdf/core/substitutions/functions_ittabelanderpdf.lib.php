@@ -47,6 +47,13 @@ function ittabelanderpdf_completesubstitutionarray(&$substitutionarray, $langs, 
 	$substitutionarray['__ITTAB_ANNAHME_SATZ_DU__'] = $portal
 		? 'Du kannst es online im Kundenbereich annehmen oder einfach auf diese Mail antworten. Ich fange erst an, wenn deine Zusage da ist.'
 		: 'Wenn alles passt, antworte einfach auf diese Mail. Ich fange erst an, wenn deine Zusage da ist.';
+	// How to ask: by e-mail, or in the customer area when it is on. No phone.
+	$substitutionarray['__ITTAB_FRAGEN_SATZ__'] = $portal
+		? 'Bei Fragen antworten Sie einfach auf diese E-Mail oder schreiben Sie mir im Kundenbereich.'
+		: 'Bei Fragen antworten Sie einfach auf diese E-Mail.';
+	$substitutionarray['__ITTAB_FRAGEN_SATZ_DU__'] = $portal
+		? 'Bei Fragen antworte einfach auf diese Mail oder schreib mir im Kundenbereich.'
+		: 'Bei Fragen antworte einfach auf diese Mail.';
 
 	if (!is_array($parameters) || ($parameters['mode'] ?? '') !== 'formemail' || !is_object($object)) {
 		$substitutionarray['__ITTAB_HALLO__'] = 'Hallo,';
