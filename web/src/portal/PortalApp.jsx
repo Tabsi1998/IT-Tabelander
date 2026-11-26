@@ -5,6 +5,7 @@ import Logo from "../components/Logo.jsx";
 import { Field, FormError } from "../forms/fields.jsx";
 import { portalRequest, usePortalData } from "./api.js";
 import Inquiries from "./pages/Inquiries.jsx";
+import InquiryDetail from "./pages/InquiryDetail.jsx";
 import { OfferDetail, Offers } from "./pages/Offers.jsx";
 import { DocumentDetail, Documents } from "./pages/Documents.jsx";
 import { InvoiceDetail } from "./pages/Invoices.jsx";
@@ -15,7 +16,8 @@ export const usePortal = () => useContext(PortalContext);
 
 const NAV = [
   { to: "/kundenbereich", label: "Übersicht", end: true },
-  { to: "/kundenbereich/anfragen", label: "Anfragen", count: "repairs_running" },
+  // The number on Anfragen: inquiries waiting for the customer's answer (#122).
+  { to: "/kundenbereich/anfragen", label: "Anfragen", count: "inquiries_waiting" },
   { to: "/kundenbereich/angebote", label: "Angebote", count: "offers_open" },
   // Invoices, credit notes and every other document under one tab (#100);
   // /kundenbereich/rechnungen stays the address of the invoices from the mails.
@@ -54,8 +56,18 @@ function Frame({ email, onSignOut, padded = false, children }) {
   );
 }
 
+// A page of the customer area to open after signing in: the inquiry from a
+// Dolibarr mail, at most with its tracking id (#122). The server checks the same.
+const NEXT_PAGE = /^\/kundenbereich(\/[A-Za-z0-9_-]{1,40}){0,3}(\?track_id=[A-Za-z0-9]{8,64})?$/;
+
+function nextPage(value) {
+  return value && NEXT_PAGE.test(value) && value !== "/kundenbereich" ? value : "";
+}
+
 /** The e-mail link; whether the address is known is never said (#63). */
 function SignIn() {
+  const location = useLocation();
+  const next = nextPage(`${location.pathname.replace(/\/$/, "")}${location.search}`);
   const [email, setEmail] = useState("");
   const [state, setState] = useState({ busy: false, error: "", sent: false });
 
@@ -67,7 +79,7 @@ function SignIn() {
     }
     setState({ busy: true, error: "", sent: false });
     try {
-      await portalRequest("POST", "/login", { email: email.trim() });
+      await portalRequest("POST", "/login", next ? { email: email.trim(), next } : { email: email.trim() });
       setState({ busy: false, error: "", sent: true });
     } catch (error) {
       setState({ busy: false, error: error.message, sent: false });
@@ -95,6 +107,7 @@ function SignIn() {
       <h1 className="m-0 text-[28px] font-bold md:text-[34px]">Anmelden ohne Passwort</h1>
       <p className="m-0 text-[17px] leading-normal text-body">
         Gib die E-Mail-Adresse ein, die du bei deiner Anfrage verwendet hast. Du bekommst einen Link, der 15 Minuten gilt.
+        {next && " Danach geht es direkt zu deiner Anfrage."}
       </p>
       <Field label="E-Mail" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
       <FormError message={state.error} />
@@ -121,7 +134,10 @@ function Redeem({ onSignedIn }) {
       return;
     }
     portalRequest("POST", "/session", { token })
-      .then((me) => { onSignedIn(me); navigate("/kundenbereich", { replace: true }); })
+      .then((me) => {
+        onSignedIn(me);
+        navigate(nextPage(new URLSearchParams(window.location.search).get("ziel")) || "/kundenbereich", { replace: true });
+      })
       .catch((failure) => setError(failure.message));
   }, [navigate, onSignedIn]);
   if (!error) return <p className="m-0 text-body" role="status">Anmeldung läuft …</p>;
@@ -176,6 +192,7 @@ function SignedIn({ me, onSignOut }) {
             <Routes>
               <Route index element={<Overview />} />
               <Route path="anfragen" element={<Inquiries />} />
+              <Route path="anfragen/:id" element={<InquiryDetail />} />
               <Route path="angebote" element={<Offers />} />
               <Route path="angebote/:id" element={<OfferDetail />} />
               <Route path="rechnungen" element={<Documents art="rechnungen" />} />
@@ -235,8 +252,10 @@ export default function PortalApp() {
     return (
       <Alone>
         <h1 className="m-0 text-[28px] font-bold">Der Kundenbereich kommt bald</h1>
-        <p className="mb-0 text-[17px] leading-normal text-body">Bis dahin siehst du den Stand deiner Anfrage über die Status-Seite.</p>
-        <Link to="/?kontakt=status#kontakt" className="btn-primary mt-2">Status prüfen</Link>
+        <p className="mb-0 text-[17px] leading-normal text-body">
+          Bis dahin bekommst du alles zu deiner Anfrage per E-Mail. Hast du etwas zu ergänzen, antworte einfach darauf.
+        </p>
+        <Link to="/" className="btn-outline mt-2 border-line">Zur Startseite</Link>
       </Alone>
     );
   }

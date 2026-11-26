@@ -25,8 +25,7 @@ export default function Header({ sections }) {
           ))}
         </nav>
         <div className="ml-auto hidden items-center gap-3.5 md:flex">
-          {settings.portal_enabled && <Link to="/kundenbereich" className="whitespace-nowrap px-1 text-[15px] font-semibold no-underline">Kundenbereich</Link>}
-          <ContactLink tab="status" className="btn-outline min-h-[44px] px-[18px] text-[15px]">Status prüfen</ContactLink>
+          {settings.portal_enabled && <Link to="/kundenbereich" className="btn-outline min-h-[44px] whitespace-nowrap px-[18px] text-[15px]">Kundenbereich</Link>}
           <ContactLink tab="anfrage" className="btn-primary min-h-[44px] px-5 text-[15px]">Anfrage starten</ContactLink>
         </div>
         <ContactLink tab="anfrage" className="btn-primary ml-auto min-h-[44px] px-3.5 text-[15px] md:hidden">Anfrage</ContactLink>
@@ -80,7 +79,6 @@ function MobileMenu({ sections, onClose }) {
         ))}
       </nav>
       <div className="flex flex-col gap-2.5 px-5 py-3">
-        <ContactLink tab="status" onNavigate={onClose} className="btn-outline min-h-[52px] text-[17px]">Status prüfen</ContactLink>
         {settings.portal_enabled && <Link to="/kundenbereich" onClick={onClose} className="btn-outline min-h-[52px] text-[17px]">Kundenbereich</Link>}
         <ContactLink tab="anfrage" onNavigate={onClose} className="btn-primary min-h-[54px] text-[17px]">Anfrage starten</ContactLink>
       </div>

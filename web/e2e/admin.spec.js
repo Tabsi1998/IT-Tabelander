@@ -225,14 +225,14 @@ test("a review from the link waits for the release; requests go out on demand (#
   await expect(invites.getByText("1 Mail verschickt.")).toBeVisible();
 });
 
-test("a device label with a QR code to the status page (#72)", async ({ page }) => {
+test("a device label with a QR code to the inquiry (#72, #122)", async ({ page }) => {
   await mockAdmin(page);
   await page.goto("/admin");
   // A contact message is no device: no label for it.
   await expect(page.getByRole("link", { name: "Etikett für ANF-KONTAKT1 drucken" })).toHaveCount(0);
   await page.getByRole("link", { name: "Etikett für ANF-NEU00001 drucken" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Etikett drucken" })).toBeVisible();
-  await expect(page.getByRole("img", { name: "QR-Code zur Status-Seite von ANF-NEU00001" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "QR-Code zur Anfrage ANF-NEU00001 im Kundenbereich" })).toBeVisible();
   await expect(page.getByText("Reparatur: Notebook Lenovo ThinkPad T14")).toBeVisible();
   await expect(page.getByText(/TS2609-0001 · 27\.9\.2026/)).toBeVisible();
   // No customer name on a label that sits on the device in the shop.

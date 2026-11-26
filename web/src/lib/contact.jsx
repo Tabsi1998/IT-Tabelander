@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 
 /** Buttons anywhere on the page open a tab of the contact area (#49):
- *  "nachricht", "anfrage" or "status", optionally with a preset. */
+ *  "nachricht" or "anfrage", optionally with a preset. */
 export const ContactContext = createContext({ openContact: () => {} });
 
 export function useContact() {

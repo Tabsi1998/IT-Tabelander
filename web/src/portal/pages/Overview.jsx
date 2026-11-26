@@ -1,7 +1,8 @@
 import { Link } from "react-router";
-import { STEPS } from "../../forms/StatusView.jsx";
 import { day, money } from "../api.js";
 import { usePortal } from "../PortalApp.jsx";
+import { stepOf } from "../steps.js";
+import { NEW_INQUIRY } from "./InquiryDetail.jsx";
 import { Loading, Problem } from "./parts.jsx";
 
 /** Hosting, maintenance and the like that run under a contract (#101). */
@@ -68,7 +69,9 @@ export default function Overview() {
   const data = overview.data;
   const offers = data.offers.filter((item) => item.status === 1);
   const invoices = data.invoices.filter((item) => item.open);
-  const repairs = data.tickets.filter((item) => item.open);
+  // An inquiry waiting for the customer's answer comes first and stands out (#122).
+  const waiting = data.tickets.filter((item) => item.open && item.step === "wartet_auf_dich");
+  const repairs = data.tickets.filter((item) => item.open && item.step !== "wartet_auf_dich");
   return (
     <>
       <div className="flex flex-col gap-1">
@@ -78,15 +81,19 @@ export default function Overview() {
       <div className="grid gap-3 sm:grid-cols-3 md:gap-4">
         <Tile label="Angebote zum Annehmen" value={data.counts.offers_open} to="/kundenbereich/angebote" strong />
         <Tile label="Offene Rechnungen" value={data.counts.invoices_open} to="/kundenbereich/rechnungen" />
-        <Tile label="Laufende Reparaturen" value={data.counts.repairs_running} to="/kundenbereich/anfragen" />
+        <Tile label="Offene Anfragen" value={data.counts.repairs_running} to="/kundenbereich/anfragen" />
       </div>
-      {offers.length + invoices.length + repairs.length === 0 ? (
+      {waiting.length + offers.length + invoices.length + repairs.length === 0 ? (
         <div className="card flex flex-col items-start gap-3 p-6">
           <p className="m-0 text-[17px] text-body">Gerade ist nichts offen.</p>
-          <Link to="/?kontakt=anfrage#kontakt" className="btn-primary">Neue Anfrage starten</Link>
+          <a href={NEW_INQUIRY} className="btn-primary">Neue Anfrage starten</a>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {waiting.map((item) => (
+            <Card key={`w${item.id}`} to={`/kundenbereich/anfragen/${item.id}`} kicker="Wartet auf dich" accent
+              title={item.title || "Anfrage"} action="Jetzt antworten" text={stepOf(item).text} />
+          ))}
           {offers.map((item) => (
             <Card key={`o${item.id}`} to={`/kundenbereich/angebote/${item.id}`} kicker="Angebot wartet auf dich" accent
               title={`Angebot ${item.ref}`} action="Ansehen und annehmen"
@@ -98,7 +105,7 @@ export default function Overview() {
               text={`${money(item.remain ?? item.total)}${item.due ? ` · fällig am ${day(item.due)}` : ""}`} />
           ))}
           {repairs.map((item) => (
-            <Card key={`t${item.id}`} to="/kundenbereich/anfragen" kicker={(STEPS[item.step] || STEPS.eingegangen).label}
+            <Card key={`t${item.id}`} to={`/kundenbereich/anfragen/${item.id}`} kicker={stepOf(item).label} action="Verlauf ansehen"
               title={item.title || "Anfrage"} text={[item.inquiry_ref, item.created_at && `seit ${day(item.created_at)}`].filter(Boolean).join(" · ")} />
           ))}
         </div>

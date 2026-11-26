@@ -28,12 +28,9 @@ export default function Home() {
   const reviews = useApi("/reviews");
   const faq = useApi("/faqs");
 
-  // /status/view.php?track_id=… is the link in Dolibarr's confirmation mail (#48).
-  const trackId = location.pathname === "/status/view.php" ? search.get("track_id") || "" : "";
   const askedTab = search.get("kontakt");
-  const [tab, setTab] = useState(trackId ? "status" : CONTACT_TABS.some((item) => item.key === askedTab) ? askedTab : "nachricht");
+  const [tab, setTab] = useState(CONTACT_TABS.some((item) => item.key === askedTab) ? askedTab : "nachricht");
   const [preset, setPreset] = useState(null);
-  const [statusFor, setStatusFor] = useState(null);
 
   const openContact = useCallback((next, nextPreset) => {
     setTab(next);
@@ -44,9 +41,9 @@ export default function Home() {
 
   useEffect(() => {
     if (slug) scrollTo("leistungen");
-    else if (trackId || askedTab || location.hash === "#kontakt") scrollTo("kontakt");
+    else if (askedTab || location.hash === "#kontakt") scrollTo("kontakt");
     else if (location.hash) scrollTo(location.hash.slice(1));
-  }, [slug, trackId, askedTab, location.hash]);
+  }, [slug, askedTab, location.hash]);
 
   const galleryItems = gallery.data?.items || [];
   const reviewCount = (reviews.data?.reviews || []).filter((review) => !review.is_demo).length;
@@ -75,14 +72,7 @@ export default function Home() {
         <Reviews data={reviews.data} googleUrl={settings.google_review_url} />
         <About />
         <Faq items={faqItems} />
-        <Contact
-          tab={tab}
-          onTab={setTab}
-          preset={preset}
-          statusFor={statusFor}
-          trackId={trackId}
-          onShowStatus={(ref, email) => { setStatusFor({ ref, email }); setTab("status"); }}
-        />
+        <Contact tab={tab} onTab={setTab} preset={preset} />
       </main>
       <Footer />
     </ContactContext.Provider>

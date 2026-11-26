@@ -2,8 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import Tabs from "./components/Tabs.jsx";
 import { DEFAULT_SERVICES, servicesFrom } from "./content/services.js";
-import { localIso } from "./forms/InquiryForm.jsx";
-import { STEPS, StatusCard } from "./forms/StatusView.jsx";
+import { STEPS, TIMELINE, stepTone } from "./portal/steps.js";
 import Reviews from "./sections/Reviews.jsx";
 import Workshop from "./sections/Workshop.jsx";
 
@@ -23,14 +22,6 @@ describe("services", () => {
     ]);
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ tab: "PC-Reparatur", heading: "Kurz", intro: "Lang", bullets: ["A"], requestType: "repair" });
-  });
-});
-
-describe("callback time", () => {
-  it("keeps the browser's own offset so the workshop sees the meant time", () => {
-    const iso = localIso("2026-10-02", "10:30");
-    expect(iso).toMatch(/^2026-10-02T10:30:00[+-]\d\d:\d\d$/);
-    expect(new Date(iso).getTime()).toBe(new Date("2026-10-02T10:30:00").getTime());
   });
 });
 
@@ -100,14 +91,20 @@ describe("workshop gallery", () => {
   });
 });
 
-describe("status", () => {
-  it("has a text for every step of the status API", () => {
+describe("inquiry steps (#122)", () => {
+  it("has a text and a place on the timeline for every step the customer area sends", () => {
     for (const step of ["eingegangen", "angebot_bereit", "in_arbeit", "wartet_auf_dich", "pausiert", "abholbereit",
       "abgeschlossen", "abgebrochen"]) {
       expect(STEPS[step].text).toBeTruthy();
+      expect(STEPS[step].bar).toBeLessThanOrEqual(TIMELINE.length);
     }
-    render(<StatusCard status={{ ref: "ANF-ABCD1234", step: "abholbereit", request_type_label: "Reparatur" }} />);
-    expect(screen.getByText("Abholbereit")).toBeInTheDocument();
-    expect(screen.getByText("Dein Gerät ist fertig und kann abgeholt werden.")).toBeInTheDocument();
+    expect(stepTone({ step: "wartet_auf_dich" })).toBe("warn");
+    expect(stepTone({ step: "abgeschlossen" })).toBe("good");
+    expect(stepTone({ step: "in_arbeit" })).toBe("plain");
+  });
+
+  it("never sends the customer to the phone or to a status page", () => {
+    const text = Object.values(STEPS).map((step) => step.text).join(" ");
+    expect(text).not.toMatch(/ruf|Status-Seite|Status prüfen/i);
   });
 });

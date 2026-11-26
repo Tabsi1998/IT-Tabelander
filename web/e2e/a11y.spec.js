@@ -44,11 +44,8 @@ test("the forms are accessible in every step (#55)", async ({ page }) => {
   await contact.getByRole("button", { name: "Weiter" }).click();
   await expect(contact.getByRole("alert")).toBeVisible();
   await expectAccessible(page);
-  await contact.getByRole("tab", { name: "Status prüfen" }).click();
-  await contact.getByLabel("Anfrage-Nummer").fill("ANF-ABCD1234");
-  await contact.getByLabel("E-Mail aus der Anfrage").fill("kunde@example.at");
-  await contact.getByRole("button", { name: "Status anzeigen" }).click();
-  await expect(contact.getByRole("status")).toBeVisible();
+  await contact.getByRole("tab", { name: "Nachricht" }).click();
+  await contact.getByRole("button", { name: "Nachricht senden" }).click();
   await expectAccessible(page);
 });
 

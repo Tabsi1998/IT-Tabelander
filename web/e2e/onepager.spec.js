@@ -89,9 +89,9 @@ test("the menu opens, leads to a section and closes with Escape", async ({ page 
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await page.getByRole("button", { name: "Menü öffnen" }).click();
-  await menu.getByRole("link", { name: /Status prüfen/ }).click();
+  await menu.getByRole("link", { name: /Anfrage starten/ }).click();
   await expect(menu).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Status prüfen" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Reparatur anfragen" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("legal texts as tabs, a draft says so (#52)", async ({ page }) => {

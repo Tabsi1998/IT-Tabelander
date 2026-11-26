@@ -54,15 +54,46 @@ const SERVICE = {
 const CREDIT_NOTE = { id: 44, ref: "AV2609-0001", status: 1, state: "bezahlt", open: false, credit_note: true,
   date: "2026-09-21T08:00:00+00:00", due: null, total: "-20.00000000", remain: "0", has_pdf: true };
 
-export function portalState(overrides = {}) {
+// Inquiries with their history (#122): one waits for the customer, one has an offer, one is closed.
+const WAITING = {
+  id: 8, ref: "TS2609-0008", title: "Reparatur: PlayStation 5", inquiry_ref: "ANF-9Z8Y7X6W", step: "wartet_auf_dich",
+  open: true, created_at: "2026-09-25T08:00:00+00:00", updated_at: "2026-09-27T09:30:00+00:00",
+};
+export const TRACK_ID = "ITPORTALTEST0008";
+
+function detail(item, messages) {
+  return { ...item, closed_at: item.open ? null : "2026-08-30T08:00:00+00:00", can_reply: item.open, messages };
+}
+
+function inquiries(tickets) {
+  const [offer, closed] = tickets;
   return {
+    8: detail(WAITING, [
+      { id: "start", at: "2026-09-25T08:00:00+00:00", from: "customer", author: null, via: null,
+        text: "Anfrageart: Reparatur\nGerät / Bereich: PlayStation\n\nBeschreibung:\nDas Laufwerk zieht keine Discs mehr ein." },
+      { id: "41", at: "2026-09-26T10:15:00+00:00", from: "team", author: "IT-Tabelander", via: "email",
+        text: "Danke für die Fotos! Ist das die Digital Edition oder die mit Laufwerk?" },
+    ]),
+    5: detail(offer, [
+      { id: "start", at: "2026-09-24T08:00:00+00:00", from: "customer", author: null, via: null, text: "Der Akku hält nur noch 20 Minuten." },
+    ]),
+    3: detail(closed, [
+      { id: "start", at: "2026-08-12T08:00:00+00:00", from: "customer", author: null, via: null, text: "Bitte Hall-Effect-Sticks einbauen." },
+      { id: "12", at: "2026-08-30T08:00:00+00:00", from: "customer", author: "Max Muster", via: "portal", text: "Passt perfekt, danke!" },
+    ]),
+  };
+}
+
+export function portalState(overrides = {}) {
+  const state = {
     enabled: true,
     signedIn: false,
     me: { email: "kunde@example.at", customers: ["Max Muster"] },
     overview: {
       email: "kunde@example.at", customers: ["Max Muster"],
-      counts: { offers_open: 1, invoices_open: 1, repairs_running: 1 },
+      counts: { offers_open: 1, invoices_open: 1, repairs_running: 2, inquiries_waiting: 1 },
       tickets: [
+        { ...WAITING },
         { id: 5, ref: "TS2609-0005", title: "Reparatur: Notebook Lenovo ThinkPad T14", inquiry_ref: "ANF-7K3M9Q2X", step: "angebot_bereit",
           open: true, created_at: "2026-09-24T08:00:00+00:00", updated_at: "2026-09-26T08:00:00+00:00" },
         { id: 3, ref: "TS2608-0003", title: "Controller-Umbau: Controller", inquiry_ref: "ANF-2B8C4D6E", step: "abgeschlossen",
@@ -81,6 +112,8 @@ export function portalState(overrides = {}) {
     sent: [],
     ...overrides,
   };
+  state.inquiries = overrides.inquiries || inquiries(state.overview.tickets.slice(1));
+  return state;
 }
 
 /** The public API of the site plus the customer area's, which remembers what the page sends. */
@@ -126,6 +159,22 @@ export async function mockPortal(page, state = portalState()) {
     if (found) {
       const item = state.documents[found[1]];
       return item ? json(route, item) : json(route, { detail: "Das gibt es hier nicht." }, 404);
+    }
+    const track = path.match(/^\/inquiries\/track\/([A-Za-z0-9]+)$/);
+    if (track) return track[1] === TRACK_ID ? json(route, { id: 8 }) : json(route, { detail: "Diese Anfrage gibt es hier nicht." }, 404);
+    const inquiry = path.match(/^\/inquiries\/(\d+)(\/messages|\/close)?$/);
+    if (inquiry) {
+      const item = state.inquiries[inquiry[1]];
+      if (!item) return json(route, { detail: "Diese Anfrage gibt es hier nicht." }, 404);
+      if (inquiry[2] === "/messages") {
+        const step = item.step === "wartet_auf_dich" ? "eingegangen" : item.step;
+        state.inquiries[inquiry[1]] = { ...item, step, messages: [...item.messages,
+          { id: `m${item.messages.length}`, at: "2026-09-27T12:00:00+00:00", from: "customer", author: "Max Muster", via: "portal", text: body.message }] };
+      }
+      if (inquiry[2] === "/close") {
+        state.inquiries[inquiry[1]] = { ...item, step: "abgeschlossen", open: false, can_reply: false, closed_at: "2026-09-27T12:00:00+00:00" };
+      }
+      return json(route, state.inquiries[inquiry[1]]);
     }
     const invoice = path.match(/^\/invoices\/(\d+)$/);
     if (invoice) {

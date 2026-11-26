@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { ContactLink } from "../lib/contact.jsx";
 import { useSite } from "../lib/site.jsx";
 import { ArrowRight, Check, TraceUnderline } from "../components/Icons.jsx";
@@ -14,7 +15,7 @@ const EXAMPLE_STEPS = [
 ];
 
 export default function Hero() {
-  const { company } = useSite();
+  const { company, settings } = useSite();
   const place = ["IT-Service", company?.town, "Tirol"].filter(Boolean).join(" · ");
   return (
     <section id="start" aria-labelledby="start-title" className="bg-surface">
@@ -27,13 +28,13 @@ export default function Hero() {
           </h1>
           <p className="m-0 mt-3 max-w-[34em] text-lg leading-normal text-body lg:mt-[18px] lg:text-[21px]">
             Reparatur, Aufrüstung und PCs nach Wunsch. Für Notebooks, PCs, Konsolen und Controller.
-            Du schickst eine Anfrage, bekommst ein klares Angebot und siehst jederzeit, wie weit dein Gerät ist.
+            Du schickst eine Anfrage, bekommst ein klares Angebot und siehst im Kundenbereich jederzeit, wie weit dein Gerät ist.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:gap-3.5">
             <ContactLink tab="anfrage" className="btn-primary min-h-[56px] px-7 text-lg">
               Anfrage starten<ArrowRight />
             </ContactLink>
-            <ContactLink tab="status" className="btn-outline min-h-[56px] px-[26px] text-lg">Status prüfen</ContactLink>
+            {settings.portal_enabled && <Link to="/kundenbereich" className="btn-outline min-h-[56px] px-[26px] text-lg">Zum Kundenbereich</Link>}
           </div>
           <ul className="m-0 mt-2 grid list-none gap-x-6 gap-y-2.5 p-0 text-base text-body sm:grid-cols-2">
             {TRUST.map((item) => (
@@ -52,7 +53,7 @@ function StatusExample() {
   return (
     <figure className="m-0 flex flex-col gap-5 rounded-2xl border border-line bg-page p-6 md:p-7" aria-label="Beispiel einer Statusanzeige">
       <div className="flex items-center justify-between gap-3">
-        <div className="kicker text-[10px] md:text-[11px]">So sieht dein Status aus</div>
+        <div className="kicker text-[10px] md:text-[11px]">So siehst du deine Anfrage</div>
         <span className="shrink-0 whitespace-nowrap rounded-full bg-badge px-2.5 py-1 text-[13px] font-semibold text-badge-ink">Angebot bereit</span>
       </div>
       <div>

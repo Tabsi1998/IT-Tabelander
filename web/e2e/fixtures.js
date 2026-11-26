@@ -33,7 +33,7 @@ export function reviews(count) {
 export const REVIEW_LINK = "Beispiel-Link-nur-fuer-Tests-000000000000";
 
 /** Answers every /api request of the page; `sent` records what the page posted. */
-export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, status, portal = false } = {}) {
+export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, portal = false } = {}) {
   const sent = [];
   const json = (route, body, statusCode = 200) => route.fulfill({ status: statusCode, contentType: "application/json", body: JSON.stringify(body) });
   await page.route("**/api/**", async (route) => {
@@ -62,12 +62,6 @@ export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, 
     if (path === "/uploads/repair-attachment" && method === "POST") return json(route, { id: "6523f0000000000000000001", url: "/api/media/x.webp" });
     if (path.startsWith("/uploads/repair-attachment/") && method === "DELETE") return json(route, { ok: true });
     if (path === "/inquiries" && method === "POST") return json(route, { ok: true, ref: "ANF-NEU12345", dolibarr_synced: true });
-    if (path === "/inquiries/status" && method === "POST") {
-      const body = request.postDataJSON();
-      if (body.email !== "kunde@example.at") return json(route, { detail: "Keine Anfrage mit dieser Nummer und E-Mail gefunden." }, 404);
-      return json(route, { ref: body.ref, request_type: "repair", request_type_label: "Reparatur", step: status || "eingegangen",
-        created_at: "2026-09-27T10:00:00+00:00", updated_at: "2026-09-27T12:00:00+00:00" });
-    }
     if (path === "/review-invites/check" && method === "POST") {
       if (request.postDataJSON().token !== REVIEW_LINK) {
         return json(route, { detail: "Dieser Link ist abgelaufen oder wurde schon verwendet." }, 404);
@@ -75,9 +69,6 @@ export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, 
       return json(route, { ref: "ANF-BEWERT01", request_type_label: "Reparatur" });
     }
     if (path === "/review-invites/submit" && method === "POST") return json(route, { ok: true });
-    if (path.startsWith("/inquiries/status/track/")) {
-      return json(route, { ref: "ANF-LINK0001", request_type: "repair", request_type_label: "Reparatur", step: "in_arbeit" });
-    }
     return json(route, { detail: "Nicht im Test vorgesehen" }, 404);
   });
   return sent;

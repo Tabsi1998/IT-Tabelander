@@ -1,17 +1,16 @@
 import Tabs from "../components/Tabs.jsx";
 import InquiryForm from "../forms/InquiryForm.jsx";
 import MessageForm from "../forms/MessageForm.jsx";
-import StatusView from "../forms/StatusView.jsx";
-import { telHref, useSite } from "../lib/site.jsx";
+import { useSite } from "../lib/site.jsx";
 
 export const CONTACT_TABS = [
   { key: "nachricht", label: "Nachricht" },
   { key: "anfrage", label: "Reparatur anfragen" },
-  { key: "status", label: "Status prüfen" },
 ];
 
-/** Contact area with tabs (#49): message, inquiry (#47) and status (#48). */
-export default function Contact({ tab, onTab, preset, statusFor, trackId, onShowStatus }) {
+/** Contact area with tabs (#49): message and inquiry (#47). The status of an
+ *  inquiry lives in the customer area since #122. */
+export default function Contact({ tab, onTab, preset }) {
   const { company, openingHours } = useSite();
 
   return (
@@ -29,21 +28,14 @@ export default function Contact({ tab, onTab, preset, statusFor, trackId, onShow
               selected={tab}
               onSelect={onTab}
               variant="card"
-              listClassName="grid grid-cols-3 border-b border-line"
+              listClassName="grid grid-cols-2 border-b border-line"
               panelClassName="min-h-[380px] p-5 md:p-8"
             >
               {tab === "nachricht" && <MessageForm />}
-              {tab === "anfrage" && <InquiryForm preset={preset} onShowStatus={onShowStatus} />}
-              {tab === "status" && <StatusView initial={statusFor} trackId={trackId} />}
+              {tab === "anfrage" && <InquiryForm preset={preset} />}
             </Tabs>
           </div>
           <aside aria-label="Direkter Kontakt" className="flex flex-col gap-[18px] rounded-2xl bg-navy p-6 text-on-navy md:p-7">
-            {company?.phone && (
-              <div>
-                <a href={telHref(company.phone)} className="text-lg font-bold text-on-navy no-underline">{company.phone}</a>
-                <div className="text-[15px] text-on-navy-muted">Anrufen</div>
-              </div>
-            )}
             {company?.email && (
               <div>
                 <a href={`mailto:${company.email}`} className="break-all text-lg font-bold text-on-navy no-underline">{company.email}</a>

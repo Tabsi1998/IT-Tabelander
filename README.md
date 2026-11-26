@@ -208,7 +208,8 @@ erst beim nächsten 30-Minuten-Takt.
 Unter **Übersicht → Neueste Anfragen** gibt es bei jeder Anfrage **Etikett**
 (oder `/admin/etikett` und die Anfrage- oder Ticket-Nummer eingeben). Das
 Etikett zeigt Nummer, Gerät (so, wie das Ticket in Dolibarr heißt), Datum und
-einen QR-Code zur Status-Seite – der Kunde scannt ihn und sieht den Stand. Ein
+einen QR-Code – der Kunde scannt ihn, meldet sich im Kundenbereich an und sieht
+seine Anfrage (der Code enthält den alten Status-Link, siehe unten). Ein
 Name steht bewusst nicht drauf, weil das Etikett sichtbar am Gerät klebt.
 Drucken geht auf Etikettendrucker mit 62 × 29 mm (z. B. Brother DK-11209) oder
 auf ein normales A4-Blatt zum Ausschneiden.
@@ -230,8 +231,10 @@ Schreibfeld.
 Die Website schickt selbst nur wenige Mails: die Warnung an dich, wenn eine
 Anfrage nicht in Dolibarr ankommt, die eine Bewertungsbitte nach einem
 geschlossenen Ticket (nur mit dem Ja des Kunden) und aus dem Kundenbereich den
-Anmelde-Link und die Bestätigung eines angenommenen Angebots. Bestätigungen zu
-Anfragen verschickt Dolibarr.
+Anmelde-Link und die Bestätigung eines angenommenen Angebots. Dazu bekommst du
+an die Warn-Adresse einen Hinweis, wenn ein Kunde im Kundenbereich auf eine
+Anfrage antwortet oder sie schließt. Bestätigungen zu Anfragen verschickt
+Dolibarr.
 
 Die Mails an Kunden kommen als HTML mit Text-Alternative im selben Aussehen wie
 die Mails des Dolibarr-Moduls IT-Tabelander PDF: weißes Blatt, Logo (vom
@@ -293,21 +296,29 @@ automatisch Folgendes:
 1. Geschäftspartner anhand der E-Mail-Adresse suchen. Einen vorhandenen Kunden
    oder Interessenten ändert die Website **nie** – Name, Adresse, UID und
    Telefon in Dolibarr bleiben, wie sie sind. Weichen die Angaben im Formular
-   ab, stehen sie nur im Ticket, mit einem Hinweis für die Werkstatt;
+   ab, stehen sie nur in der internen Notiz am Ticket (siehe 3);
 2. andernfalls einen neuen Interessenten mit den freiwillig angegebenen Firmen-,
    Adress-, Telefon-, UID-, Firmenbuch-, Gerichtsstand-, EORI- und Steuerdaten
    anlegen;
-3. ein Ticket mit allen Angaben erstellen, klassifizieren und mit dem
-   Geschäftspartner verknüpfen;
+3. ein Ticket erstellen, klassifizieren und mit dem Geschäftspartner
+   verknüpfen. Die Nachricht des Tickets ist nur, was der Kunde geschrieben
+   hat (Art, Gerät, Beschreibung) – der Kunde sieht sie im Kundenbereich und in
+   Dolibarrs Mails. Kontaktdaten, der Hinweis „schon vorhanden“, Rückruf,
+   Fotoanzahl, Bewertungsbitte und Request-ID kommen als **private Nachricht**
+   („Interne Angaben aus dem Website-Formular“) ans Ticket; die sieht nur die
+   Werkstatt;
 4. die Fotos als Dokumente an das Ticket hängen. Danach löscht die Website ihre
    eigene Kopie; Kundenfotos sind nie öffentlich abrufbar;
 5. Dolibarr schickt dem Kunden die Eingangsbestätigung und der Werkstatt eine
    Benachrichtigung – beides aus Dolibarr, nicht von der Website.
 
-Kunden sehen den Stand ihrer Anfrage über die Anfragenummer und ihre E-Mail
-oder über den Link in der Bestätigung (Schnittstelle `/api/inquiries/status`,
-die Seite dazu kommt mit der neuen Website). Angezeigt werden nur Anfrageart und
-Schritt, keine persönlichen Daten. Die Schritte kommen aus dem Ticket:
+Kunden sehen den Stand ihrer Anfrage im **Kundenbereich** (siehe dort), mit
+dem ganzen Verlauf. Die frühere Status-Seite ohne Anmeldung gibt es nicht mehr.
+Der Link `/status/view.php?track_id=…`, den Dolibarr in seine Mails schreibt
+und der im QR-Code des Etiketts steckt, bleibt gültig: Er führt zur Anmeldung
+und danach direkt zu dieser Anfrage – nur wenn sie dem angemeldeten Kunden
+gehört, sonst zur Liste seiner Anfragen. Ohne Anmeldung zeigt er nichts. Die
+Schritte kommen aus dem Ticket:
 
 | Schritt | Woher in Dolibarr |
 |---|---|
@@ -348,7 +359,9 @@ Nachricht in einer Zeile, nach etwa 60 Zeichen an einer Wortgrenze mit „…“
 gekürzt, z. B. „Kontaktnachricht: Habt ihr am Samstag geöffnet? (ANF-…)“. Das
 Etikett zeigt denselben Betreff ohne die Nummer.
 
-**Rückruf-Wunsch**: Wer im Formular eine Wunschzeit angibt (Telefonnummer
+**Rückruf-Wunsch**: Das Formular bietet ihn seit #122 nicht mehr an – Kontakt
+läuft über den Kundenbereich oder eine Antwort auf die Mail. Die Schnittstelle
+nimmt ihn weiter an: Wer eine Wunschzeit schickt (Telefonnummer
 Pflicht, frühestens in 10 Minuten, höchstens 60 Tage voraus), bekommt in
 Dolibarr einen Termin „Rückruf“ (Art: Telefonat, 15 Minuten) im Kalender,
 verknüpft mit Ticket und Kunde. Du findest ihn in der Kalenderansicht; der
@@ -391,9 +404,13 @@ Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie
      dieses Recht findet die Website Stammkunden nicht und legt sie doppelt an,
    - Kontakte: **einsehen** (Anmeldung im Kundenbereich mit der Adresse eines
      Kontakts),
-   - Tickets: **lesen** und **anlegen/ändern**,
+   - Tickets: **lesen** und **anlegen/ändern** – „ändern“ braucht der
+     Kundenbereich für Antworten (`POST /tickets/newmessage`), für die interne
+     Notiz an neuen Tickets und für „Hat sich erledigt“ (Status geschlossen),
    - Agenda: **eigene Termine einsehen** und **eigene Termine anlegen**
-     (für Rückruf-Wünsche),
+     (Rückruf-Wünsche; „einsehen“ liest außerdem den Verlauf eines Tickets im
+     Kundenbereich – Dolibarrs Ticket-Schnittstelle sagt nicht, welche
+     Einträge Nachrichten und welche Protokoll sind),
    - Wissensmanagement: Artikel **lesen**, Kategorien: **lesen**
      (Rechtstexte, FAQ),
    - Angebote: **lesen** (Schritt „Angebot bereit“) und **anlegen/ändern**
@@ -424,9 +441,8 @@ Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie
    Tickets die Werkstatt-Adresse eintragen und beim Absender die
    Absender-Adresse; das öffentliche Interface einschalten und als seine URL
    `https://it.tabelander.co.at/status/` eintragen. Dolibarr schreibt den
-   Status-Link nur mit eingeschaltetem öffentlichen Interface in die
-   Bestätigung – der Link führt dann auf die Status-Seite der Website, nicht zu
-   Dolibarr. Der E-Mail-Versand von Dolibarr selbst muss eingerichtet sein
+   Link nur mit eingeschaltetem öffentlichen Interface in die Bestätigung – er
+   führt dann in den Kundenbereich der Website, nicht zu Dolibarr. Der E-Mail-Versand von Dolibarr selbst muss eingerichtet sein
    (**Einstellungen → E-Mails**).
 6. Unter `/admin/dolibarr` (Block **Verbindung**) Dolibarr aktivieren, die
    Basis-URL der Installation (ohne `/api/index.php`) und den API-Key
@@ -540,6 +556,31 @@ gilt und einmal funktioniert. Die Seite sagt nie, ob eine Adresse bekannt ist.
 Danach bleibt der Kunde 7 Tage angemeldet. Konten legt niemand an – jede
 E-Mail-Adresse aus Dolibarr funktioniert. Ein Kontakt einer Firma sieht die
 Anfragen, Angebote und Belege der Firma.
+
+**Anfragen** (`/kundenbereich/anfragen`, eine einzelne unter
+`/kundenbereich/anfragen/<id>` mit der Ticket-ID aus Dolibarr): Betreff,
+Nummer, Stand mit Zeitstrahl und der ganze Verlauf – die erste Nachricht des
+Tickets und jede **öffentliche** Nachricht: deine Antworten aus Dolibarr
+(auch per Mail), Antworten des Kunden aus dem Kundenbereich und Mails, die der
+E-Mail-Sammler von Dolibarr ans Ticket hängt (ohne Kopfzeilen und ohne die
+zitierte alte Mail). **Private** Nachrichten und Dolibarrs eigene Einträge
+(„Ticket erstellt“, „geändert“, Termine) erscheinen nie. Was „wartet auf dich“
+ist (Ticket „Benötigt weitere Informationen“), steht in der Übersicht ganz
+vorne und hat die Zahl am Reiter **Anfragen**.
+
+- **Antworten:** Die Antwort wird eine öffentliche Ticket-Nachricht des
+  Website-Benutzers mit der Zeile „– geschrieben im Kundenbereich von Name
+  (E-Mail)“. Wartete das Ticket auf den Kunden, geht es zurück an dich
+  (zugewiesen bzw. neu), wie bei einer Antwort per Mail. Du bekommst an die
+  Warn-Adresse (**Technik**) einen Hinweis mit dem Text und dem Knopf
+  **Ticket in Dolibarr öffnen** (`https://erp.tabelander.co.at/ticket/card.php?track_id=…`).
+- **Hat sich erledigt:** Der Kunde schließt die Anfrage nach einer Rückfrage;
+  in Dolibarr ist das Ticket dann geschlossen, mit einer privaten Notiz, wer
+  es wann geschlossen hat, und du bekommst einen Hinweis. Eine Bewertungsbitte
+  geht für so ein Ticket nicht hinaus. Geschlossene Anfragen bleiben lesbar,
+  antworten geht nicht mehr – der Kunde startet dann eine neue.
+- Der Anmelde-Link kann direkt zu einer Anfrage führen: Wer über einen Link
+  aus Dolibarrs Mails kommt, landet nach der Anmeldung dort.
 
 **Sperren** geht direkt in Dolibarr am Kunden, und die Website fragt spätestens
 alle 5 Minuten neu:
@@ -767,11 +808,11 @@ yarn test:e2e     # Playwright in 390, 768, 1280 und 1440 px, mit Barrierefreihe
 
 Sie ist ein One-Pager nach Design A: Leistungen als Tabs, Ablauf, „Aus der
 Werkstatt“ (nur mit Fotos sichtbar), Bewertungen (nur mit echten Bewertungen
-sichtbar), Über mich und der Kontaktbereich mit den Tabs Nachricht, Anfrage
-und Status. Eigene Seiten gibt es nur für Rechtliches. Schriften liegen im
+sichtbar), Über mich und der Kontaktbereich mit den Tabs Nachricht und
+Anfrage. Eigene Seiten gibt es nur für Rechtliches. Schriften liegen im
 Projekt; die Seite lädt nichts von fremden Servern. Hell und dunkel folgen der
-Systemeinstellung. Der Link aus Dolibarrs Bestätigungsmail
-(`/status/view.php?track_id=…`) öffnet direkt den Status.
+Systemeinstellung. Den Stand einer Anfrage zeigt der Kundenbereich; der Link
+aus Dolibarrs Bestätigungsmail (`/status/view.php?track_id=…`) führt dorthin.
 
 Prüfungen:
 

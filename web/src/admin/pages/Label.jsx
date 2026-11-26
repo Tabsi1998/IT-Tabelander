@@ -39,7 +39,7 @@ function DeviceLabel({ label, format }) {
   return (
     <div className={`flex h-[29mm] w-[62mm] shrink-0 items-center gap-[2mm] overflow-hidden bg-white p-[1.5mm] text-black ${
       format === "sheet" ? "border border-dashed border-black" : "border border-line print:border-0"}`}>
-      <QrCode text={label.status_url} title={`QR-Code zur Status-Seite von ${label.ref}`} className="h-[26mm] w-[26mm] shrink-0" />
+      <QrCode text={label.status_url} title={`QR-Code zur Anfrage ${label.ref} im Kundenbereich`} className="h-[26mm] w-[26mm] shrink-0" />
       <div className="flex min-w-0 flex-col gap-[0.8mm] leading-tight">
         <b className="whitespace-nowrap text-[11pt]">{label.ref}</b>
         <span className="line-clamp-2 text-[7.5pt] font-semibold">{label.title}</span>
@@ -68,7 +68,7 @@ function LabelView({ reference }) {
     <>
       <div className="print:hidden">
         <PageHeader title="Etikett drucken"
-          description="Für das angenommene Gerät: Nummer, Gerät, Datum und ein QR-Code zur Status-Seite. Der Kunde scannt ihn und sieht den Stand." />
+          description="Für das angenommene Gerät: Nummer, Gerät, Datum und ein QR-Code. Der Kunde scannt ihn, meldet sich im Kundenbereich an und sieht seine Anfrage." />
       </div>
       <LoadState state={state}>
         {(label) => (

@@ -2,7 +2,7 @@ const STEPS = [
   { title: "Anfrage senden", text: "Gerät, Fehler, ein paar Fotos. Dauert zwei Minuten." },
   { title: "Diagnose", text: "Ich prüfe dein Gerät und melde mich mit einer ehrlichen Einschätzung." },
   { title: "Angebot annehmen", text: "Du bekommst ein klares Angebot. Ohne deine Zusage passiert nichts." },
-  { title: "Reparatur oder Bau", text: "Den Fortschritt siehst du jederzeit über den Status." },
+  { title: "Reparatur oder Bau", text: "Den Fortschritt siehst du jederzeit im Kundenbereich." },
   { title: "Abholen oder Versand", text: "Du holst dein Gerät ab oder bekommst es geschickt. Bezahlt wird per Überweisung." },
 ];
 
