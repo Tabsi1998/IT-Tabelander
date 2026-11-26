@@ -492,24 +492,18 @@ class WerkbankDocs
 	// ------------------------------------------------------------ generated for a customer
 
 	/**
-	 * The released article behind a document name, with its extra fields.
+	 * The latest released version of a document as a record the PDF
+	 * builders take (question = title, answer = text).
 	 *
 	 * @param string $slug Document
-	 * @return KnowledgeRecord|null
+	 * @return object|null
 	 */
 	public function template($slug)
 	{
-		$documents = $this->documents();
-		if (!isset($documents[$slug])) {
-			return null;
-		}
-		require_once DOL_DOCUMENT_ROOT.'/knowledgemanagement/class/knowledgerecord.class.php';
-		$record = new KnowledgeRecord($this->db);
-		if ($record->fetch((int) $documents[$slug]['id']) <= 0) {
-			return null;
-		}
-		$record->fetch_optionals();
-		return $record;
+		require_once __DIR__.'/werkbankdoc.class.php';
+		$store = new WerkbankDoc($this->db);
+		$doc = $store->bySlug($slug);
+		return $doc && (int) $doc->version > 0 ? $store->asRecord($doc) : null;
 	}
 
 	/**
@@ -615,7 +609,7 @@ class WerkbankDocs
 	/**
 	 * The article's text for this customer.
 	 *
-	 * @param KnowledgeRecord     $record   Template
+	 * @param object              $record   Template (WerkbankDoc::asRecord)
 	 * @param array               $fields   Input fields
 	 * @param array<string,mixed> $answers  Their values
 	 * @param Societe             $soc      Customer

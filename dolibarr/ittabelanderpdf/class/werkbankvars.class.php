@@ -30,12 +30,31 @@ class WerkbankVars
 		'__ITTAB_FIRMA_WEB__', '__ITTAB_FIRMA_UID__', '__ITTAB_GESCHAEFTSZEITEN__',
 		'__ITTAB_DATUM__', '__ITTAB_ORT__',
 		'__ITTAB_VERTRAG_REF__', '__ITTAB_VERTRAG_DATUM__', '__ITTAB_VERTRAG_BEGINN__', '__ITTAB_VERTRAG_LAUFZEIT__', '__ITTAB_VERTRAG_KUENDIGUNG__',
-		'__ITTAB_LEISTUNGEN__',
+		'__ITTAB_LEISTUNGEN__', '__ITTAB_LEISTUNGEN_VERTRAG__', '__ITTAB_PREIS:<REF>__',
 	);
 
 	/** Dolibarr's own placeholders shown in the help (there are more). */
 	const DOLIBARR = array('__THIRDPARTY_NAME__', '__THIRDPARTY_ADDRESS__', '__THIRDPARTY_ZIP__', '__THIRDPARTY_TOWN__', '__THIRDPARTY_EMAIL__',
 		'__THIRDPARTY_TVAINTRA__', '__MYCOMPANY_NAME__', '__MYCOMPANY_EMAIL__');
+
+	/**
+	 * The help table of the placeholders and the input field syntax, to copy
+	 * from (module setup and document card).
+	 *
+	 * @return string HTML
+	 */
+	public static function helpTable()
+	{
+		global $langs;
+		$langs->load('ittabelanderpdf@ittabelanderpdf');
+		$out = '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
+		$out .= '<tr class="liste_titre"><td>'.$langs->trans('WerkbankVarsPlaceholder').'</td><td>'.$langs->trans('Description').'</td></tr>';
+		foreach (array_merge(self::OWN, self::DOLIBARR) as $key) {
+			$out .= '<tr class="oddeven"><td><code class="nowraponall">'.dol_escape_htmltag($key).'</code></td><td>'.$langs->trans('WerkbankVar_'.preg_replace('/:.*$/', '', trim($key, '_'))).'</td></tr>';
+		}
+		$out .= '<tr class="oddeven"><td><code>[[FELD:name*|Bezeichnung|Typ|Vorgaben]]</code></td><td>'.$langs->trans('WerkbankVarsFieldHelp').'</td></tr>';
+		return $out.'</table></div>';
+	}
 
 	/**
 	 * Values for a customer, optionally with a contract and a contact.
@@ -117,6 +136,7 @@ class WerkbankVars
 			$values['__ITTAB_VERTRAG_BEGINN__'] = $starts ? dol_print_date(min($starts), 'day', 'tzuser', $langs) : '';
 			$values['__ITTAB_LEISTUNGEN__'] = $items !== '' ? '<ul>'.$items.'</ul>' : '';
 		}
+		$values['__ITTAB_LEISTUNGEN_VERTRAG__'] = $values['__ITTAB_LEISTUNGEN__'];
 		return $values;
 	}
 
@@ -154,8 +174,11 @@ class WerkbankVars
 	 * @param string[]             $raw    Placeholders whose value is HTML already
 	 * @return string
 	 */
-	public static function fill($html, array $values, array $raw = array('__ITTAB_LEISTUNGEN__'))
+	public static function fill($html, array $values, array $raw = array('__ITTAB_LEISTUNGEN__', '__ITTAB_LEISTUNGEN_VERTRAG__'))
 	{
+		global $db;
+		// Prices of products and services by reference: __ITTAB_PREIS:DL-PC-DIAG__.
+		$values += self::prices($db, (string) $html);
 		$empty = array();
 		foreach ($values as $key => $value) {
 			if (trim(strip_tags((string) $value)) === '') {
@@ -205,6 +228,34 @@ class WerkbankVars
 	}
 
 	/**
+	 * Values of the price placeholders in a text: the sales price of the
+	 * product or service with that reference, as Dolibarr shows it (with VAT
+	 * when the company charges VAT). An unknown reference stays and is
+	 * reported by left().
+	 *
+	 * @param DoliDB $db   Database
+	 * @param string $html Text
+	 * @return array<string,string>
+	 */
+	public static function prices($db, $html)
+	{
+		global $langs, $mysoc;
+		require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+		$values = array();
+		if (!preg_match_all('/__ITTAB_PREIS:([A-Za-z0-9_.\-]+)__/', $html, $matches)) {
+			return $values;
+		}
+		foreach (array_unique($matches[1]) as $ref) {
+			$product = new Product($db);
+			if ($product->fetch(0, $ref) > 0) {
+				$amount = !empty($mysoc->tva_assuj) ? (float) $product->price_ttc : (float) $product->price;
+				$values['__ITTAB_PREIS:'.$ref.'__'] = price($amount, 0, $langs, 1, -1, -1, 'auto');
+			}
+		}
+		return $values;
+	}
+
+	/**
 	 * Placeholders left in a text after filling.
 	 *
 	 * @param string $html Text
@@ -212,7 +263,7 @@ class WerkbankVars
 	 */
 	public static function left($html)
 	{
-		preg_match_all('/__[A-Z][A-Z0-9_]*__/', strip_tags((string) $html), $matches);
+		preg_match_all('/__[A-Z][A-Z0-9_]*(?::[A-Za-z0-9_.\-]+)?__/', strip_tags((string) $html), $matches);
 		return array_values(array_unique($matches[0]));
 	}
 }

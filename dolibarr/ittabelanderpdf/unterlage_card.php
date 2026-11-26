@@ -138,6 +138,8 @@ if ($editable) {
 	$editor = new DolEditor('text', $value('text'), '', 480, 'dolibarr_notes', 'In', true, false, isModEnabled('fckeditor'), ROWS_9, '95%');
 	print $editor->Create(1);
 	print '<div class="opacitymedium small">'.$langs->trans('WerkbankDocTextHelp').'</div>';
+	dol_include_once('/ittabelanderpdf/class/werkbankvars.class.php');
+	print '<details><summary class="opacitymedium small">'.$langs->trans('WerkbankVarsTitle').'</summary>'.WerkbankVars::helpTable().'</details>';
 } else {
 	print '<div class="ittabpdf-doctext">'.dol_htmlwithnojs((string) $value('text')).'</div>';
 }

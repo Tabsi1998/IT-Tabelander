@@ -44,7 +44,7 @@ class WerkbankFields
 		foreach ($matches as $match) {
 			// Only the marker's own text is decoded (CKEditor writes &amp; and &nbsp;).
 			$match = array_map(function ($part) {
-				return str_replace("Â ", ' ', html_entity_decode((string) $part, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+				return str_replace("\u{00A0}", ' ', html_entity_decode((string) $part, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
 			}, $match);
 			$name = strtolower($match[1]);
 			if (isset($fields[$name])) {
@@ -151,7 +151,7 @@ class WerkbankFields
 	}
 
 	/**
-	 * The form inputs for the fields, phone-friendly, with the values given.
+	 * The form inputs for the fields as rows of a Dolibarr form table.
 	 *
 	 * @param array<string,array<string,mixed>> $fields From parse()
 	 * @param array<string,mixed>               $values Values (last time or posted)
@@ -159,36 +159,29 @@ class WerkbankFields
 	 */
 	public static function inputs(array $fields, array $values)
 	{
-		global $langs;
 		$out = '';
 		foreach ($fields as $name => $field) {
-			$id = 'field-'.$name;
 			$value = array_key_exists($name, $values) ? $values[$name] : ($field['kind'] === 'multi' ? $field['selected'] : ($field['kind'] === 'single' ? (string) reset($field['selected']) : $field['default']));
-			$label = dol_escape_htmltag($field['label']).($field['required'] ? ' <span class="ittabqs-required">'.$langs->trans('WerkbankQsRequired').'</span>' : '');
-			$out .= '<div class="ittabgen-field">';
+			$out .= '<tr><td class="titlefield'.($field['required'] ? ' fieldrequired' : '').'">'.dol_escape_htmltag($field['label']).'</td><td>';
 			if ($field['kind'] === 'multi' || $field['kind'] === 'single') {
-				$out .= '<fieldset><legend class="ittabqs-label">'.$label.'</legend>';
 				$extra = array_diff(is_array($value) ? $value : array(), $field['options']);
-				foreach ($field['options'] as $index => $option) {
+				foreach ($field['options'] as $option) {
 					$on = is_array($value) ? in_array($option, $value, true) : $value === $option;
 					$type = $field['kind'] === 'multi' ? 'checkbox' : 'radio';
-					$out .= '<label class="ittabgen-option"><input type="'.$type.'" name="field_'.$name.($type === 'checkbox' ? '[]' : '').'" value="'.dol_escape_htmltag($option).'"'.($on ? ' checked' : '').'>'
-						.'<span>'.dol_escape_htmltag($option).'</span></label>';
+					$out .= '<label class="nowraponall paddingright"><input type="'.$type.'" name="field_'.$name.($type === 'checkbox' ? '[]' : '').'" value="'.dol_escape_htmltag($option).'"'.($on ? ' checked' : '').'> '
+						.dol_escape_htmltag($option).'</label><br>';
 				}
 				if ($field['kind'] === 'multi') {
-					$out .= '<input type="text" name="field_'.$name.'_more" class="ittabqs-input" placeholder="'.dol_escape_htmltag($langs->trans('WerkbankGenMore')).'" value="'.dol_escape_htmltag(implode('; ', $extra)).'">';
+					global $langs;
+					$out .= '<input type="text" name="field_'.$name.'_more" class="minwidth300" placeholder="'.dol_escape_htmltag($langs->trans('WerkbankGenMore')).'" value="'.dol_escape_htmltag(implode('; ', $extra)).'">';
 				}
-				$out .= '</fieldset>';
+			} elseif ($field['kind'] === 'textarea') {
+				$out .= '<textarea name="field_'.$name.'" rows="3" class="quatrevingtpercent">'.dol_escape_htmltag((string) $value, 0, 1).'</textarea>';
 			} else {
-				$out .= '<label class="ittabqs-label" for="'.$id.'">'.$label.'</label>';
-				if ($field['kind'] === 'textarea') {
-					$out .= '<textarea id="'.$id.'" name="field_'.$name.'" rows="3" class="ittabqs-input">'.dol_escape_htmltag((string) $value, 0, 1).'</textarea>';
-				} else {
-					$type = $field['kind'] === 'date' ? 'date' : ($field['kind'] === 'number' ? 'text" inputmode="decimal' : 'text');
-					$out .= '<input type="'.$type.'" id="'.$id.'" name="field_'.$name.'" class="ittabqs-input" value="'.dol_escape_htmltag((string) $value).'">';
-				}
+				$type = $field['kind'] === 'date' ? 'date' : 'text';
+				$out .= '<input type="'.$type.'" name="field_'.$name.'" class="minwidth300"'.($field['kind'] === 'number' ? ' inputmode="decimal"' : '').' value="'.dol_escape_htmltag((string) $value).'">';
 			}
-			$out .= '</div>';
+			$out .= '</td></tr>';
 		}
 		return $out;
 	}

@@ -27,7 +27,7 @@ class WerkbankBuilderPersonal extends WerkbankBuilderUnterlage
 
 	/**
 	 * @param DoliDB                             $db       Database
-	 * @param KnowledgeRecord                    $record   Article, answer already filled in
+	 * @param object                             $record   Template version, answer already filled in
 	 * @param Translate                          $langs    Output language
 	 * @param int|null                           $stand    "Stand" of the template
 	 * @param Societe                            $customer Customer

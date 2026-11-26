@@ -59,12 +59,54 @@ $self = dol_buildpath('/ittabelanderpdf/docs.php', 1).'?socid='.$socid;
  */
 
 $rule = GETPOSTINT('rule') > 0 ? $docs->rule(GETPOSTINT('rule')) : null;
+if ($action === 'generate') {
+	if (!$write || !$rule) {
+		accessforbidden();
+	}
+	require_once DOL_DOCUMENT_ROOT.'/contrat/class/contrat.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
+	dol_include_once('/ittabelanderpdf/class/werkbankfields.class.php');
+	$template = $docs->template((string) $rule->slug);
+	$answers = $template ? WerkbankFields::posted(WerkbankFields::parse((string) $template->answer)) : array();
+	$contract = null;
+	if (GETPOSTINT('contract') > 0) {
+		$contract = new Contrat($db);
+		if ($contract->fetch(GETPOSTINT('contract')) <= 0 || (int) $contract->socid !== $socid) {
+			$contract = null;
+		}
+	}
+	$contact = null;
+	if (GETPOSTINT('contact') > 0) {
+		$contact = new Contact($db);
+		if ($contact->fetch(GETPOSTINT('contact')) <= 0 || (int) $contact->socid !== $socid) {
+			$contact = null;
+		}
+	}
+	$event = $docs->generate($soc, $rule, $answers, $contract, $contact, $user);
+	if ($event > 0) {
+		setEventMessages($langs->trans('WerkbankGenDone', $rule->label), null, 'mesgs');
+		header('Location: '.$self.'#rule-'.((int) $rule->rowid));
+		exit;
+	}
+	// Back to the form with what was entered.
+	setEventMessages($docs->error, null, 'errors');
+	$action = 'generateform';
+	$posted = array('fields' => $answers, 'contract' => $contract ? (int) $contract->id : 0, 'contact' => $contact ? (int) $contact->id : 0);
+}
 if (in_array($action, array('startsign', 'upload', 'check', 'revoke'), true)) {
 	if (!$write || !$rule) {
 		accessforbidden();
 	}
 	if ($action === 'startsign') {
-		$event = $docs->record($socid, (string) $rule->slug, 'signing', 'device', $user, array('fk_rule' => (int) $rule->rowid));
+		// A document generated for the customer is signed on itself.
+		$generated = null;
+		foreach ($docs->status($soc) as $entry) {
+			if ((int) $entry['rule']->rowid === (int) $rule->rowid && $entry['state'] === 'generated') {
+				$generated = $entry['generated'];
+			}
+		}
+		$event = $docs->record($socid, (string) $rule->slug, 'signing', 'device', $user, array('fk_rule' => (int) $rule->rowid,
+			'element' => $generated ? 'docgen' : '', 'fk_object' => $generated ? (int) $generated->rowid : 0));
 		if ($event > 0) {
 			// The confirmation sheet exists before anyone signs.
 			$signature = new WerkbankSignature($db);
@@ -114,6 +156,7 @@ if (in_array($action, array('startsign', 'upload', 'check', 'revoke'), true)) {
  * View
  */
 
+$form = new Form($db);
 llxHeader('', $langs->trans('WerkbankDocsTab').' - '.$soc->name, '', '', 0, 0, array(), array(), '', 'mod-ittabelanderpdf page-docs');
 print dol_get_fiche_head(societe_prepare_head($soc), 'ittabpdfdocs', $langs->trans('ThirdParty'), -1, 'company');
 dol_banner_tab($soc, 'socid', '', ($user->socid ? 0 : 1), 'rowid', 'nom');
@@ -127,7 +170,8 @@ $doneCount = count(array_filter($status, function ($entry) {
 	return $entry['state'] === 'done';
 }));
 // Uploading, ticking and resetting each open a small form below the list (?action=…form&rule=…).
-$formFor = in_array($action, array('uploadform', 'checkform', 'revokeform'), true) && $rule ? $action : '';
+$formFor = in_array($action, array('uploadform', 'checkform', 'revokeform', 'generateform'), true) && $rule ? $action : '';
+$documents = $docs->documents();
 
 print '<div class="'.($open ? 'warning' : 'info').' ittabdocs-summary">'.($open ? $langs->trans('WerkbankDocsSummaryOpen', count($open)) : $langs->trans('WerkbankDocsSummaryDone'))
 	.' · '.$langs->trans('WerkbankDocsSummaryCount', $doneCount, count($status)).'</div>';
@@ -191,11 +235,17 @@ foreach ($status as $entry) {
 	if ($write) {
 		if ($state !== 'done' && $entry['signing']) {
 			print '<a class="butAction smallpaddingimp" href="'.dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=doc&amp;id='.((int) $entry['signing']->rowid).'">'.$langs->trans('WerkbankDocsContinueSign').'</a>';
-		} elseif ($state !== 'done' && $entry['exists']) {
+		} elseif ($state !== 'done' && ($entry['exists'] || !empty($entry['generated']))) {
 			print '<form method="POST" action="'.$self.'" class="inline-block"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="startsign"><input type="hidden" name="rule" value="'.$id.'">';
 			print '<input type="submit" class="butAction smallpaddingimp" value="'.dol_escape_htmltag($langs->trans($rule->action === 'handover' ? 'WerkbankDocsConfirmReceipt' : 'WerkbankDocsSignNow')).'"></form>';
 		}
-		if ($state !== 'done' && $entry['exists']) {
+		$template = isset($documents[$rule->slug]) && $documents[$rule->slug]['kind'] === 'customer';
+		if ($template) {
+			print '<a class="butAction smallpaddingimp" href="'.$self.'&amp;action=generateform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankGenButton').'</a>';
+		}
+		if ($state !== 'done' && !empty($entry['generated'])) {
+			print '<a class="butAction smallpaddingimp" href="'.DOL_URL_ROOT.'/societe/card.php?socid='.$socid.'&amp;action=presend&amp;mode=init&amp;ittabpdf_preselect_event='.((int) $entry['generated']->rowid).'#formmail">'.$langs->trans('WerkbankDocsSend').'</a>';
+		} elseif ($state !== 'done' && $entry['exists']) {
 			print '<a class="butAction smallpaddingimp" href="'.DOL_URL_ROOT.'/societe/card.php?socid='.$socid.'&amp;action=presend&amp;mode=init&amp;ittabpdf_preselect='.urlencode($rule->slug.'.pdf').'#formmail">'.$langs->trans('WerkbankDocsSend').'</a>';
 		}
 		print '<a class="butAction smallpaddingimp" href="'.$self.'&amp;action=uploadform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankDocsUploadButton').'</a>';
@@ -208,8 +258,36 @@ foreach ($status as $entry) {
 }
 print '</table></div>';
 
+// Generate for this customer: contract, contact and the template's input fields.
+if ($write && $formFor === 'generateform') {
+	dol_include_once('/ittabelanderpdf/class/werkbankfields.class.php');
+	dol_include_once('/ittabelanderpdf/class/werkbankvars.class.php');
+	$template = $docs->template((string) $rule->slug);
+	print '<a id="docform"></a>'.load_fiche_titre($langs->trans('WerkbankGenTitle', dol_escape_htmltag($rule->label)), '', '');
+	if (!$template) {
+		print '<div class="warning">'.$langs->trans('WerkbankGenNoTemplate', dol_escape_htmltag($rule->slug)).'</div>';
+	} else {
+		$last = isset($posted) ? $posted : $docs->lastValues($socid, (string) $rule->slug);
+		$fields = WerkbankFields::parse((string) $template->answer);
+		$contracts = $docs->contracts($socid, (string) $rule->products);
+		$contacts = array(0 => '');
+		foreach ($soc->contact_array_objects() as $person) {
+			$contacts[(int) $person->id] = $person->getFullName($langs).($person->poste ? ' ('.$person->poste.')' : '');
+		}
+		print '<form method="POST" action="'.$self.'">';
+		print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="generate"><input type="hidden" name="rule" value="'.((int) $rule->rowid).'">';
+		print '<table class="border centpercent tableforfield">';
+		print '<tr><td class="titlefield">'.$langs->trans('Contract').'</td><td>'.$form->selectarray('contract', array(0 => '') + $contracts, $last['contract'] ?: (int) key($contracts), 0, 0, 0, '', 0, 0, 0, '', 'minwidth300').'</td></tr>';
+		print '<tr><td>'.$langs->trans('Contact').'</td><td>'.$form->selectarray('contact', $contacts, $last['contact'], 0, 0, 0, '', 0, 0, 0, '', 'minwidth300').'</td></tr>';
+		print WerkbankFields::inputs($fields, $last['fields']);
+		print '</table>';
+		print '<div class="center"><input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankGenButton')).'"> <a class="button button-cancel" href="'.$self.'">'.$langs->trans('Cancel').'</a></div>';
+		print '<div class="center opacitymedium">'.$langs->trans('WerkbankGenHelp').'</div></form>';
+	}
+}
+
 // The form the chosen action needs, the way Dolibarr cards show them.
-if ($write && $formFor) {
+if ($write && $formFor && $formFor !== 'generateform') {
 	print '<a id="docform"></a>'.load_fiche_titre(dol_escape_htmltag($rule->label), '', '');
 	print '<form method="POST" action="'.$self.'"'.($formFor === 'uploadform' ? ' enctype="multipart/form-data"' : '').'>';
 	print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="rule" value="'.((int) $rule->rowid).'">';
