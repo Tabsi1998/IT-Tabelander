@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '1.8.1';
+		$this->version = '1.8.2';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -299,6 +299,10 @@ class modITTabelanderPDF extends DolibarrModules
 		if ($docs->installDefaults((int) $GLOBALS['conf']->entity) < 0) {
 			$this->error = $docs->error;
 			return -1;
+		}
+		// Renamed documents (1.8.2: IT care instead of hosting): rules and settings follow.
+		if ($docs->migrateRenamed((int) $GLOBALS['conf']->entity) < 0) {
+			dol_syslog('ittabelanderpdf: moving rules to renamed documents failed: '.$docs->error, LOG_WARNING);
 		}
 		// The shipped QS checklists, only when there are none yet.
 		dol_include_once('/ittabelanderpdf/class/werkbankqs.class.php');

@@ -60,15 +60,75 @@ class WerkbankDocs
 	 */
 	public static function defaults()
 	{
-		$hosting = 'DL-HOST*,DL-WART*';
+		// IT care and maintenance contracts (no own hosting since 1.8.2).
+		$care = 'DL-WART*';
 		return array(
 			array('AGB für Unternehmer akzeptiert', 'agb-unternehmer', 'accept', 'company', '', 'none', 1, 1),
 			array('Nutzungsbedingungen akzeptiert', 'nutzungsbedingungen', 'accept', 'private', '', 'none', 1, 1),
-			array('Auftragsverarbeitung (AVV) unterschrieben', 'auftragsverarbeitung', 'sign', 'company', $hosting, 'none', 1, 1),
-			array('Leistungsbeschreibung Hosting/Wartung übergeben', 'leistungsbeschreibung-hosting-wartung', 'handover', 'company', $hosting, 'none', 1, 0),
-			array('Leistungsbeschreibung Hosting/Wartung (privat) übergeben', 'leistungsbeschreibung-hosting-wartung-privat', 'handover', 'private', $hosting, 'none', 1, 0),
+			array('Auftragsverarbeitung (AVV) unterschrieben', 'auftragsverarbeitung', 'sign', 'company', $care, 'none', 1, 1),
+			array('Leistungsbeschreibung IT-Betreuung und Wartung übergeben', 'leistungsbeschreibung-betreuung-wartung', 'handover', 'company', $care, 'none', 1, 0),
+			array('Leistungsbeschreibung IT-Betreuung und Wartung (privat) übergeben', 'leistungsbeschreibung-betreuung-wartung-privat', 'handover', 'private', $care, 'none', 1, 0),
 			array('Einverständnis Fernwartung unterschrieben', 'fernwartung-einverstaendnis', 'sign', '', '', 'Fernwartung', 1, 1),
 		);
+	}
+
+	/** Documents renamed (old file name => new one, its rule label and products before and after), 1.8.2: no own hosting. */
+	const RENAMED = array(
+		'leistungsbeschreibung-hosting-wartung' => array('leistungsbeschreibung-betreuung-wartung',
+			'Leistungsbeschreibung Hosting/Wartung übergeben', 'Leistungsbeschreibung IT-Betreuung und Wartung übergeben'),
+		'leistungsbeschreibung-hosting-wartung-privat' => array('leistungsbeschreibung-betreuung-wartung-privat',
+			'Leistungsbeschreibung Hosting/Wartung (privat) übergeben', 'Leistungsbeschreibung IT-Betreuung und Wartung (privat) übergeben'),
+	);
+
+	/**
+	 * Move rules and settings from renamed documents to their successor,
+	 * once the successor is released: rules take the new file name
+	 * (and the shipped label and products when still unchanged), the
+	 * default attachments and appended files likewise. The old documents
+	 * stay, marked "nicht versendbar"; their history stays with them.
+	 *
+	 * @param int $entity Entity
+	 * @return int        Rules and settings changed, -1 on error
+	 */
+	public function migrateRenamed($entity)
+	{
+		require_once __DIR__.'/werkbankdoc.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+		$store = new WerkbankDoc($this->db);
+		$changed = 0;
+		foreach (self::RENAMED as $old => $to) {
+			list($new, $oldLabel, $newLabel) = $to;
+			// Only once the successor is released (a draft is not yet usable).
+			$successor = $store->bySlug($new);
+			if (!$successor || (int) $successor->version === 0) {
+				continue;
+			}
+			// The shipped label and products only when the owner kept them.
+			$sql = "UPDATE ".MAIN_DB_PREFIX."ittabpdf_docrule SET slug = '".$this->db->escape($new)."',"
+				." label = CASE WHEN label = '".$this->db->escape($oldLabel)."' THEN '".$this->db->escape($newLabel)."' ELSE label END,"
+				." products = CASE WHEN products = 'DL-HOST*,DL-WART*' THEN 'DL-WART*' ELSE products END"
+				." WHERE slug = '".$this->db->escape($old)."' AND entity = ".((int) $entity);
+			if (!$this->db->query($sql)) {
+				return $this->fail();
+			}
+			$changed += (int) $this->db->affected_rows(true);
+			$oldDoc = $store->bySlug($old);
+			if ($oldDoc && (int) $oldDoc->sendable) {
+				$this->db->query("UPDATE ".MAIN_DB_PREFIX."ittabpdf_doc SET sendable = 0 WHERE rowid = ".((int) $oldDoc->rowid));
+			}
+			// Default attachments per document type and files appended to PDFs.
+			$resql = $this->db->query("SELECT name, value FROM ".MAIN_DB_PREFIX."const WHERE entity = ".((int) $entity)
+				." AND (name LIKE 'ITTABPDF\\_DOCS\\_%' OR name LIKE 'ITTABPDF\\_APPEND\\_%') AND value LIKE '%".$this->db->escape($old).".pdf%'");
+			while ($resql && ($row = $this->db->fetch_object($resql))) {
+				$names = array_map('trim', explode(',', (string) $row->value));
+				$names = array_values(array_unique(array_map(function ($name) use ($old, $new) {
+					return $name === $old.'.pdf' ? $new.'.pdf' : $name;
+				}, $names)));
+				dolibarr_set_const($this->db, $row->name, implode(',', $names), 'chaine', 0, '', $entity);
+				$changed++;
+			}
+		}
+		return $changed;
 	}
 
 	/**
@@ -282,7 +342,7 @@ class WerkbankDocs
 
 	/**
 	 * Products of open contract lines of a validated contract that match the
-	 * patterns ("DL-HOST*,DL-WART*"), by product ref.
+	 * patterns ("DL-WART*,DL-PC*"), by product ref.
 	 *
 	 * @param int    $socid    Customer
 	 * @param string $patterns Comma separated, * and ? allowed

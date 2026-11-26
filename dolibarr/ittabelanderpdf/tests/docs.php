@@ -67,7 +67,7 @@ $rules = array();
 foreach ($docs->rules() as $rule) {
 	$rules[$rule->slug] = $rule;
 }
-$check('shipped rules are installed', count(array_intersect(array('agb-unternehmer', 'nutzungsbedingungen', 'auftragsverarbeitung', 'leistungsbeschreibung-hosting-wartung', 'fernwartung-einverstaendnis'), array_keys($rules))) === 5, implode(',', array_keys($rules)));
+$check('shipped rules are installed', count(array_intersect(array('agb-unternehmer', 'nutzungsbedingungen', 'auftragsverarbeitung', 'leistungsbeschreibung-betreuung-wartung', 'fernwartung-einverstaendnis'), array_keys($rules))) === 5, implode(',', array_keys($rules)));
 // Activated before the tag existed: the rule waits switched off; the owner picks the tag in the setup.
 $consent = $rules['fernwartung-einverstaendnis'];
 $check('Fernwartung rule waits for a customer tag', (int) $consent->active === 1 ? (int) $consent->fk_category > 0 : (int) $consent->fk_category === 0);
@@ -80,8 +80,8 @@ $check('installing again adds nothing', $docs->installDefaults(1) === 0);
 // The documents of the rules as released module documents, so their PDFs exist.
 dol_include_once('/ittabelanderpdf/class/werkbankdoc.class.php');
 $store = new WerkbankDoc($db);
-foreach (array('auftragsverarbeitung' => 'Vereinbarung zur Auftragsverarbeitung', 'leistungsbeschreibung-hosting-wartung' => 'Leistungsbeschreibung Hosting und Wartung',
-	'leistungsbeschreibung-hosting-wartung-privat' => 'Leistungsbeschreibung Hosting und Wartung (privat)', 'fernwartung-einverstaendnis' => 'Einverständnis Fernwartung') as $slug => $title) {
+foreach (array('auftragsverarbeitung' => 'Vereinbarung zur Auftragsverarbeitung', 'leistungsbeschreibung-betreuung-wartung' => 'Leistungsbeschreibung IT-Betreuung und Wartung',
+	'leistungsbeschreibung-betreuung-wartung-privat' => 'Leistungsbeschreibung IT-Betreuung und Wartung (privat)', 'fernwartung-einverstaendnis' => 'Einverständnis Fernwartung') as $slug => $title) {
 	$existing = $store->bySlug($slug);
 	$id = $existing ? (int) $existing->rowid : $store->save(0, array('slug' => $slug, 'title' => $title, 'kind' => 'internal', 'public' => 0,
 		'text' => '<h2>1. Gegenstand</h2><p>Text der Unterlage '.$title.'.</p>', 'position' => 0), $admin);
@@ -118,11 +118,11 @@ $state = function ($soc, $slug) use ($docs) {
 // 1. Who needs what.
 $check('company needs AGB Unternehmer, not Nutzungsbedingungen', $state($firm, 'agb-unternehmer') === 'missing' && $state($firm, 'nutzungsbedingungen') === 'none');
 $check('private person needs Nutzungsbedingungen', $state($private, 'nutzungsbedingungen') === 'missing' && $state($private, 'agb-unternehmer') === 'none');
-$check('no hosting contract, no AVV', $state($firm, 'auftragsverarbeitung') === 'none');
+$check('no care contract, no AVV', $state($firm, 'auftragsverarbeitung') === 'none');
 $product = new Product($db);
-if ($product->fetch(0, 'DL-HOST-S') <= 0) {
-	$product->ref = 'DL-HOST-S';
-	$product->label = 'Hosting S';
+if ($product->fetch(0, 'DL-WART-S') <= 0) {
+	$product->ref = 'DL-WART-S';
+	$product->label = 'Wartung S';
 	$product->type = Product::TYPE_SERVICE;
 	$product->price = 15;
 	$product->status = 1;
@@ -134,9 +134,9 @@ $contract->date_contrat = dol_now();
 $contract->commercial_signature_id = $admin->id;
 $contract->commercial_suivi_id = $admin->id;
 $contract->create($admin);
-$contract->addline('Hosting S', 15, 1, 0, 0, 0, $product->id, 0, dol_now(), dol_time_plus_duree(dol_now(), 1, 'y'));
+$contract->addline('Wartung S', 15, 1, 0, 0, 0, $product->id, 0, dol_now(), dol_time_plus_duree(dol_now(), 1, 'y'));
 $contract->validate($admin);
-$check('hosting contract asks for AVV and Leistungsbeschreibung', $state($firm, 'auftragsverarbeitung') === 'missing' && $state($firm, 'leistungsbeschreibung-hosting-wartung') === 'missing');
+$check('care contract asks for AVV and Leistungsbeschreibung', $state($firm, 'auftragsverarbeitung') === 'missing' && $state($firm, 'leistungsbeschreibung-betreuung-wartung') === 'missing');
 $tag = new Categorie($db);
 $tag->fetch((int) $rules['fernwartung-einverstaendnis']->fk_category);
 $tag->add_type($firm, Categorie::TYPE_CUSTOMER);
@@ -188,20 +188,20 @@ $pages = preg_match_all('#/Type\s*/Page[^s]#', (string) file_get_contents($pdf))
 $check('AVV signed: done, signed document with the customer', $state($firm, 'auftragsverarbeitung') === 'done' && is_file($pdf) && $pages >= 2, $pdf.' '.$pages);
 @mkdir('/tmp/ittpdf-out', 0777, true);
 copy($pdf, '/tmp/ittpdf-out/avv-unterschrieben.pdf');
-$check('receipt needs only the customer', WerkbankSignature::roles('doc', array('rule' => $rules['leistungsbeschreibung-hosting-wartung'])) === array('customer'));
+$check('receipt needs only the customer', WerkbankSignature::roles('doc', array('rule' => $rules['leistungsbeschreibung-betreuung-wartung'])) === array('customer'));
 
 // 4. A new version asks again; a reset opens it.
 rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."ittabpdf_docevent SET version = '2020-01-01' WHERE fk_soc = ".$firmId." AND slug = 'auftragsverarbeitung' AND state = 'signed'");
 $check('older version of a renewing rule counts as outdated', $state($firm, 'auftragsverarbeitung') === 'outdated');
-rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."ittabpdf_docevent SET version = '2020-01-01' WHERE fk_soc = ".$firmId." AND slug = 'leistungsbeschreibung-hosting-wartung'");
-$docs->record($firmId, 'leistungsbeschreibung-hosting-wartung', 'checked', 'hand', $admin, array('version' => '2020-01-01'));
-$check('older version of a rule without renewal stays done', $state($firm, 'leistungsbeschreibung-hosting-wartung') === 'done');
-$docs->record($firmId, 'leistungsbeschreibung-hosting-wartung', 'revoked', 'hand', $admin);
-$check('reset opens it again', $state($firm, 'leistungsbeschreibung-hosting-wartung') === 'missing');
+rt_exec($db, "UPDATE ".MAIN_DB_PREFIX."ittabpdf_docevent SET version = '2020-01-01' WHERE fk_soc = ".$firmId." AND slug = 'leistungsbeschreibung-betreuung-wartung'");
+$docs->record($firmId, 'leistungsbeschreibung-betreuung-wartung', 'checked', 'hand', $admin, array('version' => '2020-01-01'));
+$check('older version of a rule without renewal stays done', $state($firm, 'leistungsbeschreibung-betreuung-wartung') === 'done');
+$docs->record($firmId, 'leistungsbeschreibung-betreuung-wartung', 'revoked', 'hand', $admin);
+$check('reset opens it again', $state($firm, 'leistungsbeschreibung-betreuung-wartung') === 'missing');
 
 // 5. What shows on the cards and the start page.
 $missing = $docs->missing($firm);
-$check('missing list for the banner', in_array('Auftragsverarbeitung (AVV) unterschrieben', $missing, true) && in_array('Leistungsbeschreibung Hosting/Wartung übergeben', $missing, true), implode(', ', $missing));
+$check('missing list for the banner', in_array('Auftragsverarbeitung (AVV) unterschrieben', $missing, true) && in_array('Leistungsbeschreibung IT-Betreuung und Wartung übergeben', $missing, true), implode(', ', $missing));
 $names = array_map(function ($entry) {
 	return (int) $entry['soc']->id;
 }, $docs->customersMissing(50));
@@ -230,16 +230,36 @@ $second->fetch_lines();
 rt_const($db, 'ITTABPDF_DOCS_CONTRACT_CHECK', 'block');
 $blocked = $second->active_line($admin, $lineId, dol_now());
 $check('activation without the private service description is refused when set to block', $blocked < 0 && strpos($second->error.implode(' ', (array) $second->errors), '(privat)') !== false, $second->error);
-$check('AVV is for companies only (type AND product)', $state($private, 'auftragsverarbeitung') === 'none' && $state($private, 'leistungsbeschreibung-hosting-wartung-privat') === 'missing');
+$check('AVV is for companies only (type AND product)', $state($private, 'auftragsverarbeitung') === 'none' && $state($private, 'leistungsbeschreibung-betreuung-wartung-privat') === 'missing');
 rt_const($db, 'ITTABPDF_DOCS_CONTRACT_CHECK', 'warn');
 $second->fetch($second->id);
 $second->fetch_lines();
 $check('with warn it goes through', $second->active_line($admin, $lineId, dol_now()) > 0, $second->error);
 
+// 7. 1.8.2: renamed documents (hosting -> IT care): rules and settings follow, once the successor is released.
+$oldSlug = 'leistungsbeschreibung-hosting-wartung';
+$oldDoc = $store->bySlug($oldSlug);
+$oldId = $store->save($oldDoc ? (int) $oldDoc->rowid : 0, array('slug' => $oldSlug, 'title' => 'Leistungsbeschreibung Hosting und Wartung', 'kind' => 'internal', 'public' => 0,
+	'sendable' => 1, 'text' => '<p>Alt.</p>', 'position' => 0), $admin);
+$store->release($oldId, '', $admin);
+$legacy = $docs->saveRule(0, array('label' => 'Leistungsbeschreibung Hosting/Wartung übergeben', 'slug' => $oldSlug, 'action' => 'handover', 'customer_type' => 'company',
+	'products' => 'DL-HOST*,DL-WART*', 'fk_category' => 0, 'required' => 1, 'renew' => 0, 'position' => 50, 'active' => 1));
+rt_const($db, 'ITTABPDF_DOCS_CONTRACT_SEND_B2B', 'agb-unternehmer.pdf,'.$oldSlug.'.pdf');
+$moved = $docs->migrateRenamed(1);
+$rule = $docs->rule($legacy);
+$check('renamed document: the rule follows with the new label and products', $moved >= 2 && $rule->slug === 'leistungsbeschreibung-betreuung-wartung'
+	&& $rule->label === 'Leistungsbeschreibung IT-Betreuung und Wartung übergeben' && $rule->products === 'DL-WART*', $rule->slug.' '.$rule->label.' '.$rule->products);
+$check('renamed document: the default attachments follow', getDolGlobalString('ITTABPDF_DOCS_CONTRACT_SEND_B2B') === 'agb-unternehmer.pdf,leistungsbeschreibung-betreuung-wartung.pdf',
+	getDolGlobalString('ITTABPDF_DOCS_CONTRACT_SEND_B2B'));
+$check('renamed document: the old one stays, not to be sent', ($old = $store->bySlug($oldSlug)) && (int) $old->sendable === 0);
+$check('moving again changes nothing', $docs->migrateRenamed(1) === 0);
+rt_exec($db, "DELETE FROM ".MAIN_DB_PREFIX."ittabpdf_docrule WHERE rowid = ".((int) $legacy));
+rt_const($db, 'ITTABPDF_DOCS_CONTRACT_SEND_B2B', '');
+
 $failed = array_values(array_filter($checks, function ($entry) {
 	return !$entry['ok'];
 }));
 echo json_encode(array('checks' => $checks, 'failed' => count($failed), 'firm' => $firmId, 'private' => $privateId, 'propal' => (int) $propal->id,
-	'contract' => (int) $contract->id, 'rule_receipt' => (int) $rules['leistungsbeschreibung-hosting-wartung']->rowid,
+	'contract' => (int) $contract->id, 'rule_receipt' => (int) $rules['leistungsbeschreibung-betreuung-wartung']->rowid,
 	'rule_consent' => (int) $rules['fernwartung-einverstaendnis']->rowid)), "\n";
 exit(0);

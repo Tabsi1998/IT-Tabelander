@@ -121,7 +121,7 @@ function ittabpdf_rule_row($suffix, $rule, $actions, $scopes, $categories, $docu
 	print '<td>'.Form::selectarray('action_'.$suffix, $actions, $value('action', 'accept')).'</td>';
 	// Conditions, all optional, all must hold.
 	print '<td class="nowraponall"><span class="opacitymedium small">'.$langs->trans('WerkbankDocsCondType').'</span> '.Form::selectarray('customertype_'.$suffix, $scopes, $value('customer_type'));
-	print '<br><span class="opacitymedium small">'.$langs->trans('WerkbankDocsCondProducts').'</span> <input type="text" name="products_'.$suffix.'" class="minwidth150" placeholder="DL-HOST*,DL-WART*" value="'.dol_escape_htmltag($value('products')).'" title="'.dol_escape_htmltag($langs->trans('WerkbankDocsScopeContractHelp')).'">';
+	print '<br><span class="opacitymedium small">'.$langs->trans('WerkbankDocsCondProducts').'</span> <input type="text" name="products_'.$suffix.'" class="minwidth150" placeholder="DL-WART*" value="'.dol_escape_htmltag($value('products')).'" title="'.dol_escape_htmltag($langs->trans('WerkbankDocsScopeContractHelp')).'">';
 	print '<br><span class="opacitymedium small">'.$langs->trans('WerkbankDocsCondCategory').'</span> '.Form::selectarray('category_'.$suffix, $categories, $value('fk_category', '0'), 0, 0, 0, '', 0, 0, 0, '', 'minwidth150').'</td>';
 	print '<td class="center"><input type="checkbox" name="required_'.$suffix.'" value="1"'.($value('required', '1') ? ' checked' : '').'></td>';
 	print '<td class="center"><input type="checkbox" name="renew_'.$suffix.'" value="1"'.($value('renew', '0') ? ' checked' : '').'></td>';

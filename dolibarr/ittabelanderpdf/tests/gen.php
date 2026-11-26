@@ -64,7 +64,7 @@ $contract->fetch($contractId);
 // A customer template with placeholders and input fields, released.
 $text = '<h2>1. Vertragspartner</h2><p>Auftraggeber: __ITTAB_KUNDE_NAME__</p><p>UID: __ITTAB_KUNDE_UID__</p>'
 	.'<p>Anschrift: __ITTAB_KUNDE_ANSCHRIFT__</p><p>Vertrag __ITTAB_VERTRAG_REF__ vom __ITTAB_VERTRAG_DATUM__</p>'
-	.'<p>Erreichbar: __ITTAB_GESCHAEFTSZEITEN__</p><p>Hosting S kostet __ITTAB_PREIS:DL-HOST-S__.</p>__ITTAB_LEISTUNGEN_VERTRAG__'
+	.'<p>Erreichbar: __ITTAB_GESCHAEFTSZEITEN__</p><p>Wartung S kostet __ITTAB_PREIS:DL-WART-S__.</p>__ITTAB_LEISTUNGEN_VERTRAG__'
 	.'<h2>2. Daten</h2><p>Datenkategorien: [[FELD:datenkategorien*|Datenkategorien|Auswahl|+Kundendaten;+Kontaktdaten;Mitarbeiterdaten]]</p>'
 	.'<p>Ansprechperson: [[FELD:ansprech*|Ansprechperson beim Kunden|Text]]</p><p>Bemerkung: [[FELD:bemerkung|Bemerkung|Textfeld]]</p>'
 	.'<p>Ausgestellt für __THIRDPARTY_NAME__ von __ITTAB_FIRMA_NAME__.</p>';
@@ -103,7 +103,7 @@ $answers = array('datenkategorien' => array('Kundendaten', 'Gesundheitsdaten'), 
 $filled = $docs->fill($template, $fields, $answers, $firm, $contract, null);
 $check('every placeholder is replaced', WerkbankVars::left($filled) === array() && strpos($filled, '[[FELD') === false && strpos($filled, '__') === false, implode(',', WerkbankVars::left($filled)));
 $check('values of customer, contract, company, prices and fields', strpos($filled, (string) $firm->name) !== false && strpos($filled, (string) $contract->ref) !== false
-	&& strpos($filled, 'Mo bis Fr 8 bis 17 Uhr') !== false && preg_match('/Hosting S kostet [0-9]+,[0-9]{2}/u', $filled) && strpos($filled, 'Kundendaten, Gesundheitsdaten') !== false
+	&& strpos($filled, 'Mo bis Fr 8 bis 17 Uhr') !== false && preg_match('/Wartung S kostet [0-9]+,[0-9]{2}/u', $filled) && strpos($filled, 'Kundendaten, Gesundheitsdaten') !== false
 	&& strpos($filled, '<li>') !== false, strip_tags($filled));
 $check('a line with an empty value disappears (no UID, no note)', strpos($filled, 'UID:') === false && strpos($filled, 'Bemerkung:') === false);
 $wrong = clone $template;
