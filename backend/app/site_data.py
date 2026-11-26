@@ -316,15 +316,20 @@ def imprint_html(company: dict, extra_html: str = "") -> str:
     setup has no field for (authority, chamber, trade law)."""
     esc = html.escape
     rows = []
+    country = {"AT": "Österreich", "DE": "Deutschland", "CH": "Schweiz"}.get(str(company.get("country_code") or "").upper(),
+                                                                          company.get("country_code"))
     address = [company.get("name"), company.get("managers") and f"Inhaber/Geschäftsführung: {company['managers']}",
-               company.get("address"), _line(company.get("zip"), company.get("town")), company.get("country_code")]
+               company.get("address"), _line(company.get("zip"), company.get("town")), country]
     rows.append("<p>" + "<br>".join(esc(str(item)) for item in address if item) + "</p>")
     contact = [("Telefon", company.get("phone")), ("Mobil", company.get("phone_mobile")),
                ("E-Mail", company.get("email")), ("Web", company.get("url"))]
     if any(value for _label, value in contact):
         rows.append("<p>" + "<br>".join(f"{label}: {esc(str(value))}" for label, value in contact if value) + "</p>")
     facts = [("Unternehmensgegenstand", company.get("socialobject")), ("UID-Nummer", company.get("tva_intra")),
-             ("Firmenbuchnummer", company.get("idprof3")), ("Firmenbuchgericht", company.get("idprof2")),
+             # In Austria Dolibarr's Prof. Id 2 is the court of jurisdiction; it is
+             # the register court only for a company in the register (#138).
+             ("Firmenbuchnummer", company.get("idprof3")),
+             ("Firmenbuchgericht", company.get("idprof2") if company.get("idprof3") else None),
              ("Steuernummer", company.get("idprof1"))]
     if any(value for _label, value in facts):
         rows.append("<p>" + "<br>".join(f"{label}: {esc(str(value))}" for label, value in facts if value) + "</p>")
