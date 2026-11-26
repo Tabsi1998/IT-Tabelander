@@ -2,11 +2,13 @@
 
 The imprint is built from the company data in Dolibarr plus a knowledge
 article for what the setup has no field for: trade, authority, chamber and
-the legal form (Dolibarr's API does not give that one out). Privacy policy
-and terms are knowledge articles of their own.
+the legal form (Dolibarr's API does not give that one out). Privacy policy,
+terms, withdrawal notice and the terms for businesses are knowledge
+articles of their own, kept in the category "Rechtstexte" (#128).
 
 "Entwurf anlegen" writes a plain-language draft into Dolibarr's knowledge base
-and picks it for the website. The places only the owner can fill in are
+and picks it for the website (the texts with a file in legal_drafts/; the
+others come from scripts/import_unterlagen.py). The places only the owner can fill in are
 marked "[BITTE ERGÄNZEN ...]", "[BITTE PRÜFEN ...]" or "[BITTE ENTSCHEIDEN
 ...]"; the admin counts them and warns until every text is released and
 complete.
@@ -30,7 +32,12 @@ TEXTS = {
     "impressum": ("Ergänzung zum Impressum", "Impressum – Ergänzung"),
     "datenschutz": ("Datenschutzerklärung", "Datenschutzerklärung"),
     "nutzungsbedingungen": ("Nutzungsbedingungen", "Nutzungsbedingungen"),
+    "widerruf": ("Widerrufsbelehrung", "Widerrufsbelehrung"),
+    "agb-unternehmer": ("AGB für Unternehmer", "AGB für Unternehmer"),
 }
+# Without these the website is still complete: the withdrawal notice is part
+# of the terms, and the terms for businesses are only needed for companies.
+OPTIONAL = {"widerruf", "agb-unternehmer"}
 COMPANY_SETUP = "Dolibarr: Einstellungen → Unternehmen/Institution"
 # What the imprint takes from Dolibarr's company data: fields (all needed, or
 # any of them), name in the checklist, label in Dolibarr, required, note.
@@ -44,6 +51,10 @@ IMPRINT_FIELDS = (
     (("tva_intra",), "all", "UID-Nummer", "Umsatzsteuer-ID", False, "nur wenn du eine hast"),
     (("idprof3",), "all", "Firmenbuchnummer", "Firmenbuchnummer", False, "nur wenn du im Firmenbuch stehst"),
 )
+
+
+def has_draft(kind: str) -> bool:
+    return (DRAFTS_DIR / f"{kind}.html").is_file()
 
 
 def draft_html(kind: str) -> str:
@@ -76,8 +87,11 @@ def _article_state(article: dict | None) -> str:
 
 def overview(data: dict, settings: dict) -> dict:
     """For the admin and the overview: each text, the imprint checklist, and
-    the articles that may be picked (the website's category plus the picked ones)."""
+    the articles that may be picked (the category "Rechtstexte" plus the
+    picked ones; while there is none, the FAQ category as before)."""
     legal = data.get("legal") or {}
+    legal_category = (data.get("category_ids") or {}).get("legal")
+    in_category = {item["id"] for item in data.get("legal_articles") or []}
     texts = []
     for kind, (label, _title) in TEXTS.items():
         setting = site_data.LEGAL_ARTICLES[kind]
@@ -90,9 +104,14 @@ def overview(data: dict, settings: dict) -> dict:
             "gone": bool(chosen and not article and not data.get("errors", {}).get("legal")),
             "state": _article_state(article),
             "open_points": open_points(article["answer_html"]) if article else [],
+            "can_draft": has_draft(kind),
+            "optional": kind in OPTIONAL,
+            # Shown anyway: picking it decided that, the category only sorts.
+            "outside_category": bool(article and legal_category and article["id"] not in in_category),
         })
     checklist = imprint_checklist(data.get("company"))
-    choices = {item["id"]: item for item in data.get("articles") or []}
+    pool = data.get("legal_articles") if legal_category else data.get("articles")
+    choices = {item["id"]: item for item in pool or []}
     for article in legal.values():
         if article:
             choices.setdefault(article["id"], article)
@@ -101,13 +120,15 @@ def overview(data: dict, settings: dict) -> dict:
     else:
         todo = ["Das Impressum fehlt auf der Website, weil noch keine Firmendaten aus Dolibarr kommen"]
     for text in texts:
-        if text["state"] == "missing":
+        if text["state"] == "missing" and not text["optional"]:
             todo.append(f"{text['label']} fehlt")
         elif text["state"] == "draft":
             todo.append(f"{text['label']} ist noch ein Entwurf")
         if text["open_points"]:
             count = len(text["open_points"])
             todo.append(f"{text['label']}: {count} {'Stelle' if count == 1 else 'Stellen'} noch zu ergänzen")
+        if text["outside_category"]:
+            todo.append(f"{text['label']} steht in Dolibarr nicht in der Kategorie „Rechtstexte“")
     return {
         "texts": texts,
         "imprint": checklist,
@@ -121,6 +142,8 @@ async def create_draft(kind: str) -> dict:
     """Write the draft into Dolibarr's knowledge base and pick it."""
     if kind not in TEXTS:
         raise LookupError("Diesen Rechtstext gibt es nicht.")
+    if not has_draft(kind):
+        raise LookupError("Für diesen Text gibt es hier keinen Entwurf; ihn legt scripts/import_unterlagen.py an.")
     db = get_db()
     settings = await db.settings.find_one({"_id": "site"}) or {}
     setting = site_data.LEGAL_ARTICLES[kind]

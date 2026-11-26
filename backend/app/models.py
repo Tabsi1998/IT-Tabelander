@@ -292,12 +292,17 @@ class SettingsInput(BaseModel):
     portal_bank_holder: Optional[str] = Field(default=None, max_length=70)
     portal_bank_iban: Optional[str] = Field(default=None, max_length=42)
     portal_bank_bic: Optional[str] = Field(default=None, max_length=11)
-    # Website content from Dolibarr's knowledge base (#74, #81): the public
-    # category and which article is which legal page. 0 = none.
+    # Website content from Dolibarr's knowledge base (#74, #81, #128): the
+    # categories FAQ, Rechtstexte and Unterlagen (0 = the category of that
+    # name) and which article is which legal page (0 = none).
     dolibarr_content_category_id: Optional[int] = Field(default=None, ge=0)
+    dolibarr_legal_category_id: Optional[int] = Field(default=None, ge=0)
+    dolibarr_internal_category_id: Optional[int] = Field(default=None, ge=0)
     dolibarr_imprint_article_id: Optional[int] = Field(default=None, ge=0)
     dolibarr_privacy_article_id: Optional[int] = Field(default=None, ge=0)
     dolibarr_terms_article_id: Optional[int] = Field(default=None, ge=0)
+    dolibarr_withdrawal_article_id: Optional[int] = Field(default=None, ge=0)
+    dolibarr_b2b_terms_article_id: Optional[int] = Field(default=None, ge=0)
     seo_default_title: Optional[str] = None
     seo_default_description: Optional[str] = None
 
