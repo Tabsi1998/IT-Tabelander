@@ -72,10 +72,18 @@ class Document:
     category: str
     body: str
     open_points: list[str] = field(default_factory=list)
+    kind: str = ""
 
     @property
     def public(self) -> bool:
         return self.category == "Rechtstexte"
+
+    @property
+    def module_kind(self) -> str:
+        """Kind of the module's document: legal (public), customer (\"Art: Vorlage je Kunde\") or internal."""
+        if self.public:
+            return "legal"
+        return "customer" if self.kind.lower() == "vorlage je kunde" else "internal"
 
 
 class _TagCheck(HTMLParser):
@@ -124,7 +132,7 @@ def parse_document(path: Path) -> Document:
         raise DocumentError(f"{path.name}: der Text muss mit „<p>Stand: TT.MM.JJJJ</p>“ enden")
     plain = html.unescape(re.sub(r"<[^>]+>", " ", body))
     points = [" ".join(found.group(0).split()) for found in OPEN_POINT.finditer(plain)]
-    return Document(path, meta["Titel"], meta["Schluessel"], meta["Slug"], meta["Kategorie"], body, points)
+    return Document(path, meta["Titel"], meta["Schluessel"], meta["Slug"], meta["Kategorie"], body, points, meta.get("Art", ""))
 
 
 def load_documents(folder: Path = FOLDER) -> list[Document]:
@@ -308,7 +316,7 @@ def run_module(api: Dolibarr, documents: list[Document], dry_run: bool, out=None
             if action in ("create", "update") and not dry_run:
                 saved = api.request("PUT", f"ittabelanderpdf/unterlagen-entwuerfe/{urllib.parse.quote(document.slug)}",
                                     body={"title": document.title, "text": document.body,
-                                          "kind": "legal" if document.public else "internal", "public": 1 if document.public else 0})
+                                          "kind": document.module_kind, "public": 1 if document.public else 0})
                 number = int(saved.get("id") or 0)
         except DolibarrError as exc:
             errors += 1
