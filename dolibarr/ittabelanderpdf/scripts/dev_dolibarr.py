@@ -1150,7 +1150,7 @@ def versand() -> None:
     check("the history names documents by their title", "AGB für Unternehmer" in unescape(history) and ">agb-unternehmer<" not in history)
     pick = html.split('value="addmanual"', 1)[1] if 'value="addmanual"' in html else ""
     check("\"Weitere Unterlage\" offers only what may be sent", "preisliste-intern-test" not in pick and "agb-unternehmer" in pick)
-    check("the line keeps one main action and a menu", "ittabdocs-more-" in html and "Weitere Aktionen" in unescape(html))
+    check("the line keeps one main action and a menu", "dropdown-holder" in html and "Weitere Aktionen" in unescape(html))
     # 8. The setup offers only what may be sent.
     status, html, _ = get("/custom/ittabelanderpdf/admin/setup.php")
     block = html.split("ITTABPDF_DOCS_", 1)[1] if "ITTABPDF_DOCS_" in html else ""
