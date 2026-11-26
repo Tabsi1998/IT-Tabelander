@@ -1572,6 +1572,8 @@ def module_steps() -> list:
              module_stage("agenda", 1800), ("versand",)),
         Step(group, "erinnerung", "Open items widget and reminders for documents without reply",
              module_stage("erinnerung", 1800), ("agenda",)),
+        Step(group, "betrieb", "System check, help and texts outside the module",
+             module_stage("betrieb", 1800), ("erinnerung",)),
     ]
 
 

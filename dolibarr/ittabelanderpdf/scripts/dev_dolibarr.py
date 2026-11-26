@@ -1271,19 +1271,49 @@ def erinnerung() -> None:
     print(f"{len(checks)} reminder checks passed")
 
 
+def betrieb() -> None:
+    """System check, help and texts outside the module (tests/betrieb.php), then the three setup tabs in the browser."""
+    result = php("run", script="betrieb.php")
+    checks = [dict(entry, page="php") for entry in result["checks"]]
+    opener = browser()
+
+    def get(path: str) -> str:
+        return unescape(opener.open(f"{URL}{path}", timeout=60).read().decode("utf-8", "replace"))
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
+
+    base = "/custom/ittabelanderpdf/admin"
+    html = get(f"{base}/check.php")
+    check("system check page lists the checks with a way to fix them", "Systemcheck" in html and "check-cron" in html and "beheben" in html)
+    html = get(f"{base}/help.php")
+    check("help tab explains the daily work", "Unterlagen an einen Kunden schicken" in html and "Wenn etwas nicht geht" in html)
+    html = get(f"{base}/rollout.php")
+    check("rollout tab shows the texts and their state", "TICKET_MESSAGE_MAIL_INTRO" in html and "Mahnwesen - 1. Mahnung" in html and "askrollout" in html)
+    for path in ("check.php", "help.php", "rollout.php", "setup.php", "docrules.php", "werkstatt.php"):
+        html = get(f"{base}/{path}")
+        check(f"{path}: no dropdown menus", "dropdown-holder" not in html)
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"betrieb check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} operation checks passed")
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "editor": editor, "agenda": agenda, "erinnerung": erinnerung, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "editor": editor, "agenda": agenda, "erinnerung": erinnerung, "betrieb": betrieb, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand", "editor", "agenda", "erinnerung"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand", "editor", "agenda", "erinnerung", "betrieb"):
                 steps[name]()
         elif step in steps:
             steps[step]()

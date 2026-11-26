@@ -2,6 +2,13 @@
 
 ## [2.0.0] - unreleased
 
+### Operation and help (#180)
+
+- Setup tab "Texte außerhalb des Moduls": the Mahnwesen templates and the ticket introduction in the module's look, compared with what Dolibarr has, written there after confirmation; the old values go into a backup file first (Documents → ittabelanderpdf → rollout). `TICKET_MESSAGE_MAIL_SIGNATURE` is emptied (the reply template ends with the user's signature). Replaces copying from `docs/rollout/`.
+- Setup tab "Systemcheck": rights of the website's API user, the module's cron job, the mail logo reachable without sign-in, templates up to date, legal texts released and public, rules pointing to released documents that may be sent, price list categories, e-mail collector, CAPTCHA – each with its state, what it means and a link to fix it.
+- Tab "Hilfe": short guides (send, generate, sign, documents, rules, following up, QS, intake, price list, templates, system check) with links.
+- Clean-up: the old mail building blocks (sheet with logo on top, orange line, footer) are gone; English texts complete.
+
 ### Following up (#178)
 
 - Start page widget "Offen": required documents missing, documents sent and not answered for N days (with the days), signatures begun on the device, QS checklists not closed – each with a link to where to act.
