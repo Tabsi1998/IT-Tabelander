@@ -71,6 +71,7 @@ class modITTabelanderPDF extends DolibarrModules
 		// Start page: customers with required documents missing.
 		$this->boxes = array(
 			0 => array('file' => 'box_ittabpdf_docs.php@ittabelanderpdf', 'note' => 'Fehlende Unterlagen', 'enabledbydefaulton' => 'Home'),
+			1 => array('file' => 'box_ittabpdf_open.php@ittabelanderpdf', 'note' => 'Offen', 'enabledbydefaulton' => 'Home'),
 		);
 
 		$this->dirs = array();

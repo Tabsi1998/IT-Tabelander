@@ -2,6 +2,11 @@
 
 ## [2.0.0] - unreleased
 
+### Following up (#178)
+
+- Start page widget "Offen": required documents missing, documents sent and not answered for N days (with the days), signatures begun on the device, QS checklists not closed – each with a link to where to act.
+- Reminders: with "Erinnerung" switched on (off by default), the cron job reminds of required documents sent and not answered after N days (default 7), at most M times (default 2), with the new template "Erinnerung Unterlagen · Sie/Du" and the document attached again; in the history and the agenda ("Erinnerung verschickt").
+
 ### Sending (#177)
 
 - "Alle fehlenden zusenden" on top of the tab: one e-mail with every open required document; templates per customer are generated on the way (missing details: the form first, then back).

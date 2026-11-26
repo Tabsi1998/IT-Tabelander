@@ -1570,6 +1570,8 @@ def module_steps() -> list:
              module_stage("editor", 1800), ("mails",)),
         Step(group, "agenda", "History in Dolibarr's agenda, the counter of the tab",
              module_stage("agenda", 1800), ("versand",)),
+        Step(group, "erinnerung", "Open items widget and reminders for documents without reply",
+             module_stage("erinnerung", 1800), ("agenda",)),
     ]
 
 

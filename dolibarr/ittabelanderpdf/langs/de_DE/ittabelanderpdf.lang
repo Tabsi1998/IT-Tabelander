@@ -667,3 +667,17 @@ WerkbankDocsActionGenerateShort = Erzeugen
 WerkbankDocsActionGenerateAgainShort = Neu erzeugen
 WerkbankDocsActionContinueShort = Weiter unterschreiben
 WerkbankDocsSendAllMissing = Alle fehlenden zusenden
+
+# 2.0.0: open items, reminders
+WerkbankOpenBox = Offen (Unterlagen, Unterschriften, QS)
+WerkbankOpenBoxTitle = Offen (%s)
+WerkbankOpenBoxNone = Nichts offen.
+WerkbankOpenKind_missing = fehlt
+WerkbankOpenKind_waiting = keine Antwort
+WerkbankOpenKind_signing = Unterschrift
+WerkbankOpenKind_qs = QS
+WerkbankOpenDays = seit %s Tagen
+WerkbankAgendaReminded = Erinnerung verschickt
+WerkbankRemindSetting = Erinnerung
+WerkbankRemindSettingHelp = Verschickte Pflicht-Unterlagen ohne Rückmeldung nach %s Tagen automatisch erinnern, höchstens %s-mal (Vorlage „Erinnerung Unterlagen · Sie/Du“, das PDF hängt wieder an). Die Tage gelten auch für „keine Antwort“ im Widget „Offen“.
+WerkbankDocsEvent_reminded = Erinnerung verschickt
