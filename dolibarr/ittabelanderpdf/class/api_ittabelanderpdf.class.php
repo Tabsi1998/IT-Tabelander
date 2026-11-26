@@ -113,7 +113,7 @@ class Ittabelanderpdf extends DolibarrApi
 	 * Create or change the draft of a document (never releases it)
 	 *
 	 * @param string $slug    File name without .pdf
-	 * @param array  $request_data title, kind, public, text
+	 * @param array  $request_data title, kind, public, sendable, text
 	 * @return array<string,mixed>
 	 *
 	 * @url PUT unterlagen-entwuerfe/{slug}
@@ -130,6 +130,9 @@ class Ittabelanderpdf extends DolibarrApi
 			'kind' => isset($data['kind']) ? (string) $data['kind'] : ($doc ? $doc->kind : 'internal'),
 			'public' => isset($data['public']) ? (int) $data['public'] : ($doc ? (int) $doc->public : 0),
 			'text' => isset($data['text']) ? (string) $data['text'] : ($doc ? (string) $doc->text : ''), 'position' => $doc ? (int) $doc->position : 0);
+		if (isset($data['sendable'])) {
+			$values['sendable'] = (int) $data['sendable'];
+		}
 		$id = $store->save($doc ? (int) $doc->rowid : 0, $values, DolibarrApiAccess::$user);
 		if ($id < 0) {
 			throw new RestException(400, $store->error);

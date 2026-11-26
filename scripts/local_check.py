@@ -1564,6 +1564,8 @@ def module_steps() -> list:
              module_stage("gen", 1800), ("docs",)),
         Step(group, "preise", "Price list from the products, written again on price changes",
              module_stage("preise", 1800), ("gen",)),
+        Step(group, "versand", "Sending company documents: templates, list, generating, added by hand",
+             module_stage("versand", 1800), ("preise",)),
     ]
 
 

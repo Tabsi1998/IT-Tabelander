@@ -15,6 +15,9 @@
  */
 class ActionsIttabelanderpdf
 {
+	/** @var string[] Documents to attach once more inside get_form() */
+	private static $pending = array();
+
 	/** @var DoliDB */
 	public $db;
 
@@ -186,6 +189,14 @@ class ActionsIttabelanderpdf
 				dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=intake&id='.((int) $object->id), 'ittabpdf-intake-sign', $user->hasRight('ticket', 'write'));
 			return 0;
 		}
+		// Contract and proposal: make or add a company document for this customer, filed here too.
+		if (is_object($object) && !empty($object->id) && in_array($object->element, array('contrat', 'propal'), true) && (int) $object->socid > 0) {
+			$langs->load('ittabelanderpdf@ittabelanderpdf');
+			$allowed = $user->hasRight('societe', 'creer');
+			$url = dol_buildpath('/ittabelanderpdf/docs.php', 1).'?socid='.((int) $object->socid).'&action=pickdoc&'.($object->element === 'contrat' ? 'contract' : 'propal').'='.((int) $object->id).'#docadd';
+			print dolGetButtonAction($allowed ? '' : $langs->trans('NotEnoughPermissions'), $langs->trans('WerkbankDocsManualFromObject'), 'default', $url, 'ittabpdf-adddoc', $allowed);
+			return 0;
+		}
 		if (!is_object($object) || empty($object->id) || $object->element !== 'knowledgerecord') {
 			return 0;
 		}
@@ -236,16 +247,26 @@ class ActionsIttabelanderpdf
 		if (!is_object($object) || !($object instanceof FormMail) || (string) $object->withfile !== '2' || !empty($object->withfilereadonly)) {
 			return 0;
 		}
-		dol_include_once('/ittabelanderpdf/class/werkbankunterlagen.class.php');
-		$unterlagen = new WerkbankUnterlagen($this->db);
 		if ($inside) {
-			$this->addUnterlagen($object, $unterlagen);
+			// Dolibarr clears the attachments of a fresh form at the start of
+			// get_form(): the documents are put in again here, inside.
+			$this->attachPaths($object, self::$pending);
 			return 0;
 		}
-		$files = $unterlagen->files();
-		if (!$files) {
-			return 0;
-		}
+		dol_include_once('/ittabelanderpdf/class/werkbankunterlagen.class.php');
+		dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');
+		dol_include_once('/ittabelanderpdf/class/werkbankdocmail.class.php');
+		dol_include_once('/ittabelanderpdf/class/werkbankmailtemplates.class.php');
+		$unterlagen = new WerkbankUnterlagen($this->db);
+		$socid = $this->formSocid();
+		self::$pending = array();
+		$notes = $this->addUnterlagen($object, $unterlagen, $socid);
+		$attached = $object->get_attached_files();
+		$paths = isset($attached['paths']) ? (array) $attached['paths'] : array();
+		$items = WerkbankDocMail::items($this->db, $socid, $paths);
+		$object->substit = array_merge(is_array($object->substit) ? $object->substit : array(), WerkbankDocMail::fromItems($items));
+		$retext = $this->chooseTemplate($object, $socid, $items);
+
 		$inside = true;
 		$html = $object->get_form($parameters['addfileaction'], $parameters['removefileaction']);
 		$inside = false;
@@ -256,10 +277,83 @@ class ActionsIttabelanderpdf
 			$this->resprints = $html;
 			return 1;
 		}
-		$this->resprints = substr($html, 0, $at).$this->unterlagenChoice($files, $parameters['addfileaction']).substr($html, $at);
+		$message = preg_match('#<textarea[^>]*name="message"[^>]*>(.*?)</textarea>#s', $html, $match) ? html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '';
+		$subject = preg_match('#<input[^>]*name="subject"[^>]*value="([^"]*)"#', $html, $match) ? html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '';
+		$this->resprints = substr($html, 0, $at).$this->unterlagenChoice($unterlagen, $socid, $parameters['addfileaction'], $notes, $retext, WerkbankDocMail::fingerprint($message), $subject).substr($html, $at);
 		return 1;
 	}
 
+	/**
+	 * The customer of the card the mail form is on (third party, or the
+	 * third party of the proposal, contract, ...), 0 when there is none.
+	 *
+	 * @return int
+	 */
+	private function formSocid()
+	{
+		$card = isset($GLOBALS['object']) && is_object($GLOBALS['object']) ? $GLOBALS['object'] : null;
+		if (!$card) {
+			return 0;
+		}
+		return $card->element === 'societe' ? (int) $card->id : (int) (isset($card->socid) ? $card->socid : 0);
+	}
+
+	/**
+	 * Pick the module's template where Dolibarr would use none or the plain
+	 * message: "Unterlagen zusenden" when documents are attached on a third
+	 * party, else "Nachricht" (Sie or Du after the customer's setting). The
+	 * text of "Unterlagen zusenden" follows the attached documents while the
+	 * user has not changed it; afterwards only on request.
+	 *
+	 * @param FormMail                       $formmail Form
+	 * @param int                            $socid    Customer
+	 * @param array<int,array<string,mixed>> $items    Attached documents
+	 * @return string                                  'edited' when the text was changed by hand, else ''
+	 */
+	private function chooseTemplate($formmail, $socid, array $items)
+	{
+		global $conf;
+		if (!isset($formmail->param['models']) || $formmail->param['models'] !== 'thirdparty' || $socid <= 0) {
+			return '';
+		}
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		$soc = new Societe($this->db);
+		if ($soc->fetch($socid) <= 0) {
+			return '';
+		}
+		$form = !empty($soc->array_options['options_ittab_du']) ? 'du' : 'sie';
+		$message = WerkbankMailTemplates::find($this->db, 'thirdparty', $form, (int) $conf->entity);
+		$docsend = WerkbankMailTemplates::find($this->db, 'docsend', $form, (int) $conf->entity);
+		$chosen = GETPOSTISSET('modelmailselected') ? GETPOSTINT('modelmailselected') : (int) (isset($formmail->param['models_id']) ? $formmail->param['models_id'] : 0);
+		$picked = GETPOST('modelselected', 'alpha') !== '';
+		$ours = array_filter(array($message, $docsend, WerkbankMailTemplates::find($this->db, 'thirdparty', $form === 'du' ? 'sie' : 'du', (int) $conf->entity),
+			WerkbankMailTemplates::find($this->db, 'docsend', $form === 'du' ? 'sie' : 'du', (int) $conf->entity)));
+		// The user picked a template himself: that one stays.
+		if ($picked && $chosen > 0) {
+			$want = $chosen;
+		} elseif ($chosen > 0 && !in_array($chosen, $ours, true)) {
+			$want = $chosen;
+		} else {
+			$want = $items ? $docsend : $message;
+		}
+		if ($want <= 0) {
+			return '';
+		}
+		$edited = GETPOSTISSET('message') && GETPOST('ittabpdf_msghash', 'aZ09') !== ''
+			&& WerkbankDocMail::fingerprint(GETPOST('message', 'restricthtml')) !== GETPOST('ittabpdf_msghash', 'aZ09');
+		if ($want !== $chosen || (in_array($want, $ours, true) && (!$edited || GETPOST('ittabpdf_retext', 'int')))) {
+			// Built again from the template with the documents attached now (Dolibarr keeps a posted text).
+			$formmail->param['models_id'] = $want;
+			$_POST['modelmailselected'] = $want;
+			unset($_POST['message'], $_GET['message'], $_REQUEST['message']);
+			// The subject too, unless it was changed by hand.
+			if (!GETPOSTISSET('ittabpdf_subject') || GETPOST('subject', 'restricthtml') === GETPOST('ittabpdf_subject', 'restricthtml')) {
+				unset($_POST['subject'], $_GET['subject'], $_REQUEST['subject']);
+			}
+			return '';
+		}
+		return $edited && in_array($want, $ours, true) ? 'edited' : '';
+	}
 	/**
 	 * The chosen Unterlagen (button "addfile") and, on a fresh form, the
 	 * defaults of the document type, into the form's session list.
@@ -268,14 +362,31 @@ class ActionsIttabelanderpdf
 	 * @param WerkbankUnterlagen $unterlagen Unterlagen
 	 * @return void
 	 */
-	private function addUnterlagen($formmail, $unterlagen)
+	private function addUnterlagen($formmail, $unterlagen, $socid)
 	{
 		$paths = array();
-		if (GETPOST('addfile', 'alpha') && GETPOSTISSET('ittabpdf_unterlagen')) {
+		$notes = array();
+		$docs = new WerkbankDocs($this->db);
+		if (GETPOST('addfile', 'alpha')) {
 			foreach (GETPOST('ittabpdf_unterlagen', 'array:alphanohtml') as $name) {
 				$path = $unterlagen->path($name);
 				if ($path !== '') {
 					$paths[] = $path;
+				}
+			}
+			foreach (GETPOST('ittabpdf_made', 'array:int') as $event) {
+				$path = $this->generatedPath($docs, (int) $event, $socid);
+				if ($path !== '') {
+					$paths[] = $path;
+				}
+			}
+			// Templates per customer: made for this customer now, never sent blank.
+			foreach (GETPOST('ittabpdf_gen', 'array:aZ09arobase') as $slug) {
+				$made = $this->generateFor($docs, (string) $slug, $socid);
+				if (isset($made['path'])) {
+					$paths[] = $made['path'];
+				} elseif (isset($made['note'])) {
+					$notes[] = $made['note'];
 				}
 			}
 		}
@@ -283,17 +394,9 @@ class ActionsIttabelanderpdf
 		$context = isset($formmail->param['models']) ? (string) $formmail->param['models'] : '';
 		if ($fresh && GETPOSTINT('ittabpdf_preselect_event') > 0) {
 			// A document generated for this customer (tab "Unterlagen").
-			dol_include_once('/ittabelanderpdf/class/werkbankdocs.class.php');
-			dol_include_once('/ittabelanderpdf/class/werkbanksignature.class.php');
-			$docs = new WerkbankDocs($this->db);
-			$event = $docs->event(GETPOSTINT('ittabpdf_preselect_event'));
-			$card = isset($GLOBALS['object']) && is_object($GLOBALS['object']) ? $GLOBALS['object'] : null;
-			$socid = $card ? ($card->element === 'societe' ? (int) $card->id : (int) $card->socid) : 0;
-			if ($event && in_array($event->state, array('generated', 'signed'), true) && (int) $event->fk_soc === $socid && (string) $event->filename !== '') {
-				$file = WerkbankSignature::thirdpartyDir($socid).'/'.basename((string) $event->filename);
-				if (is_readable($file)) {
-					$paths[] = $file;
-				}
+			$path = $this->generatedPath($docs, GETPOSTINT('ittabpdf_preselect_event'), $socid);
+			if ($path !== '') {
+				$paths[] = $path;
 			}
 		}
 		if ($fresh && GETPOST('ittabpdf_preselect', 'alphanohtml') !== '') {
@@ -306,9 +409,124 @@ class ActionsIttabelanderpdf
 			$kind = $this->isPrivateCustomer() ? 'B2C' : 'B2B';
 			$paths = array_merge($paths, $unterlagen->pathsFrom('ITTABPDF_DOCS_'.strtoupper($context).'_'.$kind));
 		}
-		foreach (array_unique($paths) as $path) {
-			$formmail->add_attached_files($path, basename($path), 'application/pdf');
+		self::$pending = array_values(array_unique($paths));
+		$this->attachPaths($formmail, self::$pending);
+		return $notes;
+	}
+
+	/**
+	 * Attach files that are not attached yet.
+	 *
+	 * @param FormMail $formmail Form
+	 * @param string[] $paths    Files
+	 * @return void
+	 */
+	private function attachPaths($formmail, array $paths)
+	{
+		$attached = $formmail->get_attached_files();
+		$have = isset($attached['paths']) ? (array) $attached['paths'] : array();
+		foreach ($paths as $path) {
+			if (!in_array($path, $have, true)) {
+				$formmail->add_attached_files($path, basename($path), 'application/pdf');
+				$have[] = $path;
+			}
 		}
+	}
+
+	/**
+	 * The file of a document generated for this customer (event generated or signed).
+	 *
+	 * @param WerkbankDocs $docs  Documents
+	 * @param int          $id    Event
+	 * @param int          $socid Customer of the form
+	 * @return string             Path, '' when it is not one of this customer
+	 */
+	private function generatedPath($docs, $id, $socid)
+	{
+		dol_include_once('/ittabelanderpdf/class/werkbanksignature.class.php');
+		$event = $docs->event($id);
+		if (!$event || !in_array($event->state, array('generated', 'signed'), true) || (int) $event->fk_soc !== $socid || $socid <= 0 || (string) $event->filename === '') {
+			return '';
+		}
+		$file = WerkbankSignature::thirdpartyDir($socid).'/'.basename((string) $event->filename);
+		return is_readable($file) ? $file : '';
+	}
+
+	/**
+	 * Generate a template per customer for the customer of the form, with
+	 * what was entered last time and the contract or proposal of the card.
+	 * Missing required fields: a link to the form, back into this mail form.
+	 *
+	 * @param WerkbankDocs $docs  Documents
+	 * @param string       $slug  Document
+	 * @param int          $socid Customer
+	 * @return array{path?:string,note?:string}
+	 */
+	private function generateFor($docs, $slug, $socid)
+	{
+		global $user, $langs;
+		$documents = $docs->documents();
+		if ($socid <= 0 || !isset($documents[$slug]) || $documents[$slug]['kind'] !== 'customer') {
+			return array();
+		}
+		require_once DOL_DOCUMENT_ROOT.'/contrat/class/contrat.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
+		dol_include_once('/ittabelanderpdf/class/werkbankfields.class.php');
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		$soc = new Societe($this->db);
+		$soc->fetch($socid);
+		$rule = null;
+		foreach ($docs->status($soc) as $entry) {
+			if ($entry['rule']->slug === $slug) {
+				$rule = $entry['rule'];
+			}
+		}
+		if (!$rule) {
+			$id = $docs->addManual($soc, $slug);
+			$rule = $id > 0 ? $docs->rule($id) : null;
+		}
+		if (!$rule) {
+			return array();
+		}
+		$card = isset($GLOBALS['object']) && is_object($GLOBALS['object']) ? $GLOBALS['object'] : null;
+		$last = $docs->lastValues($socid, $slug);
+		$contractId = $card && $card->element === 'contrat' ? (int) $card->id : ($last['contract'] ?: (int) key($docs->contracts($socid, (string) $rule->products)));
+		$contract = null;
+		if ($contractId > 0) {
+			$contract = new Contrat($this->db);
+			if ($contract->fetch($contractId) <= 0 || (int) $contract->socid !== $socid) {
+				$contract = null;
+			}
+		}
+		$contact = null;
+		if ($last['contact'] > 0) {
+			$contact = new Contact($this->db);
+			if ($contact->fetch($last['contact']) <= 0) {
+				$contact = null;
+			}
+		}
+		$template = $docs->template($slug);
+		$fields = $template ? WerkbankFields::parse((string) $template->answer) : array();
+		$answers = $last['fields'];
+		foreach ($fields as $name => $field) {
+			if (!array_key_exists($name, $answers)) {
+				$answers[$name] = $field['kind'] === 'multi' ? $field['selected'] : ($field['kind'] === 'single' ? (string) reset($field['selected']) : $field['default']);
+			}
+		}
+		$propal = $card && $card->element === 'propal' ? $card : null;
+		if ($template && !WerkbankFields::missing($fields, $answers)) {
+			$event = $docs->generate($soc, $rule, $answers, $contract, $contact, $user, $propal);
+			$path = $event > 0 ? $this->generatedPath($docs, $event, $socid) : '';
+			if ($path !== '') {
+				return array('path' => $path);
+			}
+		}
+		// Fill in first: the form in the tab, then back here with the document attached.
+		$back = $_SERVER['PHP_SELF'].'?'.http_build_query(array_filter(array('id' => $card && $card->element !== 'societe' ? (int) $card->id : null,
+			'socid' => $card && $card->element === 'societe' ? $socid : null, 'action' => 'presend', 'mode' => 'init'))).'#formmail';
+		$url = dol_buildpath('/ittabelanderpdf/docs.php', 1).'?socid='.$socid.'&action=generateform&rule='.((int) $rule->rowid)
+			.($contract ? '&contract='.((int) $contract->id) : '').($propal ? '&propal='.((int) $propal->id) : '').'&mailback='.urlencode($back).'#docform';
+		return array('note' => $langs->trans('WerkbankDocsMailFillFirst', dol_escape_htmltag($documents[$slug]['title']), $url));
 	}
 
 	/**
@@ -338,24 +556,69 @@ class ActionsIttabelanderpdf
 	}
 
 	/**
-	 * The choice inside the mail form: one select, one button that posts as
-	 * Dolibarr's "addfile" so the form keeps its text and is shown again.
+	 * The choice above the attachment list, in three groups: generate for
+	 * this customer (templates per customer), made for this customer
+	 * already, general documents. Plus the state of the text.
 	 *
-	 * @param array<string,string> $files         File name => label
-	 * @param string               $addfileaction Name of the add button
+	 * @param WerkbankUnterlagen $unterlagen    Documents
+	 * @param int                $socid         Customer of the form (0: none, no templates per customer)
+	 * @param string             $addfileaction Name of the attach button
+	 * @param string[]           $notes         Messages (HTML) from attaching
+	 * @param string             $retext        'edited' when the text was changed by hand
+	 * @param string             $fingerprint   Of the text as shown
+	 * @param string             $subject       Subject as shown
 	 * @return string
 	 */
-	private function unterlagenChoice(array $files, $addfileaction)
+	private function unterlagenChoice($unterlagen, $socid, $addfileaction, array $notes, $retext, $fingerprint, $subject = '')
 	{
 		global $langs, $form;
 		$langs->load('ittabelanderpdf@ittabelanderpdf');
 		if (!is_object($form)) {
 			$form = new Form($this->db);
 		}
+		$docs = new WerkbankDocs($this->db);
+		$templates = array();
+		$made = array();
+		if ($socid > 0) {
+			foreach ($docs->documents() as $slug => $document) {
+				if ($document['kind'] === 'customer') {
+					$templates[$slug] = $document['title'];
+				}
+			}
+			$documents = $docs->documents();
+			foreach ($docs->events($socid) as $event) {
+				if (in_array($event->state, array('generated', 'signed'), true) && (string) $event->filename !== '' && $this->generatedPath($docs, (int) $event->rowid, $socid) !== '') {
+					$title = isset($documents[$event->slug]) ? $documents[$event->slug]['title'] : $event->slug;
+					$made[(int) $event->rowid] = $title.' – '.$langs->transnoentities($event->state === 'signed' ? 'WerkbankDocsMailMadeSigned' : 'WerkbankDocsMailMade',
+						dol_print_date($this->db->jdate($event->date_event), 'day'));
+				}
+			}
+		}
+		$files = $unterlagen->files();
 		$out = '<div class="ittabpdf-unterlagen paddingbottom">';
-		$out .= '<span class="opacitymedium">'.$langs->trans('WerkbankDocsAttach').'</span> ';
-		$out .= $form->multiselectarray('ittabpdf_unterlagen', $files, array(), 0, 0, 'minwidth300 maxwidth500', 0, 0, '', '', $langs->transnoentitiesnoconv('WerkbankDocsChoose'));
-		$out .= ' <input type="submit" class="button smallpaddingimp" name="'.dol_escape_htmltag($addfileaction).'" value="'.dol_escape_htmltag($langs->trans('WerkbankDocsAttachButton')).'">';
+		$out .= '<input type="hidden" name="ittabpdf_msghash" value="'.dol_escape_htmltag($fingerprint).'">';
+		$out .= '<input type="hidden" name="ittabpdf_subject" value="'.dol_escape_htmltag($subject).'">';
+		foreach ($notes as $note) {
+			$out .= '<div class="warning">'.$note.'</div>';
+		}
+		$groups = array(array('ittabpdf_gen', $templates, 'WerkbankDocsMailGroupGenerate'), array('ittabpdf_made', $made, 'WerkbankDocsMailGroupMade'),
+			array('ittabpdf_unterlagen', $files, 'WerkbankDocsMailGroupGeneral'));
+		$any = false;
+		foreach ($groups as $group) {
+			if (!$group[1]) {
+				continue;
+			}
+			$any = true;
+			$out .= '<div class="paddingbottom"><span class="opacitymedium">'.$langs->trans($group[2]).'</span> '
+				.$form->multiselectarray($group[0], $group[1], array(), 0, 0, 'minwidth300 maxwidth500', 0, 0, '', '', $langs->transnoentitiesnoconv('WerkbankDocsChoose')).'</div>';
+		}
+		if ($any) {
+			$out .= '<input type="submit" class="button smallpaddingimp" name="'.dol_escape_htmltag($addfileaction).'" value="'.dol_escape_htmltag($langs->trans('WerkbankDocsAttachButton')).'">';
+		}
+		if ($retext === 'edited') {
+			$out .= '<div class="info">'.$langs->trans('WerkbankDocsMailEdited')
+				.' <label><input type="checkbox" name="ittabpdf_retext" value="1"> '.$langs->trans('WerkbankDocsMailRetext').'</label></div>';
+		}
 		$out .= '</div>';
 		return $out;
 	}

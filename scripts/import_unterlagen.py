@@ -73,6 +73,7 @@ class Document:
     body: str
     open_points: list[str] = field(default_factory=list)
     kind: str = ""
+    sendable: bool = True
 
     @property
     def public(self) -> bool:
@@ -132,7 +133,9 @@ def parse_document(path: Path) -> Document:
         raise DocumentError(f"{path.name}: der Text muss mit „<p>Stand: TT.MM.JJJJ</p>“ enden")
     plain = html.unescape(re.sub(r"<[^>]+>", " ", body))
     points = [" ".join(found.group(0).split()) for found in OPEN_POINT.finditer(plain)]
-    return Document(path, meta["Titel"], meta["Schluessel"], meta["Slug"], meta["Kategorie"], body, points, meta.get("Art", ""))
+    # "Versendbar: nein" for text blocks that never go to customers.
+    sendable = meta.get("Versendbar", "ja").strip().lower() not in ("nein", "no", "0")
+    return Document(path, meta["Titel"], meta["Schluessel"], meta["Slug"], meta["Kategorie"], body, points, meta.get("Art", ""), sendable)
 
 
 def load_documents(folder: Path = FOLDER) -> list[Document]:
@@ -316,7 +319,8 @@ def run_module(api: Dolibarr, documents: list[Document], dry_run: bool, out=None
             if action in ("create", "update") and not dry_run:
                 saved = api.request("PUT", f"ittabelanderpdf/unterlagen-entwuerfe/{urllib.parse.quote(document.slug)}",
                                     body={"title": document.title, "text": document.body,
-                                          "kind": document.module_kind, "public": 1 if document.public else 0})
+                                          "kind": document.module_kind, "public": 1 if document.public else 0,
+                                          "sendable": 1 if document.sendable else 0})
                 number = int(saved.get("id") or 0)
         except DolibarrError as exc:
             errors += 1

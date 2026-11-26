@@ -597,3 +597,37 @@ WerkbankPricelistPerWeek = per week
 WerkbankPricelistPerMonth = per month
 WerkbankPricelistPerYear = per year
 WerkbankVar_ITTAB_PREISLISTE = Price list from the products (sections per category, setup → general)
+
+# 1.8.0: documents added by hand, sending documents
+WerkbankDocsManualTitle = More documents
+WerkbankDocsManualHelp = Any released document can be given to this customer without a rule. It appears above as a line of its own with a state and can be generated, sent, signed, uploaded or ticked there. A template per customer is filled in for them right away.
+WerkbankDocsManualNone = There is no released document yet (Third parties → Company documents).
+WerkbankDocsManualAction = What the customer does
+WerkbankDocsManualActionAuto = by the kind of the document
+WerkbankDocsManualRequiredHelp = counts as open until done
+WerkbankDocsManualAdd = Add
+WerkbankDocsManualAdded = "%s" is on this customer's list now.
+WerkbankDocsManualUnknown = This document does not exist or is not released yet.
+WerkbankDocsManualRemoved = "%s" was taken off the list; the history stays.
+WerkbankDocsManualBadge = added by hand
+WerkbankDocsManualRemove = Remove
+WerkbankDocsManualRemoveHelp = Takes the line off this customer's list; files and history stay.
+WerkbankDocsManualCopyTo = (a copy goes to the proposal too)
+WerkbankDocsManualFromObject = Make a document
+WerkbankDocsMailGroupGenerate = Generate for this customer:
+WerkbankDocsMailGroupMade = Generated for this customer:
+WerkbankDocsMailGroupGeneral = General documents:
+WerkbankDocsMailMade = generated on %s
+WerkbankDocsMailMadeSigned = signed on %s
+WerkbankDocsMailFillFirst = "%s" still needs some details. <a href="%s">Fill them in and generate</a> - you come back here with the finished document attached.
+WerkbankDocsMailEdited = You changed the text; the list of documents in it no longer follows.
+WerkbankDocsMailRetext = Build the text again from the template on the next "Attach" (your changes are lost)
+WerkbankDocCustomerNoPdf = A template per customer has no general PDF; it is generated per customer.
+WerkbankDocSample = Show sample
+WerkbankDocSampleMark = SAMPLE
+WerkbankDocSendable = May be sent to customers
+WerkbankDocSendableHelp = Offered under "Attach documents" when mailing and may be a default attachment. Off for internal text blocks.
+WerkbankDocForCustomer = Generate for a customer …
+WerkbankDocForCustomerGo = On to the customer
+WerkbankDocsEvent_generated = generated for the customer
+WerkbankDocsGenerateFirst = Template per customer: "Generate" first, then send or have it signed.

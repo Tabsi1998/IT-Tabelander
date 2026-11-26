@@ -55,7 +55,7 @@ if (in_array($action, array('add', 'update', 'confirm_release'), true) && !$writ
 }
 if ($action === 'add' || $action === 'update') {
 	$values = array('title' => GETPOST('title', 'alphanohtml'), 'slug' => GETPOST('slug', 'alphanohtml'), 'kind' => GETPOST('kind', 'aZ09'),
-		'public' => GETPOST('public'), 'text' => GETPOST('text', 'restricthtml'), 'position' => GETPOSTINT('position'));
+		'public' => GETPOST('public'), 'sendable' => GETPOST('sendable'), 'text' => GETPOST('text', 'restricthtml'), 'position' => GETPOSTINT('position'));
 	$saved = $store->save($action === 'add' ? 0 : $id, $values, $user);
 	if ($saved > 0) {
 		setEventMessages($langs->trans('WerkbankDocSaved'), null, 'mesgs');
@@ -75,6 +75,20 @@ if ($action === 'confirm_release' && $doc && GETPOST('confirm', 'alpha') === 'ye
 	header('Location: '.$self.'?id='.$id);
 	exit;
 }
+// Make a template per customer for a customer: on in the customer's tab "Unterlagen".
+if ($action === 'forcustomer' && $doc && $doc->kind === 'customer') {
+	if (!$user->hasRight('societe', 'creer')) {
+		accessforbidden();
+	}
+	$socid = GETPOSTINT('socid');
+	if ($socid <= 0) {
+		setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentities('ThirdParty')), null, 'errors');
+		$action = 'askcustomer';
+	} else {
+		header('Location: '.dol_buildpath('/ittabelanderpdf/docs.php', 1).'?socid='.$socid.'&action=pickdoc&slug='.urlencode($doc->slug).'#docadd');
+		exit;
+	}
+}
 // The draft as PDF, without releasing it.
 if ($action === 'preview' && $doc) {
 	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
@@ -92,11 +106,12 @@ if ($action === 'preview' && $doc) {
 	dol_mkdir(dirname($temp));
 	$builder = new WerkbankBuilderUnterlage($db, $record, $langs, dol_now());
 	$built = $builder->build();
-	$built['watermark'] = $langs->transnoentities('WerkbankDocPreviewMark');
+	$sample = $doc->kind === 'customer';
+	$built['watermark'] = $langs->transnoentities($sample ? 'WerkbankDocSampleMark' : 'WerkbankDocPreviewMark');
 	$renderer = new WerkbankRenderer(pdf_getInstance(array(WerkbankRenderer::PAGE_W, WerkbankRenderer::PAGE_H)), $langs);
 	$renderer->render($built, $temp);
 	top_httphead('application/pdf');
-	header('Content-Disposition: inline; filename="'.$doc->slug.'-entwurf.pdf"');
+	header('Content-Disposition: inline; filename="'.$doc->slug.($sample ? '-muster' : '-entwurf').'.pdf"');
 	readfile($temp);
 	dol_delete_file($temp, 0, 1);
 	exit;
@@ -137,6 +152,8 @@ foreach (WerkbankDoc::KINDS as $key) {
 }
 print '<tr><td>'.$langs->trans('WerkbankDocKind').'</td><td>'.$form->selectarray('kind', $kinds, $value('kind', 'internal'), 0, 0, 0, $editable ? '' : 'disabled').'</td></tr>';
 print '<tr><td>'.$langs->trans('WerkbankDocPublic').'</td><td><input type="checkbox" name="public" value="1"'.($value('public') ? ' checked' : '').($editable ? '' : ' disabled').'> '.$langs->trans('WerkbankDocPublicHelp').'</td></tr>';
+print '<tr><td>'.$langs->trans('WerkbankDocSendable').'</td><td><input type="checkbox" name="sendable" value="1"'.($doc ? ((int) $doc->sendable ? ' checked' : '') : ' checked')
+	.($editable ? '' : ' disabled').'> '.$langs->trans('WerkbankDocSendableHelp').'</td></tr>';
 print '<tr><td>'.$langs->trans('Position').'</td><td><input type="number" name="position" class="width75" value="'.((int) $value('position', '0')).'"'.($editable ? '' : ' disabled').'></td></tr>';
 print '<tr><td class="tdtop">'.$langs->trans('WerkbankDocText').'</td><td>';
 if ($editable) {
@@ -156,11 +173,22 @@ print '</form>';
 
 if ($doc) {
 	print '<div class="tabsAction">';
-	print '<a class="butAction" href="'.$self.'?id='.$id.'&action=preview&token='.newToken().'" target="_blank">'.$langs->trans('WerkbankDocPreview').'</a>';
+	print '<a class="butAction" href="'.$self.'?id='.$id.'&action=preview&token='.newToken().'" target="_blank">'.$langs->trans($doc->kind === 'customer' ? 'WerkbankDocSample' : 'WerkbankDocPreview').'</a>';
+	if ($doc->kind === 'customer' && (int) $doc->version > 0 && $user->hasRight('societe', 'creer')) {
+		print '<a class="butAction" href="'.$self.'?id='.$id.'&action=askcustomer#forcustomer">'.$langs->trans('WerkbankDocForCustomer').'</a>';
+	}
 	if ($write) {
 		print '<a class="butAction" href="'.$self.'?id='.$id.'&action=askrelease&token='.newToken().'">'.$langs->trans('WerkbankDocRelease').'</a>';
 	}
 	print '</div>';
+
+	if ($action === 'askcustomer' && $doc->kind === 'customer') {
+		print '<a id="forcustomer"></a>'.load_fiche_titre($langs->trans('WerkbankDocForCustomer'), '', 'company');
+		print '<form method="POST" action="'.$self.'?id='.$id.'"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="forcustomer">';
+		print '<table class="border centpercent tableforfield"><tr><td class="titlefield fieldrequired">'.$langs->trans('ThirdParty').'</td><td>'
+			.$form->select_company(GETPOSTINT('socid'), 'socid', '(s.client:IN:1,2,3)', 1, 0, 0, array(), 0, 'minwidth300').'</td></tr></table>';
+		print '<div class="center"><input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankDocForCustomerGo')).'"> <a class="button button-cancel" href="'.$self.'?id='.$id.'">'.$langs->trans('Cancel').'</a></div></form>';
+	}
 
 	// Versions: what was released when, by whom, why - with the text and the PDF of the time.
 	$versions = $store->versions($id);

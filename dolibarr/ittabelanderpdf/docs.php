@@ -14,6 +14,9 @@
  * needs (rules of the module setup), what is done and what is missing, and
  * the way to finish each one: send, sign on the device, upload the signed
  * scan, or tick by hand. Every change is an event; nothing is overwritten.
+ * Any released document can be added to the customer by hand ("Weitere
+ * Unterlage", also from a contract, a proposal or the document card): it
+ * becomes a line of its own, removable again.
  */
 
 $res = 0;
@@ -59,6 +62,46 @@ $self = dol_buildpath('/ittabelanderpdf/docs.php', 1).'?socid='.$socid;
  */
 
 $rule = GETPOSTINT('rule') > 0 ? $docs->rule(GETPOSTINT('rule')) : null;
+// A rule added by hand belongs to one customer only.
+if ($rule && !empty($rule->fk_soc) && (int) $rule->fk_soc !== $socid) {
+	$rule = null;
+}
+// Contract or proposal of this customer the document is made for (from their cards).
+$fromContract = GETPOSTINT('contract');
+$fromPropal = 0;
+if (GETPOSTINT('propal') > 0) {
+	require_once DOL_DOCUMENT_ROOT.'/comm/propal/class/propal.class.php';
+	$propal = new Propal($db);
+	$fromPropal = $propal->fetch(GETPOSTINT('propal')) > 0 && (int) $propal->socid === $socid ? (int) $propal->id : 0;
+}
+$back = ($fromContract > 0 ? '&contract='.$fromContract : '').($fromPropal > 0 ? '&propal='.$fromPropal : '');
+if ($action === 'addmanual') {
+	if (!$write) {
+		accessforbidden();
+	}
+	$slug = GETPOST('slug', 'aZ09arobase');
+	$added = $docs->addManual($soc, (string) $slug, GETPOST('doaction', 'aZ09'), GETPOSTISSET('required') ? GETPOSTINT('required') : 1);
+	if ($added > 0) {
+		$documents = $docs->documents();
+		setEventMessages($langs->trans('WerkbankDocsManualAdded', $documents[$slug]['title']), null, 'mesgs');
+		// A template per customer goes on to its form right away.
+		$next = $documents[$slug]['kind'] === 'customer' ? '&action=generateform&rule='.$added.$back.'#docform' : '#rule-'.$added;
+		header('Location: '.$self.$next);
+		exit;
+	}
+	setEventMessages($langs->trans('WerkbankDocsManualUnknown'), null, 'errors');
+	$action = 'pickdoc';
+}
+if ($action === 'removemanual') {
+	if (!$write || !$rule || empty($rule->fk_soc)) {
+		accessforbidden();
+	}
+	if ($docs->removeManual((int) $rule->rowid, $socid) > 0) {
+		setEventMessages($langs->trans('WerkbankDocsManualRemoved', $rule->label), null, 'mesgs');
+	}
+	header('Location: '.$self);
+	exit;
+}
 if ($action === 'generate') {
 	if (!$write || !$rule) {
 		accessforbidden();
@@ -82,16 +125,23 @@ if ($action === 'generate') {
 			$contact = null;
 		}
 	}
-	$event = $docs->generate($soc, $rule, $answers, $contract, $contact, $user);
+	$event = $docs->generate($soc, $rule, $answers, $contract, $contact, $user, $fromPropal > 0 ? $propal : null);
 	if ($event > 0) {
 		setEventMessages($langs->trans('WerkbankGenDone', $rule->label), null, 'mesgs');
+		// Came from a mail form: back there with the document attached.
+		$mailback = GETPOST('mailback', 'alphanohtml');
+		if ($mailback !== '' && strpos($mailback, DOL_URL_ROOT.'/') === 0 && strpos($mailback, '//') === false) {
+			list($path, $anchor) = array_pad(explode('#', $mailback, 2), 2, '');
+			header('Location: '.$path.(strpos($path, '?') === false ? '?' : '&').'ittabpdf_preselect_event='.((int) $event).'#'.($anchor !== '' ? $anchor : 'formmail'));
+			exit;
+		}
 		header('Location: '.$self.'#rule-'.((int) $rule->rowid));
 		exit;
 	}
 	// Back to the form with what was entered.
 	setEventMessages($docs->error, null, 'errors');
 	$action = 'generateform';
-	$posted = array('fields' => $answers, 'contract' => $contract ? (int) $contract->id : 0, 'contact' => $contact ? (int) $contact->id : 0);
+	$posted = array('fields' => $answers, 'contract' => $contract ? (int) $contract->id : 0, 'contact' => $contact ? (int) $contact->id : 0, 'propal' => $fromPropal);
 }
 if (in_array($action, array('startsign', 'upload', 'check', 'revoke'), true)) {
 	if (!$write || !$rule) {
@@ -205,6 +255,7 @@ foreach ($status as $entry) {
 	print '<tr class="oddeven ittabdocs-item state-'.$state.'" id="rule-'.$id.'">';
 	print '<td>'.img_picto('', 'pdf', 'class="pictofixedwidth"').dol_escape_htmltag($rule->label)
 		.((int) $rule->required ? ' <span class="badge badge-status1">'.$langs->trans('WerkbankQsRequired').'</span>' : ' <span class="opacitymedium">('.$langs->trans('WerkbankDocsOptional').')</span>')
+		.(!empty($rule->fk_soc) ? ' <span class="badge badge-status0">'.$langs->trans('WerkbankDocsManualBadge').'</span>' : '')
 		.'<br><span class="opacitymedium small">'.dol_escape_htmltag($entry['title'])
 		.($entry['stand'] !== '' ? ' · '.$langs->trans('WerkbankDocsStand', dol_print_date(dol_stringtotime($entry['stand'].' 00:00:00'), 'day')) : '').'</span></td>';
 	print '<td class="center">'.dolGetStatus($langs->trans($states[$state][0]), '', '', $states[$state][1], 5).'</td>';
@@ -226,7 +277,11 @@ foreach ($status as $entry) {
 	if ($state === 'outdated') {
 		$lines[] = '<strong>'.$langs->trans('WerkbankDocsOutdatedLine').'</strong>';
 	}
-	if (!$entry['exists'] && $state !== 'done') {
+	// A template per customer has no general PDF: it is generated for the customer.
+	$isTemplate = isset($documents[$rule->slug]) && $documents[$rule->slug]['kind'] === 'customer';
+	if ($isTemplate && empty($entry['generated']) && $state !== 'done') {
+		$lines[] = '<span class="opacitymedium">'.$langs->trans('WerkbankDocsGenerateFirst').'</span>';
+	} elseif (!$isTemplate && !$entry['exists'] && $state !== 'done') {
 		$lines[] = '<span class="opacitymedium">'.$langs->trans('WerkbankDocsNoFile', dol_escape_htmltag(WerkbankUnterlagen::relativeDir().'/'.$rule->slug.'.pdf')).'</span>';
 	}
 	print '<td class="small">'.implode('<br>', $lines).'</td>';
@@ -253,6 +308,10 @@ foreach ($status as $entry) {
 		if ($state === 'done') {
 			print '<a class="butActionDelete smallpaddingimp" href="'.$self.'&amp;action=revokeform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankDocsRevoke').'</a>';
 		}
+		if (!empty($rule->fk_soc)) {
+			print '<form method="POST" action="'.$self.'" class="inline-block"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="removemanual"><input type="hidden" name="rule" value="'.$id.'">';
+			print '<input type="submit" class="butActionDelete smallpaddingimp" value="'.dol_escape_htmltag($langs->trans('WerkbankDocsManualRemove')).'" title="'.dol_escape_htmltag($langs->trans('WerkbankDocsManualRemoveHelp')).'"></form>';
+		}
 	}
 	print '</td></tr>';
 }
@@ -276,8 +335,18 @@ if ($write && $formFor === 'generateform') {
 		}
 		print '<form method="POST" action="'.$self.'">';
 		print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="generate"><input type="hidden" name="rule" value="'.((int) $rule->rowid).'">';
+		if ($fromPropal > 0) {
+			print '<input type="hidden" name="propal" value="'.$fromPropal.'">';
+		}
+		if (GETPOST('mailback', 'alphanohtml') !== '') {
+			print '<input type="hidden" name="mailback" value="'.dol_escape_htmltag(GETPOST('mailback', 'alphanohtml')).'">';
+		}
+		$chosenContract = $fromContract > 0 && isset($contracts[$fromContract]) ? $fromContract : ($last['contract'] ?: (int) key($contracts));
 		print '<table class="border centpercent tableforfield">';
-		print '<tr><td class="titlefield">'.$langs->trans('Contract').'</td><td>'.$form->selectarray('contract', array(0 => '') + $contracts, $last['contract'] ?: (int) key($contracts), 0, 0, 0, '', 0, 0, 0, '', 'minwidth300').'</td></tr>';
+		if ($fromPropal > 0) {
+			print '<tr><td class="titlefield">'.$langs->trans('Proposal').'</td><td>'.$propal->getNomUrl(1).' <span class="opacitymedium">'.$langs->trans('WerkbankDocsManualCopyTo').'</span></td></tr>';
+		}
+		print '<tr><td class="titlefield">'.$langs->trans('Contract').'</td><td>'.$form->selectarray('contract', array(0 => '') + $contracts, $chosenContract, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300').'</td></tr>';
 		print '<tr><td>'.$langs->trans('Contact').'</td><td>'.$form->selectarray('contact', $contacts, $last['contact'], 0, 0, 0, '', 0, 0, 0, '', 'minwidth300').'</td></tr>';
 		print WerkbankFields::inputs($fields, $last['fields']);
 		print '</table>';
@@ -302,6 +371,39 @@ if ($write && $formFor && $formFor !== 'generateform') {
 	print '<tr><td class="titlefield">'.$langs->trans('Note').'</td><td><input type="text" name="note" class="minwidth300" placeholder="'.dol_escape_htmltag($langs->trans($formFor === 'revokeform' ? 'WerkbankDocsRevokeNote' : 'WerkbankDocsTickNote')).'"></td></tr>';
 	print '</table><div class="center"><input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans($formFor === 'uploadform' ? 'WerkbankDocsUploadButton' : ($formFor === 'checkform' ? 'WerkbankDocsTickButton' : 'WerkbankDocsRevoke'))).'">'
 		.' <a class="button button-cancel" href="'.$self.'">'.$langs->trans('Cancel').'</a></div></form>';
+}
+
+// Add any released document to this customer by hand.
+if ($write) {
+	$documents = isset($documents) ? $documents : $docs->documents();
+	$kinds = array('legal' => 'WerkbankDocKind_legal', 'internal' => 'WerkbankDocKind_internal', 'customer' => 'WerkbankDocKind_customer');
+	$choices = array();
+	foreach ($documents as $slug => $document) {
+		$choices[$slug] = $document['title'].' ('.$langs->trans($kinds[$document['kind']] ?? 'WerkbankDocKind_internal').')';
+	}
+	print '<a id="docadd"></a>'.load_fiche_titre($langs->trans('WerkbankDocsManualTitle'), '', 'add');
+	if (!$choices) {
+		print '<div class="opacitymedium">'.$langs->trans('WerkbankDocsManualNone').'</div>';
+	} else {
+		print '<form method="POST" action="'.$self.'#docadd">';
+		print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="addmanual">';
+		if ($fromContract > 0) {
+			print '<input type="hidden" name="contract" value="'.$fromContract.'">';
+		}
+		if ($fromPropal > 0) {
+			print '<input type="hidden" name="propal" value="'.$fromPropal.'">';
+		}
+		print '<table class="border centpercent tableforfield">';
+		print '<tr><td class="titlefield fieldrequired">'.$langs->trans('WerkbankDocSignDocument').'</td><td>'.$form->selectarray('slug', $choices, GETPOST('slug', 'aZ09arobase'), 0, 0, 0, '', 0, 0, 0, '', 'minwidth300').'</td></tr>';
+		print '<tr><td>'.$langs->trans('WerkbankDocsManualAction').'</td><td>'.$form->selectarray('doaction', array(
+			'' => $langs->trans('WerkbankDocsManualActionAuto'), 'accept' => $langs->trans('WerkbankDocsAction_accept'),
+			'sign' => $langs->trans('WerkbankDocsAction_sign'), 'handover' => $langs->trans('WerkbankDocsAction_handover')), '', 0, 0, 0, '', 0, 0, 0, '', 'minwidth300').'</td></tr>';
+		print '<tr><td>'.$langs->trans('WerkbankQsRequired').'</td><td><input type="hidden" name="required" value="0"><input type="checkbox" name="required" value="1" checked> '
+			.'<span class="opacitymedium">'.$langs->trans('WerkbankDocsManualRequiredHelp').'</span></td></tr>';
+		print '</table>';
+		print '<div class="center"><input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankDocsManualAdd')).'"></div>';
+		print '<div class="center opacitymedium">'.$langs->trans('WerkbankDocsManualHelp').'</div></form>';
+	}
 }
 
 // Everything that happened, newest first.

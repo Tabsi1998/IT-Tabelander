@@ -2,6 +2,7 @@
 -- from the knowledge base (FAQ). text is the working draft; every release
 -- becomes a row of llx_ittabpdf_docversion that never changes.
 -- kind: legal (legal text, may be public), internal, customer (template per customer).
+-- sendable: may go to customers as an e-mail attachment (a template per customer only once generated).
 CREATE TABLE llx_ittabpdf_doc(
   rowid           integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
   entity          integer DEFAULT 1 NOT NULL,
@@ -9,6 +10,7 @@ CREATE TABLE llx_ittabpdf_doc(
   title           varchar(255) NOT NULL,
   kind            varchar(16) DEFAULT 'internal' NOT NULL,
   public          smallint DEFAULT 0 NOT NULL,
+  sendable        smallint DEFAULT 1 NOT NULL,
   text            mediumtext NULL,
   changed         smallint DEFAULT 1 NOT NULL,
   version         integer DEFAULT 0 NOT NULL,

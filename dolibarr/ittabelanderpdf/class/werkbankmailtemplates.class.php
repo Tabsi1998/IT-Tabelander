@@ -99,10 +99,17 @@ class WerkbankMailTemplates
 				array('danke, dein Gerät ist bei mir angekommen. Anbei der Geräteannahmeschein mit allem, was wir bei der Abgabe festgehalten haben.',
 					'Sobald ich weiß, was dem Gerät fehlt, melde ich mich mit einem Kostenvoranschlag.'),
 				1),
-			'unterlage' => array('thirdparty', 'Unterlage', 'Ihre Unterlage von __MYCOMPANY_NAME__',
-				array('anbei die Unterlage mit den Unterschriften als PDF, für Ihre Unterlagen.'),
-				array('anbei die Unterlage mit den Unterschriften als PDF, für deine Unterlagen.'),
+			// The copy after both signed on the device (sign.php).
+			'unterlage' => array('thirdparty', 'Unterschriebene Unterlage', 'Ihre unterschriebene Unterlage von __MYCOMPANY_NAME__',
+				array('anbei die Unterlage mit unseren Unterschriften als PDF, für Ihre Unterlagen. Sie müssen nichts weiter tun.'),
+				array('anbei die Unterlage mit unseren Unterschriften als PDF, für deine Unterlagen. Du musst nichts weiter tun.'),
 				1),
+			// Company documents to the customer (tab "Unterlagen", "Unterlagen beilegen"):
+			// subject, opening, list with what to do and closing follow the attached files (WerkbankDocMail).
+			'docsend' => array('thirdparty', 'Unterlagen zusenden', '__ITTAB_UNTERLAGEN_BETREFF__',
+				array('__ITTAB_UNTERLAGEN_EINLEITUNG__', '__ITTAB_UNTERLAGEN_LISTE__', '__ITTAB_UNTERLAGEN_SCHLUSS__'),
+				array('__ITTAB_UNTERLAGEN_EINLEITUNG_DU__', '__ITTAB_UNTERLAGEN_LISTE_DU__', '__ITTAB_UNTERLAGEN_SCHLUSS_DU__'),
+				0),
 			'contract' => array('contract', 'Vertrag', 'Vertrag __REF__ von __MYCOMPANY_NAME__',
 				array('anbei der Vertrag __REF__ für die laufenden Leistungen.',
 					'Bitte lesen Sie ihn in Ruhe durch und schicken Sie ihn unterschrieben zurück, gern als Scan oder Foto.'),
@@ -150,18 +157,32 @@ class WerkbankMailTemplates
 		return $form === '' ? $base : $base.' · '.($form === 'du' ? 'Du' : 'Sie');
 	}
 
+	/** Earlier names of a template (key => name), for renameLabels(). */
+	const OLD_NAMES = array('unterlage' => array('Unterlage'));
+
 	/**
-	 * The label up to 1.7.0, with the form in brackets.
+	 * The labels a template had before: with the form in brackets (up to
+	 * 1.7.0) and under an earlier name.
 	 *
 	 * @param string $key  Template key
 	 * @param string $form 'sie', 'du' or ''
-	 * @return string
+	 * @return string[]
 	 */
-	public static function oldLabel($key, $form)
+	public static function oldLabels($key, $form)
 	{
 		$definitions = self::definitions();
-		$base = $definitions[$key][1];
-		return $form === '' ? $base : $base.' ('.($form === 'du' ? 'Du' : 'Sie').')';
+		$names = array_merge(array($definitions[$key][1]), isset(self::OLD_NAMES[$key]) ? self::OLD_NAMES[$key] : array());
+		$labels = array();
+		foreach ($names as $base) {
+			if ($form === '') {
+				$labels[] = $base;
+				continue;
+			}
+			$word = $form === 'du' ? 'Du' : 'Sie';
+			$labels[] = $base.' ('.$word.')';
+			$labels[] = $base.' · '.$word;
+		}
+		return array_values(array_diff(array_unique($labels), array(self::label($key, $form))));
 	}
 
 	/**
@@ -177,23 +198,21 @@ class WerkbankMailTemplates
 	{
 		$renamed = 0;
 		foreach (self::variants() as $label => $row) {
-			$old = self::oldLabel($row[0], $row[1]);
-			if ($old === $label) {
-				continue;
+			foreach (self::oldLabels($row[0], $row[1]) as $old) {
+				$resql = $db->query("SELECT rowid FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf'"
+					." AND label = '".$db->escape($label)."' AND entity = ".((int) $entity));
+				if (!$resql) {
+					return -1;
+				}
+				if ($db->num_rows($resql) > 0) {
+					break;
+				}
+				if (!$db->query("UPDATE ".MAIN_DB_PREFIX."c_email_templates SET label = '".$db->escape($label)."'"
+					." WHERE module = 'ittabelanderpdf' AND label = '".$db->escape($old)."' AND entity = ".((int) $entity))) {
+					return -1;
+				}
+				$renamed += (int) $db->affected_rows(true);
 			}
-			$resql = $db->query("SELECT rowid FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf'"
-				." AND label = '".$db->escape($label)."' AND entity = ".((int) $entity));
-			if (!$resql) {
-				return -1;
-			}
-			if ($db->num_rows($resql) > 0) {
-				continue;
-			}
-			if (!$db->query("UPDATE ".MAIN_DB_PREFIX."c_email_templates SET label = '".$db->escape($label)."'"
-				." WHERE module = 'ittabelanderpdf' AND label = '".$db->escape($old)."' AND entity = ".((int) $entity))) {
-				return -1;
-			}
-			$renamed += (int) $db->affected_rows(true);
 		}
 		return $renamed;
 	}
@@ -223,6 +242,8 @@ class WerkbankMailTemplates
 		'Arbeitsbericht · Du' => array('b342bf7edfdd9323ec56a3b3770eaed5', '6ffbc72cbb66c2a4077cd7cba11aeb17', '243d7c055dc86575b0fbc2a63f14b88a', '8ed055521899be433fb214fedf71b21a', '8042831663dd002e274ab08377b66acb'),
 		'Vertrag · Sie' => array('913c7e628356699e1a72f5cccf4ba035', '83ed5c7baf59bb1f67f2aeff53aa3452', '087b9c296330f5ee19bc45abe1820d9a', 'ebf5f57d1d6f1813cc45296692417dcb', 'd5b202757e2c1e6c773b160e6d3a262d'),
 		'Vertrag · Du' => array('e033242fb7aa2c54561c796319ce1a89', '30a5dac241d93407a4ca906eb70fb49d', 'a6d0569ef0ec9cee8032b3ce1598982e', '6d2dc895b6899d58d8cdac38f4dee41f', '7fe84aa5b60ae6b9087a30b826ab3f71'),
+		'Unterschriebene Unterlage · Sie' => array('f1c81769145a6ba7655b5015b6d6ea0e'),
+		'Unterschriebene Unterlage · Du' => array('13805e1aa00ea4ba264f383a5f70107a'),
 		'Nachricht · Sie' => array('bb8d44cc5d8cb1bcec6122f97e931f6b', 'ba29ff846bd2289d38591d21af1cd028', 'fc78ed7dab76930fe92ad497c1be2a31', 'd872cc822a07cc54e4a36ca88af72ab3'),
 		'Nachricht · Du' => array('72e9fc6264c480b439fb9e646aad93d7', 'fcf5e22c8672d8974a8389e8bb72c4c1', '8934af8c870b8fb2d58301138db43721', '3b4bd725d0cded1ae76ac37f8956be90'),
 		'Ticket-Antwort' => array('94ac499d4537e47f28b8fe68d4f9cea2', '5f242533ce3713418b9e8b092caef823'),
@@ -262,9 +283,13 @@ class WerkbankMailTemplates
 		$greeting = $form === 'du' ? '__ITTAB_HALLO__' : ($form === 'sie' ? '__ITTAB_GUTENTAG__' : 'Guten Tag,');
 		$body = '<p style="'.$p.'">'.$greeting.'</p>';
 		foreach ($paragraphs as $paragraph) {
-			$body .= '<p style="'.$p.'">'.$paragraph.'</p>';
+			// The document variables are paragraphs and a list of their own.
+			$body .= strpos($paragraph, '__ITTAB_UNTERLAGEN_') === 0 ? $paragraph."
+" : '<p style="'.$p.'">'.$paragraph.'</p>';
 		}
-		if ($key !== 'thirdparty') {
+		// A third party has no facts box (no number, no amount).
+		$plain = in_array($key, array('thirdparty', 'unterlage', 'docsend'), true);
+		if (!$plain) {
 			$body .= '__ITTAB_FAKTEN__';
 		}
 		if ($key === 'invoice' || $key === 'deposit') {
@@ -273,7 +298,7 @@ class WerkbankMailTemplates
 		if ($key === 'shipping') {
 			$body .= '__ITTAB_SENDUNG__';
 		}
-		if (!in_array($key, array('thirdparty', 'supplier_proposal', 'order_supplier'), true)) {
+		if (!$plain && !in_array($key, array('supplier_proposal', 'order_supplier'), true)) {
 			// Button into the customer area or nothing, depending on ITTABPDF_PORTAL_ENABLED.
 			$body .= '__ITTAB_KUNDENBEREICH_BLOCK__';
 		}
@@ -470,6 +495,9 @@ class WerkbankMailTemplates
 			$forms = $du === null ? array('' => $sie) : array('sie' => $sie, 'du' => $du);
 			foreach ($forms as $form => $paragraphs) {
 				$topicForm = ($key === 'shipping' && $form === 'du') ? 'Deine Lieferung: Lieferschein __REF__' : $topic;
+				if ($key === 'docsend' && $form === 'du') {
+					$topicForm = '__ITTAB_UNTERLAGEN_BETREFF_DU__';
+				}
 				$rows[self::label($key, $form)] = array($key, $form, $type, $topicForm, self::html($paragraphs, $form, $key), (int) $attach);
 			}
 		}

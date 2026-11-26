@@ -291,7 +291,7 @@ def ui() -> None:
         socid = re.search(r"socid=(\d+)", card_html)
         for name, path, wanted in (("proposal", f"/comm/propal/card.php?id={state['planned_propal']}&action=presend&mode=init", ["Angebot · Sie", "Angebot · Du"]),
                                    ("third party", f"/societe/card.php?socid={socid.group(1) if socid else 0}&action=presend&mode=init",
-                                    ["Nachricht · Sie", "Nachricht · Du", "Unterlage · Sie", "Unterlage · Du"])):
+                                    ["Nachricht · Sie", "Nachricht · Du", "Unterlagen zusenden · Sie", "Unterlagen zusenden · Du", "Unterschriebene Unterlage · Sie", "Unterschriebene Unterlage · Du"])):
             labels = [label for label in template_options(path) if label]
             ok = (all(label in labels for label in wanted) and not any(label in ("Sie", "Du") for label in labels)
                   and len(labels) == len(set(labels)))
@@ -988,19 +988,177 @@ def preise() -> None:
     print(f"{len(checks)} price list checks passed")
 
 
+def versand() -> None:
+    """Sending company documents (tests/mailsend.php), then every way through the browser and Mailpit.
+
+    The customer's mail form picks "Nachricht" or "Unterlagen zusenden"
+    (Sie/Du after the customer), the subject and the list follow the
+    attached documents, a template per customer is generated for the
+    customer (or the form asks to fill in first and comes back), documents
+    not to be sent are never offered, and what goes out has no blank fields.
+    Also the documents added by hand from the tab, a contract, a proposal
+    and the document card.
+    """
+    urllib.request.urlopen(urllib.request.Request(f"{MAILPIT_URL}/api/v1/messages", method="DELETE"), timeout=30)
+    result = php("run", script="mailsend.php")
+    checks = [dict(entry, page="php") for entry in result["checks"]]
+    opener = browser()
+
+    def get(path: str) -> tuple:
+        try:
+            answer = opener.open(f"{URL}{path}", timeout=60)
+            return answer.status, answer.read().decode("utf-8", "replace"), answer.geturl()
+        except urllib.error.HTTPError as error:
+            return error.code, "", ""
+
+    def post(path: str, fields: list) -> tuple:
+        try:
+            answer = opener.open(f"{URL}{path}", data=urllib.parse.urlencode(fields).encode(), timeout=120)
+            return answer.status, answer.read().decode("utf-8", "replace"), answer.geturl()
+        except urllib.error.HTTPError as error:
+            return error.code, "", ""
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
+
+    def attached(html: str) -> list:
+        return re.findall(r'<div id="attachfile_\d+">.*?(?:</span>|>)\s*([^<>]+?\.pdf)', html)
+
+    def chosen_template(html: str) -> str:
+        found = re.search(r'<select[^>]*id="modelmailselected".*?</select>', html, re.S)
+        option = re.search(r'<option[^>]*selected[^>]*>(.*?)</option>', found.group(0), re.S) if found else None
+        return unescape(re.sub(r"<[^>]+>", "", option.group(1))).strip() if option else ""
+
+    def subject(html: str) -> str:
+        found = re.search(r'name="subject"[^>]*value="([^"]*)"', html) or re.search(r'value="([^"]*)"[^>]*name="subject"', html)
+        return unescape(found.group(1)) if found else ""
+
+    def body(html: str) -> str:
+        found = re.search(r'<textarea[^>]*name="message"[^>]*>(.*?)</textarea>', html, re.S)
+        return unescape(found.group(1)) if found else ""
+
+    def options(html: str, name: str) -> list:
+        found = re.search(r'<select[^>]*name="' + re.escape(name) + r'\[\]"[^>]*>(.*?)</select>', html, re.S)
+        return re.findall(r'<option value="([^"]*)"', found.group(1)) if found else []
+
+    def fields_of(html: str, drop=()) -> list:
+        return [entry for entry in form_fields(html, "mailform")
+                if entry[0] not in drop and (not entry[0].startswith("ittabpdf_") or entry[0] in ("ittabpdf_msghash", "ittabpdf_subject"))]
+
+    firm, private = result["firm"], result["private"]
+    card = f"/societe/card.php?socid={firm}"
+    # 1. The customer's mail form without a template: "Nachricht", Sie or Du, one closing.
+    status, html, _ = get(f"{card}&action=presend&mode=init")
+    check("company: \"Nachricht · Sie\" is chosen, greeting Sie, one closing", chosen_template(html) == "Nachricht · Sie"
+          and "Guten Tag" in body(html) and "Hallo," not in body(html) and body(html).count("Mit freundlichen Grüßen") == 1,
+          f"{chosen_template(html)} | {body(html)[:200]}")
+    status, html, _ = get(f"/societe/card.php?socid={private}&action=presend&mode=init")
+    check("private person (Du): \"Nachricht · Du\" with Hallo", chosen_template(html) == "Nachricht · Du" and "Hallo" in body(html),
+          chosen_template(html))
+    # 2. From the tab: one document, the template "Unterlagen zusenden", subject with its title.
+    status, html, _ = get(f"{card}&action=presend&mode=init&ittabpdf_preselect=agb-unternehmer.pdf")
+    check("one document: \"Unterlagen zusenden · Sie\", its title in the subject, listed with what to do",
+          chosen_template(html) == "Unterlagen zusenden · Sie" and subject(html).startswith("AGB für Unternehmer von")
+          and "AGB für Unternehmer" in body(html) and "bestätigen Sie" in body(html) and "agb-unternehmer.pdf" in attached(html),
+          f"{chosen_template(html)} | {subject(html)} | {attached(html)}")
+    general, generate = options(html, "ittabpdf_unterlagen"), options(html, "ittabpdf_gen")
+    check("the choice: templates per customer apart, nothing blank or internal among the general ones",
+          "gen-test-vereinbarung" in generate and "gen-test-vereinbarung.pdf" not in general and "preisliste-intern-test.pdf" not in general
+          and "qs-checklisten.pdf" not in general and "agb-unternehmer.pdf" in general, f"{generate} {general}")
+    other = next((name for name in general if name != "agb-unternehmer.pdf"), "")
+    # 3. A second general document and the template per customer: subject and list follow.
+    status, html, _ = post(card, fields_of(html) + [("addfile", "Beilegen"), ("ittabpdf_unterlagen[]", other), ("ittabpdf_gen[]", "gen-test-vereinbarung")])
+    names = attached(html)
+    made = [name for name in names if name.startswith("gen-test-vereinbarung-")]
+    check("several: plural subject, every document listed, the template generated for the customer (WAF passes)",
+          status == 200 and subject(html).startswith("Ihre Unterlagen von") and other in names and made
+          and "für Sie ausgefüllt" in body(html) and body(html).count("<li") >= 3, f"{status} {subject(html)} {names}")
+    # 4. A text changed by hand stays; the form says so.
+    fields = [(key, value + "<p>Eigener Satz.</p>" if key == "message" else value) for key, value in fields_of(html)]
+    status, edited, _ = post(card, fields + [("addfile", "Beilegen")])
+    check("a text changed by hand stays and the form offers to rebuild it", "Eigener Satz." in body(edited) and "ittabpdf_retext" in edited)
+    # 5. Sent: Mailpit has subject, list and the attachments; no blank fields in the generated one.
+    fields = [entry for entry in fields_of(html, ("sendto", "fromtype"))]
+    status, sent_html, _ = post(card, fields + [("sendto", "office@musterfirma.example"), ("fromtype", "company"), ("sendmail", "Senden")])
+    time.sleep(2)
+    sent = [mailpit(f"message/{item['ID']}") for item in mailpit("messages?limit=50").get("messages", [])]
+    mail = sent[0] if len(sent) == 1 else {}
+    files = sorted(entry["FileName"] for entry in mail.get("Attachments") or [])
+    check("the e-mail goes out with subject, list and every document, one closing", status == 200 and mail.get("Subject", "").startswith("Ihre Unterlagen von")
+          and "AGB für Unternehmer" in (mail.get("HTML") or "") and "agb-unternehmer.pdf" in files and any(name.startswith("gen-test-vereinbarung-") for name in files)
+          and (mail.get("HTML") or "").count("Mit freundlichen Grüßen") == 1, f"{status} {mail.get('Subject')} {files}")
+    blanks = []
+    for entry in mail.get("Attachments") or []:
+        if entry["FileName"].startswith("gen-test-vereinbarung-"):
+            data = urllib.request.urlopen(f"{MAILPIT_URL}/api/v1/message/{mail['ID']}/part/{entry['PartID']}", timeout=30).read()
+            target = EXAMPLES / "versand-erzeugt.pdf"
+            EXAMPLES.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            text = subprocess.run(["pdftotext", str(target), "-"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout \
+                if shutil.which("pdftotext") else ""
+            blanks.append(("____" in text, len(text)))
+    check("the generated PDF in the e-mail has no blank lines", blanks and not any(blank for blank, _ in blanks), str(blanks))
+    status, html, _ = get(f"/custom/ittabelanderpdf/docs.php?socid={firm}")
+    check("the checklist marks the documents sent", status == 200 and "state-sent" in html)
+    # 6. A template whose required field has no value yet: fill in first, back into the mail form.
+    status, html, _ = get(f"{card}&action=presend&mode=init")
+    status, html, _ = post(card, fields_of(html) + [("addfile", "Beilegen"), ("ittabpdf_gen[]", "gen-test-pflicht")])
+    link = re.search(r'href="([^"]*action=generateform[^"]*mailback=[^"]*)"', html)
+    check("missing required field: the form asks to fill in first", bool(link) and not any(name.startswith("gen-test-pflicht") for name in attached(html)))
+    if link:
+        status, form_html, _ = get(unescape(link.group(1)).replace(URL, ""))
+        token = re.search(r'name="token" value="([^"]+)"><input type="hidden" name="action" value="generate">', form_html)
+        rule = re.search(r'value="generate"><input type="hidden" name="rule" value="(\d+)"', form_html)
+        back = re.search(r'name="mailback" value="([^"]*)"', form_html)
+        status, html, url = post(f"/custom/ittabelanderpdf/docs.php?socid={firm}", [("token", token.group(1) if token else ""), ("action", "generate"),
+                                 ("rule", rule.group(1) if rule else ""), ("mailback", unescape(back.group(1)) if back else ""), ("field_geraet", "Notebook X1")])
+        check("after filling in, back in the mail form with the document attached", "action=presend" in url
+              and any(name.startswith("gen-test-pflicht-") for name in attached(html)), f"{url} {attached(html)}")
+    # 7. Added by hand: from the tab, a contract, a proposal and the document card.
+    tab = f"/custom/ittabelanderpdf/docs.php?socid={private}"
+    status, html, _ = get(tab)
+    token = re.search(r'name="token" value="([^"]+)"><input type="hidden" name="action" value="addmanual">', html)
+    status, html, url = post(tab, [("token", token.group(1) if token else ""), ("action", "addmanual"), ("slug", "agb-unternehmer"), ("doaction", ""), ("required", "1")])
+    check("tab: a document added by hand is a line with its badge and a remove button", status == 200 and "von Hand hinzugefügt" in unescape(html) and 'value="removemanual"' in html)
+    for name, path in (("contract", f"/contrat/card.php?id={result['contract']}"), ("proposal", f"/comm/propal/card.php?id={result['propal']}")):
+        status, html, _ = get(path)
+        found = re.search(r'href="([^"]*docs\.php\?socid=\d+&(?:amp;)?action=pickdoc&(?:amp;)?(?:contract|propal)=\d+[^"]*)"', html)
+        check(f"{name} card: button to make a document", bool(found))
+        if found:
+            status, html, _ = get(unescape(found.group(1)).replace(URL, ""))
+            check(f"{name}: the tab opens the form with the {name} kept", status == 200 and 'value="addmanual"' in html
+                  and re.search(r'name="(?:contract|propal)" value="\d+"', html) is not None)
+    status, html, _ = get(f"/custom/ittabelanderpdf/unterlage_card.php?id={result['template']}&action=askcustomer")
+    check("document card: generate for a customer, with the customer choice", status == 200 and 'name="socid"' in html and 'value="forcustomer"' in html)
+    token = re.search(r'name="token" value="([^"]+)"><input type="hidden" name="action" value="forcustomer">', html)
+    status, html, url = post(f"/custom/ittabelanderpdf/unterlage_card.php?id={result['template']}", [("token", token.group(1) if token else ""),
+                                                                                                  ("action", "forcustomer"), ("socid", str(firm))])
+    check("…and on to the customer's tab with the document chosen", "docs.php" in url and "slug=gen-test-vereinbarung" in url, url)
+    # 8. The setup offers only what may be sent.
+    status, html, _ = get("/custom/ittabelanderpdf/admin/setup.php")
+    block = html.split("ITTABPDF_DOCS_", 1)[1] if "ITTABPDF_DOCS_" in html else ""
+    check("setup defaults offer neither templates per customer nor internal blocks", "gen-test-vereinbarung.pdf" not in block and "preisliste-intern-test.pdf" not in block)
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"versand check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} sending checks passed")
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "versand": versand, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise", "versand"):
                 steps[name]()
         elif step in steps:
             steps[step]()
