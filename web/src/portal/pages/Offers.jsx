@@ -180,6 +180,16 @@ export function OfferDetail() {
       {item.can_answer && !answered && (
         <Answer offer={item} onDone={(updated, accepted) => { setAnswered({ offer: updated, accepted }); overview.reload(); }} />
       )}
+      {item.status === 2 && (
+        <section className="card flex flex-col gap-3 p-5 md:p-7" aria-label="Rücktritt">
+          <p className="m-0 text-[15px] text-body">
+            Du hast dieses Angebot angenommen. Als Verbraucherin oder Verbraucher kannst du innerhalb der Rücktrittsfrist
+            online zurücktreten.
+          </p>
+          <Link to={`/rechtliches/widerruf?vertrag=${encodeURIComponent(item.ref)}#vertrag-widerrufen`}
+            className="btn-outline self-start border-line">Vertrag widerrufen</Link>
+        </section>
+      )}
       {item.status === 1 && item.expired && (
         <p className="card m-0 p-5 text-body">Dieses Angebot ist abgelaufen. Schreib mir einfach, dann schicke ich dir ein neues.</p>
       )}

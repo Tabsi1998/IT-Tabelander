@@ -1,6 +1,7 @@
 import { NavLink, useParams } from "react-router";
 import Footer from "../components/Footer.jsx";
 import { DownloadIcon } from "../components/Icons.jsx";
+import WithdrawalForm from "../forms/WithdrawalForm.jsx";
 import { useApi } from "../lib/useApi.js";
 import NotFound from "./NotFound.jsx";
 import SimpleHeader from "./SimpleHeader.jsx";
@@ -68,6 +69,8 @@ export default function Legal() {
           {/* The backend cleans this HTML (nh3) before it leaves the server. */}
           {text.data?.html && <div className="legal-text" dangerouslySetInnerHTML={{ __html: text.data.html }} />}
         </article>
+        {/* The online withdrawal (§ 13a FAGG, #142): there even before the text is picked. */}
+        {page.kind === "widerruf" && <WithdrawalForm />}
       </main>
       <div className="print:hidden"><Footer onHome={false} /></div>
     </div>

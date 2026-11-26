@@ -61,6 +61,9 @@ export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, 
         pages, pdf: Boolean(legal[kind].pdf) });
     }
     if (path === "/contact" && method === "POST") return json(route, { ok: true, ref: "ANF-KONTAKT1", dolibarr_synced: true });
+    if (path === "/withdrawals" && method === "POST") {
+      return json(route, { receipt: "WR-1A2B3C4D", received_at: "2026-11-26T09:41:00+00:00", received_local: "26.11.2026 10:41", mail_sent: true });
+    }
     if (path === "/uploads/repair-attachment" && method === "POST") return json(route, { id: "6523f0000000000000000001", url: "/api/media/x.webp" });
     if (path.startsWith("/uploads/repair-attachment/") && method === "DELETE") return json(route, { ok: true });
     if (path === "/inquiries" && method === "POST") return json(route, { ok: true, ref: "ANF-NEU12345", dolibarr_synced: true });

@@ -21,7 +21,8 @@ from app.db import close_client, get_db, now_utc  # noqa: E402
 from app.seed import run_all_seeds  # noqa: E402
 from app.routers import (auth, dashboard, dolibarr_router,  # noqa: E402
                          faqs, gallery, media, portal as portal_router, repairs,
-                         review_invites as review_invites_router, reviews, services, settings, site)
+                         review_invites as review_invites_router, reviews, services, settings, site,
+                         withdrawals as withdrawals_router)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("it-tabelander")
@@ -56,6 +57,9 @@ class PublicRequestGuardMiddleware:
         ("POST", "/api/portal/session"): (20, 60 * 60, 4 * 1024),
         # A new inquiry from the customer area (#123): each one is a ticket and a mail.
         ("POST", "/api/portal/inquiries"): (10, 60 * 60, 32 * 1024),
+        # The online withdrawal (#142): open to everyone by law, each one a
+        # confirmation mail and a notice; a real customer sends one or two.
+        ("POST", "/api/withdrawals"): (5, 60 * 60, 8 * 1024),
     }
     # Addresses with a ticket number in them (#122): one counter per pattern,
     # so another number does not open another allowance. Each answer and each
@@ -327,7 +331,8 @@ app.add_middleware(
 app.add_middleware(SecurityHeadersMiddleware)
 
 for r in (auth, services, faqs, reviews, settings, repairs,
-          media, dolibarr_router, dashboard, site, gallery, review_invites_router, portal_router):
+          media, dolibarr_router, dashboard, site, gallery, review_invites_router, portal_router,
+          withdrawals_router):
     app.include_router(r.router)
 
 READ_METHODS = ["GET", "HEAD"]

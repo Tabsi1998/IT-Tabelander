@@ -43,6 +43,8 @@ async def ensure_indexes():
         partialFilterExpression={"review_ok": True},
     )
     await db.review_invites.create_index("token_hash", unique=True, name="review_invite_token")
+    # Online withdrawals (#142): the same click twice is one declaration.
+    await db.withdrawals.create_index("request_id", unique=True, name="unique_withdrawal_request_id")
     await db.review_invites.create_index(
         "expires_at", expireAfterSeconds=365 * 24 * 60 * 60, name="review_invite_expiry",
     )
