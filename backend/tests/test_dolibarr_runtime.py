@@ -264,7 +264,7 @@ class TestStatusFollowsDolibarr:
 
         # The new prospect sees it in the customer area (#122).
         enable_portal(admin_client)
-        status = portal_session(email).get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60)
+        status = direct_session(email, party).get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60)
         assert status.status_code == 200 and status.json()["step"] == "in_arbeit", status.text
         # Dolibarr's Unix seconds arrive as a real point in time, not hours off.
         updated = datetime.fromisoformat(status.json()["updated_at"])
@@ -435,7 +435,10 @@ class TestCallback:
         created = send_inquiry(email, extra={"callback_at": wish.isoformat()})
         party = dolibarr_get(f"thirdparties/email/{email}")
         ticket = ticket_for(created["ref"], party["id"])
-        assert "Rückruf gewünscht" in str(ticket["message"])
+        # For the workshop only: a private note, not the customer's text (#122).
+        assert "Rückruf gewünscht" not in str(ticket["message"])
+        assert any("Rückruf gewünscht" in str(item["message"]) for item in dolibarr_get(f"tickets/{ticket['id']}")["messages"]
+                   if str(item.get("private")) == "1")
         events = dolibarr_get("agendaevents", sqlfilters=f"(t.fk_element:=:{int(ticket['id'])}) "
                                                          "and (t.elementtype:=:'ticket')")
         calls = [event for event in events if event.get("type_code") == "AC_TEL"]
@@ -560,7 +563,7 @@ class TestStatusSteps:
         party = dolibarr_get(f"thirdparties/email/{email}")
         ticket = ticket_for(created["ref"], party["id"])
         enable_portal(admin_client)
-        session = portal_session(email)
+        session = direct_session(email, party)
 
         def step():
             response = session.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60)
@@ -681,11 +684,27 @@ def enable_portal(admin_client):
     assert switched.status_code == 200, switched.text
 
 
-def portal_session(email: str) -> requests.Session:
+def direct_session(email: str, party: dict) -> requests.Session:
+    """A customer-area session written straight into the website's database:
+    for scenarios about what a signed-in customer sees, without one more
+    sign-in mail (those are limited per hour)."""
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    website_db().portal_sessions.insert_one({
+        "_id": hashlib.sha256(token.encode()).hexdigest(), "email": email,
+        "customers": [{"id": int(party["id"]), "name": str(party.get("name") or "")}],
+        "created_at": now, "checked_at": now, "expires_at": now + timedelta(hours=1)})
+    session = requests.Session()
+    session.headers["Cookie"] = f"portal_session={token}"
+    return session
+
+
+def portal_session(email: str, next_page: str | None = None) -> requests.Session:
     """Sign in like a customer: address, mail, link."""
     before = len(link_mails_to(email))
     session = requests.Session()
-    asked = session.post(f"{BASE_URL}/api/portal/login", json={"email": email}, timeout=30)
+    asked = session.post(f"{BASE_URL}/api/portal/login",
+                         json={"email": email, **({"next": next_page} if next_page else {})}, timeout=30)
     assert asked.status_code == 200 and asked.json() == {"ok": True}, asked.text
     deadline = time.time() + 30
     while len(link_mails_to(email)) <= before and time.time() < deadline:
@@ -694,7 +713,11 @@ def portal_session(email: str) -> requests.Session:
     text = mail_text(newest)
     # #114: HTML with the module's logo and the Du closing, plus the text part.
     assert "maillogo.php" in text and "Liebe Grüße" in text and "Viele Grüße" not in text
-    token = re.search(r"/kundenbereich/anmelden#([A-Za-z0-9_-]{40,})", text).group(1)
+    if next_page:
+        # The link leads to that page after signing in (#122).
+        assert "/kundenbereich/anmelden?ziel=" + requests.utils.quote(next_page, safe="") + "#" in text, text[:2000]
+        assert "kannst mir direkt antworten" in text
+    token = re.search(r"/kundenbereich/anmelden(?:\?ziel=[A-Za-z0-9%._-]*)?#([A-Za-z0-9_-]{40,})", text).group(1)
     opened = session.post(f"{BASE_URL}/api/portal/session", json={"token": token}, timeout=60)
     assert opened.status_code == 200, opened.text
     return session
@@ -781,7 +804,8 @@ class TestCustomerArea:
         assert world["b_offer"]["ref"] in refs and world["a_offer"]["ref"] not in refs and world["a_invoice"]["ref"] not in refs
 
     def test_a_contact_sees_the_company(self, portal_world):
-        overview = portal_session(portal_world["contact"]).get(f"{BASE_URL}/api/portal/overview", timeout=60).json()
+        target = f"/kundenbereich/anfragen?track_id={portal_world['a_ticket']['track_id']}"
+        overview = portal_session(portal_world["contact"], target).get(f"{BASE_URL}/api/portal/overview", timeout=60).json()
         assert overview["customers"] == [f"Portal Firma D {portal_world['tag']}"]
 
     def test_a_blocked_customer_gets_no_link_and_an_old_link_opens_nothing(self, portal_world):
@@ -1050,9 +1074,23 @@ def agenda(ticket_id) -> list:
     return response.json() if response.status_code == 200 else []
 
 
+@pytest.fixture(scope="class")
+def ticket_world(admin_client):
+    enable_portal(admin_client)
+    tag = uuid.uuid4().hex[:8]
+    world = {}
+    for key in ("a", "b"):
+        email = f"ticket-{key}-{tag}@example.com"
+        socid = new_customer(f"Ticket {key.upper()} {tag}", email)
+        world[key] = email
+        world[f"{key}_ticket"] = new_ticket(socid, f"Reparatur: Notebook {key.upper()} (ANF-TICKET0{key.upper()})")
+        world[f"{key}_session"] = direct_session(email, {"id": socid, "name": f"Ticket {key.upper()} {tag}"})
+    return world
+
+
 class TestTicketPortal:
-    def test_history_answers_and_closing_stay_with_the_own_customer(self, portal_world):
-        world = portal_world
+    def test_history_answers_and_closing_stay_with_the_own_customer(self, ticket_world):
+        world = ticket_world
         a, b = world["a_session"], world["b_session"]
         ticket, foreign = world["a_ticket"], world["b_ticket"]
         # The workshop asks publicly and notes something privately; the ticket waits for the customer.
@@ -1111,16 +1149,3 @@ class TestTicketPortal:
         assert late.status_code == 409 and "abgeschlossen" in late.json()["detail"]
         assert len(a.get(f"{BASE_URL}/api/portal/inquiries/{ticket['id']}", timeout=60).json()["messages"]) == 3
         assert mail_with(WARNINGS_TO, f"Kundenbereich: {ticket['ref']} als erledigt geschlossen")
-
-    def test_the_sign_in_link_can_lead_straight_to_an_inquiry(self, portal_world):
-        world = portal_world
-        target = f"/kundenbereich/anfragen?track_id={world['b_ticket']['track_id']}"
-        before = len(link_mails_to(world["contact"]))
-        asked = requests.post(f"{BASE_URL}/api/portal/login", json={"email": world["contact"], "next": target}, timeout=30)
-        assert asked.status_code == 200
-        deadline = time.time() + 30
-        while len(link_mails_to(world["contact"])) <= before and time.time() < deadline:
-            time.sleep(1)
-        text = mail_text(link_mails_to(world["contact"])[0])
-        assert "/kundenbereich/anmelden?ziel=%2Fkundenbereich%2Fanfragen%3Ftrack_id%3D" in text
-        assert "kannst mir direkt antworten" in text
