@@ -101,7 +101,7 @@ $check('one document: listed with Stand and what to do (Sie)', strpos($one['__IT
 	&& strpos($one['__ITTAB_UNTERLAGEN_EINLEITUNG__'], 'diese Unterlage') !== false, strip_tags($one['__ITTAB_UNTERLAGEN_LISTE__']));
 $several = WerkbankDocMail::substitutions($db, $privateId, array($paths[0], WerkbankSignature::thirdpartyDir($privateId).'/'.$generated->filename));
 $check('several documents: plural subject and opening (Du)', $several['__ITTAB_UNTERLAGEN_BETREFF_DU__'] === 'Deine Unterlagen von '.$mysoc->name
-	&& strpos($several['__ITTAB_UNTERLAGEN_EINLEITUNG_DU__'], 'diese Unterlagen') !== false, $several['__ITTAB_UNTERLAGEN_BETREFF_DU__']);
+	&& strpos($several['__ITTAB_UNTERLAGEN_EINLEITUNG_DU__'], 'folgende Unterlagen') !== false, $several['__ITTAB_UNTERLAGEN_BETREFF_DU__']);
 $check('the generated one says it is filled in and asks to sign', strpos($several['__ITTAB_UNTERLAGEN_LISTE_DU__'], 'für dich ausgefüllt') !== false
 	&& strpos($several['__ITTAB_UNTERLAGEN_LISTE_DU__'], 'unterschreib') !== false, strip_tags($several['__ITTAB_UNTERLAGEN_LISTE_DU__']));
 $check('the text passes the WAF', !preg_match('/<style|<svg|=\s*["\']?data:|\son[a-z]+\s*=/i', implode('', $several)));
@@ -130,5 +130,6 @@ $failed = array_values(array_filter($checks, function ($entry) {
 echo json_encode(array('checks' => $checks, 'failed' => count($failed), 'firm' => $firmId, 'private' => $privateId, 'event' => $event, 'genrule' => $genRule,
 	'contract' => (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."contrat WHERE fk_soc = ".$firmId." AND statut = 1 ORDER BY rowid DESC"),
 	'propal' => (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."propal WHERE fk_soc = ".$firmId." ORDER BY rowid DESC"),
-	'template' => (int) $template->rowid)), "\n";
+	'template' => (int) $template->rowid,
+	'contact' => (int) rt_value($db, "SELECT rowid FROM ".MAIN_DB_PREFIX."socpeople WHERE lastname = 'Muster' AND fk_soc = ".$firmId))), "\n";
 exit(0);

@@ -113,6 +113,8 @@ Unternehmensunterlagen und Rechtstexte sind ein eigener Bereich des Moduls (Men�
 - **An Kunden versendbar** (Feld an der Unterlage): nur solche werden angeboten, auch als Standard-Anhang und zum Anhängen ans Angebot. Aus für Textbausteine (Geräteannahme, QS-Checklisten, Impressum-Ergänzung).
 - **Mailtext:** Beim Geschäftspartner wählt das Formular „Unterlagen zusenden · Sie/Du“, sobald Unterlagen beiliegen, sonst „Nachricht · Sie/Du“ (nach „Du statt Sie“ am Kunden). Betreff und Liste (Titel, Stand, was zu tun ist) folgen den beigelegten Unterlagen, solange du den Text nicht selbst geändert hast; danach bietet das Formular an, ihn neu aufzubauen. Variablen: `__ITTAB_UNTERLAGEN_BETREFF__`, `…_EINLEITUNG__`, `…_LISTE__`, `…_SCHLUSS__`, jeweils auch mit `_DU`.
 - Die Kopie nach dem Unterschreiben geht mit „Unterschriebene Unterlage · Sie/Du“.
+- **Empfänger:** Vorgewählt ist genau einer – der Kontakt des Belegs (Angebot/Vertrag), sonst ein Kontakt mit Rolle beim Geschäftspartner, sonst dessen Adresse. Die Anrede passt sich dem gewählten Empfänger an („Guten Tag Frau Muster,“); ein Wechsel baut den Text neu auf, solange du ihn nicht geändert hast.
+- **Reiter „Unterlagen“:** je Zeile eine Hauptaktion, der Rest unter „Weitere Aktionen“.
 
 ## Werkstatt: QS-Checklisten und Prüfprotokoll
 

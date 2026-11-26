@@ -39,7 +39,7 @@ dol_include_once('/ittabelanderpdf/class/werkbanksignature.class.php');
 /** @var Translate $langs */
 /** @var User $user */
 
-$langs->loadLangs(array('companies', 'ittabelanderpdf@ittabelanderpdf'));
+$langs->loadLangs(array('companies', 'contracts', 'propal', 'ittabelanderpdf@ittabelanderpdf'));
 $socid = GETPOSTINT('socid');
 $action = GETPOST('action', 'aZ09');
 if ($user->socid > 0) {
@@ -75,6 +75,10 @@ if (GETPOSTINT('propal') > 0) {
 	$fromPropal = $propal->fetch(GETPOSTINT('propal')) > 0 && (int) $propal->socid === $socid ? (int) $propal->id : 0;
 }
 $back = ($fromContract > 0 ? '&contract='.$fromContract : '').($fromPropal > 0 ? '&propal='.$fromPropal : '');
+// Links of the "more" menu carry the token; Dolibarr checks it for POST only.
+if (in_array($action, array('startsign', 'removemanual'), true) && $_SERVER['REQUEST_METHOD'] !== 'POST' && GETPOST('token', 'alpha') !== currentToken()) {
+	accessforbidden();
+}
 if ($action === 'addmanual') {
 	if (!$write) {
 		accessforbidden();
@@ -244,7 +248,7 @@ $fileLink = function ($filename) use ($socid, $langs) {
 
 print '<div class="div-table-responsive"><table class="noborder centpercent ittabdocs-list">';
 print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankDocSignDocument').'</td><td class="center">'.$langs->trans('Status').'</td>'
-	.'<td>'.$langs->trans('WerkbankDocsProof').'</td><td class="right">'.$langs->trans('Action').'</td></tr>';
+	.'<td>'.$langs->trans('WerkbankDocsProof').'</td><td class="right">'.$langs->trans('WerkbankDocsActionsCol').'</td></tr>';
 if (!$status) {
 	print '<tr class="oddeven"><td colspan="4"><span class="opacitymedium">'.$langs->trans('WerkbankDocsNoRules').'</span></td></tr>';
 }
@@ -286,32 +290,53 @@ foreach ($status as $entry) {
 	}
 	print '<td class="small">'.implode('<br>', $lines).'</td>';
 
-	print '<td class="right nowraponall">';
+	// One main action as a button, everything else in Dolibarr's "more" menu (keeps the line narrow).
+	print '<td class="right">';
 	if ($write) {
-		if ($state !== 'done' && $entry['signing']) {
-			print '<a class="butAction smallpaddingimp" href="'.dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=doc&amp;id='.((int) $entry['signing']->rowid).'">'.$langs->trans('WerkbankDocsContinueSign').'</a>';
-		} elseif ($state !== 'done' && ($entry['exists'] || !empty($entry['generated']))) {
-			print '<form method="POST" action="'.$self.'" class="inline-block"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="startsign"><input type="hidden" name="rule" value="'.$id.'">';
-			print '<input type="submit" class="butAction smallpaddingimp" value="'.dol_escape_htmltag($langs->trans($rule->action === 'handover' ? 'WerkbankDocsConfirmReceipt' : 'WerkbankDocsSignNow')).'"></form>';
-		}
 		$template = isset($documents[$rule->slug]) && $documents[$rule->slug]['kind'] === 'customer';
-		if ($template) {
+		$open = $state !== 'done';
+		$sendUrl = '';
+		if ($open && !empty($entry['generated'])) {
+			$sendUrl = DOL_URL_ROOT.'/societe/card.php?socid='.$socid.'&action=presend&mode=init&ittabpdf_preselect_event='.((int) $entry['generated']->rowid).'#formmail';
+		} elseif ($open && $entry['exists'] && !$template) {
+			$sendUrl = DOL_URL_ROOT.'/societe/card.php?socid='.$socid.'&action=presend&mode=init&ittabpdf_preselect='.urlencode($rule->slug.'.pdf').'#formmail';
+		}
+		$signable = $open && !$entry['signing'] && ($entry['exists'] && !$template || !empty($entry['generated']));
+		$signLabel = $langs->trans($rule->action === 'handover' ? 'WerkbankDocsConfirmReceipt' : 'WerkbankDocsSignNow');
+		$signUrl = $self.'&action=startsign&rule='.$id.'&token='.newToken();
+		$more = array();
+		// The main action.
+		if ($open && $entry['signing']) {
+			print '<a class="butAction smallpaddingimp" href="'.dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=doc&amp;id='.((int) $entry['signing']->rowid).'">'.$langs->trans('WerkbankDocsContinueSign').'</a>';
+		} elseif ($open && $template && empty($entry['generated'])) {
 			print '<a class="butAction smallpaddingimp" href="'.$self.'&amp;action=generateform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankGenButton').'</a>';
+		} elseif ($signable && $rule->action === 'sign') {
+			print '<form method="POST" action="'.$self.'" class="inline-block"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="startsign"><input type="hidden" name="rule" value="'.$id.'">';
+			print '<input type="submit" class="butAction smallpaddingimp" value="'.dol_escape_htmltag($signLabel).'"></form>';
+			$signable = false;
+		} elseif ($sendUrl !== '') {
+			print '<a class="butAction smallpaddingimp" href="'.dol_escape_htmltag($sendUrl).'">'.$langs->trans('WerkbankDocsSend').'</a>';
+			$sendUrl = '';
 		}
-		if ($state !== 'done' && !empty($entry['generated'])) {
-			print '<a class="butAction smallpaddingimp" href="'.DOL_URL_ROOT.'/societe/card.php?socid='.$socid.'&amp;action=presend&amp;mode=init&amp;ittabpdf_preselect_event='.((int) $entry['generated']->rowid).'#formmail">'.$langs->trans('WerkbankDocsSend').'</a>';
-		} elseif ($state !== 'done' && $entry['exists']) {
-			print '<a class="butAction smallpaddingimp" href="'.DOL_URL_ROOT.'/societe/card.php?socid='.$socid.'&amp;action=presend&amp;mode=init&amp;ittabpdf_preselect='.urlencode($rule->slug.'.pdf').'#formmail">'.$langs->trans('WerkbankDocsSend').'</a>';
+		// The rest.
+		if ($sendUrl !== '') {
+			$more[] = array('urlraw' => $sendUrl, 'label' => $langs->trans('WerkbankDocsSend'), 'perm' => 1);
 		}
-		print '<a class="butAction smallpaddingimp" href="'.$self.'&amp;action=uploadform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankDocsUploadButton').'</a>';
-		print '<a class="butAction smallpaddingimp" href="'.$self.'&amp;action=checkform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankDocsTickButton').'</a>';
-		if ($state === 'done') {
-			print '<a class="butActionDelete smallpaddingimp" href="'.$self.'&amp;action=revokeform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankDocsRevoke').'</a>';
+		if ($signable) {
+			$more[] = array('urlraw' => $signUrl, 'label' => $signLabel, 'perm' => 1);
+		}
+		if ($template && (!empty($entry['generated']) || !$open)) {
+			$more[] = array('urlraw' => $self.'&action=generateform&rule='.$id.'#docform', 'label' => $langs->trans('WerkbankGenAgain'), 'perm' => 1);
+		}
+		$more[] = array('urlraw' => $self.'&action=uploadform&rule='.$id.'#docform', 'label' => $langs->trans('WerkbankDocsUploadButton'), 'perm' => 1);
+		$more[] = array('urlraw' => $self.'&action=checkform&rule='.$id.'#docform', 'label' => $langs->trans('WerkbankDocsTickButton'), 'perm' => 1);
+		if (!$open) {
+			$more[] = array('urlraw' => $self.'&action=revokeform&rule='.$id.'#docform', 'label' => $langs->trans('WerkbankDocsRevoke'), 'perm' => 1);
 		}
 		if (!empty($rule->fk_soc)) {
-			print '<form method="POST" action="'.$self.'" class="inline-block"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="removemanual"><input type="hidden" name="rule" value="'.$id.'">';
-			print '<input type="submit" class="butActionDelete smallpaddingimp" value="'.dol_escape_htmltag($langs->trans('WerkbankDocsManualRemove')).'" title="'.dol_escape_htmltag($langs->trans('WerkbankDocsManualRemoveHelp')).'"></form>';
+			$more[] = array('urlraw' => $self.'&action=removemanual&rule='.$id.'&token='.newToken(), 'label' => $langs->trans('WerkbankDocsManualRemove'), 'perm' => 1);
 		}
+		print dolGetButtonAction('', $langs->trans('WerkbankDocsMoreActions'), 'default', $more, 'ittabdocs-more-'.$id);
 	}
 	print '</td></tr>';
 }
@@ -379,6 +404,9 @@ if ($write) {
 	$kinds = array('legal' => 'WerkbankDocKind_legal', 'internal' => 'WerkbankDocKind_internal', 'customer' => 'WerkbankDocKind_customer');
 	$choices = array();
 	foreach ($documents as $slug => $document) {
+		if ($document['kind'] !== 'customer' && empty($document['sendable'])) {
+			continue;
+		}
 		$choices[$slug] = $document['title'].' ('.$langs->trans($kinds[$document['kind']] ?? 'WerkbankDocKind_internal').')';
 	}
 	print '<a id="docadd"></a>'.load_fiche_titre($langs->trans('WerkbankDocsManualTitle'), '', 'add');
@@ -413,7 +441,8 @@ if ($events) {
 	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent ittabdocs-history">';
 	print '<tr class="liste_titre"><td>'.$langs->trans('Date').'</td><td>'.$langs->trans('WerkbankDocSignDocument').'</td><td>'.$langs->trans('Event').'</td><td>'.$langs->trans('User').'</td><td>'.$langs->trans('Note').'</td></tr>';
 	foreach ($events as $event) {
-		print '<tr class="oddeven"><td class="nowraponall">'.dol_print_date($db->jdate($event->date_event), 'dayhour').'</td><td>'.dol_escape_htmltag($event->slug).'</td>'
+		$title = isset($documents[$event->slug]) ? $documents[$event->slug]['title'] : $event->slug;
+		print '<tr class="oddeven"><td class="nowraponall">'.dol_print_date($db->jdate($event->date_event), 'dayhour').'</td><td>'.dol_escape_htmltag($title).'</td>'
 			.'<td>'.$langs->trans('WerkbankDocsEvent_'.$event->state).$fileLink($event->filename).'</td><td>'.dol_escape_htmltag($who($event)).'</td><td>'.dol_escape_htmltag((string) $event->note).'</td></tr>';
 	}
 	print '</table></div>';
