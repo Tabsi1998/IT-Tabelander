@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response  # noqa: E402
 
-from app import handover, review_invites, website  # noqa: E402
+from app import handover, review_invites, site_data, website  # noqa: E402
 from app.db import close_client, get_db, now_utc  # noqa: E402
 from app.seed import run_all_seeds  # noqa: E402
 from app.routers import (auth, dashboard, dolibarr_router,  # noqa: E402
@@ -356,8 +356,10 @@ async def sitemap():
     settings_doc = await get_db().settings.find_one({"_id": "site"}) or {}
     base = str(settings_doc.get("canonical_base_url") or
                os.environ.get("CANONICAL_BASE_URL", "https://it.tabelander.co.at")).rstrip("/")
-    # The one-pager and its legal pages (#54); old addresses redirect there.
-    static_paths = ["/", *(f"/rechtliches/{kind}" for kind in website.LEGAL_PAGES)]
+    # The one-pager and its legal pages (#54, #128: the optional ones once
+    # they are picked); old addresses redirect there.
+    data, legal_settings = await site_data.legal_data()
+    static_paths = ["/", *(f"/rechtliches/{kind}" for kind in site_data.available_pages(data, legal_settings))]
     urls = "".join(f"<url><loc>{escape(base + p)}</loc><changefreq>weekly</changefreq></url>" for p in static_paths)
     xml = (f'<?xml version="1.0" encoding="UTF-8"?>'
            f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>')

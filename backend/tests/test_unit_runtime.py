@@ -147,12 +147,20 @@ def test_sitemap_lists_the_one_pager_and_its_legal_pages(monkeypatch):
     class Database:
         settings = SettingsCollection()
 
+    # The withdrawal notice is picked; the terms for businesses are not (#128).
+    legal = {"legal": {"widerruf": {"id": 4, "answer_html": "<p>x</p>", "status": 1}}}
+
+    async def legal_data():
+        return legal, {"dolibarr_withdrawal_article_id": 4}
+
     monkeypatch.setattr(server, "get_db", lambda: Database())
+    monkeypatch.setattr(server.site_data, "legal_data", legal_data)
     response = asyncio.run(server.sitemap())
     xml = response.body.decode("utf-8")
 
     assert "<loc>https://example.test/</loc>" in xml
     assert "https://example.test/rechtliches/datenschutz" in xml
+    assert "https://example.test/rechtliches/widerruf" in xml and "agb-unternehmer" not in xml
     # Old addresses only redirect (#54); the sitemap lists no duplicates.
     assert "/anfrage" not in xml and "/pc-reparatur" not in xml and "konfigurator" not in xml
 

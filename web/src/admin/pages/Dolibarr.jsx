@@ -6,7 +6,12 @@ import { LoadState, Notice, PageHeader, Section, Toggle } from "../ui.jsx";
 
 const TYPES = [["repair", "Reparatur"], ["pc_build", "PC-Neubau"], ["pc_upgrade", "Upgrade"], ["controller_custom", "Controller-Umbau"],
   ["consulting", "Beratung"], ["other", "Sonstiges"], ["contact", "Kontaktnachricht"]];
-const CONTENT = [["dolibarr_content_category_id", "Kategorie der Website-Artikel (FAQ)"]];
+// Which category is which (#128): empty = the category of that name.
+const CONTENT = [
+  ["dolibarr_content_category_id", "faq", "Kategorie FAQ (auf der Website)", "FAQ"],
+  ["dolibarr_legal_category_id", "legal", "Kategorie Rechtstexte", "Rechtstexte"],
+  ["dolibarr_internal_category_id", "internal", "Kategorie Unterlagen (nie auf der Website)", "Unterlagen"],
+];
 
 function when(value) {
   const date = value ? new Date(value) : null;
@@ -118,7 +123,7 @@ function Content({ overview, settings }) {
   const [choice, setChoice] = useState(Object.fromEntries(CONTENT.map(([key]) => [key, settings[key] || 0])));
   const [state, run] = useSaver();
   return (
-    <Section title="Inhalte aus Dolibarr" description="Firmendaten und Öffnungszeiten kommen aus Unternehmen/Institution, die FAQ aus der Wissensbasis. Öffentlich ist nur, was die gewählte Kategorie hat und freigegeben ist. Die Rechtstexte stehen im nächsten Block.">
+    <Section title="Inhalte aus Dolibarr" description="Firmendaten und Öffnungszeiten kommen aus Unternehmen/Institution, FAQ und Rechtstexte aus der Wissensbasis. Die Kategorie entscheidet: FAQ erscheinen auf der Website, sobald sie freigegeben sind; Rechtstexte wählst du im nächsten Block; Unterlagen bleiben intern. Ohne Auswahl gilt die Kategorie mit diesem Namen.">
       <LoadState state={overview}>
         {(data) => (
           <>
@@ -131,13 +136,16 @@ function Content({ overview, settings }) {
                 <p className="m-0 text-sm text-muted">{data.faq_count || 0} FAQ freigegeben</p>
               </div>
               <div className="flex flex-col gap-3">
-                {CONTENT.map(([key, label]) => (
-                  <Field key={key} label={label} as="select" value={choice[key] || 0}
-                    onChange={(event) => setChoice((current) => ({ ...current, [key]: Number(event.target.value) }))}>
-                    <option value={0}>– keine Kategorie –</option>
-                    {(data.categories || []).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-                  </Field>
-                ))}
+                {CONTENT.map(([key, role, label, name]) => {
+                  const found = (data.categories || []).some((item) => item.id === data.category_ids?.[role]);
+                  return (
+                    <Field key={key} label={label} as="select" value={choice[key] || 0}
+                      onChange={(event) => setChoice((current) => ({ ...current, [key]: Number(event.target.value) }))}>
+                      <option value={0}>{`automatisch: „${name}“${found ? "" : " (gibt es noch nicht)"}`}</option>
+                      {(data.categories || []).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                    </Field>
+                  );
+                })}
                 <Notice tone="success">{state.done}</Notice>
                 <Notice tone="error">{state.error}</Notice>
                 <div className="flex flex-wrap gap-3">
@@ -160,6 +168,8 @@ const LEGAL_HELP = {
   impressum: "Gewerbe, Behörde, Kammer und Rechtsform – dafür hat Dolibarr kein Feld. Der Rest des Impressums kommt aus den Firmendaten.",
   datenschutz: "Was mit den Daten deiner Kunden passiert, wie lange und welche Rechte sie haben.",
   nutzungsbedingungen: "Angebot, Daten auf dem Gerät, Abholung, Bezahlung, Gewährleistung und das Rücktrittsrecht bei Online-Zusagen.",
+  widerruf: "Rücktrittsrecht und Muster-Widerrufsformular als eigene Seite. Optional: beides steht auch in den Nutzungsbedingungen.",
+  "agb-unternehmer": "Bedingungen für Firmenkunden, per Sie. Optional; die Seite erscheint erst, wenn ein Artikel gewählt ist.",
 };
 const LEGAL_STATES = {
   missing: ["fehlt", "bg-badge text-badge-ink"],
@@ -181,7 +191,8 @@ function Check({ ok, required }) {
 /** Imprint, privacy policy and terms (#68, #69, #75): what is missing, and drafts to start from. */
 function LegalTexts({ overview, settings }) {
   const [choice, setChoice] = useState(Object.fromEntries(
-    ["dolibarr_imprint_article_id", "dolibarr_privacy_article_id", "dolibarr_terms_article_id"].map((key) => [key, settings[key] || 0])));
+    ["dolibarr_imprint_article_id", "dolibarr_privacy_article_id", "dolibarr_terms_article_id",
+      "dolibarr_withdrawal_article_id", "dolibarr_b2b_terms_article_id"].map((key) => [key, settings[key] || 0])));
   const [state, run] = useSaver();
 
   const draft = async (text) => {
@@ -195,11 +206,12 @@ function LegalTexts({ overview, settings }) {
 
   return (
     <Section title="Rechtstexte"
-      description="Das Impressum entsteht aus den Firmendaten in Dolibarr, Datenschutzerklärung und Nutzungsbedingungen sind Artikel der Wissensbasis. Die Entwürfe sind in einfacher Sprache; was nur du weißt, ist mit „BITTE …“ markiert. Vor der Freigabe am besten von der WKO prüfen lassen.">
+      description="Das Impressum entsteht aus den Firmendaten in Dolibarr, die anderen Texte sind Artikel der Wissensbasis in der Kategorie „Rechtstexte“. Die Entwürfe sind in einfacher Sprache; was nur du weißt, ist mit „BITTE …“ markiert. Vor der Freigabe am besten von der WKO prüfen lassen.">
       <LoadState state={overview}>
-        {({ legal }) => (
+        {({ legal, pdf }) => (
           <>
             {legal.error && <Notice tone="warning">{legal.error}</Notice>}
+            {pdf?.problem && <Notice tone="warning">PDF: {pdf.problem}</Notice>}
             {legal.todo.length === 0
               ? <Notice tone="success">Impressum, Datenschutzerklärung und Nutzungsbedingungen sind vollständig und freigegeben.</Notice>
               : <Notice tone="warning">Noch offen: {legal.todo.join(" · ")}</Notice>}
@@ -226,6 +238,13 @@ function LegalTexts({ overview, settings }) {
                   </div>
                   <p className="m-0 text-sm text-body">{LEGAL_HELP[text.kind]}</p>
                   {text.gone && <Notice tone="warning">Der gewählte Artikel ist in Dolibarr nicht mehr da oder veraltet.</Notice>}
+                  {text.outside_category && <Notice tone="warning">Steht in Dolibarr nicht in der Kategorie „Rechtstexte“. Bitte dort zuordnen; die Seite bleibt online.</Notice>}
+                  {pdf && (
+                    <p className="m-0 text-sm text-body">
+                      PDF: {pdf.available?.[text.kind] ? "liegt in Dolibarr, Download auf der Seite" : "noch keines"}
+                      <span className="block break-all text-muted">Dokumente → {pdf.files?.[text.kind]}</span>
+                    </p>
+                  )}
                   {text.open_points.length > 0 && (
                     <details className="text-sm">
                       <summary className="cursor-pointer font-semibold">
@@ -241,11 +260,13 @@ function LegalTexts({ overview, settings }) {
                     <option value={0}>– kein Artikel –</option>
                     {legal.choices.map((item) => <option key={item.id} value={item.id}>{item.question}{item.status === 0 ? " (Entwurf)" : ""}</option>)}
                   </Field>
-                  {text.state === "missing" && !choice[text.setting] && (
+                  {text.state === "missing" && !choice[text.setting] && (text.can_draft ? (
                     <button type="button" className="btn-outline self-start border-line" disabled={state.busy} onClick={() => draft(text)}>
                       Entwurf in Dolibarr anlegen
                     </button>
-                  )}
+                  ) : (
+                    <p className="m-0 text-sm text-body">Den Entwurf legt <code>scripts/import_unterlagen.py</code> in Dolibarr an.</p>
+                  ))}
                 </div>
               ))}
             </div>

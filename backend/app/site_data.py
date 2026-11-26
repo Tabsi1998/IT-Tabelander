@@ -2,8 +2,11 @@
 
 Everything the website says about the company is kept in Dolibarr: company
 data and opening hours in its setup, legal texts and FAQ as articles of its
-knowledge base. Only articles tagged with the category chosen in the website
-settings are public; everything else in the knowledge base stays internal.
+knowledge base. Three categories decide what an article is (#128): "FAQ"
+(public questions), "Rechtstexte" (legal pages, picked by number) and
+"Unterlagen" (internal papers, never on the website). The website settings
+name each by its number; left empty, the category of that name is used.
+Everything else in the knowledge base stays internal.
 
 The website keeps a copy for ten minutes and shows the last known copy while
 Dolibarr is unreachable. The API user needs no admin rights: two constants
@@ -34,9 +37,20 @@ LEGAL_ARTICLES = {
     "impressum": "dolibarr_imprint_article_id",
     "datenschutz": "dolibarr_privacy_article_id",
     "nutzungsbedingungen": "dolibarr_terms_article_id",
+    "widerruf": "dolibarr_withdrawal_article_id",
+    "agb-unternehmer": "dolibarr_b2b_terms_article_id",
 }
 LEGAL_TITLES = {"impressum": "Impressum", "datenschutz": "Datenschutzerklärung",
-                "nutzungsbedingungen": "Nutzungsbedingungen"}
+                "nutzungsbedingungen": "Nutzungsbedingungen", "widerruf": "Widerrufsbelehrung",
+                "agb-unternehmer": "AGB für Unternehmer"}
+# The three pages every visitor finds; the other two show once they are picked.
+CORE_LEGAL_PAGES = ("impressum", "datenschutz", "nutzungsbedingungen")
+# Role of a category: website setting with its number, name used when it is empty.
+CATEGORY_SETTINGS = {
+    "faq": ("dolibarr_content_category_id", "FAQ"),
+    "legal": ("dolibarr_legal_category_id", "Rechtstexte"),
+    "internal": ("dolibarr_internal_category_id", "Unterlagen"),
+}
 COMPANY_FIELDS = (
     "name", "managers", "address", "zip", "town", "country_code", "phone", "phone_mobile",
     "email", "url", "tva_intra", "idprof1", "idprof2", "idprof3", "idprof5", "socialobject",
@@ -183,9 +197,9 @@ async def refresh(*, force: bool = False) -> dict:
         settings = await _settings()
         if not cfg["enabled"]:
             return {**cache, "errors": {"dolibarr": "Dolibarr ist in den Website-Einstellungen nicht aktiviert."}}
-        category_id = settings.get("dolibarr_content_category_id")
         result = {"company": cache.get("company"), "opening_hours": cache.get("opening_hours"),
-                  "articles": cache.get("articles"), "legal": cache.get("legal") or {}, "errors": {}}
+                  "articles": cache.get("articles"), "legal_articles": cache.get("legal_articles"),
+                  "internal_ids": cache.get("internal_ids"), "legal": cache.get("legal") or {}, "errors": {}}
         parts = [("company", fetch_company), ("opening_hours", fetch_opening_hours)]
         async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
             for part, fetch in parts:
@@ -194,24 +208,54 @@ async def refresh(*, force: bool = False) -> dict:
                 except Exception as exc:  # noqa: BLE001
                     result["errors"][part] = _hint(part, exc)
                     logger.warning("Dolibarr %s unavailable: %s", part, type(exc).__name__)
-            if category_id:
+            ids = await _category_ids(client, cfg, settings, cache, result)
+            for role, key in (("faq", "articles"), ("legal", "legal_articles"), ("internal", "internal_ids")):
+                if not ids.get(role):
+                    result[key] = []
+                    continue
                 try:
-                    result["articles"] = await fetch_articles(client, cfg, int(category_id))
+                    articles = await fetch_articles(client, cfg, ids[role])
                 except Exception as exc:  # noqa: BLE001
                     result["errors"]["articles"] = _hint("articles", exc)
                     logger.warning("Dolibarr knowledge base unavailable: %s", type(exc).__name__)
-            else:
-                result["articles"] = []
+                    continue
+                result[key] = [item["id"] for item in articles] if role == "internal" else articles
             result["legal"] = await _fetch_legal(client, cfg, settings, result)
-        result.update({"category_id": category_id, "fetched_at": now_utc()})
+        result.update({"category_id": ids.get("faq"), "category_ids": ids, "fetched_at": now_utc()})
         await db.site_cache.replace_one({"_id": CACHE_ID}, {"_id": CACHE_ID, **result}, upsert=True)
         return result
+
+
+def category_by_name(categories: list[dict], name: str) -> int | None:
+    wanted = name.casefold()
+    return next((item["id"] for item in categories if str(item["label"]).strip().casefold() == wanted), None)
+
+
+async def _category_ids(client, cfg, settings: dict, cache: dict, result: dict) -> dict:
+    """The number of each category: from the settings, else by its name.
+    Never by an article's title: the category alone says what is public."""
+    ids, categories = {}, None
+    known = cache.get("category_ids") or {}
+    for role, (key, name) in CATEGORY_SETTINGS.items():
+        if settings.get(key):
+            ids[role] = int(settings[key])
+            continue
+        if categories is None:
+            try:
+                categories = await fetch_categories(client, cfg)
+            except Exception as exc:  # noqa: BLE001
+                result["errors"]["categories"] = _hint("categories", exc)
+                logger.warning("Dolibarr categories unavailable: %s", type(exc).__name__)
+                categories = False
+        # Dolibarr unreachable: the number found last time.
+        ids[role] = known.get(role) if categories is False else category_by_name(categories, name)
+    return ids
 
 
 async def _fetch_legal(client, cfg, settings: dict, result: dict) -> dict:
     """The picked legal articles by their number; a failure keeps the last copy."""
     legal = {}
-    listed = {item["id"]: item for item in result.get("articles") or []}
+    listed = {item["id"]: item for item in [*(result.get("articles") or []), *(result.get("legal_articles") or [])]}
     for kind, key in LEGAL_ARTICLES.items():
         if not settings.get(key):
             continue
@@ -238,8 +282,10 @@ def _legal_ids(settings: dict) -> set[int]:
 
 
 def faq_entries(data: dict, settings: dict) -> list[dict]:
-    """Validated articles of the website category that are no legal page."""
-    legal = _legal_ids(settings)
+    """Validated articles of the FAQ category that are no legal page and
+    neither a legal text nor an internal paper by their category."""
+    legal = (_legal_ids(settings) | {item["id"] for item in data.get("legal_articles") or []}
+             | set(data.get("internal_ids") or []))
     return [
         {"id": f"dolibarr-{article['id']}", "question": article["question"],
          "answer": plain_text(article["answer_html"]), "answer_html": article["answer_html"],
@@ -252,11 +298,12 @@ def faq_entries(data: dict, settings: dict) -> list[dict]:
 
 async def dolibarr_faq() -> list[dict] | None:
     """The FAQ from Dolibarr, or None while the website still shows its own:
-    before a category is chosen, and until the first article is released."""
+    before there is a FAQ category, and until the first article is released."""
     settings = await _settings()
-    if not settings.get("dolibarr_content_category_id"):
+    data = await refresh()
+    if not data.get("category_id"):
         return None
-    entries = faq_entries(await refresh(), settings)
+    entries = faq_entries(data, settings)
     return entries or None
 
 
@@ -284,15 +331,9 @@ def imprint_html(company: dict, extra_html: str = "") -> str:
     return "".join(rows) + (extra_html or "")
 
 
-async def legal_page(kind: str) -> dict | None:
-    """One legal page: the imprint from company data (plus an optional
-    article), privacy and terms from their articles. A draft is marked."""
-    if kind not in LEGAL_ARTICLES:
-        return None
-    settings = await _settings()
-    data = await refresh()
-    if "legal" not in data:
-        data = await refresh(force=True)  # a copy from before the legal articles were read by number
+def page_from(data: dict, settings: dict, kind: str) -> dict | None:
+    """One legal page from the cached copy: the imprint from company data
+    (plus an optional article), the others from their picked articles."""
     article = (data.get("legal") or {}).get(kind) if settings.get(LEGAL_ARTICLES[kind]) else None
     if kind == "impressum":
         if not data.get("company"):
@@ -303,12 +344,39 @@ async def legal_page(kind: str) -> dict | None:
         if not article:
             return None
         body, draft = article["answer_html"], article["status"] == ARTICLE_DRAFT
+    return {"kind": kind, "title": LEGAL_TITLES[kind], "html": body, "draft": draft,
+            "updated_at": (article or {}).get("updated_at")}
+
+
+async def legal_data() -> tuple[dict, dict]:
+    settings = await _settings()
+    data = await refresh()
+    if "legal" not in data:
+        data = await refresh(force=True)  # a copy from before the legal articles were read by number
+    return data, settings
+
+
+def available_pages(data: dict, settings: dict) -> list[str]:
+    """The legal pages for the navigation: the three main ones always, the
+    others once an article is picked for them."""
+    return [kind for kind in LEGAL_ARTICLES if kind in CORE_LEGAL_PAGES or page_from(data, settings, kind)]
+
+
+async def legal_page(kind: str) -> dict | None:
+    """One legal page for the website, with the other pages and whether
+    there is a PDF to download. A draft is marked and never a PDF."""
+    from . import legal_pdf
+
+    if kind not in LEGAL_ARTICLES:
+        return None
+    data, settings = await legal_data()
+    page = page_from(data, settings, kind)
+    if not page:
+        return None
     return {
-        "kind": kind,
-        "title": LEGAL_TITLES[kind],
-        "html": body,
-        "draft": draft,
-        "updated_at": (article or {}).get("updated_at"),
+        **page,
+        "pages": [{"kind": item, "title": LEGAL_TITLES[item]} for item in available_pages(data, settings)],
+        "pdf": not page["draft"] and await legal_pdf.available(kind),
         "fetched_at": data.get("fetched_at").isoformat() if isinstance(data.get("fetched_at"), datetime) else None,
     }
 
@@ -328,9 +396,10 @@ async def site_info() -> dict:
 
 async def admin_overview() -> dict:
     """For the owner: what comes from Dolibarr, and what to fix where."""
-    from . import legal_texts
+    from . import legal_pdf, legal_texts
 
     data = await refresh(force=True)
+    legal_pdf.forget()  # "Neu laden" also looks for new PDFs
     settings = await _settings()
     cfg = await dolibarr.get_config()
     categories, category_error = [], None
@@ -347,10 +416,13 @@ async def admin_overview() -> dict:
         "company": data.get("company"),
         "opening_hours": data.get("opening_hours") or [],
         "categories": categories,
+        # The number of each category actually used, set or found by its name.
+        "category_ids": {role: (data.get("category_ids") or {}).get(role) for role in CATEGORY_SETTINGS},
         "articles": [{key: item[key] for key in ("id", "ref", "question", "status")}
                      for item in data.get("articles") or []],
         "faq_count": len(faq_entries(data, settings)),
         "legal": legal_texts.overview(data, settings),
+        "pdf": await legal_pdf.overview() if cfg["enabled"] else None,
         "errors": errors,
         "fetched_at": data.get("fetched_at").isoformat() if isinstance(data.get("fetched_at"), datetime) else None,
     }
@@ -360,7 +432,7 @@ async def admin_overview() -> dict:
 
 async def copy_website_faq() -> dict:
     """Copy the website's own FAQ into Dolibarr's knowledge base as drafts.
-    The owner reviews them there, tags them "Website" and releases them; the
+    The owner reviews them there, tags them "FAQ" and releases them; the
     category API cannot tag knowledge articles."""
     db = get_db()
     cfg = await dolibarr.get_config()

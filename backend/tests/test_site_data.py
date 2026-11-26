@@ -305,3 +305,48 @@ def test_start_page_texts_from_the_admin_go_in_literally():
     assert '<title>PC-Hilfe ' + backslash + 'g&lt;0&gt; &amp; &lt;Tirol&gt;</title>' in changed
     assert 'content="Reparatur ' + backslash + '1"' in changed and 'Alt' not in changed
     assert website.with_texts(page, {}) == page
+
+
+# ------------------------------------------------ categories decide (#128)
+
+def test_faq_leaves_out_legal_texts_and_internal_papers_by_their_category():
+    released = site_data.ARTICLE_VALIDATED
+    data = {"articles": [
+        {"id": 1, "question": "Holt ihr ab?", "answer_html": "<p>Ja.</p>", "status": released},
+        {"id": 5, "question": "AGB für Unternehmer", "answer_html": "<p>...</p>", "status": released},
+        {"id": 6, "question": "Preisliste", "answer_html": "<p>...</p>", "status": released},
+    ], "legal_articles": [{"id": 5, "question": "AGB für Unternehmer", "answer_html": "", "status": released}],
+        "internal_ids": [6]}
+    assert [entry["question"] for entry in site_data.faq_entries(data, {})] == ["Holt ihr ab?"]
+
+
+def test_a_category_is_its_number_from_the_settings_or_else_its_name():
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path)
+        return httpx.Response(200, json=[{"id": "8", "label": "FAQ"}, {"id": "9", "label": "rechtstexte "},
+                                         {"id": "10", "label": "Website"}])
+
+    result = {"errors": {}}
+    ids = _run(lambda client: site_data._category_ids(
+        client, CFG, {"dolibarr_internal_category_id": 12}, {}, result), handler)
+    assert ids == {"faq": 8, "legal": 9, "internal": 12} and result["errors"] == {}
+    assert len(seen) == 1
+
+    def down(request):
+        raise httpx.ConnectError("weg")
+
+    result = {"errors": {}}
+    ids = _run(lambda client: site_data._category_ids(
+        client, CFG, {}, {"category_ids": {"faq": 8, "legal": 9}}, result), down)
+    assert ids == {"faq": 8, "legal": 9, "internal": None} and "erreichbar" in result["errors"]["categories"]
+
+
+def test_the_navigation_shows_the_two_extra_pages_only_once_picked():
+    data = {"company": {"name": "IT-Tabelander"},
+            "legal": {"agb-unternehmer": {"id": 5, "answer_html": "<p>AGB</p>", "status": 0}}}
+    assert site_data.available_pages(data, {}) == ["impressum", "datenschutz", "nutzungsbedingungen"]
+    assert site_data.available_pages(data, {"dolibarr_b2b_terms_article_id": 5})[-1] == "agb-unternehmer"
+    page = site_data.page_from(data, {"dolibarr_b2b_terms_article_id": 5}, "agb-unternehmer")
+    assert page["title"] == "AGB für Unternehmer" and page["draft"] is True

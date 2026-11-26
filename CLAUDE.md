@@ -76,8 +76,10 @@ module's own `dev_dolibarr.py` 18051/18151.
 ## Code map
 
 - `backend/app/`: `dolibarr.py` (client), `handover.py` (queue to Dolibarr),
-  `site_data.py` (company data, opening hours, knowledge articles, cache),
-  `legal_texts.py` + `legal_drafts/`, `portal.py` (customer area),
+  `site_data.py` (company data, opening hours, knowledge articles, cache;
+  the categories FAQ, Rechtstexte and Unterlagen decide, never a title),
+  `legal_texts.py` + `legal_drafts/`, `legal_pdf.py` (legal PDFs from the
+  ECM folder `IT-Tabelander/Unterlagen`, fixed names), `portal.py` (customer area),
   `portal_inquiries.py` (inquiries in the customer area: history, answers, closing, new inquiry),
   `portal_files.py` (their files: which the customer sees, uploads checked by content),
   `review_invites.py`, `mailer.py`, `mail_layout.py` (HTML + text of customer
