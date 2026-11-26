@@ -232,7 +232,7 @@ class WerkbankRenderer
 					if ($y + 22.0 > self::BOTTOM) {
 						$y = $this->newPage();
 					}
-					$y = $this->caption(self::LEFT, $y + ($index ? 6.0 : 2.0), self::RIGHT - self::LEFT, $block['cap']) + 1.2;
+					$y = $this->caption(self::LEFT, $y + ($index ? 4.6 : 2.0), self::RIGHT - self::LEFT, $block['cap']) + 1.2;
 					$this->hline(self::LEFT, $y, self::RIGHT, 0.212, self::INK);
 					$y += 1.0;
 					break;
@@ -359,13 +359,18 @@ class WerkbankRenderer
 			}
 			$top = $y + 2.6;
 			$this->font('itsans', '', 9.5, self::INK, 1.35);
-			$labelBottom = $this->text(self::LEFT, $top, 95.0, $row['label']);
-			$x = 120.0;
+			$labelBottom = $this->text(self::LEFT, $top, 92.0, $row['label']);
+			// Boxes from x 120 on; more or longer options start further left, never wrap.
+			$widths = array();
+			foreach ($row['options'] as $option) {
+				$widths[] = 5.0 + $this->pdf->GetStringWidth($option) + 1.0;
+			}
+			$x = min(120.0, self::RIGHT - array_sum($widths) - 7.0 * (count($widths) - 1));
 			foreach ($row['options'] as $index => $option) {
 				$this->tickBox($x, $top + 0.4, isset($row['selected']) && $row['selected'] === $index);
 				$this->font('itsans', '', 9.5, self::INK, 1.35);
-				$this->text($x + 5.0, $top, 30.0, $option);
-				$x += 6.5 + $this->pdf->GetStringWidth($option) + 8.0;
+				$this->text($x + 5.0, $top, $widths[$index] - 4.0, $option);
+				$x += $widths[$index] + 7.0;
 			}
 			$bottom = $labelBottom;
 			if (!empty($row['hint'])) {
@@ -1042,7 +1047,7 @@ class WerkbankRenderer
 		$this->hline($x, $y, $x + 75.0, 0.18, self::INK);
 		$bottom = $this->caption($x, $y + 1.4, 75.0, $signed['label']);
 		if (!empty($signed['name']) || !empty($signed['when'])) {
-			$this->font('itsans', '', 7.6, self::BODY, 1.35);
+			$this->font('itsans', '', 7.0, self::BODY, 1.3);
 			$bottom = $this->text($x, $bottom + 0.4, 75.0, trim((!empty($signed['name']) ? $signed['name'] : '').(!empty($signed['when']) ? ' · '.$signed['when'] : ''), ' ·'));
 		}
 		if ($customer && !empty($this->doc['esign'])) {

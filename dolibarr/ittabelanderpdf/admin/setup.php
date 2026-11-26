@@ -54,7 +54,8 @@ $values = array(
 	'ITTABPDF_PORTAL_URL' => 'WerkbankSetupPortal',
 );
 // Template choice per automatic e-mail: key => type_template.
-$choices = array('propal' => 'propal_send', 'invoice' => 'facture_send', 'deposit' => 'facture_send', 'creditnote' => 'facture_send', 'paid' => 'facture_send');
+$choices = array('propal' => 'propal_send', 'invoice' => 'facture_send', 'deposit' => 'facture_send', 'creditnote' => 'facture_send', 'paid' => 'facture_send',
+	'qsreport' => 'fichinter_send', 'intake' => 'ticket_send');
 
 $action = GETPOST('action', 'aZ09');
 $unterlagen = new WerkbankUnterlagen($db);

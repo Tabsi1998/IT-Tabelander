@@ -1554,6 +1554,8 @@ def module_steps() -> list:
              module_stage("unterlagen", 1800), ("fixtures",)),
         Step(group, "qs", "Workshop: QS checklists, test report, intake slip, phone page, rights",
              module_stage("qs", 1800), ("fixtures",)),
+        Step(group, "sign", "Signatures on the device, signed PDFs and sending",
+             module_stage("sign", 1800), ("qs",)),
     ]
 
 

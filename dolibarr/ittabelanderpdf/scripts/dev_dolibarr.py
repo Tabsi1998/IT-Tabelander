@@ -17,7 +17,8 @@ the IT-Tabelander repository; run this from that folder.
     python scripts/dev_dolibarr.py tickets    the module's own ticket confirmation (tests/ticket_confirm.php), checked in Mailpit
     python scripts/dev_dolibarr.py unterlagen company documents from the knowledge base (tests/unterlagen.php), mail form, ticket, setup
     python scripts/dev_dolibarr.py qs         QS checklists, test report, intake slip (tests/qs.php), phone page, setup, rights
-    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets, unterlagen, qs
+    python scripts/dev_dolibarr.py sign       signatures on the device and sending (tests/sign.php), signing page
+    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets, unterlagen, qs, sign
     python scripts/dev_dolibarr.py down       remove containers, volumes and network
 
 Standard library only. Passwords are new on every start; the local test
@@ -586,7 +587,7 @@ def qs() -> None:
     check("autosave without the token is refused", state != 200 or json.loads(answer or "{}").get("ok") is not True, str(state))
     status, html, _ = get(f"{base}/qs.php?id={result['open_run']}")
     status, html, _ = post(f"{base}/qs.php?id={result['open_run']}", [("token", token(html)), ("action", "close"), ("note", "Alles geprüft.")])
-    check("close writes the test report", status == 200 and "ittabqs-done" in html and "pruefprotokoll" in html)
+    check("close writes the test report and goes on to signing", status == 200 and 'id="ittabsig"' in html and "pruefprotokoll" in html)
     link = re.search(r'href="([^"]*document\.php\?modulepart=ficheinter[^"]*pruefprotokoll[^"]*)"', html)
     if link:
         with opener.open(URL + unescape(link.group(1)).replace(URL, ""), timeout=60) as answer:
@@ -648,16 +649,94 @@ def qs() -> None:
     print(f"{len(checks)} QS checks passed")
 
 
+def sign() -> None:
+    """Signatures on the device and sending (tests/sign.php), then the signing page in the browser.
+
+    The page shows a pad per signer; a signature goes through ajax/sign.php as
+    base64 without "data:" and "=" (the WAF lets it pass), lands in the PDF,
+    and the send form mails the signed report to the address shown. Example
+    PDFs go to beispiele/.
+    """
+    urllib.request.urlopen(urllib.request.Request(f"{MAILPIT_URL}/api/v1/messages", method="DELETE"), timeout=30)
+    php("enable", script="sign.php")
+    result = php("run", script="sign.php")
+    checks = [dict(entry, page="php") for entry in result["checks"]]
+    time.sleep(2)
+    sent = [mailpit(f"message/{item['ID']}") for item in mailpit("messages?limit=50").get("messages", [])]
+    for subject, attachment in (("Prüfprotokoll", "-pruefprotokoll-"), ("Geräteannahme", "-geraeteannahme.pdf")):
+        mail = [detail for detail in sent if detail["Subject"].startswith(subject)]
+        files = [entry["FileName"] for detail in mail for entry in detail.get("Attachments") or []]
+        bcc = [entry["Address"] for detail in mail for entry in detail.get("Bcc") or []]
+        checks.append({"page": "mailpit", "check": f"{subject}: one mail with the PDF and BCC", "ok": len(mail) == 1 and any(attachment in name for name in files) and bool(bcc),
+                       "detail": f"{[detail['Subject'] for detail in mail]} {files} {bcc}"})
+        if mail:
+            MAILS.mkdir(parents=True, exist_ok=True)
+            (MAILS / f"sign-{subject.lower().replace('ü', 'ue').replace('ä', 'ae')}.html").write_text(mail[0].get("HTML") or "", encoding="utf-8")
+    EXAMPLES.mkdir(parents=True, exist_ok=True)
+    for name in ("pruefprotokoll-unterschrieben.pdf", "geraeteannahme-unterschrieben.pdf"):
+        docker("cp", f"{WEB}:/tmp/ittpdf-out/{name}", str(EXAMPLES / name))
+
+    opener = browser()
+
+    def get(path: str) -> tuple:
+        try:
+            answer = opener.open(f"{URL}{path}", timeout=60)
+            return answer.status, answer.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as error:
+            return error.code, ""
+
+    def post(path: str, fields: list) -> tuple:
+        try:
+            answer = opener.open(f"{URL}{path}", data=urllib.parse.urlencode(fields).encode(), timeout=120)
+            return answer.status, answer.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as error:
+            return error.code, ""
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
+
+    base = "/custom/ittabelanderpdf"
+    status, html = get(f"{base}/sign.php?kind=intake&id={result['ticket']}")
+    check("signing page shows both signatures of the intake slip", status == 200 and html.count("ittabsig-card is-signed") == 2 and "sign.js" in html)
+    status, html = get(f"{base}/sign.php?kind=qs&id={result['run']}")
+    root = re.search(r'data-endpoint="([^"]+)" data-token="([^"]+)"', html)
+    check("signing page offers a pad per signer", status == 200 and bool(root) and html.count("<canvas") == 2 and "disabled" in html)
+    if root:
+        endpoint, token = unescape(root.group(1)).replace(URL, ""), unescape(root.group(2))
+        for role, name in (("technician", "Fabian Tabelander"), ("customer", "Maria Muster")):
+            status, answer = post(endpoint, [("action", "sign"), ("token", token), ("kind", "qs"), ("id", str(result["run"])), ("role", role),
+                                              ("name", name), ("png", result["png"])])
+            check(f"{role} signs through ajax/sign.php (WAF passes)", status == 200 and json.loads(answer or "{}").get("ok") is True, f"{status} {answer[:120]}")
+        status, answer = post(endpoint, [("action", "sign"), ("token", token), ("kind", "qs"), ("id", str(result["run"])), ("role", "customer"),
+                                          ("name", "X"), ("png", "data:image/png;base64," + result["png"])])
+        check("a data: URL does not get through", status != 200, str(status))
+    status, html = get(f"{base}/sign.php?kind=qs&id={result['run']}")
+    form = re.search(r'name="token" value="([^"]+)"><input type="hidden" name="action" value="send">', html)
+    check("send form unlocks with every signature", status == 200 and html.count("ittabsig-card is-signed") == 2 and bool(form) and 'name="sendto"' in html)
+    before = len(mailpit("messages?limit=50").get("messages", []))
+    status, html = post(f"{base}/sign.php?kind=qs&id={result['run']}", [("token", form.group(1) if form else ""), ("action", "send"),
+                                                                       ("sendto", "Maria Muster <office@musterfirma.example>")])
+    time.sleep(2)
+    after = len(mailpit("messages?limit=50").get("messages", []))
+    check("send goes to the confirmed address (WAF passes)", status == 200 and after == before + 1 and "ittabsig-sent" in html, f"{status} {before}->{after}")
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"sign check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} signature checks passed")
+
+
 def main() -> int:
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign"):
                 steps[name]()
         elif step in steps:
             steps[step]()

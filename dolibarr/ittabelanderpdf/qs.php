@@ -126,6 +126,11 @@ if ($action === 'close' && $run && $fichinter) {
 		setEventMessages($langs->trans('WerkbankQsCloseFailed', $langs->transnoentities($qs->error)), null, 'errors');
 	} else {
 		setEventMessages($langs->trans('WerkbankQsClosed'), null, 'mesgs');
+		// Next step on the same device: sign, then send.
+		if (trim((string) $run->signers) !== '') {
+			header('Location: '.dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=qs&id='.((int) $run->rowid));
+			exit;
+		}
 	}
 	header('Location: '.$self.'?id='.((int) $run->rowid));
 	exit;
@@ -326,7 +331,11 @@ function ittabqs_show_run($db, $qs, $run, $fichinter, $self)
 		print '<div class="ittabqs-done">';
 		print '<p>'.$langs->trans('WerkbankQsClosedOn', dol_print_date($db->jdate($run->date_close), 'dayhour', 'tzuser')).'</p>';
 		if ($file !== '' && is_file($GLOBALS['conf']->ficheinter->dir_output.'/'.$file)) {
-			print '<a class="ittabqs-primary" href="'.DOL_URL_ROOT.'/document.php?modulepart=ficheinter&amp;file='.urlencode($file).'">'.img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans('WerkbankQsOpenPdf').'</a>';
+			print '<a class="ittabqs-secondary" href="'.DOL_URL_ROOT.'/document.php?modulepart=ficheinter&amp;file='.urlencode($file).'">'.img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans('WerkbankQsOpenPdf').'</a>';
+		}
+		print '<a class="ittabqs-primary" href="'.dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=qs&amp;id='.((int) $run->rowid).'">'.$langs->trans('WerkbankSignAndSend').'</a>';
+		if (!empty($run->date_sent)) {
+			print '<p>'.$langs->trans('WerkbankSignSentOn', dol_print_date($db->jdate($run->date_sent), 'dayhour', 'tzuser'), dol_escape_htmltag((string) $run->sent_to)).'</p>';
 		}
 		if ($user->hasRight('ittabelanderpdf', 'qs', 'manage')) {
 			print '<form method="POST" action="'.$self.'?id='.((int) $run->rowid).'"><input type="hidden" name="token" value="'.newToken().'">';

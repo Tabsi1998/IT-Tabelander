@@ -409,6 +409,12 @@ class WerkbankMailData
 					$rows[] = array('WerkbankWishedDelivery', dol_print_date($object->delivery_date, 'day', false, $langs));
 				}
 				break;
+			case 'ticket':
+				$rows[] = array('WerkbankIntakeRequest', $object->ref);
+				if (!empty($object->subject)) {
+					$rows[] = array('WerkbankIntakeSubject', $object->subject);
+				}
+				break;
 			default:
 				return '';
 		}
