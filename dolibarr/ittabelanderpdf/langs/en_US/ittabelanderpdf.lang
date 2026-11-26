@@ -634,3 +634,4 @@ WerkbankDocsGenerateFirst = Template per customer: "Generate" first, then send o
 WerkbankDocsMoreActions = More actions
 WerkbankGenAgain = Generate again
 WerkbankDocNotSendable = not to be sent
+WerkbankDocsActionsCol = Action

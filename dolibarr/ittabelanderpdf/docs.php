@@ -248,7 +248,7 @@ $fileLink = function ($filename) use ($socid, $langs) {
 
 print '<div class="div-table-responsive"><table class="noborder centpercent ittabdocs-list">';
 print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankDocSignDocument').'</td><td class="center">'.$langs->trans('Status').'</td>'
-	.'<td>'.$langs->trans('WerkbankDocsProof').'</td><td class="right">'.$langs->trans('Action').'</td></tr>';
+	.'<td>'.$langs->trans('WerkbankDocsProof').'</td><td class="right">'.$langs->trans('WerkbankDocsActionsCol').'</td></tr>';
 if (!$status) {
 	print '<tr class="oddeven"><td colspan="4"><span class="opacitymedium">'.$langs->trans('WerkbankDocsNoRules').'</span></td></tr>';
 }
