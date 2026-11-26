@@ -758,6 +758,26 @@ if ($stage === 'mails') {
 		$result = $queue->send($proposal, 'propal', $admin, true, '', $form);
 		$check('template propal '.$form.' (portal on)', $result['ok'], $result['error']);
 	}
+	// Every customer document links to its own page of the customer area (#115),
+	// the button sits in each customer template, not in supplier ones.
+	$pages = array(
+		'invoice' => array('facture', $docs['rechnung-2-teilzahlung'][1], '/kundenbereich/rechnungen/'),
+		'creditnote' => array('facture', $docs['gutschrift-1-offen'][1], '/kundenbereich/rechnungen/'),
+		'order' => array('commande', $docs['auftrag-1'][1], '/kundenbereich/belege/auftraege/'),
+		'shipping' => array('shipping', $docs['lieferschein-1'][1], '/kundenbereich/belege/lieferscheine/'),
+		'fichinter' => array('fichinter', $docs['arbeitsbericht-1'][1], '/kundenbereich/belege/arbeitsberichte/'),
+		'contract' => array('contrat', $docs['vertrag-1-gemischt'][1], '/kundenbereich/belege/vertraege/'),
+	);
+	foreach ($pages as $key => $page) {
+		$object = rt_load($db, $page[0], $page[1]);
+		$check('portal link '.$key, WerkbankMailData::portalUrl($object) === 'https://it.tabelander.co.at'.$page[2].((int) $object->id), WerkbankMailData::portalUrl($object));
+		$template = (string) rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE rowid = ".WerkbankMailTemplates::find($db, $key, 'sie', $conf->entity));
+		$check('button in template '.$key, strpos($template, '__ITTAB_KUNDENBEREICH_BLOCK__') !== false);
+		$result = $queue->send($object, $key, $admin, false, '', 'du');
+		$check('template '.$key.' du (portal on)', $result['ok'], $result['error']);
+	}
+	$supplier = (string) rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE rowid = ".WerkbankMailTemplates::find($db, 'order_supplier', '', $conf->entity));
+	$check('no button for suppliers', strpos($supplier, '__ITTAB_KUNDENBEREICH_BLOCK__') === false);
 	if ($proposal->generateDocument('werkbank', $langs) > 0) {
 		dol_mkdir(RT_OUT);
 		copy(DOL_DATA_ROOT.'/'.$proposal->last_main_doc, RT_OUT.'/angebot-1-kundenbereich-an.pdf');
