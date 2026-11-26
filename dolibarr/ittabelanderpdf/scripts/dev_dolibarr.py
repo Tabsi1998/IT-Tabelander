@@ -936,19 +936,53 @@ def gen() -> None:
     print(f"{len(checks)} generate checks passed")
 
 
+def preise() -> None:
+    """The price list from the products (tests/pricelist.php), then its block in the setup.
+
+    Sections per product category, only for sale and above 0 €, units; a
+    document with __ITTAB_PREISLISTE__ is written again when a price changes,
+    the archive keeps the released version. The setup form passes the WAF.
+    """
+    result = php("run", script="pricelist.php")
+    checks = [dict(entry, page="php") for entry in result["checks"]]
+    EXAMPLES.mkdir(parents=True, exist_ok=True)
+    docker("cp", f"{WEB}:/tmp/ittpdf-out/preisliste.pdf", str(EXAMPLES / "preisliste.pdf"))
+    opener = browser()
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
+
+    setup = "/custom/ittabelanderpdf/admin/setup.php"
+    html = opener.open(f"{URL}{setup}", timeout=60).read().decode("utf-8", "replace")
+    token = re.search(r'name="token" value="([^"]+)"><input type="hidden" name="action" value="save_pricelist">', html)
+    check("setup shows the price list block", bool(token) and 'name="ITTABPDF_PRICELIST_CATEGORIES[]"' in html and "refresh_pricelist" in html)
+    categories = re.findall(r'<option value="(\d+)"[^>]*>[^<]*PL (?:Reparatur|Hosting)', html)
+    fields = [("token", token.group(1) if token else ""), ("action", "save_pricelist"), ("ITTABPDF_PRICELIST_AUTO", "1")]
+    fields += [("ITTABPDF_PRICELIST_CATEGORIES[]", value) for value in categories]
+    answer = opener.open(f"{URL}{setup}", data=urllib.parse.urlencode(fields).encode(), timeout=120)
+    html = answer.read().decode("utf-8", "replace")
+    check("saving the price list setup writes the documents (WAF passes)", answer.status == 200 and "mit Preisen neu erzeugt" in html, f"{answer.status} {categories}")
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"price list check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} price list checks passed")
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "gen": gen, "preise": preise, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs", "sign", "docs", "gen", "preise"):
                 steps[name]()
         elif step in steps:
             steps[step]()

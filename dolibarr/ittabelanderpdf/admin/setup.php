@@ -104,6 +104,21 @@ if ($action === 'regenerate_unterlagen') {
 	header('Location: '.$_SERVER['PHP_SELF'].'#unterlagen');
 	exit;
 }
+// Price list from the products (__ITTAB_PREISLISTE__).
+if ($action === 'save_pricelist' || $action === 'refresh_pricelist') {
+	dol_include_once('/ittabelanderpdf/class/werkbankpricelist.class.php');
+	if ($action === 'save_pricelist') {
+		$ids = array_values(array_filter(array_map('intval', GETPOST('ITTABPDF_PRICELIST_CATEGORIES', 'array:int'))));
+		dolibarr_set_const($db, 'ITTABPDF_PRICELIST_CATEGORIES', implode(',', $ids), 'chaine', 0, '', $conf->entity);
+		foreach (array('ITTABPDF_PRICELIST_OTHERS', 'ITTABPDF_PRICELIST_DESC', 'ITTABPDF_PRICELIST_AUTO') as $const) {
+			dolibarr_set_const($db, $const, GETPOST($const) ? '1' : '0', 'chaine', 0, '', $conf->entity);
+		}
+	}
+	$written = WerkbankPricelist::refresh($db, $user);
+	setEventMessages($written < 0 ? $langs->trans('WerkbankPricelistFailed') : $langs->trans('WerkbankPricelistWritten', $written), null, $written < 0 ? 'warnings' : 'mesgs');
+	header('Location: '.$_SERVER['PHP_SELF'].'#pricelist');
+	exit;
+}
 if ($action === 'takeover_unterlagen') {
 	dol_include_once('/ittabelanderpdf/class/werkbankdoc.class.php');
 	$store = new WerkbankDoc($db);
@@ -308,6 +323,27 @@ print '<br><br><a id="unterlagen"></a>'.load_fiche_titre($langs->trans('Werkbank
 		print '<input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankDocTakeover')).'"></form>';
 	}
 	print '<div class="opacitymedium">'.$langs->trans('WerkbankDocsSetupHelp').'</div>';
+
+	// Price list from the products and services.
+	dol_include_once('/ittabelanderpdf/class/werkbankpricelist.class.php');
+	print '<br><a id="pricelist"></a>'.load_fiche_titre($langs->trans('WerkbankPricelistTitle'), '', 'product');
+	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'#pricelist">';
+	print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="save_pricelist">';
+	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
+	print '<tr class="liste_titre"><td>'.$langs->trans('Parameter').'</td><td>'.$langs->trans('Value').'</td></tr>';
+	print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('WerkbankPricelistCategories').(isModEnabled('categorie') ? '' : ' '.img_warning($langs->trans('WerkbankPricelistNeedsCategories'))).'</td><td>';
+	print $form->multiselectarray('ITTABPDF_PRICELIST_CATEGORIES', WerkbankPricelist::categories($db), WerkbankPricelist::chosen(), 0, 0, 'minwidth300 maxwidth500', 0, 0, '', '', '');
+	print '<div class="opacitymedium">'.$langs->trans('WerkbankPricelistCategoriesHelp').'</div></td></tr>';
+	foreach (array('ITTABPDF_PRICELIST_OTHERS' => array('WerkbankPricelistOthersSetting', 0), 'ITTABPDF_PRICELIST_DESC' => array('WerkbankPricelistDesc', 0),
+		'ITTABPDF_PRICELIST_AUTO' => array('WerkbankPricelistAuto', 1)) as $const => $setting) {
+		print '<tr class="oddeven"><td>'.$langs->trans($setting[0]).'</td><td><input type="checkbox" name="'.$const.'" value="1"'.(getDolGlobalInt($const, $setting[1]) ? ' checked' : '').'></td></tr>';
+	}
+	print '</table></div>';
+	print '<div class="opacitymedium">'.$langs->trans('WerkbankPricelistHelp').'</div>';
+	print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans('Save').'"></div></form>';
+	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'#pricelist" class="center">';
+	print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="refresh_pricelist">';
+	print '<input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankPricelistRefresh')).'"></form>';
 }
 
 print dol_get_fiche_end();

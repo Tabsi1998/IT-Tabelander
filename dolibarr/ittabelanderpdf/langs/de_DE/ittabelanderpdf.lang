@@ -575,3 +575,25 @@ WerkbankVar_MYCOMPANY_NAME = Dolibarr: Name der Firma
 WerkbankVar_MYCOMPANY_EMAIL = Dolibarr: E-Mail der Firma
 WerkbankVarsHours = Geschäftszeiten für __ITTAB_GESCHAEFTSZEITEN__
 WerkbankVarsHoursHelp = leer: aus Firma → Öffnungszeiten
+
+# Price list from the products (__ITTAB_PREISLISTE__)
+WerkbankPricelistTitle = Preisliste aus den Produkten
+WerkbankPricelistCategories = Abschnitte (Produkt-Kategorien)
+WerkbankPricelistCategoriesHelp = Je gewählter Kategorie ein Abschnitt, in der Reihenfolge des Kategorienbaums. Nur Produkte und Leistungen „im Verkauf“ mit Preis über 0 €.
+WerkbankPricelistNeedsCategories = Modul Kategorien ist aus
+WerkbankPricelistOthersSetting = Abschnitt „Weitere Leistungen“ für Produkte ohne gewählte Kategorie
+WerkbankPricelistOthers = Weitere Leistungen
+WerkbankPricelistDesc = Beschreibung unter der Bezeichnung zeigen
+WerkbankPricelistAuto = PDFs automatisch neu erzeugen, wenn sich ein Produkt ändert
+WerkbankPricelistHelp = Der Platzhalter __ITTAB_PREISLISTE__ in einer Unterlage (z. B. Preisliste) setzt die Liste ein, __ITTAB_PREIS:<Referenz>__ einen einzelnen Preis. Solche Unterlagen bekommen als Stand das heutige Datum.
+WerkbankPricelistRefresh = Preis-Unterlagen jetzt neu erzeugen
+WerkbankPricelistWritten = %s Unterlagen mit Preisen neu erzeugt.
+WerkbankPricelistFailed = Nicht alle Unterlagen mit Preisen ließen sich erzeugen (Protokoll).
+WerkbankPricelistPer = pro %s
+WerkbankPricelistPerMinute = pro Minute
+WerkbankPricelistPerHour = pro Stunde
+WerkbankPricelistPerDay = pro Tag
+WerkbankPricelistPerWeek = pro Woche
+WerkbankPricelistPerMonth = pro Monat
+WerkbankPricelistPerYear = pro Jahr
+WerkbankVar_ITTAB_PREISLISTE = Preisliste aus den Produkten (Abschnitte je Kategorie, Einstellungen → Allgemein)

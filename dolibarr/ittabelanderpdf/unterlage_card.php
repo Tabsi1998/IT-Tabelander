@@ -83,6 +83,11 @@ if ($action === 'preview' && $doc) {
 	$record = (object) array('id' => (int) $doc->rowid, 'element' => 'ittabpdf_doc', 'table_element' => 'ittabpdf_doc', 'entity' => (int) $doc->entity,
 		'ref' => $doc->slug, 'question' => $doc->title, 'answer' => (string) $doc->text, 'status' => 0, 'tms' => dol_now(),
 		'array_options' => array('options_ittab_slug' => $doc->slug));
+	// General documents show the price list and company values as they will be (a template per customer keeps its placeholders).
+	if ($doc->kind !== 'customer') {
+		dol_include_once('/ittabelanderpdf/class/werkbankvars.class.php');
+		$record->answer = WerkbankVars::fill($record->answer, WerkbankVars::values($db, null));
+	}
 	$temp = $conf->user->dir_temp.'/ittabpdf-preview-'.((int) $user->id).'.pdf';
 	dol_mkdir(dirname($temp));
 	$builder = new WerkbankBuilderUnterlage($db, $record, $langs, dol_now());
