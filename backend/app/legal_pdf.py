@@ -2,8 +2,10 @@
 
 The Dolibarr module "IT-Tabelander PDF" lays each public legal text out in
 the design of the documents and files it in Dolibarr's documents (ECM) as
-IT-Tabelander/Unterlagen/<slug>.pdf. The website fetches exactly these files
-through the API (documents/download, modulepart ecm) and hands them on.
+IT-Tabelander/Unterlagen/<slug>.pdf. The website asks the module's API for
+the PDF of the released version (/ittabelanderpdf/unterlagen/<slug>/pdf, from
+1.5.0, #156); with an older module it fetches the file itself
+(documents/download, modulepart ecm) and hands it on.
 
 Only the fixed list below is ever asked for: the path never comes from the
 request. A page that is missing or still a draft has no PDF (the router
@@ -62,6 +64,16 @@ async def _download(kind: str) -> bytes | None:
         return None
     try:
         async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
+            # The module's document first; missing endpoint or document: the file in the ECM.
+            response = await client.get(f"{cfg['base']}/api/index.php/ittabelanderpdf/unterlagen/{SLUGS[kind]}/pdf",
+                                        headers=dolibarr._headers(cfg))
+            if response.status_code == 200:
+                try:
+                    content = _pdf(response.json() or {})
+                except ValueError:
+                    content = None
+                if content is not None:
+                    return content
             response = await client.get(
                 f"{cfg['base']}/api/index.php/documents/download", headers=dolibarr._headers(cfg),
                 params={"modulepart": "ecm", "original_file": f"{FOLDER}/{SLUGS[kind]}.pdf"})

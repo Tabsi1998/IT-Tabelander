@@ -255,12 +255,20 @@ function LegalTexts({ overview, settings }) {
                       </ul>
                     </details>
                   )}
-                  <Field label="Artikel in Dolibarr" as="select" value={choice[text.setting] || 0}
-                    onChange={(event) => setChoice((current) => ({ ...current, [text.setting]: Number(event.target.value) }))}>
-                    <option value={0}>– kein Artikel –</option>
-                    {legal.choices.map((item) => <option key={item.id} value={item.id}>{item.question}{item.status === 0 ? " (Entwurf)" : ""}</option>)}
-                  </Field>
-                  {text.state === "missing" && !choice[text.setting] && (text.can_draft ? (
+                  {text.source === "module" ? (
+                    <p className="m-0 text-sm text-body">
+                      Kommt aus den <b>Unterlagen</b> des Dolibarr-Moduls: Version {text.module?.version}
+                      {text.module?.updated_at ? `, Stand ${text.module.updated_at.split("-").reverse().join(".")}` : ""}.
+                      Ändern und freigeben in Dolibarr unter Geschäftspartner → Unterlagen.
+                    </p>
+                  ) : (
+                    <Field label="Artikel in Dolibarr" as="select" value={choice[text.setting] || 0}
+                      onChange={(event) => setChoice((current) => ({ ...current, [text.setting]: Number(event.target.value) }))}>
+                      <option value={0}>– kein Artikel –</option>
+                      {legal.choices.map((item) => <option key={item.id} value={item.id}>{item.question}{item.status === 0 ? " (Entwurf)" : ""}</option>)}
+                    </Field>
+                  )}
+                  {text.source !== "module" && text.state === "missing" && !choice[text.setting] && (text.can_draft ? (
                     <button type="button" className="btn-outline self-start border-line" disabled={state.busy} onClick={() => draft(text)}>
                       Entwurf in Dolibarr anlegen
                     </button>
@@ -271,7 +279,8 @@ function LegalTexts({ overview, settings }) {
               ))}
             </div>
             <p className="m-0 text-[15px] text-body">
-              So gibst du einen Text frei: in Dolibarr <b>Wissensbasis</b> → Artikel öffnen → <b>Ändern</b> → markierte Stellen ergänzen → <b>Speichern</b> → <b>Freigeben</b>.
+              So gibst du einen Text frei: in Dolibarr <b>Geschäftspartner → Unterlagen</b> → Unterlage öffnen → <b>Ändern</b> → <b>Speichern</b> → <b>Freigeben</b>
+              (Modul ab 1.5.0; mit älterem Modul: <b>Wissensbasis</b> → Artikel → <b>Freigeben</b>).
               Danach hier <b>Neu laden</b>.
             </p>
             <Notice tone="success">{state.done}</Notice>

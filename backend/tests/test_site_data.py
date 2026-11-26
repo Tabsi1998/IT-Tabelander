@@ -357,3 +357,39 @@ def test_the_navigation_shows_the_two_extra_pages_only_once_picked():
     assert site_data.available_pages(data, {"dolibarr_b2b_terms_article_id": 5})[-1] == "agb-unternehmer"
     page = site_data.page_from(data, {"dolibarr_b2b_terms_article_id": 5}, "agb-unternehmer")
     assert page["title"] == "AGB für Unternehmer" and page["draft"] is True
+
+
+def test_legal_texts_come_from_the_module_and_else_from_the_picked_article():
+    seen = []
+
+    def module(request):
+        seen.append(request.url.path)
+        if request.url.path.endswith("/ittabelanderpdf/unterlagen"):
+            return httpx.Response(200, json=[{"slug": "datenschutz", "title": "Datenschutzerklärung", "version": 2},
+                                             {"slug": "intern-nie", "title": "Nie"}])
+        if request.url.path.endswith("/ittabelanderpdf/unterlagen/datenschutz"):
+            return httpx.Response(200, json={"slug": "datenschutz", "title": "Datenschutzerklärung", "version": 2,
+                                             "stand": "2026-11-26", "pdf": True,
+                                             "html": "<h2>1. Wer</h2><p>Text</p><script>alert(1)</script>"})
+        return httpx.Response(404, json={"error": {"message": "Not found"}})
+
+    texts = _run(lambda client: site_data.fetch_module_legal(client, CFG), module)
+    assert set(texts) == {"datenschutz"}
+    assert texts["datenschutz"]["source"] == "module" and "<script" not in texts["datenschutz"]["answer_html"]
+    assert not any("intern-nie" in path for path in seen), "only the legal pages are asked for"
+
+    data = {"company": {"name": "IT-Tabelander"}, "module_legal": texts,
+            "legal": {"datenschutz": {"id": 2, "answer_html": "<p>Alt</p>", "status": 1},
+                      "nutzungsbedingungen": {"id": 3, "answer_html": "<p>Bedingungen</p>", "status": 1}}}
+    settings = {"dolibarr_privacy_article_id": 2, "dolibarr_terms_article_id": 3}
+    page = site_data.page_from(data, settings, "datenschutz")
+    assert page["html"].startswith("<h2>1. Wer") and page["source"] == "module" and page["updated_at"] == "2026-11-26"
+    fallback = site_data.page_from(data, settings, "nutzungsbedingungen")
+    assert fallback["html"] == "<p>Bedingungen</p>" and fallback["source"] == "article"
+
+
+def test_an_older_module_leaves_the_knowledge_base_as_source():
+    gone = lambda request: httpx.Response(404, json={"error": {"message": "API not found"}})  # noqa: E731
+    assert _run(lambda client: site_data.fetch_module_legal(client, CFG), gone) is None
+    forbidden = lambda request: httpx.Response(403, json={"error": {"message": "Forbidden"}})  # noqa: E731
+    assert _run(lambda client: site_data.fetch_module_legal(client, CFG), forbidden) is None

@@ -8,6 +8,11 @@ knowledge base. Three categories decide what an article is (#128): "FAQ"
 name each by its number; left empty, the category of that name is used.
 Everything else in the knowledge base stays internal.
 
+Since the Dolibarr module ittabelanderpdf 1.5.0 the legal texts are its own
+documents ("Unterlagen", REST /ittabelanderpdf/unterlagen): a released public
+text there wins over the picked article (#156). With an older module, or a
+text the module does not have, the picked article stays the source.
+
 The website keeps a copy for ten minutes and shows the last known copy while
 Dolibarr is unreachable. The API user needs no admin rights: two constants
 name it for company data and settings, the rest are plain read rights.
@@ -160,6 +165,38 @@ async def fetch_article(client, cfg, article_id: int) -> dict | None:
     return _article(response.json() or {})
 
 
+async def fetch_module_legal(client, cfg) -> dict | None:
+    """The released public legal texts of the module, by legal page; None
+    while the module has no such endpoint (older than 1.5.0) or the API user
+    may not read it, so the knowledge base stays the source."""
+    from . import legal_pdf
+
+    response = await _get(client, cfg, "ittabelanderpdf/unterlagen")
+    if response.status_code in (401, 403, 404, 501):
+        return None
+    response.raise_for_status()
+    listed = {str(item.get("slug") or ""): item for item in response.json() or [] if isinstance(item, dict)}
+    texts = {}
+    for kind, slug in legal_pdf.SLUGS.items():
+        if slug not in listed:
+            continue
+        answer = await _get(client, cfg, f"ittabelanderpdf/unterlagen/{slug}")
+        if answer.status_code == 404:
+            continue
+        answer.raise_for_status()
+        raw = answer.json() or {}
+        body = clean_html(raw.get("html"))
+        if not body.strip():
+            continue
+        texts[kind] = {
+            "id": f"modul-{slug}", "slug": slug, "question": str(raw.get("title") or "").strip(),
+            "answer_html": body, "status": ARTICLE_VALIDATED, "source": "module",
+            "version": int(raw.get("version") or 0), "updated_at": str(raw.get("stand") or "") or None,
+            "pdf": bool(raw.get("pdf")),
+        }
+    return texts
+
+
 async def fetch_categories(client, cfg) -> list[dict]:
     response = await _get(client, cfg, "categories", {"type": "knowledgemanagement", "limit": 200})
     if response.status_code == 404:
@@ -199,7 +236,8 @@ async def refresh(*, force: bool = False) -> dict:
             return {**cache, "errors": {"dolibarr": "Dolibarr ist in den Website-Einstellungen nicht aktiviert."}}
         result = {"company": cache.get("company"), "opening_hours": cache.get("opening_hours"),
                   "articles": cache.get("articles"), "legal_articles": cache.get("legal_articles"),
-                  "internal_ids": cache.get("internal_ids"), "legal": cache.get("legal") or {}, "errors": {}}
+                  "internal_ids": cache.get("internal_ids"), "legal": cache.get("legal") or {},
+                  "module_legal": cache.get("module_legal") or {}, "errors": {}}
         parts = [("company", fetch_company), ("opening_hours", fetch_opening_hours)]
         async with httpx.AsyncClient(timeout=cfg["timeout"]) as client:
             for part, fetch in parts:
@@ -221,6 +259,11 @@ async def refresh(*, force: bool = False) -> dict:
                     continue
                 result[key] = [item["id"] for item in articles] if role == "internal" else articles
             result["legal"] = await _fetch_legal(client, cfg, settings, result)
+            try:
+                result["module_legal"] = await fetch_module_legal(client, cfg) or {}
+            except Exception as exc:  # noqa: BLE001
+                result["errors"]["legal"] = _hint("articles", exc)
+                logger.warning("Dolibarr module documents unavailable: %s", type(exc).__name__)
         result.update({"category_id": ids.get("faq"), "category_ids": ids, "fetched_at": now_utc()})
         await db.site_cache.replace_one({"_id": CACHE_ID}, {"_id": CACHE_ID, **result}, upsert=True)
         return result
@@ -336,10 +379,19 @@ def imprint_html(company: dict, extra_html: str = "") -> str:
     return "".join(rows) + (extra_html or "")
 
 
+def legal_source(data: dict, settings: dict, kind: str) -> dict | None:
+    """What carries a legal page: the module's released document, else the picked article."""
+    module = (data.get("module_legal") or {}).get(kind)
+    if module:
+        return module
+    return (data.get("legal") or {}).get(kind) if settings.get(LEGAL_ARTICLES[kind]) else None
+
+
 def page_from(data: dict, settings: dict, kind: str) -> dict | None:
     """One legal page from the cached copy: the imprint from company data
-    (plus an optional article), the others from their picked articles."""
-    article = (data.get("legal") or {}).get(kind) if settings.get(LEGAL_ARTICLES[kind]) else None
+    (plus an optional text), the others from the module's document or their
+    picked article."""
+    article = legal_source(data, settings, kind)
     if kind == "impressum":
         if not data.get("company"):
             return None
@@ -350,7 +402,7 @@ def page_from(data: dict, settings: dict, kind: str) -> dict | None:
             return None
         body, draft = article["answer_html"], article["status"] == ARTICLE_DRAFT
     return {"kind": kind, "title": LEGAL_TITLES[kind], "html": body, "draft": draft,
-            "updated_at": (article or {}).get("updated_at")}
+            "updated_at": (article or {}).get("updated_at"), "source": (article or {}).get("source", "article")}
 
 
 async def legal_data() -> tuple[dict, dict]:
