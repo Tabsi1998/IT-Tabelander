@@ -46,7 +46,7 @@ Dateien: `docs/rollout/mahnwesen/` (je Stufe `*.html` = Inhalt, `*.betreff.txt` 
 
 In der jeweiligen Vorlage den Editor auf **Quelltext** stellen, den bisherigen Inhalt ersetzen, speichern. Falls die Produktionstexte gegenüber den Plugin-Standardtexten geändert wurden: vorher vergleichen (die neuen Texte folgen inhaltlich den Standardtexten).
 
-Wichtig: Mahnwesen druckt den E-Mail-Text auch in den Mahnbrief (PDF), und zwar alles **vor** `<!--MAHNWESEN_PDF_END-->`. Deshalb stehen Logo und dunkler Fuß in diesen Vorlagen **nach** der Marke, nur in der E-Mail; im Brief kommen Logo und Fuß aus dem Mahnwesen-Briefkopf. Die Marke nicht entfernen.
+Wichtig: Mahnwesen druckt den E-Mail-Text auch in den Mahnbrief (PDF), und zwar alles **vor** `<!--MAHNWESEN_PDF_END-->`. Deshalb steht die Signatur mit Linie, Logo und Kontakt (ab 1.9.0) in diesen Vorlagen **nach** der Marke, nur in der E-Mail; im Brief kommen Logo und Fuß aus dem Mahnwesen-Briefkopf. Die Marke nicht entfernen.
 
 Das Logo steht in den Mahnwesen-Texten als `__ITTAB_LOGO__`. Mahnwesen schickt seine Texte durch Dolibarrs Variablen-Ersetzung, dabei setzt dieses Modul das Firmenlogo ein. Das funktioniert nur, solange IT-Tabelander PDF aktiv ist; sonst steht dort der Text `__ITTAB_LOGO__`.
 
