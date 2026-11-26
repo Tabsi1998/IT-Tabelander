@@ -520,6 +520,36 @@ class ActionsIttabelanderpdf
 				$paths[] = $path;
 			}
 		}
+		// "Alle fehlenden zusenden": every open required document of the customer, templates generated.
+		if ($fresh && GETPOSTINT('ittabpdf_preselect_missing') && $socid > 0) {
+			require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+			$soc = new Societe($this->db);
+			if ($soc->fetch($socid) > 0) {
+				$documents = $docs->documents();
+				foreach ($docs->status($soc) as $entry) {
+					if (!(int) $entry['rule']->required || $entry['state'] === 'done') {
+						continue;
+					}
+					$slug = (string) $entry['rule']->slug;
+					$kind = isset($documents[$slug]) ? $documents[$slug]['kind'] : '';
+					if ($kind === 'customer') {
+						$path = !empty($entry['generated']) ? $this->generatedPath($docs, (int) $entry['generated']->rowid, $socid) : '';
+						if ($path === '') {
+							$made = $this->generateFor($docs, $slug, $socid);
+							$path = isset($made['path']) ? $made['path'] : '';
+							if (isset($made['note'])) {
+								$notes[] = $made['note'];
+							}
+						}
+					} else {
+						$path = $unterlagen->path($slug.'.pdf');
+					}
+					if ($path !== '') {
+						$paths[] = $path;
+					}
+				}
+			}
+		}
 		if ($fresh && GETPOST('ittabpdf_preselect', 'alphanohtml') !== '') {
 			$path = $unterlagen->path(GETPOST('ittabpdf_preselect', 'alphanohtml'));
 			if ($path !== '') {

@@ -666,3 +666,4 @@ WerkbankDocsActionRemoveShort = Entfernen
 WerkbankDocsActionGenerateShort = Erzeugen
 WerkbankDocsActionGenerateAgainShort = Neu erzeugen
 WerkbankDocsActionContinueShort = Weiter unterschreiben
+WerkbankDocsSendAllMissing = Alle fehlenden zusenden

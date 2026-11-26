@@ -43,6 +43,16 @@ function rt_shape($html)
 if ($stage === 'prepare') {
 	rt_modules(array('modFckeditor'));
 	rt_const($db, 'FCKEDITOR_ENABLE_MAIL', '1');
+	// A template with the parts the module puts in when sending: facts box, button, bank details, signature.
+	dol_include_once('/ittabelanderpdf/class/werkbankmaildata.class.php');
+	$T = 'WerkbankMailTemplates';
+	$parts = $T::paragraph('Guten Tag,').WerkbankMailData::box(WerkbankMailData::factRow('Angebot Nr.', 'PR2611-0001').WerkbankMailData::factRow('Gesamt', '90,00 €', true))
+		.$T::button('https://it.example.at/kundenbereich', 'Im Kundenbereich ansehen')
+		.$T::signature('Mit freundlichen Grüßen', 'Fabian Tabelander', 'IT-Tabelander', '__ITTAB_LOGO__', 'Spridrichstraße 17, 6410 Telfs', 'office@example.test',
+			'https://it.example.at', 'it.example.at', WerkbankMailData::phoneLink('+43 676 0000000'));
+	rt_exec($db, "DELETE FROM ".MAIN_DB_PREFIX."c_email_templates WHERE label = 'Editor-Test Bausteine'");
+	rt_exec($db, "INSERT INTO ".MAIN_DB_PREFIX."c_email_templates (entity, module, type_template, label, active, topic, content, position) VALUES (1, 'ittabelanderpdf', 'thirdparty', 'Editor-Test Bausteine', 1, 'Test', '".$db->escape($parts)."', 999)");
+	$labels[] = 'Editor-Test Bausteine';
 	$list = array();
 	foreach ($labels as $label) {
 		$row = $db->fetch_object($db->query("SELECT rowid, content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE module = 'ittabelanderpdf' AND label = '".$db->escape($label)."'"));
@@ -80,6 +90,14 @@ foreach ($before as $label => $entry) {
 		'ok' => strpos((string) $row->content, 'border-top:2px') === false && strpos((string) $row->content, '<hr') !== false
 			&& strpos((string) $row->content, '__ITTAB_LOGO__') > strpos((string) $row->content, '<hr'));
 }
+// The parts of the module: the facts box keeps its tint and the fonts of label and value, the button its colour.
+$parts = (string) rt_value($db, "SELECT content FROM ".MAIN_DB_PREFIX."c_email_templates WHERE label = 'Editor-Test Bausteine'");
+$checks[] = array('check' => 'facts box and button keep their look in the editor',
+	'ok' => (bool) preg_match('/background-color:\s*#F7F9FB/i', $parts) && (bool) preg_match('/font-size:\s*12px/', $parts) && (bool) preg_match('/font-size:\s*22px/', $parts)
+		&& (bool) preg_match('/background-color:\s*#FE5A23/i', $parts) && (bool) preg_match('/color:\s*#ffffff/i', $parts),
+	'detail' => substr($parts, 0, 600));
+rt_exec($db, "DELETE FROM ".MAIN_DB_PREFIX."c_email_templates WHERE label = 'Editor-Test Bausteine'");
+
 $failed = array_values(array_filter($checks, function ($entry) {
 	return !$entry['ok'];
 }));
