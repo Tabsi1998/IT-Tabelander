@@ -71,6 +71,13 @@ def test_imprint_comes_from_company_data_and_escapes_it():
     assert "UID-Nummer: ATU12345678" in body and "Firmenbuchnummer: FN 123456a" in body
     assert "Firmenbuchgericht: LG Innsbruck" in body and "Unternehmensgegenstand: IT-Service" in body
     assert body.endswith("<p>Aufsichtsbehörde: BH</p>")
+    assert "Österreich" in body and ">AT<" not in body
+
+
+def test_imprint_hides_the_court_without_a_register_entry():
+    # Dolibarr's Prof. Id 2 is the court of jurisdiction in Austria (#138).
+    body = site_data.imprint_html({"name": "IT-Tabelander", "country_code": "AT", "idprof2": "Innsbruck"}, "")
+    assert "Firmenbuchgericht" not in body and "Innsbruck" not in body
 
 
 def test_hints_name_the_dolibarr_setting():
