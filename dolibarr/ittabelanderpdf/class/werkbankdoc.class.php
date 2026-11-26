@@ -251,6 +251,13 @@ class WerkbankDoc
 				return -1;
 			}
 		}
+		// A successor of a renamed document is there now: rules and settings follow (WerkbankDocs::RENAMED).
+		require_once __DIR__.'/werkbankdocs.class.php';
+		if (in_array($doc->slug, array_column(WerkbankDocs::RENAMED, 0), true)) {
+			global $conf;
+			$docs = new WerkbankDocs($this->db);
+			$docs->migrateRenamed((int) $conf->entity);
+		}
 		return $number;
 	}
 

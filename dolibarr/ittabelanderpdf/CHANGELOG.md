@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.2] - 2026-11-26
+
+- No own hosting any more: the shipped rules ask for "Leistungsbeschreibung IT-Betreuung und Wartung" (`leistungsbeschreibung-betreuung-wartung`, and `-privat`) and, like the AVV, for contracts with `DL-WART*` (was `DL-HOST*,DL-WART*`).
+- Upgrade: rules, default attachments and appended documents of the old file names (`leistungsbeschreibung-hosting-wartung`, `-privat`) move to the new ones as soon as the new document is released (on activation and when releasing it); a rule keeps a label or products the owner changed. The old documents stay, marked "nicht versendbar"; what was handed over under the old name stays in the history.
+- Help texts name `DL-WART*` as the example.
+
 ## [1.8.1] - 2026-11-26
 
 - Mail forms: one recipient is preselected when Dolibarr selects none (it does only with exactly one): the contact of the document (proposal, contract: customer contact), else a contact with a role at the third party, else the third party's address. Never several.
