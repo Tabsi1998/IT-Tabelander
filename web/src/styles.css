@@ -69,7 +69,7 @@
     -webkit-text-size-adjust: 100%;
   }
   body {
-    @apply bg-page font-sans text-ink antialiased;
+    @apply bg-page font-sans text-ink antialiased print:bg-white;
     margin: 0;
   }
   h1, h2, h3 {
