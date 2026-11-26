@@ -4,6 +4,7 @@ import { usePortal } from "../PortalApp.jsx";
 import { stepOf } from "../steps.js";
 import { NEW_INQUIRY } from "./InquiryDetail.jsx";
 import { Loading, Problem } from "./parts.jsx";
+import { waitsForYou } from "./Unterlagen.jsx";
 
 /** Hosting, maintenance and the like that run under a contract (#101). */
 function Services({ services }) {
@@ -63,7 +64,7 @@ function Card({ to, kicker, title, text, action, accent }) {
 
 /** What is open, at a glance (#64): offers to answer, invoices to pay, repairs under way. */
 export default function Overview() {
-  const { overview } = usePortal();
+  const { overview, documents } = usePortal();
   if (overview.loading && !overview.data) return <Loading />;
   if (overview.error) return <Problem error={overview.error} onRetry={overview.reload} />;
   const data = overview.data;
@@ -72,6 +73,8 @@ export default function Overview() {
   // An inquiry waiting for the customer's answer comes first and stands out (#122).
   const waiting = data.tickets.filter((item) => item.open && item.step === "wartet_auf_dich");
   const repairs = data.tickets.filter((item) => item.open && item.step !== "wartet_auf_dich");
+  // Documents to confirm or sign (#187); the overview never waits for them.
+  const papers = (documents?.data || []).filter(waitsForYou);
   return (
     <>
       <div className="flex flex-col gap-1">
@@ -83,7 +86,7 @@ export default function Overview() {
         <Tile label="Offene Rechnungen" value={data.counts.invoices_open} to="/kundenbereich/rechnungen" />
         <Tile label="Offene Anfragen" value={data.counts.repairs_running} to="/kundenbereich/anfragen" />
       </div>
-      {waiting.length + offers.length + invoices.length + repairs.length === 0 ? (
+      {waiting.length + offers.length + papers.length + invoices.length + repairs.length === 0 ? (
         <div className="card flex flex-col items-start gap-3 p-6">
           <p className="m-0 text-[17px] text-body">Gerade ist nichts offen.</p>
           <Link to={NEW_INQUIRY} className="btn-primary">Neue Anfrage starten</Link>
@@ -98,6 +101,11 @@ export default function Overview() {
             <Card key={`o${item.id}`} to={`/kundenbereich/angebote/${item.id}`} kicker="Angebot wartet auf dich" accent
               title={`Angebot ${item.ref}`} action="Ansehen und annehmen"
               text={`${money(item.total)}${item.valid_until ? ` · gültig bis ${day(item.valid_until)}` : ""}`} />
+          ))}
+          {papers.map((item) => (
+            <Card key={`u${item.customer_id}-${item.slug}`} to="/kundenbereich/unterlagen" kicker="Unterlage wartet auf dich" accent
+              title={item.title} action={item.can_sign ? "Lesen und unterschreiben" : "Lesen und bestätigen"}
+              text={item.stand ? `Stand ${day(`${item.stand}T12:00:00`)}` : "Bitte kurz ansehen"} />
           ))}
           {invoices.map((item) => (
             <Card key={`i${item.id}`} to={`/kundenbereich/rechnungen/${item.id}`} kicker="Rechnung offen"

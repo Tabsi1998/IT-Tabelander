@@ -322,6 +322,113 @@ test("a work report and a contract show what was done and what runs (#100)", asy
   await expect(page).toHaveURL(/\/kundenbereich\/belege$/);
 });
 
+// A stroke across the pad, with the mouse; on the phone the same pointer events come from the finger.
+async function drawSignature(page) {
+  const pad = page.getByRole("application", { name: "Feld für deine Unterschrift" });
+  await pad.scrollIntoViewIfNeeded();
+  const box = await pad.boundingBox();
+  await page.mouse.move(box.x + 30, box.y + box.height * 0.7);
+  await page.mouse.down();
+  for (const [x, y] of [[0.25, 0.4], [0.4, 0.75], [0.6, 0.35], [0.8, 0.7]]) {
+    await page.mouse.move(box.x + box.width * x, box.y + box.height * y, { steps: 6 });
+  }
+  await page.mouse.up();
+}
+
+test("documents: what waits stands first, each with its state and PDF (#187)", async ({ page }) => {
+  await signedIn(page, "/kundenbereich/unterlagen");
+  await expect(page.getByRole("heading", { level: 1, name: "Unterlagen" })).toBeVisible();
+  const titles = await page.getByRole("main").getByRole("heading", { level: 2 }).allTextContents();
+  expect(titles).toEqual(["AGB für Unternehmer", "Vereinbarung zur Auftragsverarbeitung (AVV)", "Leistungsbeschreibung IT-Betreuung und Wartung",
+    "Zusatzvereinbarung Datenschutz", "Einverständnis Fernwartung"]);
+  const agb = page.getByRole("article", { name: "AGB für Unternehmer" });
+  await expect(agb).toContainText("wartet auf dich");
+  await expect(agb).toContainText("Stand 20.11.2026");
+  await expect(agb.getByRole("link", { name: "PDF lesen" })).toHaveAttribute("href", "/api/portal/unterlagen/agb-unternehmer/pdf");
+  const consent = page.getByRole("article", { name: "Einverständnis Fernwartung" });
+  await expect(consent.getByRole("link", { name: "Unterschriebenes PDF" })).toHaveAttribute("href", "/api/portal/unterlagen/fernwartung-einverstaendnis/pdf");
+  await expect(consent).toContainText("Erledigt am 10.11.2026.");
+  await expect(page.getByRole("article", { name: "Leistungsbeschreibung IT-Betreuung und Wartung" })).toContainText("zum Nachlesen");
+  const prepared = page.getByRole("article", { name: "Zusatzvereinbarung Datenschutz" });
+  await expect(prepared).toContainText("in Vorbereitung");
+  await expect(prepared.getByRole("link")).toHaveCount(0);
+  await expect(prepared.getByRole("button")).toHaveCount(0);
+  const nav = page.getByRole("navigation", { name: page.viewportSize().width < 1024 ? "Kundenbereich unten" : "Kundenbereich", exact: true });
+  await expect(nav.getByRole("link", { name: /Unterlagen/ })).toHaveAttribute("aria-current", "page");
+  await expectNoSidewaysScroll(page);
+});
+
+test("the overview shows a document waiting and leads to it (#187)", async ({ page }) => {
+  await signedIn(page);
+  const card = page.getByRole("link", { name: /AGB für Unternehmer/ });
+  await expect(card).toContainText("Lesen und bestätigen");
+  await card.click();
+  await expect(page).toHaveURL(/\/kundenbereich\/unterlagen$/);
+});
+
+test("confirm the AGB: the tick and the name, with the Stand shown (#187)", async ({ page }) => {
+  const state = await signedIn(page, "/kundenbereich/unterlagen");
+  const agb = page.getByRole("article", { name: "AGB für Unternehmer" });
+  await agb.getByRole("button", { name: "Bestätigen" }).click();
+  const form = agb.getByRole("form", { name: "AGB für Unternehmer bestätigen" });
+  await form.getByRole("button", { name: "Verbindlich bestätigen" }).click();
+  await expect(form.getByRole("alert")).toHaveText(/gelesen hast/);
+  await form.getByLabel(/Ich habe „AGB für Unternehmer“ \(Stand 20\.11\.2026\) gelesen/).check();
+  await form.getByRole("button", { name: "Verbindlich bestätigen" }).click();
+  await expect(form.getByRole("alert")).toHaveText(/deinen Namen/);
+  await form.getByLabel("Dein Name zur Bestätigung").fill("  Max Muster ");
+  await form.getByRole("button", { name: "Verbindlich bestätigen" }).click();
+  await expect(page.getByRole("status")).toHaveText(/„AGB für Unternehmer“ ist bestätigt/);
+  expect(state.sent.find((item) => item.path === "/unterlagen/agb-unternehmer/bestaetigen").body)
+    .toEqual({ name: "Max Muster", accepted: true, version: "2026-11-20" });
+  await expect(agb).toContainText("erledigt");
+  await expect(agb.getByRole("button")).toHaveCount(0);
+});
+
+test("sign the AVV on the screen; the counter signature follows (#187)", async ({ page }) => {
+  const state = await signedIn(page, "/kundenbereich/unterlagen");
+  const avv = page.getByRole("article", { name: "Vereinbarung zur Auftragsverarbeitung (AVV)" });
+  await avv.getByRole("button", { name: "Online unterschreiben" }).click();
+  const form = avv.getByRole("form", { name: /unterschreiben$/ });
+  await expect(form.getByRole("button", { name: "Unterschrift löschen" })).toBeDisabled();
+  await form.getByLabel("Dein Name in Druckbuchstaben").fill("MAX MUSTER");
+  await form.getByRole("button", { name: "Unterschrift abschicken" }).click();
+  await expect(form.getByRole("alert")).toHaveText(/unterschreib im Feld/);
+  await drawSignature(page);
+  await expect(form.getByRole("button", { name: "Unterschrift löschen" })).toBeEnabled();
+  await expectNoSidewaysScroll(page);
+  await form.getByRole("button", { name: "Unterschrift abschicken" }).click();
+  await expect(page.getByRole("status")).toHaveText(/Unterschrift für „Vereinbarung zur Auftragsverarbeitung \(AVV\)“ ist angekommen/);
+  const { body } = state.sent.find((item) => item.path === "/unterlagen/auftragsverarbeitung/unterschreiben");
+  expect(body.name).toBe("MAX MUSTER");
+  expect(body.version).toBe("2026-11-18");
+  // A PNG as base64, without "data:" and "=" (Dolibarr's WAF).
+  expect(body.png).toMatch(/^[A-Za-z0-9+/]+$/);
+  expect(Buffer.from(body.png, "base64").subarray(1, 4).toString()).toBe("PNG");
+  await expect(avv).toContainText("Gegenzeichnung folgt");
+  await expect(avv.getByRole("button")).toHaveCount(0);
+});
+
+test("a refusal of the server shows in the form, which stays (#187)", async ({ page }) => {
+  await signedIn(page, "/kundenbereich/unterlagen");
+  await page.route("**/api/portal/unterlagen/agb-unternehmer/bestaetigen", (route) => route.fulfill({
+    status: 409, contentType: "application/json",
+    body: JSON.stringify({ detail: "Diese Unterlage hat inzwischen einen neuen Stand. Bitte lade die Seite neu und lies sie noch einmal." }) }));
+  const agb = page.getByRole("article", { name: "AGB für Unternehmer" });
+  await agb.getByRole("button", { name: "Bestätigen" }).click();
+  await agb.getByRole("checkbox").check();
+  await agb.getByLabel("Dein Name zur Bestätigung").fill("Max Muster");
+  await agb.getByRole("button", { name: "Verbindlich bestätigen" }).click();
+  await expect(agb.getByRole("alert")).toHaveText(/neuen Stand/);
+  await expect(agb.getByLabel("Dein Name zur Bestätigung")).toHaveValue("Max Muster");
+});
+
+test("without documents the page says so (#187)", async ({ page }) => {
+  await mockPortal(page, portalState({ signedIn: true, documents: [] }));
+  await page.goto("/kundenbereich/unterlagen");
+  await expect(page.getByText("Gerade gibt es keine Unterlagen für dich.")).toBeVisible();
+});
+
 for (const scheme of ["light", "dark"]) {
   for (const [name, path, heading, signIn] of [
     ["anmelden", "/kundenbereich", "Anmelden ohne Passwort", false],
@@ -336,6 +443,7 @@ for (const scheme of ["light", "dark"]) {
     ["auftrag", "/kundenbereich/belege/auftraege/51", "Auftragsbestätigung CO2609-0004", true],
     ["arbeitsbericht", "/kundenbereich/belege/arbeitsberichte/71", "Arbeitsbericht FI2609-0003", true],
     ["vertrag", "/kundenbereich/belege/vertraege/81", "Vertrag CT2609-0001", true],
+    ["unterlagen", "/kundenbereich/unterlagen", "Unterlagen", true],
   ]) {
     test(`customer area ${name} is accessible in ${scheme === "light" ? "hell" : "dunkel"} (#63)`, async ({ page }, testInfo) => {
       await page.emulateMedia({ colorScheme: scheme });

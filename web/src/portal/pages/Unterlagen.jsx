@@ -199,9 +199,9 @@ function Sign({ item, several, onDone, onCancel }) {
       <div className="flex flex-col gap-1.5">
         <span className="text-[15px] font-semibold">Deine Unterschrift</span>
         <span id={hint} className="text-[15px] text-muted">Mit dem Finger, einem Stift oder der Maus ins Feld.</span>
-        <div className="relative mt-1 overflow-hidden rounded-[10px] border-[1.5px] border-field bg-white">
-          <canvas ref={canvas} role="img" aria-label="Feld für deine Unterschrift" aria-describedby={hint}
-            className="block h-[170px] w-full cursor-crosshair touch-none md:h-[190px]" />
+        <div role="application" aria-label="Feld für deine Unterschrift" aria-describedby={hint}
+          className="relative mt-1 overflow-hidden rounded-[10px] border-[1.5px] border-field bg-white">
+          <canvas ref={canvas} className="block h-[170px] w-full cursor-crosshair touch-none md:h-[190px]" />
           {/* The line to sign on, as on paper; it is not part of the image. */}
           <span aria-hidden="true" className="pointer-events-none absolute inset-x-5 bottom-10 border-b border-dashed border-[#9AA9BA]" />
           {!inked && (
