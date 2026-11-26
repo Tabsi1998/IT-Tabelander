@@ -33,6 +33,11 @@ EVENTS = [
      "note_private": "Ticket found by trackid\n-----\nEin T14.\n\nAm 1.1.2026 schrieb IT-Tabelander:\n> Welches?\n"
                      "----- Header\nReceived: from mail"},
     {"id": "5", "code": "TICKET_MSG_PRIVATE_SENTBYMAIL", "note_private": "Auch intern", "datep": 1790000005},
+    # Mails about the ticket with somebody else: a supplier's answer, a mail to the supplier.
+    {"id": "7", "code": "AC_EMAIL_IN", "datep": 1790000007, "email_from": "Lieferant <verkauf@lieferant.example>",
+     "note_private": "-----\nAngebot Ersatzteil 80 Euro netto"},
+    {"id": "8", "code": "AC_EMAIL", "datep": 1790000008, "email_to": "verkauf@lieferant.example",
+     "note_private": "-----\nBitte Teil bestellen"},
     {"id": "6", "code": "AC_TEL", "note_private": "Telefon: +43 1", "datep": 1790000006},
 ]
 
@@ -116,7 +121,8 @@ def test_the_history_shows_public_messages_only_and_who_wrote_them(world):
         ("customer", "Startet nicht."), ("team", "Welches Modell genau?"), ("customer", "Ein T14.")]
     text = json.dumps(shown, ensure_ascii=False)
     # Never a private message, never Dolibarr's log, never the mail headers or the quoted mail.
-    for hidden in ("Interne Notiz", "Auch intern", "erstellt", "Telefon", "Received", "Welches?", "trackid"):
+    for hidden in ("Interne Notiz", "Auch intern", "erstellt", "Telefon", "Received", "Welches?", "trackid",
+                   "Ersatzteil", "Teil bestellen"):
         assert hidden not in text
     assert shown["messages"][2]["via"] == "email" and shown["messages"][2]["author"] == "Max Muster"
     # The agenda is asked for this ticket only.

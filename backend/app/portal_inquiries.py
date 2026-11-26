@@ -125,13 +125,19 @@ def _mail_sender(value) -> str:
     return (found.group(1).strip() if found and found.group(1).strip() else text.strip("<>"))[:120]
 
 
-def public_ids(events: list[dict]) -> set[str]:
-    """The events the customer may see; a file linked to one of them he may see too."""
-    return {str(event.get("id")) for event in events if str(event.get("code") or "") in PUBLIC_CODES}
+ADDRESS = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
 
-def history(raw: dict, events: list[dict]) -> list[dict]:
-    """The first message, then every public message, oldest first."""
+def _addresses(value) -> set[str]:
+    return {found.lower() for found in ADDRESS.findall(str(value or ""))}
+
+
+def history(raw: dict, events: list[dict], customer: set[str] = frozenset()) -> list[dict]:
+    """The first message, then every public message, oldest first. A mail the
+    collector put on the ticket shows only between the workshop and the
+    customer's own addresses (customer): a supplier's answer or a mail to
+    someone else about the same ticket stays out."""
+    customer = {address.lower() for address in customer} | _addresses(raw.get("origin_email"))
     items = []
     first = first_message_text(raw.get("message"))
     if first:
@@ -142,6 +148,10 @@ def history(raw: dict, events: list[dict]) -> list[dict]:
     for event in sorted(events, key=lambda item: (portal._int(item.get("datep")), portal._int(item.get("id")))):
         code = str(event.get("code") or "")
         if code not in PUBLIC_CODES:
+            continue
+        if code == "AC_EMAIL_IN" and not _addresses(event.get("email_from")) & customer:
+            continue
+        if code == "AC_EMAIL" and not _addresses(event.get("email_to")) & customer:
             continue
         text = message_text(event.get("note_private") or event.get("note") or "")
         who, author, via = PUBLIC_CODES[code], None, "email" if code.startswith("AC_EMAIL") or code.endswith("SENTBYMAIL") else None
@@ -242,10 +252,12 @@ async def detail(session: dict, ticket_id: int) -> dict:
         raw = await _owned_ticket(client, cfg, session, ticket_id)
         code = _status(raw)
         waiting = code not in CLOSED and await dolibarr._offer_waiting(client, cfg, str(raw.get("id")), portal._socid(raw))
-        events = await _events(client, cfg, raw.get("id"))
-        files = portal_files.visible(await portal_files.ticket_files(client, cfg, raw.get("id")), public_ids(events))
+        messages = history(raw, await _events(client, cfg, raw.get("id")), {session["email"]})
+        # A file linked to a message the customer sees, he may see too.
+        files = portal_files.visible(await portal_files.ticket_files(client, cfg, raw.get("id")),
+                                     {item["id"] for item in messages})
     return {**portal._ticket(raw, waiting), "closed_at": dolibarr._iso_time(raw.get("date_close")),
-            "can_reply": code not in CLOSED, "messages": history(raw, events), "files": files}
+            "can_reply": code not in CLOSED, "messages": messages, "files": files}
 
 
 # ------------------------------------------------------------------ the owner

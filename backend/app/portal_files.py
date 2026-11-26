@@ -89,7 +89,8 @@ async def download(session: dict, ticket_id: int, name: str) -> tuple[str, str, 
     cfg = await portal._config()
     async with httpx.AsyncClient(timeout=max(cfg["timeout"], 30)) as client:
         raw = await portal_inquiries._owned_ticket(client, cfg, session, ticket_id)
-        events = portal_inquiries.public_ids(await portal_inquiries._events(client, cfg, raw.get("id")))
+        events = {item["id"] for item in portal_inquiries.history(
+            raw, await portal_inquiries._events(client, cfg, raw.get("id")), {session["email"]})}
         allowed = {item["name"] for item in visible(await ticket_files(client, cfg, raw.get("id")), events)}
         if name not in allowed:
             raise portal.NotFound("Diese Datei gibt es hier nicht.")
