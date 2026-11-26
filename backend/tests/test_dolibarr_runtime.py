@@ -907,6 +907,32 @@ class TestCustomerArea:
         assert "Muster-Widerrufsformular" in text and "14 Tagen" in text and "„Max Portal“" in text
         assert mail_with(WARNINGS_TO, f"Angebot {world['a_offer']['ref']} angenommen"), "the owner was not told"
 
+    def test_the_signed_offer_is_withdrawn_online_without_signing_in(self, portal_world):
+        """#142, § 13a FAGG: the confirmation of receipt, the owner's notice and
+        a note at the offer; the acceptance mail shows where the function is."""
+        world = portal_world
+        ref = world["a_offer"]["ref"]
+        accepted = mail_text(mail_with(world["a"], f"Bestätigung: Angebot {ref}"))
+        assert "Vertrag widerrufen" in accepted and f"/rechtliches/widerruf?vertrag={ref}" in accepted
+        response = requests.post(f"{BASE_URL}/api/withdrawals", timeout=60, json={
+            "request_id": f"widerruf-{uuid.uuid4().hex}", "name": "Max Portal", "email": world["a"],
+            "contract": ref, "scope": "part", "parts": "die Position Akku tauschen A"})
+        assert response.status_code == 200, response.text
+        answer = response.json()
+        assert answer["mail_sent"] is True and answer["receipt"].startswith("WR-")
+        confirmation = mail_with(world["a"], f"Eingangsbestätigung: Widerruf {ref}")
+        assert confirmation, "the customer got no confirmation of receipt"
+        text = mail_text(confirmation)
+        assert answer["received_local"] in text and "die Position Akku tauschen A" in text and answer["receipt"] in text
+        notice = mail_with(WARNINGS_TO, f"Widerruf eingegangen: {ref}")
+        assert notice and "Am Angebot in Dolibarr vermerkt" in mail_text(notice)
+        offer = dolibarr_get(f"proposals/{world['a_offer']['id']}")
+        assert "„Max Portal“" in offer["note_private"], "the acceptance proof must stay"
+        assert "Widerruf über die Website eingegangen" in offer["note_private"] and answer["receipt"] in offer["note_private"]
+        assert int(offer["status"]) == 2, "the website only notes it; the owner decides"
+        stored = website_db().withdrawals.find_one({"receipt": answer["receipt"]})
+        assert stored["owner_told"] is True and "email" not in stored and "name" not in stored
+
     def test_an_open_invoice_shows_what_to_transfer(self, portal_world):
         """#66: amount and invoice number in the data and in the code for the banking app."""
         world = portal_world

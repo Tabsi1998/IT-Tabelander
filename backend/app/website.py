@@ -40,6 +40,7 @@ OLD_ADDRESSES = {
     "datenschutz": "/rechtliches/datenschutz",
     "nutzungsbedingungen": "/rechtliches/nutzungsbedingungen",
     "rechtliches": "/rechtliches/impressum",
+    "widerruf": "/rechtliches/widerruf#vertrag-widerrufen",
 }
 LEGAL_PAGES = ("impressum", "datenschutz", "nutzungsbedingungen", "widerruf", "agb-unternehmer")
 DAYS = {"Montag": "Monday", "Dienstag": "Tuesday", "Mittwoch": "Wednesday", "Donnerstag": "Thursday",

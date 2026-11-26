@@ -666,6 +666,13 @@ def money(value) -> str:
     return f"{number:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def withdrawal_link(site_base: str, ref) -> str:
+    """The withdrawal form with the contract filled in (#142)."""
+    from urllib.parse import quote
+
+    return f"{site_base}/rechtliches/widerruf?vertrag={quote(str(ref or ''), safe='')}#vertrag-widerrufen"
+
+
 def acceptance_mail(*, ref: str, total, name: str, when: str, start_now: bool, company: dict,
                     site_base: str) -> tuple[str, str, str]:
     """The confirmation on a durable medium the law asks for (FAGG), with the
@@ -688,6 +695,10 @@ def acceptance_mail(*, ref: str, total, name: str, when: str, start_now: bool, c
         mail_layout.paragraph("Bist du Verbraucherin oder Verbraucher, kannst du innerhalb von 14 Tagen ab heute ohne "
                               "Angabe von Gründen vom Vertrag zurücktreten. Schick mir dazu eine eindeutige Nachricht, "
                               "zum Beispiel per E-Mail. Du kannst dafür das Muster-Formular unten verwenden."),
+        # The online withdrawal function and where it is (§ 13a FAGG, #142).
+        mail_layout.paragraph("Du kannst auch online zurücktreten: auf der Website mit dem Knopf „Vertrag widerrufen“. "
+                              "Du bekommst dann sofort eine Eingangsbestätigung per E-Mail."),
+        mail_layout.button("Vertrag widerrufen", withdrawal_link(site_base, ref)),
         mail_layout.heading("Muster-Widerrufsformular"),
         mail_layout.paragraph("(Wenn Sie den Vertrag widerrufen wollen, dann füllen Sie bitte dieses Formular aus und "
                               "senden Sie es zurück.)"),

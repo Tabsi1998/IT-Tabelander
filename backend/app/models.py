@@ -233,6 +233,35 @@ class ContactInput(BaseModel):
         return self
 
 
+# ---------- Online withdrawal (§ 13a FAGG, #142) ----------
+# An offer, order or invoice number as Dolibarr writes them ("AN202611-0001"):
+# no quote or bracket, so it can go into a Dolibarr filter as it is.
+CONTRACT_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9/_.-]{1,39}$"
+
+
+class WithdrawalInput(BaseModel):
+    """What the law asks for: the name, the contract and where the
+    confirmation goes; a part of the contract may be withdrawn alone."""
+    request_id: str = Field(min_length=8, max_length=128, pattern=REQUEST_ID_PATTERN)
+    name: str = Field(min_length=2, max_length=128)
+    email: EmailStr
+    contract: str = Field(pattern=CONTRACT_PATTERN)
+    scope: Literal["all", "part"] = "all"
+    parts: Optional[str] = Field(default="", max_length=1000)
+    honeypot: Optional[str] = Field(default="", max_length=500)
+
+    @field_validator("request_id", "name", "contract", "parts", "honeypot", mode="before")
+    @classmethod
+    def strip_text(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def parts_when_partial(self):
+        if self.scope == "part" and len(self.parts or "") < 3:
+            raise ValueError("Bitte angeben, welchen Teil du widerrufst.")
+        return self
+
+
 # ---------- Review requests (#71) ----------
 REVIEW_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{20,100}$"
 
