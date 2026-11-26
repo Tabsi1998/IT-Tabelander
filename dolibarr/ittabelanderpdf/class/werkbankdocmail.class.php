@@ -118,15 +118,15 @@ class WerkbankDocMail
 			foreach ($items as $item) {
 				$stand = $item['stand'] !== '' ? ' (Stand '.dol_print_date(dol_stringtotime($item['stand'].' 00:00:00'), 'day', 'tzuser', $langs).')' : '';
 				$made = $item['generated'] ? ($du ? ', für dich ausgefüllt' : ', für Sie ausgefüllt') : '';
-				$list .= '<li style="margin:0 0 8px 0;"><strong>'.dol_escape_htmltag($item['title'], 0, 0, '', 1).'</strong>'.dol_escape_htmltag($stand.$made, 0, 0, '', 1).': '
-					.dol_escape_htmltag($todo[$item['action']] ?? $todo['handover'], 0, 0, '', 1).'</li>';
+				$list .= '<li style="margin:0 0 8px 0;">'.WerkbankMailTemplates::text('<strong>'.dol_escape_htmltag($item['title'], 0, 0, '', 1).'</strong>'
+					.dol_escape_htmltag($stand.$made, 0, 0, '', 1).': '.dol_escape_htmltag($todo[$item['action']] ?? $todo['handover'], 0, 0, '', 1)).'</li>';
 				$asks = $asks || in_array($item['action'], array('accept', 'sign'), true);
 			}
 			$values['__ITTAB_UNTERLAGEN_BETREFF'.$suffix.'__'] = $subject;
-			$values['__ITTAB_UNTERLAGEN_EINLEITUNG'.$suffix.'__'] = '<p style="'.$p.'">'.dol_escape_htmltag($intro, 0, 0, '', 1).'</p>';
+			$values['__ITTAB_UNTERLAGEN_EINLEITUNG'.$suffix.'__'] = '<p style="'.$p.'">'.WerkbankMailTemplates::text(dol_escape_htmltag($intro, 0, 0, '', 1)).'</p>';
 			$values['__ITTAB_UNTERLAGEN_LISTE'.$suffix.'__'] = $list !== '' ? '<ul style="margin:0 0 16px 0;padding:0 0 0 22px;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:1.6;color:#3B4D63;">'.$list.'</ul>' : '';
 			$values['__ITTAB_UNTERLAGEN_SCHLUSS'.$suffix.'__'] = $asks
-				? '<p style="'.$p.'">'.($du ? 'Danke, dass du dir kurz Zeit dafür nimmst.' : 'Vielen Dank, dass Sie sich kurz Zeit dafür nehmen.').'</p>' : '';
+				? '<p style="'.$p.'">'.WerkbankMailTemplates::text($du ? 'Danke, dass du dir kurz Zeit dafür nimmst.' : 'Vielen Dank, dass Sie sich kurz Zeit dafür nehmen.').'</p>' : '';
 		}
 		return $values;
 	}

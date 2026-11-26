@@ -974,7 +974,7 @@ if ($stage === 'rollout') {
 			}
 		}
 		// The letter keeps the closing words; the signature with the logo is for the e-mail (after the marker).
-		$body .= '<p style="'.$T::P.'margin:24px 0 0 0;">Mit freundlichen Grüßen<br>'.dol_escape_htmltag($mysoc->managers).'</p>';
+		$body .= '<p style="'.$T::P.'margin:24px 0 0 0;">'.$T::text('Mit freundlichen Grüßen<br>'.dol_escape_htmltag($mysoc->managers)).'</p>';
 		// Mahnwesen runs its texts through complete_substitutions_array, so the
 		// logo variable of this module works there (FormMail::setSubstitFromObject).
 		// Mahnwesen prints everything before the marker into the letter, so logo

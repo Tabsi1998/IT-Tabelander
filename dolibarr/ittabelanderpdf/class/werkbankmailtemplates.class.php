@@ -288,11 +288,11 @@ class WerkbankMailTemplates
 			return $body.'<p style="'.$t.'">Mit freundlichen Grüßen</p>__USER_SIGNATURE__';
 		}
 		$greeting = $form === 'du' ? '__ITTAB_HALLO__' : ($form === 'sie' ? '__ITTAB_GUTENTAG__' : 'Guten Tag,');
-		$body = '<p style="'.$p.'">'.$greeting.'</p>';
+		$body = '<p style="'.$p.'">'.self::text($greeting).'</p>';
 		foreach ($paragraphs as $paragraph) {
 			// The document variables are paragraphs and a list of their own.
 			$body .= strpos($paragraph, '__ITTAB_UNTERLAGEN_') === 0 ? $paragraph."
-" : '<p style="'.$p.'">'.$paragraph.'</p>';
+" : '<p style="'.$p.'">'.self::text($paragraph).'</p>';
 		}
 		// A third party has no facts box (no number, no amount).
 		$plain = in_array($key, array('thirdparty', 'unterlage', 'docsend'), true);
@@ -312,14 +312,29 @@ class WerkbankMailTemplates
 		// Questions go by e-mail or through the customer area, not by phone
 		// (the number stays in the footer only).
 		if (in_array($key, array('supplier_proposal', 'order_supplier'), true)) {
-			$body .= '<p style="'.$p.'">Bei Fragen antworten Sie einfach auf diese E-Mail.</p>';
+			$body .= '<p style="'.$p.'">'.self::text('Bei Fragen antworten Sie einfach auf diese E-Mail.').'</p>';
 		} elseif ($key !== 'thirdparty') {
-			$body .= '<p style="'.$p.'">'.($form === 'du' ? '__ITTAB_FRAGEN_SATZ_DU__' : '__ITTAB_FRAGEN_SATZ__').'</p>';
+			$body .= '<p style="'.$p.'">'.self::text($form === 'du' ? '__ITTAB_FRAGEN_SATZ_DU__' : '__ITTAB_FRAGEN_SATZ__').'</p>';
 		}
 		// No logo or line on top: the mail starts with the greeting and ends with
 		// the owner's signature (1.9.0); the frame comes only with the automatic send.
 		return $body.self::signature($form === 'du' ? 'Liebe Grüße' : 'Mit freundlichen Grüßen', '__ITTAB_INHABER__', '__MYCOMPANY_NAME__', '__ITTAB_LOGO__',
 			'__ITTAB_ADRESSE__', '__MYCOMPANY_EMAIL__', '__MYCOMPANY_URL__', '__ITTAB_WEB__', '__ITTAB_TELEFON_LINK__', $key === 'thirdparty' ? 8 : 24);
+	}
+
+	/**
+	 * Text with its font as a span: Dolibarr's editor (CKEditor with its
+	 * content filter, also in the mail form) keeps font, size and colour on
+	 * spans only and drops them from paragraphs and divs.
+	 *
+	 * @param string $inner HTML
+	 * @param int    $size  Font size in px
+	 * @param string $color Colour
+	 * @return string
+	 */
+	public static function text($inner, $size = 16, $color = self::BODY)
+	{
+		return '<span style="font-family:'.self::FONT.';font-size:'.((int) $size).'px;color:'.$color.';">'.$inner.'</span>';
 	}
 
 	/**
@@ -346,12 +361,13 @@ class WerkbankMailTemplates
 		$link = 'color:'.self::MUTED.';text-decoration:none;';
 		// Every block carries its font: hand-sent mails have no frame around them.
 		$font = 'font-family:'.self::FONT.';line-height:1.6;';
-		return ($words !== '' ? '<p style="'.self::P.'margin:'.((int) $gap).'px 0 16px 0;">'.$words.'</p>' : '')
+		return ($words !== '' ? '<p style="'.self::P.'margin:'.((int) $gap).'px 0 16px 0;">'.self::text($words).'</p>' : '')
 			.'<div style="color:#3b4d63;'.$font.'font-size:16px;">'
-			.'<p style="margin:0 0 10px 0;'.$font.'font-size:16px;color:#3b4d63;"><strong>'.$name.'</strong><br>'.$company.'</p>'
-			.'<hr style="border:0;border-top:1px solid '.self::LINE.';" />'
+			.'<p style="margin:0 0 10px 0;line-height:1.6;">'.self::text('<strong>'.$name.'</strong><br>'.$company).'</p>'
+			// A plain rule: the editor drops any style on it.
+			.'<hr />'
 			.'<p style="margin:0 0 8px 0;">'.$logo.'</p>'
-			.'<p style="margin:0;'.$font.'font-size:14px;color:#3b4d63;">'.$address.'<br><a href="mailto:'.$email.'" style="'.$link.'">'.$email.'</a> · <a href="'.$url.'" style="'.$link.'">'.$web.'</a><br>'.$phone.'</p>'
+			.'<p style="margin:0;line-height:1.6;">'.self::text($address.'<br><a href="mailto:'.$email.'" style="'.$link.'">'.$email.'</a> · <a href="'.$url.'" style="'.$link.'">'.$web.'</a><br>'.$phone, 14).'</p>'
 			.'</div>';
 	}
 
@@ -732,7 +748,7 @@ class WerkbankMailTemplates
 	 */
 	public static function paragraph($html)
 	{
-		return '<p style="'.self::P.'">'.$html.'</p>';
+		return '<p style="'.self::P.'">'.self::text($html).'</p>';
 	}
 
 	/**
