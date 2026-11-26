@@ -110,7 +110,9 @@ class WerkbankSignature
 		}
 		if ($kind === 'doc') {
 			// A contract (AVV, remote maintenance) both sign; accepting or receiving only the customer.
-			return $loaded['rule']->action === 'sign' ? WerkbankQs::SIGNERS : array('customer');
+			// A document made for the customer has both signature lines; a contract
+			// (AVV, remote maintenance) both sign; accepting or receiving only the customer.
+			return $loaded['run']->element === 'docgen' || $loaded['rule']->action === 'sign' ? WerkbankQs::SIGNERS : array('customer');
 		}
 		return WerkbankQs::SIGNERS;
 	}
@@ -359,6 +361,18 @@ class WerkbankSignature
 		require_once __DIR__.'/werkbankrenderer.class.php';
 		$langs->loadLangs(array('main', 'companies', 'ittabelanderpdf@ittabelanderpdf'));
 		$target = self::pdfPath('doc', $loaded);
+		if ($loaded['run']->element === 'docgen') {
+			require_once __DIR__.'/werkbankdocs.class.php';
+			$docs = new WerkbankDocs($this->db);
+			$generated = $docs->event((int) $loaded['run']->fk_object);
+			if (!$generated || $generated->state !== 'generated') {
+				$this->error = 'WerkbankSignUnknown';
+				return '';
+			}
+			$path = $docs->writeGenerated($loaded['object'], $loaded['rule'], $generated, $signed, $target);
+			$this->error = $docs->error;
+			return $path;
+		}
 		if (!is_dir(dirname($target)) && dol_mkdir(dirname($target)) < 0) {
 			$this->error = 'ErrorCanNotCreateDir';
 			return '';
