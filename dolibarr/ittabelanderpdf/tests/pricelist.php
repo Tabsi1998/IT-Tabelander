@@ -98,7 +98,9 @@ $check('only for sale and above 0 €', strpos($html, 'Fehlerdiagnose') !== fals
 $check('prices with their unit', preg_match('/Werkstattstunde<\/strong>: 45,00 .{1,8} pro Stunde/u', $html) && preg_match('/Webhosting<\/strong>: 9,90 .{1,8} pro Monat/u', $html)
 	&& preg_match('/Fehlerdiagnose<\/strong>: 29,00 [^<]*<\/li>/u', $html), strip_tags($html));
 rt_const($db, 'ITTABPDF_PRICELIST_OTHERS', '1');
-$check('products without a chosen category in their own section', strpos(WerkbankPricelist::html($db), 'Weitere Leistungen</h3><ul><li><strong>Ohne Kategorie') !== false);
+$others = WerkbankPricelist::html($db);
+$check('products without a chosen category in their own section', strpos($others, 'Weitere Leistungen</h3>') !== false
+	&& strpos($others, 'Ohne Kategorie') > strpos($others, 'Weitere Leistungen</h3>'), strip_tags($others));
 rt_const($db, 'ITTABPDF_PRICELIST_OTHERS', '0');
 $check('the list passes the WAF', !preg_match('/<style|<svg|data:|\son[a-z]+=/i', $html));
 
