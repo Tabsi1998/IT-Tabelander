@@ -114,32 +114,27 @@ if (in_array($action, array('startsign', 'upload', 'check', 'revoke'), true)) {
  * View
  */
 
-llxHeader('<meta name="viewport" content="width=device-width, initial-scale=1">', $langs->trans('WerkbankDocsTab').' - '.$soc->name, '', '', 0, 0,
-	array(), array('/ittabelanderpdf/css/qs.css'), '', 'mod-ittabelanderpdf page-docs');
+llxHeader('', $langs->trans('WerkbankDocsTab').' - '.$soc->name, '', '', 0, 0, array(), array(), '', 'mod-ittabelanderpdf page-docs');
 print dol_get_fiche_head(societe_prepare_head($soc), 'ittabpdfdocs', $langs->trans('ThirdParty'), -1, 'company');
 dol_banner_tab($soc, 'socid', '', ($user->socid ? 0 : 1), 'rowid', 'nom');
 print dol_get_fiche_end();
 
 $status = $docs->status($soc);
-$required = array_filter($status, function ($entry) {
-	return (int) $entry['rule']->required;
+$open = array_filter($status, function ($entry) {
+	return (int) $entry['rule']->required && $entry['state'] !== 'done';
 });
-$open = array_filter($required, function ($entry) {
-	return $entry['state'] !== 'done';
-});
-$states = array('missing' => 'WerkbankDocsStateMissing', 'sent' => 'WerkbankDocsStateSent', 'signing' => 'WerkbankDocsStateSigning',
-	'done' => 'WerkbankDocsStateDone', 'outdated' => 'WerkbankDocsStateOutdated');
+$doneCount = count(array_filter($status, function ($entry) {
+	return $entry['state'] === 'done';
+}));
+// Uploading, ticking and resetting each open a small form below the list (?action=…form&rule=…).
+$formFor = in_array($action, array('uploadform', 'checkform', 'revokeform'), true) && $rule ? $action : '';
 
-print '<div class="ittabqs ittabdocs">';
-print '<div class="ittabdocs-summary'.($open ? ' is-open' : ' is-complete').'" role="status">';
-print '<strong>'.($open ? $langs->trans('WerkbankDocsSummaryOpen', count($open)) : $langs->trans('WerkbankDocsSummaryDone')).'</strong>';
-print '<span>'.$langs->trans('WerkbankDocsSummaryCount', count($status) - count(array_filter($status, function ($entry) {
-	return $entry['state'] !== 'done';
-})), count($status)).'</span></div>';
+print '<div class="'.($open ? 'warning' : 'info').' ittabdocs-summary">'.($open ? $langs->trans('WerkbankDocsSummaryOpen', count($open)) : $langs->trans('WerkbankDocsSummaryDone'))
+	.' · '.$langs->trans('WerkbankDocsSummaryCount', $doneCount, count($status)).'</div>';
 
-if (!$status) {
-	print '<p class="ittabqs-empty">'.$langs->trans('WerkbankDocsNoRules').'</p>';
-}
+$states = array('missing' => array('WerkbankDocsStateMissing', 'status8'), 'sent' => array('WerkbankDocsStateSent', 'status1'),
+	'signing' => array('WerkbankDocsStateSigning', 'status3'), 'generated' => array('WerkbankDocsStateGenerated', 'status1'),
+	'done' => array('WerkbankDocsStateDone', 'status4'), 'outdated' => array('WerkbankDocsStateOutdated', 'status8'));
 $who = function ($event) {
 	$name = trim($event->firstname.' '.$event->lastname);
 	return $name !== '' ? $name : (string) $event->login;
@@ -150,21 +145,27 @@ $fileLink = function ($filename) use ($socid, $langs) {
 	if ((string) $filename === '' || !is_file(WerkbankSignature::thirdpartyDir($socid).'/'.$filename)) {
 		return '';
 	}
-	return ' <a href="'.DOL_URL_ROOT.'/document.php?modulepart=societe&amp;file='.urlencode($socid.'/'.$filename).'">'.img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans('WerkbankDocsOpenFile').'</a>';
+	return ' <a href="'.DOL_URL_ROOT.'/document.php?modulepart=societe&amp;file='.urlencode($socid.'/'.$filename).'">'.img_picto($langs->trans('WerkbankDocsOpenFile'), 'pdf').'</a>';
 };
 
-print '<ul class="ittabdocs-list">';
+print '<div class="div-table-responsive"><table class="noborder centpercent ittabdocs-list">';
+print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankDocSignDocument').'</td><td class="center">'.$langs->trans('Status').'</td>'
+	.'<td>'.$langs->trans('WerkbankDocsProof').'</td><td class="right">'.$langs->trans('Action').'</td></tr>';
+if (!$status) {
+	print '<tr class="oddeven"><td colspan="4"><span class="opacitymedium">'.$langs->trans('WerkbankDocsNoRules').'</span></td></tr>';
+}
 foreach ($status as $entry) {
 	$rule = $entry['rule'];
 	$id = (int) $rule->rowid;
 	$state = $entry['state'];
-	print '<li class="ittabdocs-item state-'.$state.'" id="rule-'.$id.'">';
-	print '<div class="ittabdocs-head"><span class="ittabdocs-mark" aria-hidden="true"></span><div>';
-	print '<div class="ittabdocs-label">'.dol_escape_htmltag($rule->label).' <span class="ittabdocs-kind">'.$langs->trans((int) $rule->required ? 'WerkbankQsRequired' : 'WerkbankDocsOptional').'</span></div>';
-	print '<div class="ittabdocs-doc">'.dol_escape_htmltag($entry['title']).($entry['stand'] !== '' ? ' · '.$langs->trans('WerkbankDocsStand', dol_print_date(dol_stringtotime($entry['stand'].' 00:00:00'), 'day')) : '').'</div>';
-	print '</div><span class="ittabdocs-state">'.$langs->trans($states[$state]).'</span></div>';
+	print '<tr class="oddeven ittabdocs-item state-'.$state.'" id="rule-'.$id.'">';
+	print '<td>'.img_picto('', 'pdf', 'class="pictofixedwidth"').dol_escape_htmltag($rule->label)
+		.((int) $rule->required ? ' <span class="badge badge-status1">'.$langs->trans('WerkbankQsRequired').'</span>' : ' <span class="opacitymedium">('.$langs->trans('WerkbankDocsOptional').')</span>')
+		.'<br><span class="opacitymedium small">'.dol_escape_htmltag($entry['title'])
+		.($entry['stand'] !== '' ? ' · '.$langs->trans('WerkbankDocsStand', dol_print_date(dol_stringtotime($entry['stand'].' 00:00:00'), 'day')) : '').'</span></td>';
+	print '<td class="center">'.dolGetStatus($langs->trans($states[$state][0]), '', '', $states[$state][1], 5).'</td>';
 
-	// What counts now, in one line: when, how, who, the file.
+	// What counts now: when, how, who, the file.
 	$lines = array();
 	if ($entry['done']) {
 		$event = $entry['done'];
@@ -175,67 +176,68 @@ foreach ($status as $entry) {
 	if ($entry['sent'] && $state !== 'done') {
 		$lines[] = $langs->transnoentities('WerkbankDocsSentLine', dol_print_date($db->jdate($entry['sent']->date_event), 'day'), dol_escape_htmltag($who($entry['sent'])));
 	}
+	if (!empty($entry['generated']) && $state !== 'done') {
+		$lines[] = $langs->transnoentities('WerkbankDocsGeneratedLine', dol_print_date($db->jdate($entry['generated']->date_event), 'day')).$fileLink($entry['generated']->filename);
+	}
 	if ($state === 'outdated') {
 		$lines[] = '<strong>'.$langs->trans('WerkbankDocsOutdatedLine').'</strong>';
 	}
-	if ($lines) {
-		print '<p class="ittabdocs-facts">'.implode('<br>', $lines).'</p>';
+	if (!$entry['exists'] && $state !== 'done') {
+		$lines[] = '<span class="opacitymedium">'.$langs->trans('WerkbankDocsNoFile', dol_escape_htmltag(WerkbankUnterlagen::relativeDir().'/'.$rule->slug.'.pdf')).'</span>';
 	}
+	print '<td class="small">'.implode('<br>', $lines).'</td>';
 
+	print '<td class="right nowraponall">';
 	if ($write) {
-		print '<div class="ittabdocs-actions">';
-		$ready = $entry['exists'];
-		if ($state !== 'done') {
-			if ($entry['signing']) {
-				print '<a class="ittabqs-primary" href="'.dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=doc&amp;id='.((int) $entry['signing']->rowid).'">'.$langs->trans('WerkbankDocsContinueSign').'</a>';
-			} elseif ($ready) {
-				print '<form method="POST" action="'.$self.'"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="startsign"><input type="hidden" name="rule" value="'.$id.'">';
-				print '<button type="submit" class="ittabqs-primary">'.$langs->trans($rule->action === 'handover' ? 'WerkbankDocsConfirmReceipt' : 'WerkbankDocsSignNow').'</button></form>';
-			}
-			if ($ready) {
-				print '<a class="ittabqs-secondary" href="'.DOL_URL_ROOT.'/societe/card.php?socid='.$socid.'&amp;action=presend&amp;mode=init&amp;ittabpdf_preselect='.urlencode($rule->slug.'.pdf').'#formmail">'.$langs->trans('WerkbankDocsSend').'</a>';
-			}
+		if ($state !== 'done' && $entry['signing']) {
+			print '<a class="butAction smallpaddingimp" href="'.dol_buildpath('/ittabelanderpdf/sign.php', 1).'?kind=doc&amp;id='.((int) $entry['signing']->rowid).'">'.$langs->trans('WerkbankDocsContinueSign').'</a>';
+		} elseif ($state !== 'done' && $entry['exists']) {
+			print '<form method="POST" action="'.$self.'" class="inline-block"><input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="startsign"><input type="hidden" name="rule" value="'.$id.'">';
+			print '<input type="submit" class="butAction smallpaddingimp" value="'.dol_escape_htmltag($langs->trans($rule->action === 'handover' ? 'WerkbankDocsConfirmReceipt' : 'WerkbankDocsSignNow')).'"></form>';
 		}
-		print '<details class="ittabdocs-more"><summary>'.$langs->trans('WerkbankDocsUploadOrTick').'</summary>';
-		print '<form method="POST" action="'.$self.'" enctype="multipart/form-data" class="ittabdocs-form">';
-		print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="upload"><input type="hidden" name="rule" value="'.$id.'">';
-		print '<label class="ittabqs-label" for="docfile-'.$id.'">'.$langs->trans('WerkbankDocsUploadLabel').'</label>';
-		print '<input type="file" id="docfile-'.$id.'" name="docfile" accept="application/pdf,image/jpeg,image/png" capture="environment" class="ittabqs-input">';
-		print '<button type="submit" class="ittabqs-secondary">'.$langs->trans('WerkbankDocsUploadButton').'</button></form>';
-		print '<form method="POST" action="'.$self.'" class="ittabdocs-form">';
-		print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="check"><input type="hidden" name="rule" value="'.$id.'">';
-		print '<label class="ittabqs-label" for="docdate-'.$id.'">'.$langs->trans('WerkbankDocsTickLabel').'</label>';
-		print '<input type="date" id="docdate-'.$id.'" name="date" class="ittabqs-input" value="'.dol_print_date(dol_now(), '%Y-%m-%d').'">';
-		print '<input type="text" name="note" class="ittabqs-input" placeholder="'.dol_escape_htmltag($langs->trans('WerkbankDocsTickNote')).'">';
-		print '<button type="submit" class="ittabqs-secondary">'.$langs->trans('WerkbankDocsTickButton').'</button></form>';
+		if ($state !== 'done' && $entry['exists']) {
+			print '<a class="butAction smallpaddingimp" href="'.DOL_URL_ROOT.'/societe/card.php?socid='.$socid.'&amp;action=presend&amp;mode=init&amp;ittabpdf_preselect='.urlencode($rule->slug.'.pdf').'#formmail">'.$langs->trans('WerkbankDocsSend').'</a>';
+		}
+		print '<a class="butAction smallpaddingimp" href="'.$self.'&amp;action=uploadform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankDocsUploadButton').'</a>';
+		print '<a class="butAction smallpaddingimp" href="'.$self.'&amp;action=checkform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankDocsTickButton').'</a>';
 		if ($state === 'done') {
-			print '<form method="POST" action="'.$self.'" class="ittabdocs-form">';
-			print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="revoke"><input type="hidden" name="rule" value="'.$id.'">';
-			print '<input type="text" name="note" class="ittabqs-input" placeholder="'.dol_escape_htmltag($langs->trans('WerkbankDocsRevokeNote')).'">';
-			print '<button type="submit" class="ittabqs-secondary">'.$langs->trans('WerkbankDocsRevoke').'</button></form>';
+			print '<a class="butActionDelete smallpaddingimp" href="'.$self.'&amp;action=revokeform&amp;rule='.$id.'#docform">'.$langs->trans('WerkbankDocsRevoke').'</a>';
 		}
-		print '</details>';
-		if (!$ready) {
-			print '<p class="ittabqs-help">'.$langs->trans('WerkbankDocsNoFile', dol_escape_htmltag(WerkbankUnterlagen::relativeDir().'/'.$rule->slug.'.pdf')).'</p>';
-		}
-		print '</div>';
 	}
-	print '</li>';
+	print '</td></tr>';
 }
-print '</ul>';
+print '</table></div>';
+
+// The form the chosen action needs, the way Dolibarr cards show them.
+if ($write && $formFor) {
+	print '<a id="docform"></a>'.load_fiche_titre(dol_escape_htmltag($rule->label), '', '');
+	print '<form method="POST" action="'.$self.'"'.($formFor === 'uploadform' ? ' enctype="multipart/form-data"' : '').'>';
+	print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="rule" value="'.((int) $rule->rowid).'">';
+	print '<input type="hidden" name="action" value="'.($formFor === 'uploadform' ? 'upload' : ($formFor === 'checkform' ? 'check' : 'revoke')).'">';
+	print '<table class="border centpercent tableforfield">';
+	if ($formFor === 'uploadform') {
+		print '<tr><td class="titlefield fieldrequired">'.$langs->trans('WerkbankDocsUploadLabel').'</td><td><input type="file" name="docfile" accept="application/pdf,image/jpeg,image/png" capture="environment"></td></tr>';
+	}
+	if ($formFor === 'checkform') {
+		print '<tr><td class="titlefield">'.$langs->trans('Date').'</td><td><input type="date" name="date" value="'.dol_print_date(dol_now(), '%Y-%m-%d').'"></td></tr>';
+	}
+	print '<tr><td class="titlefield">'.$langs->trans('Note').'</td><td><input type="text" name="note" class="minwidth300" placeholder="'.dol_escape_htmltag($langs->trans($formFor === 'revokeform' ? 'WerkbankDocsRevokeNote' : 'WerkbankDocsTickNote')).'"></td></tr>';
+	print '</table><div class="center"><input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans($formFor === 'uploadform' ? 'WerkbankDocsUploadButton' : ($formFor === 'checkform' ? 'WerkbankDocsTickButton' : 'WerkbankDocsRevoke'))).'">'
+		.' <a class="button button-cancel" href="'.$self.'">'.$langs->trans('Cancel').'</a></div></form>';
+}
 
 // Everything that happened, newest first.
 $events = $docs->events($socid);
 if ($events) {
-	print '<details class="ittabdocs-history"><summary>'.$langs->trans('WerkbankDocsHistory', count($events)).'</summary><ol>';
+	print load_fiche_titre($langs->trans('WerkbankDocsHistory', count($events)), '', '');
+	print '<div class="div-table-responsive-no-min"><table class="noborder centpercent ittabdocs-history">';
+	print '<tr class="liste_titre"><td>'.$langs->trans('Date').'</td><td>'.$langs->trans('WerkbankDocSignDocument').'</td><td>'.$langs->trans('Event').'</td><td>'.$langs->trans('User').'</td><td>'.$langs->trans('Note').'</td></tr>';
 	foreach ($events as $event) {
-		print '<li><span class="ittabdocs-when">'.dol_print_date($db->jdate($event->date_event), 'dayhour').'</span> '
-			.dol_escape_htmltag($event->slug).' – '.$langs->trans('WerkbankDocsEvent_'.$event->state).' · '.dol_escape_htmltag($who($event))
-			.((string) $event->note !== '' ? ' · '.dol_escape_htmltag($event->note) : '').$fileLink($event->filename).'</li>';
+		print '<tr class="oddeven"><td class="nowraponall">'.dol_print_date($db->jdate($event->date_event), 'dayhour').'</td><td>'.dol_escape_htmltag($event->slug).'</td>'
+			.'<td>'.$langs->trans('WerkbankDocsEvent_'.$event->state).$fileLink($event->filename).'</td><td>'.dol_escape_htmltag($who($event)).'</td><td>'.dol_escape_htmltag((string) $event->note).'</td></tr>';
 	}
-	print '</ol></details>';
+	print '</table></div>';
 }
-print '</div>';
 
 llxFooter();
 $db->close();

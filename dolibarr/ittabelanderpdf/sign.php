@@ -86,16 +86,13 @@ $signed = $signature->signatures($kind, $id, $loaded);
 $recipient = WerkbankSignature::recipient($kind, $loaded);
 $document = $kind === 'doc' ? $loaded['ref'] : $langs->trans($kind === 'qs' ? 'WerkbankQsTitle' : 'WerkbankIntakeTitle').' '.$loaded['ref'];
 
-llxHeader('<meta name="viewport" content="width=device-width, initial-scale=1">', $langs->trans('WerkbankSignTitle'), '', '', 0, 0,
-	array('/ittabelanderpdf/js/sign.js'), array('/ittabelanderpdf/css/qs.css'), '', 'mod-ittabelanderpdf page-sign');
+llxHeader('', $langs->trans('WerkbankSignTitle'), '', '', 0, 0, array('/ittabelanderpdf/js/sign.js'), array('/ittabelanderpdf/css/qs.css'), '', 'mod-ittabelanderpdf page-sign');
 
-print '<div class="ittabqs">';
-print '<nav class="ittabqs-crumbs"><a href="'.dol_escape_htmltag($back).'">'.$langs->trans('WerkbankSignBack').'</a><span class="ittabqs-sep" aria-hidden="true">›</span><span>'.dol_escape_htmltag($document).'</span></nav>';
-print '<h1 class="ittabqs-title">'.$langs->trans('WerkbankSignTitle').' <span class="ittabqs-title-sub">'.dol_escape_htmltag($document)
-	.(is_object($object->thirdparty) && !empty($object->thirdparty->name) ? ' · '.dol_escape_htmltag($object->thirdparty->name) : '').'</span></h1>';
+$customerName = is_object($object->thirdparty) && !empty($object->thirdparty->name) ? ' – '.$object->thirdparty->name : '';
+print load_fiche_titre($langs->trans('WerkbankSignTitle').': '.dol_escape_htmltag($document.$customerName), '<a href="'.dol_escape_htmltag($back).'">'.$langs->trans('WerkbankSignBack').'</a>', 'signature');
 if (is_file($pdf)) {
 	list($modulepart, $file) = WerkbankSignature::documentLink($kind, $pdf);
-	print '<p><a class="ittabqs-secondary" href="'.DOL_URL_ROOT.'/document.php?modulepart='.$modulepart.'&amp;file='.urlencode($file).'">'.img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans('WerkbankSignOpenPdf').'</a></p>';
+	print '<div class="tabsAction"><a class="butAction" href="'.DOL_URL_ROOT.'/document.php?modulepart='.$modulepart.'&amp;file='.urlencode($file).'">'.$langs->trans('WerkbankSignOpenPdf').'</a></div>';
 }
 
 $labels = array(
@@ -108,50 +105,46 @@ if (isset($object->thirdparty) && is_object($object->thirdparty) && !empty($obje
 	$defaults['customer'] = (string) $object->thirdparty->name;
 }
 
-print '<div id="ittabsig" class="ittabsig" data-endpoint="'.dol_escape_htmltag(dol_buildpath('/ittabelanderpdf/ajax/sign.php', 1)).'" data-token="'.dol_escape_htmltag(currentToken()).'"'
+print '<div id="ittabsig" data-endpoint="'.dol_escape_htmltag(dol_buildpath('/ittabelanderpdf/ajax/sign.php', 1)).'" data-token="'.dol_escape_htmltag(currentToken()).'"'
 	.' data-kind="'.$kind.'" data-id="'.$id.'" data-empty="'.dol_escape_htmltag($langs->transnoentities('WerkbankSignEmpty')).'"'
 	.' data-noname="'.dol_escape_htmltag($langs->transnoentities('WerkbankSignNameMissing')).'" data-saving="'.dol_escape_htmltag($langs->transnoentities('WerkbankSignSaving')).'"'
 	.' data-failed="'.dol_escape_htmltag($langs->transnoentities('WerkbankQsSaveFailed')).'">';
 foreach ($roles as $role) {
 	$row = isset($signed[$role]) ? $signed[$role] : null;
-	print '<section class="ittabsig-card'.($row ? ' is-signed' : '').'" data-role="'.$role.'">';
-	print '<h2 class="ittabqs-subtitle">'.dol_escape_htmltag($labels[$role]).'</h2>';
+	print '<div class="ittabsig-card'.($row ? ' is-signed' : '').'" data-role="'.$role.'">';
+	print load_fiche_titre(dol_escape_htmltag($labels[$role]), '', '');
+	print '<table class="border centpercent tableforfield">';
 	if ($row) {
 		list($modulepart, $file) = WerkbankSignature::documentLink($kind, $row->path);
-		print '<div class="ittabsig-done"><img src="'.DOL_URL_ROOT.'/viewimage.php?modulepart='.$modulepart.'&amp;file='.urlencode($file).'&amp;cache='.dol_filemtime($row->path).'" alt="'.dol_escape_htmltag($langs->trans('WerkbankSignImageOf', $row->name)).'">';
-		print '<p>'.dol_escape_htmltag($row->name).' · '.dol_print_date($db->jdate($row->date_sign), 'dayhour', 'tzuser').'</p></div>';
-		print '<details class="ittabsig-again"><summary>'.$langs->trans('WerkbankSignAgain').'</summary>';
+		print '<tr><td class="titlefield">'.$langs->trans('WerkbankSignTitle').'</td><td><img class="ittabsig-image" src="'.DOL_URL_ROOT.'/viewimage.php?modulepart='.$modulepart.'&amp;file='.urlencode($file).'&amp;cache='.dol_filemtime($row->path).'" alt="'.dol_escape_htmltag($langs->trans('WerkbankSignImageOf', $row->name)).'">'
+			.'<br>'.dol_escape_htmltag($row->name).' · '.dol_print_date($db->jdate($row->date_sign), 'dayhour', 'tzuser').'</td></tr>';
 	}
-	print '<div class="ittabsig-pad"><canvas aria-label="'.dol_escape_htmltag($langs->trans('WerkbankSignHere')).'"></canvas><span class="ittabsig-hint" aria-hidden="true">'.$langs->trans('WerkbankSignHere').'</span></div>';
-	print '<label class="ittabqs-label" for="ittabsig-name-'.$role.'">'.$langs->trans('WerkbankSignName').'</label>';
-	print '<input type="text" id="ittabsig-name-'.$role.'" class="ittabqs-input ittabsig-name" autocomplete="name" value="'.dol_escape_htmltag($row ? $row->name : $defaults[$role]).'" placeholder="'.dol_escape_htmltag($langs->trans('WerkbankSignNameHint')).'">';
-	print '<div class="ittabsig-actions"><button type="button" class="ittabqs-secondary ittabsig-clear">'.$langs->trans('WerkbankSignClear').'</button>';
-	print '<button type="button" class="ittabqs-primary ittabsig-save">'.$langs->trans('WerkbankSignSave').'</button></div>';
-	print '<p class="ittabqs-help ittabsig-status" aria-live="polite"></p>';
-	if ($row) {
-		print '</details>';
-	}
-	print '</section>';
+	print '<tr><td class="titlefield">'.$langs->trans($row ? 'WerkbankSignAgain' : 'WerkbankSignHere').'</td><td><div class="ittabsig-pad"><canvas aria-label="'.dol_escape_htmltag($langs->trans('WerkbankSignHere')).'"></canvas></div></td></tr>';
+	print '<tr><td>'.$langs->trans('WerkbankSignName').'</td><td><input type="text" class="minwidth300 ittabsig-name" autocomplete="name" value="'.dol_escape_htmltag($row ? $row->name : $defaults[$role]).'" placeholder="'.dol_escape_htmltag($langs->trans('WerkbankSignNameHint')).'"></td></tr>';
+	print '</table>';
+	print '<div class="center"><button type="button" class="button button-cancel ittabsig-clear">'.$langs->trans('WerkbankSignClear').'</button> ';
+	print '<button type="button" class="button ittabsig-save">'.$langs->trans('WerkbankSignSave').'</button></div>';
+	print '<div class="center opacitymedium ittabsig-status" aria-live="polite"></div>';
+	print '</div>';
 }
 print '</div>';
 
 // Sending: only with every signature, and only to an address the user sees.
 $complete = count(array_intersect($roles, array_keys($signed))) === count($roles);
-print '<form method="POST" action="'.$self.'" class="ittabqs-panel ittabsig-send" id="ittabsig-send">';
+print load_fiche_titre($langs->trans('WerkbankSignSendTitle'), '', 'email');
+print '<form method="POST" action="'.$self.'" id="ittabsig-send">';
 print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="send">';
-print '<h2 class="ittabqs-subtitle">'.$langs->trans('WerkbankSignSendTitle').'</h2>';
 if ($kind === 'qs' && !empty($loaded['run']->date_sent)) {
-	print '<p class="ittabsig-sent">'.$langs->trans('WerkbankSignSentOn', dol_print_date($db->jdate($loaded['run']->date_sent), 'dayhour', 'tzuser'), dol_escape_htmltag((string) $loaded['run']->sent_to)).'</p>';
+	print '<div class="info ittabsig-sent">'.$langs->trans('WerkbankSignSentOn', dol_print_date($db->jdate($loaded['run']->date_sent), 'dayhour', 'tzuser'), dol_escape_htmltag((string) $loaded['run']->sent_to)).'</div>';
 }
 if (!$complete) {
-	print '<p class="ittabqs-help">'.$langs->trans('WerkbankSignSendAfter').'</p>';
+	print '<div class="warning">'.$langs->trans('WerkbankSignSendAfter').'</div>';
 }
-print '<label class="ittabqs-label" for="ittabsig-to">'.$langs->trans('WerkbankSignSendTo').'</label>';
-print '<input type="text" inputmode="email" id="ittabsig-to" name="sendto" class="ittabqs-input" value="'.dol_escape_htmltag($recipient).'"'.($complete ? '' : ' disabled').'>';
-print '<p class="ittabqs-help">'.$langs->trans('WerkbankSignSendHelp', dol_escape_htmltag(getDolGlobalString('ITTABPDF_AUTOSEND_BCC'))).'</p>';
-print '<button type="submit" class="ittabqs-primary"'.($complete ? '' : ' disabled').'>'.$langs->trans('WerkbankSignSendNow').'</button>';
+print '<table class="border centpercent tableforfield"><tr><td class="titlefield">'.$langs->trans('WerkbankSignSendTo').'</td><td>';
+print '<input type="text" inputmode="email" name="sendto" class="minwidth300" value="'.dol_escape_htmltag($recipient).'"'.($complete ? '' : ' disabled').'>';
+print '<div class="opacitymedium small">'.$langs->trans('WerkbankSignSendHelp', dol_escape_htmltag(getDolGlobalString('ITTABPDF_AUTOSEND_BCC'))).'</div></td></tr></table>';
+print '<div class="center"><input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('WerkbankSignSendNow')).'"'.($complete ? '' : ' disabled').'></div>';
 print '</form>';
-print '</div>';
 
 llxFooter();
 $db->close();

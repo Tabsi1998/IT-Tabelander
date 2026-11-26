@@ -82,8 +82,11 @@ dol_include_once('/ittabelanderpdf/class/werkbankdoc.class.php');
 $store = new WerkbankDoc($db);
 foreach (array('auftragsverarbeitung' => 'Vereinbarung zur Auftragsverarbeitung', 'leistungsbeschreibung-hosting-wartung' => 'Leistungsbeschreibung Hosting und Wartung',
 	'leistungsbeschreibung-hosting-wartung-privat' => 'Leistungsbeschreibung Hosting und Wartung (privat)', 'fernwartung-einverstaendnis' => 'Einverständnis Fernwartung') as $slug => $title) {
-	if (!$store->bySlug($slug)) {
-		$id = $store->save(0, array('slug' => $slug, 'title' => $title, 'kind' => 'internal', 'public' => 0, 'text' => '<h2>1. Gegenstand</h2><p>Text der Unterlage '.$title.'.</p>', 'position' => 0), $admin);
+	$existing = $store->bySlug($slug);
+	$id = $existing ? (int) $existing->rowid : $store->save(0, array('slug' => $slug, 'title' => $title, 'kind' => 'internal', 'public' => 0,
+		'text' => '<h2>1. Gegenstand</h2><p>Text der Unterlage '.$title.'.</p>', 'position' => 0), $admin);
+	// Imported drafts (scripts/import_unterlagen.py) are released for the test.
+	if (!$existing || (int) $existing->version === 0) {
 		$store->release($id, '', $admin);
 	}
 }

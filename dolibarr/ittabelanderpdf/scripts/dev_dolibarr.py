@@ -496,6 +496,20 @@ def unterlagen() -> None:
     check("API gives the PDF", status == 200 and base64.b64decode(pdf.get("content", "")).startswith(b"%PDF"), str(status))
     status, _ = api("unterlagen/checkliste-uebergabe")
     check("API hides internal documents", status == 404, str(status))
+
+    # scripts/import_unterlagen.py of the repository brings docs/unterlagen as drafts into the module.
+    script = ROOT.parents[1] / "scripts" / "import_unterlagen.py"
+    folder = ROOT.parents[1] / "docs" / "unterlagen"
+    if script.exists() and folder.exists():
+        env = {**os.environ, "DOLIBARR_URL": URL, "DOLIBARR_API_KEY": apikey, "PYTHONIOENCODING": "utf-8"}
+        first = subprocess.run([sys.executable, str(script), "--ordner", str(folder)], env=env, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace")
+        second = subprocess.run([sys.executable, str(script), "--ordner", str(folder)], env=env, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace")
+        check("import script writes the drafts into the module, a second run changes nothing",
+              first.returncode == 0 and "widerruf:" in first.stdout and second.returncode == 0
+              and "anlegen" not in second.stdout and "aktualisieren" not in second.stdout and "unverändert" in second.stdout,
+              (second.stdout + second.stderr)[-300:])
     with opener.open(f"{URL}/document.php?modulepart=ecm&file=IT-Tabelander/Unterlagen/nutzungsbedingungen.pdf", timeout=60) as answer:
         check("PDF downloads from Documents", answer.status == 200 and answer.read(4) == b"%PDF")
 
@@ -603,13 +617,13 @@ def qs() -> None:
     check("new intervention from the phone (WAF passes)", status == 200 and bool(created) and "ittabqs-kind" in html, url)
     kinds = re.findall(r'name="type" value="(\d+)"', html)
     status, html, url = post(f"{base}/qs.php?fichinter={created.group(1) if created else 0}", [("token", token(html)), ("action", "start"), ("type", kinds[-1] if kinds else "0")])
-    check("kind of job starts a QS", status == 200 and "id=" in url and 'class="ittabqs-list"' in html, url)
+    check("kind of job starts a QS", status == 200 and "id=" in url and 'ittabqs-list' in html, url)
 
     # Autosave on the open PC build run: tick, value, text, note.
     status, html, _ = get(f"{base}/qs.php?id={result['open_run']}")
     form = re.search(r'data-endpoint="([^"]+)" data-token="([^"]+)"', html)
-    items = re.findall(r'<li class="ittabqs-item[^"]*" data-id="(\d+)" data-kind="(\w+)" data-required="(\d)"', html)
-    check("checklist shows every point with big targets", status == 200 and bool(form) and len(items) >= 10 and "ittabqs-box" in html and "ittabqs-status" in html,
+    items = re.findall(r'<tr class="oddeven ittabqs-item[^"]*" data-id="(\d+)" data-kind="(\w+)" data-required="(\d)"', html)
+    check("checklist shows every point", status == 200 and bool(form) and len(items) >= 10 and "ittabqs-check" in html and "ittabqs-status" in html,
           f"{len(items)} points")
     saved = []
     for item, kind, required in items:
@@ -812,7 +826,12 @@ def docs() -> None:
             return error.code, "", ""
 
     def token(html: str) -> str:
-        return re.search(r'name="token" value="([^"]+)"', html).group(1)
+        found = re.search(r'name="token" value="([^"]+)"', html)
+        if found:
+            return found.group(1)
+        # The tab shows its forms only on demand (?action=checkform…).
+        page = get(f"{base}/docs.php?socid={result['firm']}&action=checkform&rule={result['rule_receipt']}")[1]
+        return re.search(r'name="token" value="([^"]+)"', page).group(1)
 
     def check(name: str, ok: bool, detail: str = "") -> None:
         checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
@@ -858,6 +877,9 @@ def docs() -> None:
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):  # a Windows console is cp1252
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
              "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "sign": sign, "docs": docs, "down": down}
     wanted = sys.argv[1:] or ["all"]
