@@ -6,9 +6,13 @@ Dolibarr-Wissensmanagement behält: `p`, `h2`, `h3`, `ul`/`ol`/`li`, `strong`,
 `em`, `a`, `br`. Keine Tabellen, keine Stile. Die Gestaltung als PDF
 (Werkbank-Design) macht das Dolibarr-Modul.
 
-> **Alle Texte sind Entwürfe – vor Verwendung vom WKO-Rechtsservice prüfen
-> lassen.** Dieser Hinweis steht nur hier und im Kopfkommentar jeder Datei,
-> nicht im Text für Kundinnen und Kunden.
+> **Stand 26.11.2026: freigabefähig, WKO-Prüfung empfohlen.** Alle Texte sind
+> fertig formuliert, ohne offene Stellen, nach den Mustern und Merkblättern der
+> WKO und den Gesetzen im RIS. Eine Prüfung durch den WKO-Rechtsservice bleibt
+> empfohlen. Vor der Freigabe muss Fabian die Punkte unter „Was Fabian dafür
+> sicherstellen muss“ erledigen, damit jede Zusage stimmt. Der Hinweis zur
+> WKO-Prüfung steht nur hier und im Kopfkommentar jeder Datei, nicht im Text
+> für Kundinnen und Kunden.
 
 Ausgangspunkt waren die Muster der WKO (Fachverband UBIT: AGB für
 Organisations- und Programmierleistungen B2B und für IT-Betreiberdienstleistungen
@@ -20,13 +24,13 @@ eigene Fassungen in einfacher Sprache, keine Abschriften.
 
 | Datei | Titel in Dolibarr | Für wen | Anrede | Kategorie | Öffentlich | PDF-Slug | WKO-Prüfung |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `agb-unternehmer.html` | AGB für Unternehmer | Firmenkunden | Sie | Rechtstexte | ja (Website, PDF) | `agb-unternehmer` | offen |
-| `widerruf.html` | Widerrufsbelehrung und Muster-Widerrufsformular | Privatkunden (aus den Nutzungsbedingungen) | Du | Rechtstexte | ja (Website, PDF) | `widerruf` | offen |
-| `leistungsbeschreibung-hosting-wartung.html` | Leistungsbeschreibung Hosting und Wartung | Firmenkunden mit Hosting/Wartung, Teil des Vertrags | Sie | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-hosting-wartung` | offen |
-| `leistungsbeschreibung-hosting-wartung-privat.html` | Leistungsbeschreibung Hosting und Wartung für Privatkunden | Privatkunden mit Hosting/Wartung (§ 15 KSchG) | Du | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-hosting-wartung-privat` | offen |
-| `auftragsverarbeitung.html` | Vereinbarung zur Auftragsverarbeitung (Art. 28 DSGVO) | Firmenkunden mit Hosting, Wartung, Fernwartung | Sie | Unterlagen | auf Anfrage, zum Unterschreiben | `auftragsverarbeitung` | offen |
-| `fernwartung-einverstaendnis.html` | Einverständniserklärung Fernwartung | alle Fernwartungskunden | neutral (Ich-Form des Kunden) | Unterlagen | auf Anfrage | `fernwartung-einverstaendnis` | offen |
-| `geraeteannahme-bausteine.html` | Geräteannahmeschein – Textbausteine | Privatkunden (ein Baustein für Firmen) | Du | Unterlagen | nein, Text für das Modul | `geraeteannahme-bausteine` | offen |
+| `agb-unternehmer.html` | AGB für Unternehmer | Firmenkunden | Sie | Rechtstexte | ja (Website, PDF) | `agb-unternehmer` | empfohlen |
+| `widerruf.html` | Widerrufsbelehrung und Muster-Widerrufsformular | Privatkunden (aus den Nutzungsbedingungen) | Du | Rechtstexte | ja (Website, PDF) | `widerruf` | empfohlen |
+| `leistungsbeschreibung-hosting-wartung.html` | Leistungsbeschreibung Hosting und Wartung | Firmenkunden mit Hosting/Wartung, Teil des Vertrags | Sie | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-hosting-wartung` | empfohlen |
+| `leistungsbeschreibung-hosting-wartung-privat.html` | Leistungsbeschreibung Hosting und Wartung für Privatkunden | Privatkunden mit Hosting/Wartung (§ 15 KSchG) | Du | Unterlagen | auf Anfrage, mit dem Angebot | `leistungsbeschreibung-hosting-wartung-privat` | empfohlen |
+| `auftragsverarbeitung.html` | Vereinbarung zur Auftragsverarbeitung (Art. 28 DSGVO) | Firmenkunden mit Hosting, Wartung, Fernwartung | Sie | Unterlagen | auf Anfrage, zum Unterschreiben | `auftragsverarbeitung` | empfohlen |
+| `fernwartung-einverstaendnis.html` | Einverständniserklärung Fernwartung | alle Fernwartungskunden | neutral (Ich-Form des Kunden) | Unterlagen | auf Anfrage | `fernwartung-einverstaendnis` | empfohlen |
+| `geraeteannahme-bausteine.html` | Geräteannahmeschein – Textbausteine | Privatkunden (ein Baustein für Firmen) | Du | Unterlagen | nein, Text für das Modul | `geraeteannahme-bausteine` | empfohlen |
 | `qs-checklisten.html` | Qualitätsprüfung – Checklisten je Auftragsart | intern | – | Unterlagen | nein | `qs-checklisten` | nicht nötig |
 | `firmendatenblatt.html` | Firmendatenblatt IT-Tabelander | Firmenkunden (Lieferantenanlage) | neutral | Unterlagen | auf Anfrage | `firmendatenblatt` | nicht nötig |
 | `preisliste.html` | Preisliste IT-Tabelander | intern, auf Anfrage | neutral | Unterlagen | **nein** | `preisliste` | nicht nötig |
@@ -68,7 +72,7 @@ Wissensmanagement an. Es erkennt seine Artikel am Feld `import_key`
 DOLIBARR_URL=https://erp.example.com DOLIBARR_API_KEY=... python scripts/import_unterlagen.py --dry-run
 # echter Lauf
 DOLIBARR_URL=https://erp.example.com DOLIBARR_API_KEY=... python scripts/import_unterlagen.py
-# die offenen [BITTE …]-Stellen, ohne Dolibarr
+# offene [BITTE …]-Stellen, ohne Dolibarr: keine Ausgabe und Rückgabe 0, wenn alles fertig ist
 python scripts/import_unterlagen.py --offene-punkte
 ```
 
@@ -83,11 +87,13 @@ Wegwerf-Dolibarr in `backend/tests/test_dolibarr_unterlagen.py` (Gruppe
 
 ## Ablauf bis zur Verwendung
 
-1. Die restlichen `[BITTE PRÜFEN/ERGÄNZEN …]`-Stellen (unten unter „Noch offen“) in den Dateien ausfüllen.
-2. Alles vom WKO-Rechtsservice prüfen lassen (Tirol: Wirtschaftsrecht, Mitgliederservice).
-3. Import laufen lassen, Kategorien zuordnen, in Dolibarr freigeben.
-4. Die Modul-Sitzung erzeugt die PDFs; die öffentlichen legt sie in Dokumente (ECM)
-   unter `IT-Tabelander/Unterlagen/<slug>.pdf` ab.
+1. Die Punkte unter „Was Fabian dafür sicherstellen muss“ erledigen.
+2. Import laufen lassen, Kategorien zuordnen, in Dolibarr freigeben.
+3. Die Modul-Sitzung erzeugt die PDFs; die öffentlichen legt sie in Dokumente (ECM)
+   unter `IT-Tabelander/Unterlagen/<slug>.pdf` ab. Kundenfelder (Auftraggeber,
+   Anschrift, Leistungen) sind derzeit neutrale Formularzeilen (`____`); das Modul
+   stellt sie ab Version 1.4.0 auf seine Platzhalter um.
+4. Empfohlen: vom WKO-Rechtsservice prüfen lassen (Tirol: Wirtschaftsrecht).
 5. Bei jeder Änderung: Datei hier ändern, „Stand“ anpassen, Import erneut (nur Entwürfe)
    oder in Dolibarr direkt ändern und die Datei hier nachziehen.
 
@@ -121,29 +127,75 @@ Kostenregel für Prüfungen übernommen · Sicherungskopien höchstens 4 Wochen.
 
 **Fernwartung:** dauerhafter Zugang nur, wenn das Kästchen angekreuzt ist.
 
-## Noch offen
+**Freigabefähig gemacht (26.11.2026, #143)**
 
-`python scripts/import_unterlagen.py --offene-punkte` listet die Stellen
-wörtlich. Es sind nur noch Fakten, die Fabian bestätigen oder ergänzen muss,
-und Fragen an die WKO:
+- **Rücktrittsausnahme für Wunsch-PCs:** Ein PC aus handelsüblichen Teilen nach
+  Auswahl des Kunden bleibt **rücktrittsfähig**. Ausgenommen sind nur Teile, die
+  eigens angepasst oder angefertigt werden (Gravur, maßgefertigte Kabel, eigens
+  gebaute Wasserkühlung). Begründung: Die Ausnahmen in § 18 FAGG sind abschließend
+  und eng; die Kundenspezifikation muss der Unternehmer beweisen (WKO,
+  Rücktrittsrecht bei Warenkauf im Internet). Standardteile lassen sich ohne
+  Weiteres wieder trennen (so auch der deutsche BGH, VIII ZR 295/01, zu Notebooks
+  nach Kundenwunsch). Die kundenfreundliche Lösung ist die sichere. In der Werkstatt
+  geschlossene Verträge haben ohnehin kein Rücktrittsrecht.
+- **„Rechtstexte“ im Webpaket:** Keine Rechtsberatung im Einzelfall. Fabian weist
+  auf die Pflichten hin, erstellt Impressum und Datenschutzerklärung aus den
+  Angaben des Kunden und den WKO-Mustern, bindet sie ein und geht sie bei der
+  Übergabe mit dem **WKO-Übergabeprotokoll für gesetzeskonforme Webseiten**
+  (Fachgruppen UBIT und Werbung) durch; der Kunde bestätigt dort seine Angaben.
+  Begründung: Als Fachmann haftet der Webdesigner nach §§ 1299, 1300 ABGB dafür, dass
+  die Seite gesetzeskonform ist, und das lässt sich per AGB nicht ausschließen
+  (Präambel des WKO-Protokolls). Hinweis, Muster und Protokoll erfüllen die
+  Warnpflicht. Preisliste: „Einbindung von Impressum und Datenschutzerklärung“ statt
+  „Rechtstexte“.
+- **Widerrufsbutton (§ 13a FAGG, für Verträge ab 1.10.2026):** Die
+  Widerrufsbelehrung nennt die Online-Rücktrittsfunktion „Vertrag widerrufen“ auf
+  `/rechtliches/widerruf` mit Eingangsbestätigung per E-Mail. Die Website-Funktion
+  baut Issue #142.
+- **Technik:** als Zusagen formuliert, die ein Ein-Personen-Betrieb mit eigenem
+  Server erfüllen muss (Liste unten). USV und RAID sind nicht zugesagt; zugesagt ist
+  die Wiederherstellung aus der Sicherung binnen 2 Werktagen.
+- **Fernwartung:** kein Programmname, sondern „durchgehend verschlüsselt, nur nach
+  Freigabe, Sitzung sichtbar“. Läuft die Verbindung über Server des Herstellers,
+  sieht dieser nur Verbindungsdaten und steht dann in Anlage 3 des AVV.
+- **Zahlen aus dem Angebot:** Speicherplatz, Benutzer und Geräte „im Umfang aus dem
+  Angebot“. Geschäftszeiten: „werktags Montag bis Freitag, aktuelle Zeiten auf
+  it.tabelander.co.at“.
+- **Firmendatenblatt:** Steuernummer und UID-Nummer stehen nicht im Text. Das Modul
+  kann sie als Variablen aus den Dolibarr-Firmendaten einsetzen (Kleinunternehmer
+  ohne UID: Zeile entfällt).
+- **QS-Richtwerte:** CPU unter Last mindestens 10 °C unter der Höchsttemperatur des
+  Herstellers (Tjmax, bei aktuellen Desktop-CPUs meist 95–100 °C), Grafikkarte unter
+  85 °C, Kreisfehler der Sticks unter 10 % (Hall-Effect unter 5 %), Lighthouse mobil
+  mindestens 90.
 
-- **Technik (AVV Anlage 2, Leistungsbeschreibungen):** abgeschlossener Raum,
-  zweiter Faktor, Festplattenverschlüsselung (Arbeitsgeräte und Server),
-  Trennung je Kunde, USV/RAID, Wiederherstellungsziel, Monitoring-Werkzeug,
-  eigene oder gemeinsame Nextcloud, #67 (Dolibarr von außen sperren).
-- **Sicherungskopie außer Haus vor dem ersten Hosting-Vertrag einrichten**
-  (Stand 24.11.2026 fehlt sie).
-- **Fernwartungsprogramm** nennen; läuft es über Server des Herstellers, gehört
-  er in Anlage 3 des AVV und in die Datenschutzerklärung.
-- **Zahlen ergänzen:** Speicherplatz Webhosting, Benutzer Nextcloud, Geräte
-  IT-Wartung, Geschäftszeiten, Steuernummer und UID-Nummer im Firmendatenblatt.
-- **QS-Checklisten:** Grenzwert Kreisgenauigkeit Controller, Lighthouse-Zielwert.
-- **WKO:** Ausnahme vom Rücktrittsrecht für Wunsch-PCs; wie weit „Rechtstexte“
-  im Paket Webseite Basis gehen dürfen (keine Rechtsberatung); was mit nie
-  abgeholten Geräten passieren darf.
-- **Nutzungsbedingungen:** Abschnitt zu Hosting und Wartung für Privatkunden
-  einfügen (Vorschlag in `pruefung-bestehende-rechtstexte.md`).
+## Was Fabian dafür sicherstellen muss
 
-Zu klären außerhalb der Texte:
-- Betriebshaftpflichtversicherung, gerade für Hosting und Fernwartung.
-- Gerichtsstand: Telfs hat ein eigenes Bezirksgericht. Die AGB nennen wie gewünscht Innsbruck; für Verbraucher gilt ohnehin ihr Wohnsitz.
+Jede Zusage in den Texten muss stimmen, bevor sie freigegeben werden:
+
+- [ ] **Serverraum** abschließbar und abgeschlossen, wenn niemand da ist; Fremde nur in Begleitung (AVV Anlage 2).
+- [ ] **SSH nur mit Schlüssel**, Passwort-Anmeldung am Server aus.
+- [ ] **Passwortmanager** für alle Zugänge, jedes Passwort einzigartig; **zweiter Faktor** überall, wo es ihn gibt (Dolibarr, Nextcloud, Mail, Domain-Anbieter, GitHub).
+- [ ] **Verwaltungsoberflächen nicht öffentlich** (Dolibarr, Server-Oberflächen, Nginx Proxy Manager): nur aus dem eigenen Netz oder per VPN (#67).
+- [ ] **Arbeitsgeräte** mit Festplattenverschlüsselung (BitLocker) und automatischer Bildschirmsperre.
+- [ ] **Datenträger mit Kundendaten und Sicherungen verschlüsselt** (z. B. LUKS). Geht das für bestehende Platten nicht sofort, Hosting erst danach anbieten.
+- [ ] **Kunden getrennt:** eigene Datenbank, eigenes Verzeichnis, eigene Benutzer je Kunde.
+- [ ] **Sicherung:** täglich, 14 Tage plus 4 Wochensicherungen, verschlüsselt, mit **Kopie an einem zweiten Ort** (z. B. NAS an einem anderen Standort). Stand 24.11.2026 fehlt die Kopie außer Haus. Liegt sie bei einem Cloud-Anbieter, ist er Unterauftragsverarbeiter (AVV Abschnitt 5 und Anlage 3, nur EU/EWR).
+- [ ] **Wiederherstellung** einmal im Quartal testen und festhalten; das Ziel von 2 Werktagen muss realistisch sein (Ersatzhardware griffbereit).
+- [ ] **Überwachung** alle 5 Minuten mit Warnung (z. B. Uptime Kuma), auch für Zertifikat und Speicherplatz.
+- [ ] **Sicherheitsupdates** innerhalb von 3 Werktagen (z. B. automatische Updates plus monatliche Kontrolle).
+- [ ] **Webserver-Protokolle** nach 14 Tagen löschen (logrotate).
+- [ ] **Firewall:** von außen nur die nötigen Ports offen; Anmeldungen und Verwaltungszugriffe am Server werden protokolliert.
+- [ ] **Alte Datenträger** vor dem Weggeben sicher löschen oder zerstören; Kopien aus Datenübernahmen nach dem Auftrag löschen.
+- [ ] **Jährliche Prüfung** der Maßnahmen im Kalender eintragen (AVV Anlage 2).
+- [ ] **Fernwartungsprogramm** wählen, das durchgehend verschlüsselt und nur nach Freigabe am Gerät verbindet (z. B. RustDesk mit eigenem Server, dann gibt es keinen Unterauftragsverarbeiter). Läuft es über Server des Herstellers: Hersteller vor dem ersten Einsatz in Anlage 3 des AVV und in die Datenschutzerklärung.
+- [ ] **Verzeichnis der Verarbeitungstätigkeiten** als Auftragsverarbeiter anlegen (Art. 30 Abs. 2 DSGVO; WKO-Muster „Verzeichnis Verarbeitungstätigkeiten Auftragsverarbeiter“).
+- [ ] **Ablauf bei Datenpannen** festhalten (Kunde binnen 24 Stunden informieren).
+- [ ] **Rücktrittsfunktion** auf `/rechtliches/widerruf` live (#142), bevor die Widerrufsbelehrung freigegeben wird. Bis dahin die Online-Annahme für Privatkunden aussetzen oder die Widerrufsbelehrung erst mit #142 freigeben.
+- [ ] **Leistungskatalog in Dolibarr:** Beschreibung von `DL-WEB-BASIS` auf „Einbindung von Impressum und Datenschutzerklärung“ ändern.
+- [ ] **WKO-Übergabeprotokoll** für gesetzeskonforme Webseiten besorgen und bei jeder Übergabe verwenden.
+- [ ] **Live-Rechtstexte** nach `pruefung-bestehende-rechtstexte.md` anpassen (Nutzungsbedingungen: Rücktritt mit Verweis auf die Widerrufsbelehrung, Abschnitt Hosting für Privatkunden).
+- [ ] **Betriebshaftpflichtversicherung** prüfen, gerade für Hosting und Fernwartung.
+
+Gerichtsstand: Telfs hat ein eigenes Bezirksgericht. Die AGB nennen wie gewünscht
+Innsbruck; für Verbraucher gilt ohnehin ihr Wohnsitz.
