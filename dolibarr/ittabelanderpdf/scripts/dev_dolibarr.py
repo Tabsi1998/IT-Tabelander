@@ -353,7 +353,7 @@ def tickets() -> None:
     for case, (address, opening, closing) in expected.items():
         ref = created[case]["ref"]
         mine = [detail for detail in messages if address in to(detail)]
-        html = unescape(mine[0].get("HTML") or "") if len(mine) == 1 else ""
+        html = re.sub(r"\s+", " ", unescape(mine[0].get("HTML") or "")) if len(mine) == 1 else ""  # mailers fold long lines
         checks.append({"check": f"{case}: one confirmation to {address}",
                        "ok": len(mine) == 1 and mine[0]["Subject"].startswith(f"{opening} {ref}")
                        and closing in html and internal not in html and "\\n" not in html
@@ -1097,8 +1097,8 @@ def versand() -> None:
     mail = sent[0] if len(sent) == 1 else {}
     files = sorted(entry["FileName"] for entry in mail.get("Attachments") or [])
     check("the e-mail goes out with subject, list and every document, one closing", status == 200 and mail.get("Subject", "").startswith("Ihre Unterlagen von")
-          and "AGB für Unternehmer" in (mail.get("HTML") or "") and "agb-unternehmer.pdf" in files and any(name.startswith("gen-test-vereinbarung-") for name in files)
-          and (mail.get("HTML") or "").count("Mit freundlichen Grüßen") == 1, f"{status} {mail.get('Subject')} {files}")
+          and "AGB für Unternehmer" in re.sub(r"\s+", " ", unescape(mail.get("HTML") or "")) and "agb-unternehmer.pdf" in files and any(name.startswith("gen-test-vereinbarung-") for name in files)
+          and re.sub(r"\s+", " ", unescape(mail.get("HTML") or "")).count("Mit freundlichen Grüßen") == 1, f"{status} {mail.get('Subject')} {files}")
     blanks = []
     for entry in mail.get("Attachments") or []:
         if entry["FileName"].startswith("gen-test-vereinbarung-"):

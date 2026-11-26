@@ -292,7 +292,9 @@ class WerkbankMailTemplates
 		foreach ($paragraphs as $paragraph) {
 			// The document variables are paragraphs and a list of their own.
 			$body .= strpos($paragraph, '__ITTAB_UNTERLAGEN_') === 0 ? $paragraph."
-" : '<p style="'.$p.'">'.self::text($paragraph).'</p>';
+"
+				// The empty line to write in stays a bare <br> (the editor drops an empty span).
+				: '<p style="'.$p.'">'.($paragraph === '<br>' ? $paragraph : self::text($paragraph)).'</p>';
 		}
 		// A third party has no facts box (no number, no amount).
 		$plain = in_array($key, array('thirdparty', 'unterlage', 'docsend'), true);
