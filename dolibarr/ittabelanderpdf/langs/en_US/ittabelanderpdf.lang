@@ -666,3 +666,4 @@ WerkbankDocsActionRemoveShort = Remove
 WerkbankDocsActionGenerateShort = Generate
 WerkbankDocsActionGenerateAgainShort = Generate again
 WerkbankDocsActionContinueShort = Continue signing
+WerkbankDocsSendAllMissing = Send all missing

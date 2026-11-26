@@ -2,6 +2,11 @@
 
 ## [2.0.0] - unreleased
 
+### Sending (#177)
+
+- "Alle fehlenden zusenden" on top of the tab: one e-mail with every open required document; templates per customer are generated on the way (missing details: the form first, then back).
+- Facts box, bank details and buttons built from what Dolibarr's editor keeps (font on spans, tint as background-color, label above value): a hand-sent mail looks like an automatic one. The editor test checks these parts too.
+
 ### Documents tab and agenda (#176)
 
 - Tab "Unterlagen": no menus any more. Each line shows what to do next as a button and every other action as a small link with an icon, wrapping on narrow screens; on a phone every document is a card. On top a progress bar "3 von 5 erledigt". The tab of the third party shows the number of open required documents.

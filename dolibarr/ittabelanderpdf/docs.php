@@ -232,7 +232,11 @@ $percent = $status ? (int) round(100 * $doneCount / count($status)) : 100;
 print '<div class="'.($open ? 'warning' : 'info').' ittabdocs-summary">'
 	.'<div class="ittabdocs-progress" title="'.$percent.' %"><div class="ittabdocs-progress-bar" style="width:'.$percent.'%"></div></div>'
 	.'<strong>'.$langs->trans('WerkbankDocsProgress', $doneCount, count($status)).'</strong>'
-	.($open ? ' · '.$langs->trans('WerkbankDocsSummaryOpen', count($open)) : ' · '.$langs->trans('WerkbankDocsSummaryDone')).'</div>';
+	.($open ? ' · '.$langs->trans('WerkbankDocsSummaryOpen', count($open)) : ' · '.$langs->trans('WerkbankDocsSummaryDone'))
+	// Everything open in one e-mail (templates per customer generated on the way).
+	.($open && $write ? ' <a class="butAction smallpaddingimp marginleftonly" href="'.DOL_URL_ROOT.'/societe/card.php?socid='.$socid.'&amp;action=presend&amp;mode=init&amp;ittabpdf_preselect_missing=1#formmail">'
+		.'<span class="fa fa-paper-plane paddingright"></span>'.$langs->trans('WerkbankDocsSendAllMissing').'</a>' : '')
+	.'</div>';
 
 $states = array('missing' => array('WerkbankDocsStateMissing', 'status8'), 'sent' => array('WerkbankDocsStateSent', 'status1'),
 	'signing' => array('WerkbankDocsStateSigning', 'status3'), 'generated' => array('WerkbankDocsStateGenerated', 'status1'),
