@@ -701,8 +701,23 @@ class WerkbankMailTemplates
 	 */
 	public static function portalButton($url)
 	{
-		return '<div style="margin:4px 0 24px 0;"><a href="'.dol_escape_htmltag($url).'" style="display:block;padding:14px 20px;border-radius:4px;background:'.self::BRAND.';color:#fff;font-family:'.self::FONT.';font-size:16px;font-weight:bold;line-height:1.3;text-align:center;text-decoration:none;">'
-			.'Im Kundenbereich ansehen</a></div>';
+		return self::button($url, 'Im Kundenbereich ansehen');
+	}
+
+	/**
+	 * An orange button: a block with background and rounded corners, the
+	 * link in white inside (what Dolibarr's editor keeps on div, a and span).
+	 *
+	 * @param string $url   Address
+	 * @param string $label Text (HTML)
+	 * @return string
+	 */
+	public static function button($url, $label)
+	{
+		$radius = 'border-top-left-radius:4px;border-top-right-radius:4px;border-bottom-left-radius:4px;border-bottom-right-radius:4px;';
+		return '<div style="margin:4px 0 24px 0;padding:14px 20px;background-color:'.self::BRAND.';'.$radius.'">'
+			.'<a href="'.dol_escape_htmltag($url).'" style="color:#ffffff;text-decoration:none;">'
+			.'<span style="font-family:'.self::FONT.';font-size:16px;color:#ffffff;"><strong>'.$label.'</strong></span></a></div>';
 	}
 
 	// ------------------------------------------------------------ rollout pieces

@@ -256,7 +256,8 @@ class WerkbankMailData
 	 */
 	public static function box($rows)
 	{
-		return '<div style="margin:8px 0 24px 0;padding:12px 16px;background:#F7F9FB;border-left:2px solid #FE5A23;">'.$rows.'</div>';
+		// background-color and padding survive Dolibarr's editor; the orange line only shows where nothing filtered it.
+		return '<div style="margin:8px 0 24px 0;padding:12px 16px;background-color:#F7F9FB;border-left:2px solid #FE5A23;">'.$rows.'</div>';
 	}
 
 	/**
@@ -269,9 +270,12 @@ class WerkbankMailData
 	 */
 	public static function factRow($label, $value, $big = false)
 	{
-		return '<div style="overflow:hidden;padding:2px 0;">'
-			.'<span style="'.self::VALUE.($big ? 'font-size:22px;' : '').'">'.$value.'</span>'
-			.'<span style="'.self::LABEL.'">'.$label.'</span></div>';
+		// Label above value, the font on spans: what Dolibarr's editor keeps (no floats,
+		// no letter spacing), so a hand-sent mail looks like an automatic one.
+		$label = dol_escape_htmltag(mb_strtoupper(html_entity_decode((string) $label, ENT_QUOTES | ENT_HTML5, 'UTF-8'), 'UTF-8'), 0, 0, '', 1);
+		return '<p style="margin:0 0 8px 0;line-height:1.4;">'
+			.'<span style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#4A5B6E;">'.$label.'</span><br>'
+			.'<span style="font-family:Arial, Helvetica, sans-serif;font-size:'.($big ? 22 : 16).'px;color:#1B3348;"><strong>'.$value.'</strong></span></p>';
 	}
 
 	/**
@@ -471,8 +475,9 @@ class WerkbankMailData
 		foreach ($lines as $line) {
 			$html .= dol_escape_htmltag($line).'<br>';
 		}
-		return '<p style="margin:0 0 2px 0;'.self::LABEL.'">'.dol_escape_htmltag($langs->transnoentities('WerkbankTransfer')).'</p>'
-			.'<p style="'.self::TEXT.'">'.$html.'</p>';
+		return '<p style="margin:0 0 2px 0;line-height:1.4;"><span style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#4A5B6E;">'
+			.dol_escape_htmltag(mb_strtoupper($langs->transnoentities('WerkbankTransfer'), 'UTF-8')).'</span></p>'
+			.'<p style="margin:0 0 16px 0;line-height:1.6;"><span style="font-family:Arial, Helvetica, sans-serif;font-size:16px;color:#3B4D63;">'.$html.'</span></p>';
 	}
 
 	/**

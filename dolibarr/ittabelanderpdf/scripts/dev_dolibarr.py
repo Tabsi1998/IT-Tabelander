@@ -1163,6 +1163,13 @@ def versand() -> None:
     pick = html.split('value="addmanual"', 1)[1] if 'value="addmanual"' in html else ""
     check("\"Weitere Unterlage\" offers only what may be sent", "preisliste-intern-test" not in pick and "agb-unternehmer" in pick)
     check("the line keeps one main action and a menu", "ittabdocs-actions" in html and "dropdown" not in html.split("ittabdocs-list", 1)[-1].split("</table>", 1)[0])
+    # 9. "Alle fehlenden zusenden": one mail with every open required document.
+    status, html, _ = get(f"/custom/ittabelanderpdf/docs.php?socid={firm}")
+    check("the tab offers to send all missing documents", "ittabpdf_preselect_missing=1" in html)
+    status, html, _ = get(f"{card}&action=presend&mode=init&ittabpdf_preselect_missing=1")
+    names = attached(html)
+    check("all missing: the open documents attached, the list in the text", status == 200 and len(names) >= 1
+          and chosen_template(html).startswith("Unterlagen zusenden") and body(html).count("<li") >= len(names), f"{names} {chosen_template(html)}")
     # 8. The setup offers only what may be sent.
     status, html, _ = get("/custom/ittabelanderpdf/admin/setup.php")
     block = html.split("ITTABPDF_DOCS_", 1)[1] if "ITTABPDF_DOCS_" in html else ""

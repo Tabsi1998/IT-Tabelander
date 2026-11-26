@@ -203,9 +203,7 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 	 */
 	private static function requestBox($label, $title)
 	{
-		$small = 'font-family:'.WerkbankMailTemplates::FONT.';font-size:12px;line-height:20px;letter-spacing:1px;text-transform:uppercase;color:'.WerkbankMailTemplates::MUTED.';';
-		$bold = 'margin:4px 0 0 0;font-family:'.WerkbankMailTemplates::FONT.';font-size:16px;line-height:1.5;font-weight:bold;color:'.WerkbankMailTemplates::INK.';';
-		return WerkbankMailData::box('<div style="'.$small.'">'.$label.'</div>'.($title !== '' ? '<div style="'.$bold.'">'.$title.'</div>' : ''));
+		return WerkbankMailData::box(WerkbankMailData::factRow($label, $title));
 	}
 
 	/**
@@ -316,17 +314,14 @@ class InterfaceITTabPdfTicketConfirm extends DolibarrTriggers
 		foreach (array_filter($rows, 'strlen') as $name => $value) {
 			// Long values (a company name with its number) go below their label,
 			// floated they would push the label under them on a phone.
-			$facts .= mb_strlen(trim(strip_tags($value))) > 24
-				? '<div style="padding:2px 0;"><div style="'.WerkbankMailData::LABEL.'">'.$e($name).'</div>'
-					.'<div style="'.str_replace('float:right;', '', WerkbankMailData::VALUE).'line-height:1.4;">'.$value.'</div></div>'
-				: WerkbankMailData::factRow($e($name), $value);
+			$facts .= WerkbankMailData::factRow($e($name), $value);
 		}
 
 		$body = WerkbankMailTemplates::paragraph('Neue Anfrage: <strong style="color:'.WerkbankMailTemplates::INK.';">'.$e($subjectText !== '' ? $subjectText : $object->ref).'</strong>');
 		$body .= WerkbankMailData::box($facts);
 		$body .= '<div style="margin:0 0 24px 0;font-family:'.WerkbankMailTemplates::FONT.';font-size:15px;line-height:1.6;color:'.WerkbankMailTemplates::BODY.';">'.self::textHtml($object->message).'</div>';
 		$url = dol_buildpath('/ticket/card.php', 2).'?track_id='.urlencode((string) $object->track_id);
-		$body .= '<div style="margin:4px 0 8px 0;"><a href="'.$e($url).'" style="display:block;padding:14px 20px;border-radius:4px;background:'.WerkbankMailTemplates::BRAND.';color:#fff;font-family:'.WerkbankMailTemplates::FONT.';font-size:16px;font-weight:bold;line-height:1.3;text-align:center;text-decoration:none;">Ticket in Dolibarr öffnen</a></div>';
+		$body .= WerkbankMailTemplates::button($url, 'Ticket in Dolibarr öffnen');
 
 		$subject = 'Neue Anfrage '.$object->ref.($subjectText !== '' ? ': '.$subjectText : '');
 		return self::mail($subject, $to, self::document($body), (int) $object->id);
