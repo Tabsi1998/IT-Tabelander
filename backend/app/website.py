@@ -41,7 +41,7 @@ OLD_ADDRESSES = {
     "nutzungsbedingungen": "/rechtliches/nutzungsbedingungen",
     "rechtliches": "/rechtliches/impressum",
 }
-LEGAL_PAGES = ("impressum", "datenschutz", "nutzungsbedingungen")
+LEGAL_PAGES = ("impressum", "datenschutz", "nutzungsbedingungen", "widerruf", "agb-unternehmer")
 DAYS = {"Montag": "Monday", "Dienstag": "Tuesday", "Mittwoch": "Wednesday", "Donnerstag": "Thursday",
         "Freitag": "Friday", "Samstag": "Saturday", "Sonntag": "Sunday"}
 TIME_RANGE = re.compile(r"(\d{1,2})[:.](\d{2})\s*(?:–|-|bis)\s*(\d{1,2})[:.](\d{2})")

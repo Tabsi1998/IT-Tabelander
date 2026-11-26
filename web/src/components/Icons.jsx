@@ -28,3 +28,7 @@ export function TraceUnderline() {
     </svg>
   );
 }
+
+export function DownloadIcon({ size = 20 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" strokeWidth="2.2" {...base}><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" /></svg>;
+}

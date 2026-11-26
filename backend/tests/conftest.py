@@ -27,7 +27,7 @@ BASE_URL = (
 
 INTEGRATION_FILES = {"test_api.py", "test_regression_iter2.py"}
 # Scenarios against a real Dolibarr; they also need the integration settings.
-DOLIBARR_FILES = {"test_dolibarr_runtime.py"}
+DOLIBARR_FILES = {"test_dolibarr_runtime.py", "test_dolibarr_unterlagen.py"}
 
 
 def _test_database_env():

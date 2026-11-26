@@ -283,6 +283,10 @@ test("legal texts: what is missing, and a draft to start from (#68, #69, #75)", 
   await legal.getByText("2 Stellen noch zu ergänzen", { exact: true }).click();
   await expect(legal.getByText("[BITTE MIT DER WKO KLÄREN: nicht abgeholte Geräte]")).toBeVisible();
 
+  // The two optional texts come from the import script, not from a button (#128).
+  await expect(legal.getByText("scripts/import_unterlagen.py")).toHaveCount(2);
+  await expect(legal.getByText("Steht in Dolibarr nicht in der Kategorie „Rechtstexte“", { exact: false })).toBeVisible();
+  await expect(legal.getByText("IT-Tabelander/Unterlagen/agb-unternehmer.pdf", { exact: false })).toBeVisible();
   await legal.getByRole("button", { name: "Entwurf in Dolibarr anlegen" }).click();
   await expect(legal.getByText(/Entwurf angelegt/)).toBeVisible();
   expect(state.sent.some((item) => item.method === "POST" && item.path === "/admin/legal/datenschutz/draft")).toBe(true);

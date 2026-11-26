@@ -16,8 +16,8 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 /**
  * Device intake slip (Geräteannahmeschein) from a ticket, one sheet to print
  * and sign: customer, device, accessories, condition, fault, the questions
- * of the ticket's select fields (access data, backup), a line for the
- * password on paper only (never stored or printed), the notices of the
+ * of the ticket's select fields (access data, backup), optionally a line
+ * for the password on paper only (never stored or printed), the notices of the
  * module setup by Sie or Du, two signatures.
  */
 class WerkbankBuilderIntake extends WerkbankBuilder
@@ -150,7 +150,7 @@ class WerkbankBuilderIntake extends WerkbankBuilder
 			array('type' => 'choices', 'rows' => array($questions['ittab_zugang'])),
 		);
 		// Only ever a line on paper: the password is never stored or printed.
-		if (getDolGlobalInt('ITTABPDF_INTAKE_PASSWORD_FIELD', 1)) {
+		if (getDolGlobalInt('ITTABPDF_INTAKE_PASSWORD_FIELD', 0)) {
 			$doc['blocks'][] = array('type' => 'fields', 'rows' => array(array($langs->transnoentities('WerkbankIntakePassword'), '', 'wide')));
 		}
 		$doc['blocks'][] = array('type' => 'choices', 'rows' => array($questions['ittab_sicherung']));

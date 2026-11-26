@@ -150,7 +150,7 @@ if ($type) {
 			print '<tr class="oddeven"><td class="titlefield">'.$langs->trans($setting[0]).'<div class="opacitymedium small">'.$langs->trans('WerkbankIntakeNoticesHelp').'</div></td><td>';
 			print '<textarea name="'.$const.'" class="quatrevingtpercent" rows="8">'.dol_escape_htmltag(getDolGlobalString($const, $setting[1]), 0, 1).'</textarea></td></tr>';
 		}
-		print '<tr class="oddeven"><td>'.$langs->trans('WerkbankIntakePasswordField').'</td><td><input type="checkbox" name="ITTABPDF_INTAKE_PASSWORD_FIELD" value="1"'.(getDolGlobalInt('ITTABPDF_INTAKE_PASSWORD_FIELD', 1) ? ' checked' : '').'> '.$langs->trans('WerkbankIntakePasswordFieldHelp').'</td></tr>';
+		print '<tr class="oddeven"><td>'.$langs->trans('WerkbankIntakePasswordField').'</td><td><input type="checkbox" name="ITTABPDF_INTAKE_PASSWORD_FIELD" value="1"'.(getDolGlobalInt('ITTABPDF_INTAKE_PASSWORD_FIELD', 0) ? ' checked' : '').'> '.$langs->trans('WerkbankIntakePasswordFieldHelp').'</td></tr>';
 		print '<tr class="liste_titre"><td>'.$langs->trans('WerkbankQsMenu').'</td><td></td></tr>';
 		print '<tr class="oddeven"><td>'.$langs->trans('WerkbankQsBlockClose').'</td><td><input type="checkbox" name="ITTABPDF_QS_BLOCK_CLOSE" value="1"'.(getDolGlobalInt('ITTABPDF_QS_BLOCK_CLOSE', 1) ? ' checked' : '').'> '.$langs->trans('WerkbankQsBlockCloseHelp').'</td></tr>';
 		print '<tr class="oddeven"><td>'.$langs->trans('WerkbankQsAppendReport').'</td><td><input type="checkbox" name="ITTABPDF_QS_APPEND_WORKREPORT" value="1"'.(getDolGlobalInt('ITTABPDF_QS_APPEND_WORKREPORT') ? ' checked' : '').'> '.$langs->trans('WerkbankQsAppendReportHelp').'</td></tr>';

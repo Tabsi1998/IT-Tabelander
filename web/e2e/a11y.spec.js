@@ -2,10 +2,17 @@ import AxeBuilder from "@axe-core/playwright";
 import { mkdirSync } from "node:fs";
 import { REVIEW_LINK, expect, expectNoSidewaysScroll, mockApi, test } from "./fixtures.js";
 
-const LEGAL = { impressum: { title: "Impressum", html: "<p>IT-Tabelander<br>Teststraße 1<br>6410 Telfs</p>" } };
+const LEGAL = {
+  impressum: { title: "Impressum", html: "<p>IT-Tabelander<br>Teststraße 1<br>6410 Telfs</p>" },
+  datenschutz: { title: "Datenschutzerklärung", html: "<p>Keine Cookies.</p>" },
+  nutzungsbedingungen: { title: "Nutzungsbedingungen", html: "<p>Bitte sichere deine Daten.</p>" },
+  widerruf: { title: "Widerrufsbelehrung", html: "<p>14 Tage.</p>", pdf: true },
+  "agb-unternehmer": { title: "AGB für Unternehmer", html: "<h3>1. Geltung</h3><p>Nur für Unternehmer.</p>", pdf: true },
+};
 const PAGES = [
   ["startseite", "/", "IT-Technik, die"],
   ["rechtliches", "/rechtliches/impressum", "Rechtliches"],
+  ["rechtliches-agb", "/rechtliches/agb-unternehmer", "Rechtliches"],
   ["nicht-gefunden", "/gibt-es-nicht", "Diese Seite gibt es nicht."],
   ["bewertung", `/bewertung#${REVIEW_LINK}`, "Wie war’s?"],
 ];
@@ -78,6 +85,26 @@ test("a legal page prints just its text, e.g. as PDF for the offers in Dolibarr 
   await expect(page.getByRole("contentinfo")).toBeHidden();
   await expect(page.getByRole("heading", { level: 2, name: "Impressum" })).toBeVisible();
   await expect(page.getByText("Teststraße 1")).toBeVisible();
+});
+
+test("a released legal page with a PDF offers the download, five tabs without sideways scroll (#128)", async ({ page }) => {
+  await open(page, "/rechtliches/agb-unternehmer", "Rechtliches");
+  const tabs = page.getByRole("navigation", { name: "Rechtliche Texte" }).getByRole("link");
+  await expect(tabs).toHaveCount(5);
+  await expect(tabs.filter({ hasText: "AGB Unternehmen" })).toHaveAttribute("aria-current", "page");
+  const download = page.getByRole("link", { name: "Als PDF herunterladen" });
+  await expect(download).toHaveAttribute("href", "/api/legal/agb-unternehmer/pdf");
+  await expect(download).toHaveAttribute("download", "");
+  await expectNoSidewaysScroll(page);
+  await page.emulateMedia({ media: "print" });
+  await expect(download).toBeHidden();
+  await expect(page.getByRole("heading", { level: 2, name: "AGB für Unternehmer" })).toBeVisible();
+});
+
+test("without a PDF there is no download button (#128)", async ({ page }) => {
+  await open(page, "/rechtliches/impressum", "Rechtliches");
+  await expect(page.getByText("Teststraße 1")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Als PDF herunterladen" })).toHaveCount(0);
 });
 
 // Screenshots of every page in every width, for looking through after a run:

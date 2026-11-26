@@ -393,7 +393,8 @@ Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie
 
 1. Unter **Einstellungen → Module/Anwendungen** aktivieren: **Geschäftspartner**,
    **Tickets**, **Agenda (Ereignisse/Termine)**, **Angebote**, **Rechnungen**,
-   **Wissensmanagement-System**, **Kategorien** und **REST-API**. Für alle
+   **Wissensmanagement-System**, **Kategorien**, **REST-API** und
+   **Dokumente (ECM)** (Rechtstexte als PDF). Für alle
    Belege im Kundenbereich außerdem die Module, die du nutzt:
    **Kundenaufträge**, **Lieferungen** (Versand), **Serviceaufträge**
    (Arbeitsberichte) und **Verträge/Abonnements**. Ein ausgeschaltetes Modul
@@ -425,7 +426,12 @@ Die Bezeichnungen sind die der deutschen Oberfläche von Dolibarr 23 und 24 (sie
      leer und im Log der Website steht eine Warnung,
    - Produkte: **lesen** (Abrechnungsintervall der laufenden Leistungen aus der
      Dauer der Leistung, z. B. „1 Monat“ = monatlich). Ohne dieses Recht fehlt
-     nur das Intervall.
+     nur das Intervall,
+   - Dokumente (ECM): **lesen/herunterladen** (Rechtstexte als PDF aus
+     `IT-Tabelander/Unterlagen/`, `GET /documents/download` mit
+     `modulepart=ecm`). Hochladen oder Einrichten braucht die Website nicht.
+     Ohne dieses Recht gibt es keinen PDF-Knopf, und im Admin steht, welches
+     Recht fehlt.
    Im Benutzer einen API-Schlüssel erzeugen. **Keine** Admin-Rechte.
    Nur vorübergehend zusätzlich „Wissensmanagement: Artikel anlegen/ändern“ –
    für die Entwürfe der Rechtstexte und den einmaligen Umzug der alten FAQ –,
@@ -471,19 +477,28 @@ Alles, was die Website über die Firma sagt, pflegst du in Dolibarr:
   Steuernummer, Gerichtsstand (Firmenbuchgericht), Firmenbuchnummer und die
   sozialen Netzwerke. Daraus baut die Website das Impressum.
 - **Öffnungszeiten** im Reiter **Öffnungszeiten** derselben Seite.
-- **FAQ** als Artikel der **Wissensbasis**:
-  1. Unter **Kategorien** eine Kategorie für die Wissensbasis anlegen,
-     z. B. „Website“.
-  2. Je eine Frage pro FAQ-Eintrag als Artikel schreiben, ihm die Kategorie
-     „Website“ geben und ihn **freigeben**. Artikel ohne diese Kategorie
-     bleiben intern – interne Notizen sieht nie jemand auf der Website.
-  3. Auf der Website unter `/admin/dolibarr` im Block **Inhalte aus
-     Dolibarr** die Kategorie auswählen, **Auswahl speichern**.
-- **Rechtstexte** ebenfalls als Artikel der Wissensbasis, siehe nächster
-  Abschnitt.
+- **Wissensbasis** mit drei Kategorien (unter **Kategorien**, Typ
+  Wissensbasis). Die Kategorie entscheidet, was ein Artikel ist – nie sein
+  Titel:
+  - **FAQ**: Fragen und Antworten für die Website. Je eine Frage pro Artikel,
+    Kategorie „FAQ“ geben und **freigeben**.
+  - **Rechtstexte**: Ergänzung zum Impressum, Datenschutzerklärung,
+    Nutzungsbedingungen, Widerrufsbelehrung, AGB für Unternehmer. Welcher
+    Artikel welche Seite ist, wählst du im Block **Rechtstexte** (nächster
+    Abschnitt).
+  - **Unterlagen**: interne Unterlagen (Auftragsverarbeitung,
+    Leistungsbeschreibung, Fernwartung, Preisliste …). Sie erscheinen nie auf
+    der Website, auch wenn sie versehentlich zusätzlich „FAQ“ tragen.
+  Artikel ohne diese Kategorien bleiben ebenfalls intern.
+- Auf der Website unter `/admin/dolibarr` im Block **Inhalte aus Dolibarr**
+  steht je Rolle „automatisch“: dann gilt die Kategorie mit genau diesem Namen.
+  Heißt sie anders, die Kategorie dort auswählen und **Auswahl speichern**.
+  Die Auswahl merkt sich die Nummer; Umbenennen in Dolibarr (z. B. „Website“
+  in „FAQ“) ändert also nichts.
 
-In den FAQ erscheinen nur freigegebene Artikel der Kategorie, die kein
-Rechtstext sind.
+In den FAQ erscheinen nur freigegebene Artikel der FAQ-Kategorie, die kein
+gewählter Rechtstext sind und weder in „Rechtstexte“ noch in „Unterlagen“
+stehen.
 Bis der erste FAQ-Artikel freigegeben ist, zeigt die Website ihre bisherigen
 FAQ weiter. Die Website fragt Dolibarr höchstens alle 10 Minuten; **Neu laden**
 im Admin holt sofort. Ist Dolibarr nicht erreichbar, zeigt sie den letzten
@@ -493,15 +508,15 @@ Bankdaten zeigt die Website bewusst nicht: Das Dolibarr-Recht dafür würde auch
 Kontobewegungen lesbar machen. Die IBAN steht auf den Rechnungen aus Dolibarr,
 die im Kundenportal (Meilenstein 5) abrufbar werden.
 
-### Rechtstexte: Impressum, Datenschutzerklärung, Nutzungsbedingungen
+### Rechtstexte: Impressum, Datenschutz, Nutzungsbedingungen, Widerruf, AGB
 
 Unter `/admin/dolibarr` im Block **Rechtstexte** steht alles an einer Stelle:
 
 - **Impressum aus den Firmendaten** als Prüfliste: ✓ ausgefüllt, **!** fehlt
   (Pflicht), **–** leer, aber nur nötig, wenn es auf dich zutrifft (z. B. UID).
   Bei jedem fehlenden Punkt steht das Feld in Dolibarr dabei.
-- Drei Texte mit ihrem Stand (fehlt, Entwurf, freigegeben) und den Stellen,
-  die noch zu ergänzen sind:
+- Fünf Texte mit ihrem Stand (fehlt, Entwurf, freigegeben), den Stellen,
+  die noch zu ergänzen sind, und ob es schon ein PDF gibt:
   - **Ergänzung zum Impressum**: Rechtsform, Gewerbe, Gewerbebehörde, Kammer,
     Berufsrecht und Offenlegung nach dem Mediengesetz. Dafür hat Dolibarr kein
     Feld, das die Website lesen kann (Unternehmensform und „Hinweis“ gibt die
@@ -509,6 +524,13 @@ Unter `/admin/dolibarr` im Block **Rechtstexte** steht alles an einer Stelle:
   - **Datenschutzerklärung**
   - **Nutzungsbedingungen** für Reparaturen, mit dem Rücktrittsrecht und dem
     Muster-Widerrufsformular für online angenommene Angebote
+  - **Widerrufsbelehrung** (optional) und **AGB für Unternehmer** (optional):
+    als eigene Seiten `/rechtliches/widerruf` und
+    `/rechtliches/agb-unternehmer`. Sie erscheinen in der Navigation erst,
+    wenn ein Artikel gewählt ist. Ihre Entwürfe legt
+    `scripts/import_unterlagen.py` an, nicht der Knopf.
+- Ein gewählter Text, der nicht in der Kategorie „Rechtstexte“ steht, bleibt
+  online; der Block und die Übersicht erinnern daran, ihn dort zuzuordnen.
 
 So kommst du zu fertigen Texten:
 
@@ -516,7 +538,9 @@ So kommst du zu fertigen Texten:
    **Wissensmanagement: Artikel anlegen/ändern** geben.
 2. Beim Text **Entwurf in Dolibarr anlegen** klicken. Der Entwurf landet als
    Artikel in der Wissensbasis und ist sofort für die Website gewählt; dort
-   steht er mit dem Hinweis „Entwurf“. Eine Kategorie braucht er nicht.
+   steht er mit dem Hinweis „Entwurf“. Die Kategorie „Rechtstexte“ gibst du
+   ihm in Dolibarr (die Schnittstelle von Dolibarr 23/24 kann Artikeln keine
+   Kategorie geben).
 3. In Dolibarr **Wissensbasis** → Artikel öffnen → **Ändern** → alle Stellen
    „[BITTE …]“ ergänzen oder entscheiden → **Speichern** → **Freigeben**.
 4. Im Admin **Neu laden**. Solange etwas fehlt, ein Text Entwurf ist oder eine
@@ -530,6 +554,26 @@ einfacher Sprache geschrieben, ersetzen aber keine Rechtsberatung – vor der
 Freigabe am besten vom Rechtsservice der WKO prüfen lassen. Den früher üblichen
 Link zur EU-Plattform für Online-Streitbeilegung braucht es nicht mehr; die
 Plattform wurde im Juli 2025 eingestellt.
+
+**Rechtstexte als PDF:** Das Dolibarr-Modul „IT-Tabelander PDF“ legt die
+freigegebenen Rechtstexte im Werkbank-Design unter **Dokumente** (ECM) im
+Ordner `IT-Tabelander/Unterlagen` ab, mit diesen Dateinamen:
+
+| Seite | Datei in Dolibarr |
+| --- | --- |
+| `/rechtliches/nutzungsbedingungen` | `IT-Tabelander/Unterlagen/nutzungsbedingungen.pdf` |
+| `/rechtliches/widerruf` | `IT-Tabelander/Unterlagen/widerruf.pdf` |
+| `/rechtliches/datenschutz` | `IT-Tabelander/Unterlagen/datenschutz.pdf` |
+| `/rechtliches/agb-unternehmer` | `IT-Tabelander/Unterlagen/agb-unternehmer.pdf` |
+| `/rechtliches/impressum` | `IT-Tabelander/Unterlagen/impressum-ergaenzung.pdf` |
+
+Liegt die Datei dort und ist der Text freigegeben, zeigt die Seite den Knopf
+**Als PDF herunterladen** (`/api/legal/<seite>/pdf`). Die Website fragt nur
+genau diese fünf Dateien ab, nie einen Pfad aus der Anfrage, prüft, dass es
+wirklich ein PDF ist (höchstens 10 MB), und merkt sich Datei oder Fehlen
+10 Minuten (**Neu laden** im Admin holt sofort). Ein Entwurf bekommt nie ein
+PDF. Fehlt die Datei, gibt es keinen Knopf; Drucken über den Browser geht
+weiterhin.
 
 **Nutzungsbedingungen an Angebote hängen:** die Seite
 `/rechtliches/nutzungsbedingungen` im Browser drucken und „Als PDF speichern“
@@ -795,7 +839,8 @@ Ein gesunder Healthcheck liefert:
 | Dolibarr meldet HTTP 403 | API-Benutzerrechte für **Geschäftspartner** und **Tickets** prüfen; die genaue fehlgeschlagene Stufe steht unter `/admin/dolibarr` bei der Warteschlange |
 | Stammkunde wird in Dolibarr doppelt angelegt | dem API-Benutzer das Recht **Geschäftspartner: alle einsehen, nicht nur die verknüpften** geben |
 | Firmendaten oder Öffnungszeiten fehlen auf der Website | `/admin/dolibarr` → **Inhalte aus Dolibarr** zeigt den Grund; meist fehlt die Konstante `API_LOGINS_ALLOWED_FOR_GET_COMPANY` bzw. `API_LOGINS_ALLOWED_FOR_CONST_READ` |
-| Ein FAQ-Artikel erscheint nicht | Kategorie „Website“ gesetzt? Freigegeben? Nicht als Rechtstext ausgewählt? Dann **Neu laden** |
+| Ein FAQ-Artikel erscheint nicht | Kategorie „FAQ“ gesetzt? Freigegeben? Nicht als Rechtstext gewählt und nicht in „Rechtstexte“ oder „Unterlagen“? Dann **Neu laden** |
+| Kein Knopf „Als PDF herunterladen“ | Text freigegeben? Datei unter Dokumente → `IT-Tabelander/Unterlagen/<seite>.pdf`? Recht **Dokumente (ECM): lesen/herunterladen**? Dann **Neu laden** |
 | **Entwurf in Dolibarr anlegen** meldet fehlende Rechte | dem Website-Benutzer vorübergehend **Wissensmanagement: Artikel anlegen/ändern** geben |
 | Kunde bekommt keine Eingangsbestätigung | Dolibarr unter **Einstellungen → E-Mails** eine Test-Mail senden lassen; die Website verschickt diese Mail nicht selbst |
 | Keine Warn-Mail, obwohl Anfragen warten | unter `/admin/technik` **Test-Mail senden**; unter `/admin/dolibarr` steht bei der Warteschlange, warum die Warnung nicht rausging |

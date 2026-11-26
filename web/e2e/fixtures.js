@@ -56,7 +56,9 @@ export async function mockApi(page, { gallery = 3, reviewCount = 3, legal = {}, 
     if (path.startsWith("/legal/")) {
       const kind = path.split("/").pop();
       if (legal[kind] === undefined) return json(route, { detail: "Noch nicht hinterlegt." }, 404);
-      return json(route, { kind, title: legal[kind].title, html: legal[kind].html, draft: Boolean(legal[kind].draft) });
+      const pages = Object.keys(legal).map((item) => ({ kind: item, title: legal[item].title }));
+      return json(route, { kind, title: legal[kind].title, html: legal[kind].html, draft: Boolean(legal[kind].draft),
+        pages, pdf: Boolean(legal[kind].pdf) });
     }
     if (path === "/contact" && method === "POST") return json(route, { ok: true, ref: "ANF-KONTAKT1", dolibarr_synced: true });
     if (path === "/uploads/repair-attachment" && method === "POST") return json(route, { id: "6523f0000000000000000001", url: "/api/media/x.webp" });
