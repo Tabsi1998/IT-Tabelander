@@ -47,6 +47,9 @@ class ActionsIttabelanderpdf
 		if ($action === 'ittabpdf_unterlage_pdf' && is_object($object) && $object->element === 'knowledgerecord') {
 			return $this->writeUnterlage($object);
 		}
+		if ($action === 'ittabpdf_intake' && is_object($object) && $object->element === 'ticket') {
+			return $this->writeIntake($object);
+		}
 		if ($action === 'ittabpdf_attach' && is_object($object) && $object->element === 'ticket') {
 			return $this->attachToTicket($object, $action);
 		}
@@ -127,6 +130,13 @@ class ActionsIttabelanderpdf
 	public function addMoreActionsButtons($parameters, &$object, &$action, $hookmanager)
 	{
 		global $langs, $user;
+		if (is_object($object) && !empty($object->id) && $object->element === 'ticket') {
+			global $langs, $user;
+			$langs->load('ittabelanderpdf@ittabelanderpdf');
+			$url = $_SERVER['PHP_SELF'].'?track_id='.urlencode((string) $object->track_id).'&action=ittabpdf_intake&token='.newToken();
+			print dolGetButtonAction($user->hasRight('ticket', 'write') ? '' : $langs->trans('NotEnoughPermissions'), $langs->trans('WerkbankIntakeButton'), 'default', $url, 'ittabpdf-intake', $user->hasRight('ticket', 'write'));
+			return 0;
+		}
 		if (!is_object($object) || empty($object->id) || $object->element !== 'knowledgerecord') {
 			return 0;
 		}
@@ -368,6 +378,34 @@ class ActionsIttabelanderpdf
 			$text .= ' – '.$langs->trans('WerkbankDocsOnlyReleased');
 		}
 		return '<div class="info ittabpdf-unterlage">'.$text.'</div>';
+	}
+
+	/**
+	 * Button "Geräteannahmeschein" on the ticket card: the PDF into the
+	 * ticket's documents, ready to print and sign.
+	 *
+	 * @param Ticket $ticket Ticket
+	 * @return int
+	 */
+	private function writeIntake($ticket)
+	{
+		global $user, $langs;
+		if (GETPOST('token', 'alphanohtml') !== currentToken() || !$user->hasRight('ticket', 'write')) {
+			accessforbidden();
+		}
+		dol_include_once('/ittabelanderpdf/class/werkbankintake.class.php');
+		$langs->load('ittabelanderpdf@ittabelanderpdf');
+		$intake = new WerkbankIntake($this->db);
+		$path = $intake->write($ticket);
+		if ($path === '') {
+			setEventMessages($langs->trans('WerkbankIntakeFailed', $intake->error), null, 'errors');
+		} else {
+			$file = dol_sanitizeFileName($ticket->ref).'/'.basename($path);
+			setEventMessages($langs->trans('WerkbankIntakeWritten').' <a href="'.DOL_URL_ROOT.'/document.php?modulepart=ticket&amp;file='.urlencode($file).'">'
+				.dol_escape_htmltag(basename($path)).'</a>', null, 'mesgs');
+		}
+		header('Location: '.$_SERVER['PHP_SELF'].'?track_id='.urlencode((string) $ticket->track_id));
+		exit;
 	}
 
 	/**

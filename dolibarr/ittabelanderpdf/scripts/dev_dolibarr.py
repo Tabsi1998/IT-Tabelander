@@ -16,7 +16,8 @@ the IT-Tabelander repository; run this from that folder.
     python scripts/dev_dolibarr.py ui         log in and check the card banner and the queue page
     python scripts/dev_dolibarr.py tickets    the module's own ticket confirmation (tests/ticket_confirm.php), checked in Mailpit
     python scripts/dev_dolibarr.py unterlagen company documents from the knowledge base (tests/unterlagen.php), mail form, ticket, setup
-    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets, unterlagen
+    python scripts/dev_dolibarr.py qs         QS checklists, test report, intake slip (tests/qs.php), phone page, setup, rights
+    python scripts/dev_dolibarr.py all        up, install, fixtures, pdf, mails, rollout, ui, tickets, unterlagen, qs
     python scripts/dev_dolibarr.py down       remove containers, volumes and network
 
 Standard library only. Passwords are new on every start; the local test
@@ -512,16 +513,151 @@ def unterlagen() -> None:
     print(f"{len(checks)} Unterlagen checks passed")
 
 
+def qs() -> None:
+    """Workshop: QS checklists (tests/qs.php), then the phone page, its autosave, setup, rights and the intake slip.
+
+    The way a technician goes on a phone: customer -> new intervention ->
+    kind of job -> tick points (each saved through ajax/qs.php) -> close,
+    refused while required points are open, then the test report. The
+    workshop setup adds a kind of job and a point; a user without the QS
+    right is turned away; the ticket card writes the intake slip. Every form
+    passes Dolibarr's WAF. Example PDFs go to beispiele/.
+    """
+    php("enable", script="qs.php")
+    result = php("run", script="qs.php")
+    checks = [dict(entry, page="php") for entry in result["checks"]]
+    EXAMPLES.mkdir(parents=True, exist_ok=True)
+    for name in ("pruefprotokoll-1.pdf", "arbeitsbericht-mit-pruefprotokoll.pdf", "geraeteannahme-1.pdf", "geraeteannahme-2-leer.pdf"):
+        docker("cp", f"{WEB}:/tmp/ittpdf-out/{name}", str(EXAMPLES / name))
+    opener = browser()
+    base = "/custom/ittabelanderpdf"
+
+    def get(path: str) -> tuple:
+        try:
+            answer = opener.open(f"{URL}{path}", timeout=60)
+            return answer.status, answer.read().decode("utf-8", "replace"), answer.geturl()
+        except urllib.error.HTTPError as error:
+            return error.code, error.read().decode("utf-8", "replace"), ""
+
+    def post(path: str, fields: list) -> tuple:
+        try:
+            answer = opener.open(f"{URL}{path}", data=urllib.parse.urlencode(fields).encode(), timeout=120)
+            return answer.status, answer.read().decode("utf-8", "replace"), answer.geturl()
+        except urllib.error.HTTPError as error:
+            return error.code, error.read().decode("utf-8", "replace"), ""
+
+    def token(html: str) -> str:
+        return re.search(r'name="token" value="([^"]+)"', html).group(1)
+
+    def check(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"page": "web", "check": name, "ok": bool(ok), "detail": detail})
+
+    # The way on the phone: customer, new intervention, kind of job.
+    status, html, _ = get(f"{base}/qs.php")
+    check("start page asks for the customer", status == 200 and 'name="socid"' in html and "qs.css" in html and "qs.js" in html)
+    status, html, _ = get(f"{base}/qs.php?socid={result['socid']}")
+    check("customer page lists open interventions", status == 200 and "create_fichinter" in html)
+    status, html, url = post(f"{base}/qs.php?socid={result['socid']}", [("token", token(html)), ("action", "create_fichinter"),
+                                                                       ("description", "Vor Ort: Drucker und WLAN")])
+    created = re.search(r"fichinter=(\d+)", url)
+    check("new intervention from the phone (WAF passes)", status == 200 and bool(created) and "ittabqs-kind" in html, url)
+    kinds = re.findall(r'name="type" value="(\d+)"', html)
+    status, html, url = post(f"{base}/qs.php?fichinter={created.group(1) if created else 0}", [("token", token(html)), ("action", "start"), ("type", kinds[-1] if kinds else "0")])
+    check("kind of job starts a QS", status == 200 and "id=" in url and 'class="ittabqs-list"' in html, url)
+
+    # Autosave on the open PC build run: tick, value, text, note.
+    status, html, _ = get(f"{base}/qs.php?id={result['open_run']}")
+    form = re.search(r'data-endpoint="([^"]+)" data-token="([^"]+)"', html)
+    items = re.findall(r'<li class="ittabqs-item[^"]*" data-id="(\d+)" data-kind="(\w+)" data-required="(\d)"', html)
+    check("checklist shows every point with big targets", status == 200 and bool(form) and len(items) >= 10 and "ittabqs-box" in html and "ittabqs-status" in html,
+          f"{len(items)} points")
+    saved = []
+    for item, kind, required in items:
+        value = {"value": "68", "text": "MB 2309XYZ, GPU 77AB"}.get(kind, "")
+        state, answer, _ = post(unescape(form.group(1)).replace(URL, ""), [("action", "saveitem"), ("token", unescape(form.group(2))),
+                                                                           ("run", str(result["open_run"])), ("item", item),
+                                                                           ("checked", "1" if kind == "check" else "0"), ("value", value),
+                                                                           ("note", "Lüfterkurve leise" if kind == "check" and not saved else "")])
+        saved.append(state == 200 and json.loads(answer or "{}").get("ok") is True)
+    last = json.loads(answer or "{}")
+    check("every point saves through ajax/qs.php", saved and all(saved) and last.get("counts", {}).get("required_open") == 0, json.dumps(last)[:200])
+    state, answer, _ = post(unescape(form.group(1)).replace(URL, ""), [("action", "saveitem"), ("token", "falsch"), ("run", str(result["open_run"])),
+                                                                       ("item", items[0][0]), ("checked", "0")])
+    check("autosave without the token is refused", state != 200 or json.loads(answer or "{}").get("ok") is not True, str(state))
+    status, html, _ = get(f"{base}/qs.php?id={result['open_run']}")
+    status, html, _ = post(f"{base}/qs.php?id={result['open_run']}", [("token", token(html)), ("action", "close"), ("note", "Alles geprüft.")])
+    check("close writes the test report", status == 200 and "ittabqs-done" in html and "pruefprotokoll" in html)
+    link = re.search(r'href="([^"]*document\.php\?modulepart=ficheinter[^"]*pruefprotokoll[^"]*)"', html)
+    if link:
+        with opener.open(URL + unescape(link.group(1)).replace(URL, ""), timeout=60) as answer:
+            check("test report downloads", answer.status == 200 and answer.read(4) == b"%PDF")
+    else:
+        check("test report downloads", False, "no link")
+
+    # Required points: a fresh QS cannot be closed and marks what is missing.
+    status, html, url = get(f"{base}/qs.php?fichinter={result['fichinter']}")
+    status, html, url = post(f"{base}/qs.php?fichinter={result['fichinter']}", [("token", token(html)), ("action", "start"), ("type", kinds[0] if kinds else "0")])
+    run = re.search(r"id=(\d+)", url)
+    status, html, url = post(f"{base}/qs.php?id={run.group(1) if run else 0}", [("token", token(html)), ("action", "close"), ("note", "")])
+    check("close with open required points is refused and marks them", status == 200 and "missing=1" in url and "is-missing" in html, url)
+
+    # Cards: QS tab on the intervention and the third party, intake slip on the ticket.
+    status, html, _ = get(f"/fichinter/card.php?id={result['fichinter']}")
+    check("intervention card has the QS tab", status == 200 and "ittabelanderpdf/qs.php?fichinter=" in html)
+    status, html, _ = get(f"/societe/card.php?socid={result['socid']}")
+    check("third party card has the QS tab", status == 200 and "ittabelanderpdf/qs.php?socid=" in html)
+    status, html, _ = get(f"/ticket/card.php?track_id={result['ticket']}")
+    button = re.search(r'href="([^"]*action=ittabpdf_intake[^"]*)"', html)
+    check("ticket card offers the intake slip", status == 200 and bool(button))
+    if button:
+        status, html, _ = get(unescape(button.group(1)).replace(URL, ""))
+        check("intake slip is written", status == 200 and "geraeteannahme.pdf" in html)
+
+    # Workshop setup: a new kind of job and a new point, without code.
+    status, html, _ = get(f"{base}/admin/werkstatt.php")
+    check("workshop setup lists the kinds of job", status == 200 and "Controller-Umbau" in html and "ITTABPDF_INTAKE_NOTICES" in html)
+    status, html, _ = post(f"{base}/admin/werkstatt.php", [("token", token(html)), ("action", "save_types"), ("label_new", "Netzwerk vor Ort"),
+                                                           ("code_new", "NETZWERK"), ("position_new", "200")])
+    check("new kind of job is saved (WAF passes)", status == 200 and "Netzwerk vor Ort" in html, str(status))
+    type_id = re.findall(r"werkstatt\.php\?type=(\d+)", html)
+    if type_id:
+        status, html, _ = get(f"{base}/admin/werkstatt.php?type={type_id[-1]}")
+        status, html, _ = post(f"{base}/admin/werkstatt.php?type={type_id[-1]}", [("token", token(html)), ("action", "save_items"), ("label_new", "WLAN-Durchsatz"),
+                                                                                  ("kind_new", "value"), ("unit_new", "Mbit/s"), ("required_new", "1"), ("position_new", "10")])
+        check("new point with unit is saved", status == 200 and "WLAN-Durchsatz" in html and "Mbit/s" in html, str(status))
+    else:
+        check("new point with unit is saved", False, "no type link")
+
+    # A user without the QS right is turned away from the page and the autosave.
+    other = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    page = other.open(f"{URL}/index.php", timeout=30).read().decode("utf-8", "replace")
+    other.open(f"{URL}/index.php?mainmenu=home", data=urllib.parse.urlencode({
+        "token": token(page), "actionlogin": "login", "loginfunction": "loginfunction",
+        "username": result["plain_login"], "password": result["plain_word"]}).encode(), timeout=30).read()
+    try:
+        denied = other.open(f"{URL}{base}/qs.php", timeout=30)
+        denied_status, denied_html = denied.status, denied.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as error:
+        denied_status, denied_html = error.code, ""
+    check("user without the QS right is refused", denied_status == 403 or ("ittabqs" not in denied_html and "socid" not in denied_html), str(denied_status))
+
+    print(json.dumps(checks, indent=2, ensure_ascii=False))
+    failed = [entry for entry in checks if not entry["ok"]]
+    if failed:
+        raise SystemExit(f"qs check failed: {', '.join(entry['check'] for entry in failed)}")
+    print(f"{len(checks)} QS checks passed")
+
+
 def main() -> int:
     steps = {"up": up, "install": install, "fixtures": fixtures, "pdf": pdf, "mails": mails, "rollout": rollout, "ui": ui,
-             "tickets": tickets, "unterlagen": unterlagen, "down": down}
+             "tickets": tickets, "unterlagen": unterlagen, "qs": qs, "down": down}
     wanted = sys.argv[1:] or ["all"]
     if wanted[0] == "pdf" and len(wanted) == 2:
         pdf(wanted[1])
         return 0
     for step in wanted:
         if step == "all":
-            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen"):
+            for name in ("up", "install", "fixtures", "pdf", "mails", "rollout", "ui", "tickets", "unterlagen", "qs"):
                 steps[name]()
         elif step in steps:
             steps[step]()

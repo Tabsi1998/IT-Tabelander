@@ -39,7 +39,7 @@ class modITTabelanderPDF extends DolibarrModules
 		$this->descriptionlong = 'ModuleITTabelanderPDFDescLong';
 		$this->editor_name = 'IT-Tabelander';
 		$this->editor_url = 'https://it.tabelander.co.at';
-		$this->version = '1.1.0';
+		$this->version = '1.2.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'pdf';
 
@@ -59,6 +59,12 @@ class modITTabelanderPDF extends DolibarrModules
 			// documents: article card, mail form, ticket message.
 			'hooks' => array('propalcard', 'invoicecard', 'knowledgerecordcard', 'formmail', 'ticketcard'),
 			'moduleforexternal' => 0,
+		);
+
+		// QS on interventions and from the third party (qs.php works on a phone too).
+		$this->tabs = array(
+			'intervention:+ittabpdfqs:WerkbankQsTab:ittabelanderpdf@ittabelanderpdf:$user->hasRight("ittabelanderpdf", "qs", "run"):/ittabelanderpdf/qs.php?fichinter=__ID__',
+			'thirdparty:+ittabpdfqs:WerkbankQsTab:ittabelanderpdf@ittabelanderpdf:$user->hasRight("ittabelanderpdf", "qs", "run") && isModEnabled("ficheinter"):/ittabelanderpdf/qs.php?socid=__ID__',
 		);
 
 		$this->dirs = array();
@@ -88,6 +94,8 @@ class modITTabelanderPDF extends DolibarrModules
 			// Default attachments of the mail form, file names in the folder; missing files are skipped.
 			12 => array('ITTABPDF_DOCS_PROPAL_SEND_B2B', 'chaine', 'agb-unternehmer.pdf', 'Company documents attached to proposal e-mails to companies', 0, 'current', 0),
 			13 => array('ITTABPDF_DOCS_PROPAL_SEND_B2C', 'chaine', 'nutzungsbedingungen.pdf,widerruf.pdf', 'Company documents attached to proposal e-mails to private customers', 0, 'current', 0),
+			14 => array('ITTABPDF_QS_BLOCK_CLOSE', 'chaine', '1', 'An intervention cannot be closed while a QS of it has required points open', 0, 'current', 0),
+			15 => array('ITTABPDF_QS_APPEND_WORKREPORT', 'chaine', '0', 'Put the test reports behind the work report PDF', 0, 'current', 0),
 			8 => array('ITTABPDF_ACCEPT_TEXT_NOPORTAL', 'chaine', 'Bitte kurz per E-Mail an __MYCOMPANY_EMAIL__ bestätigen. Gearbeitet wird erst nach Zusage.', 'How a customer accepts a proposal without the customer area (Werkbank PDF)', 0, 'current', 0),
 		);
 
@@ -109,7 +117,10 @@ class modITTabelanderPDF extends DolibarrModules
 			),
 		);
 
-		$this->rights = array();
+		$this->rights = array(
+			array(75623001, 'Run QS checklists and close them with a test report', 'w', 0, 'qs', 'run'),
+			array(75623002, 'Manage the QS checklists (kinds of job and their points)', 'w', 0, 'qs', 'manage'),
+		);
 		$this->menu = array();
 		$this->menu[0] = array(
 			'fk_menu' => 'fk_mainmenu=billing',
@@ -123,6 +134,34 @@ class modITTabelanderPDF extends DolibarrModules
 			'position' => 1900,
 			'enabled' => 'isModEnabled("ittabelanderpdf")',
 			'perms' => '$user->hasRight("facture", "lire") || $user->hasRight("propal", "lire")',
+			'target' => '',
+			'user' => 0,
+		);
+		$this->menu[1] = array(
+			'fk_menu' => 'fk_mainmenu=commercial,fk_leftmenu=ficheinter',
+			'type' => 'left',
+			'titre' => 'WerkbankQsMenu',
+			'mainmenu' => 'commercial',
+			'leftmenu' => 'ittabpdf_qs',
+			'url' => '/ittabelanderpdf/qs.php',
+			'langs' => 'ittabelanderpdf@ittabelanderpdf',
+			'position' => 2210,
+			'enabled' => 'isModEnabled("ittabelanderpdf") && isModEnabled("ficheinter")',
+			'perms' => '$user->hasRight("ittabelanderpdf", "qs", "run")',
+			'target' => '',
+			'user' => 0,
+		);
+		$this->menu[2] = array(
+			'fk_menu' => 'fk_mainmenu=commercial,fk_leftmenu=ficheinter',
+			'type' => 'left',
+			'titre' => 'WerkbankQsChecklists',
+			'mainmenu' => 'commercial',
+			'leftmenu' => 'ittabpdf_qs_setup',
+			'url' => '/ittabelanderpdf/admin/werkstatt.php',
+			'langs' => 'ittabelanderpdf@ittabelanderpdf',
+			'position' => 2211,
+			'enabled' => 'isModEnabled("ittabelanderpdf") && isModEnabled("ficheinter")',
+			'perms' => '$user->hasRight("ittabelanderpdf", "qs", "manage")',
 			'target' => '',
 			'user' => 0,
 		);
@@ -155,6 +194,31 @@ class modITTabelanderPDF extends DolibarrModules
 		if ($this->db->DDLListTables($GLOBALS['conf']->db->name, MAIN_DB_PREFIX.'knowledgemanagement_knowledgerecord_extrafields')) {
 			$fields[] = array('ittab_slug', 'WerkbankExtraSlug', 'varchar', 100, '64', 'knowledgemanagement_knowledgerecord', '', 'WerkbankExtraSlugHelp');
 		}
+		// Device data for the intake slip, on tickets (requests come in as tickets).
+		// Yes/no as a select: "not asked yet" stays empty, unlike a boolean.
+		if ($this->db->DDLListTables($GLOBALS['conf']->db->name, MAIN_DB_PREFIX.'ticket_extrafields')) {
+			$yesno = array('options' => array('1' => 'Ja', '2' => 'Nein'));
+			$backup = array('options' => array('1' => 'Ja', '2' => 'Nein', '3' => 'Keine wichtigen Daten'));
+			$kinds = array('options' => array('pc' => 'PC', 'notebook' => 'Notebook', 'konsole' => 'Konsole', 'controller' => 'Controller',
+				'tablet' => 'Tablet', 'smartphone' => 'Smartphone', 'drucker' => 'Drucker', 'sonstiges' => 'Sonstiges'));
+			$ticketFields = array(
+				array('ittab_geraet_art', 'WerkbankExtraDeviceKind', 'select', 110, '', $kinds),
+				array('ittab_geraet_modell', 'WerkbankExtraDeviceModel', 'varchar', 111, '128', ''),
+				array('ittab_geraet_sn', 'WerkbankExtraDeviceSerial', 'varchar', 112, '64', ''),
+				array('ittab_zubehoer', 'WerkbankExtraAccessories', 'varchar', 113, '255', ''),
+				array('ittab_zustand', 'WerkbankExtraCondition', 'text', 114, '', ''),
+				array('ittab_fehler', 'WerkbankExtraFault', 'text', 115, '', ''),
+				array('ittab_zugang', 'WerkbankExtraAccessNeeded', 'select', 116, '', $yesno),
+				array('ittab_sicherung', 'WerkbankExtraBackupDone', 'select', 117, '', $backup),
+			);
+			foreach ($ticketFields as $field) {
+				$result = $extrafields->addExtraField($field[0], $field[1], $field[2], $field[3], $field[4], 'ticket', 0, 0, '', $field[5], 1, '', '1', '', '', '', 'ittabelanderpdf@ittabelanderpdf', 'isModEnabled("ittabelanderpdf")');
+				if ($result < 0) {
+					$this->error = $extrafields->error;
+					return -1;
+				}
+			}
+		}
 		foreach ($fields as $field) {
 			$result = $extrafields->addExtraField($field[0], $field[1], $field[2], $field[3], $field[4], $field[5], 0, 0, $field[6], '', 1, '', '1', isset($field[7]) ? $field[7] : '', '', '', 'ittabelanderpdf@ittabelanderpdf', 'isModEnabled("ittabelanderpdf")');
 			if ($result < 0) {
@@ -177,6 +241,13 @@ class modITTabelanderPDF extends DolibarrModules
 		}
 
 		if ($this->_load_tables('/ittabelanderpdf/sql/') < 0) {
+			return -1;
+		}
+		// The shipped QS checklists, only when there are none yet.
+		dol_include_once('/ittabelanderpdf/class/werkbankqs.class.php');
+		$qs = new WerkbankQs($this->db);
+		if ($qs->installDefaults((int) $GLOBALS['conf']->entity) < 0) {
+			$this->error = $qs->error;
 			return -1;
 		}
 		dol_include_once('/ittabelanderpdf/class/werkbankmailtemplates.class.php');

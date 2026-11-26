@@ -2,7 +2,7 @@
 
 Belege im Werkbank-Design von IT-Tabelander, mit den echten Markenschriften, dazu passende E-Mail-Vorlagen und ein verzögerter, abbrechbarer automatischer Versand.
 
-Modulnummer **756230** · Version 1.1.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
+Modulnummer **756230** · Version 1.2.0 · getestet mit Dolibarr 23.0.3 (PHP 8.2) · Mindestversion Dolibarr 21, PHP 7.4
 
 ![Entwurf](docs/entwurf/mockup.png)
 
@@ -34,7 +34,7 @@ Ist die Firma nicht umsatzsteuerpflichtig (Firmeneinstellung „Umsatzsteuer: ne
 
 ## Installation
 
-1. `module_ittabelanderpdf-1.1.0.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
+1. `module_ittabelanderpdf-1.2.0.zip` in Dolibarr hochladen: **Start → Einstellungen → Module/Anwendungen → Reiter „Externes Modul bereitstellen“**.
 2. In der Modulliste **IT-Tabelander PDF** aktivieren. Dabei passiert:
    - die Vorlage `werkbank` wird für alle neun Belegarten eingeschaltet (noch nicht als Standard),
    - Zusatzfelder: Kunde/Lieferant „Anrede per Du“ (`ittab_du`), Vertrag „Mindestlaufzeit (Monate)“ (`ittab_mindestlaufzeit`) und „Kündigungsfrist“ (`ittab_kuendigungsfrist`),
@@ -83,6 +83,24 @@ Unternehmensunterlagen entstehen aus Artikeln im **Wissensmanagement** (Modul �
 - **An das Beleg-PDF anhängen:** Je Angebot, Auftragsbestätigung und Rechnung lässt sich eine Unterlage hinter das Werkbank-PDF hängen (eigene Seiten mit eigenem Kopf und eigener Seitenzählung). Ist dort nichts gewählt, gilt Dolibarrs eigene Einstellung **Einstellungen → PDF → „AGB/Verkaufsbedingungen anhängen“** (`MAIN_PDF_ADD_TERMSOFSALE_PROPAL` usw. mit hochgeladener Datei); `werkbank` hängt diese Datei genauso an wie `cyan`.
 - **Einstellungen** (Abschnitt „Unterlagen“ in den Moduleinstellungen): Kategorien mit PDF (Vorgabe: „Rechtstexte“ und „Unterlagen“ per Name, gespeichert wird die ID), Ordner, automatisch neu erzeugen, Standard-Anhänge, Anhang ans Beleg-PDF, Liste aller Artikel mit Datei und Stand.
 - **Website:** lädt die PDFs über die REST-API (`GET /documents/download?modulepart=ecm&original_file=IT-Tabelander/Unterlagen/<name>.pdf`); der API-Benutzer braucht dafür das Recht „Dokumente (ECM) lesen/herunterladen“.
+
+## Werkstatt: QS-Checklisten und Prüfprotokoll
+
+![QS am Handy](docs/beispiele/qs-handy.png)
+
+- **Wo:** Menü **Serviceaufträge → QS / Prüfprotokoll**, Reiter **QS** am Serviceauftrag und am Geschäftspartner. Die Seite ist fürs Handy und das Werkstatt-Tablet gebaut (große Häkchen, 16-px-Felder, eine Spalte); am Rechner sieht sie gleich aus.
+- **Ablauf vor Ort oder in der Werkstatt:** Kunde wählen → offenen Serviceauftrag wählen oder neuen anlegen → Auftragsart antippen → Punkte abhaken. Jede Änderung wird sofort gespeichert (Häkchen, Messwert mit Einheit, Text, Notiz, „entfällt“), mit Name und Uhrzeit. Oben steht, wie viele Punkte erledigt und wie viele Pflichtpunkte offen sind.
+- **QS abschließen:** geht erst, wenn alle Pflichtpunkte erledigt sind oder „entfallen“; sonst sagt die Seite, welche fehlen, und markiert sie. Danach liegt das **Prüfprotokoll** als Werkbank-PDF beim Serviceauftrag (`<REF>-pruefprotokoll-<n>.pdf`): Kunde, Auftragsart, jeder Punkt mit Häkchen, Wert, Notiz, wer und wann, Bemerkung, Unterschriftszeilen. Wieder öffnen darf, wer QS-Checklisten verwalten darf.
+- **Serviceauftrag schließen:** schließt fertige QS mit (Prüfprotokoll entsteht) und wird verweigert, solange eine QS offene Pflichtpunkte hat (abschaltbar). Auf Wunsch hängen die Prüfprotokolle hinter dem Arbeitsbericht-PDF.
+- **Checklisten pflegen:** Einstellungen → IT-Tabelander PDF → Reiter **Werkstatt und QS** (oder Menü **QS-Checklisten**): Auftragsarten anlegen, umbenennen, sortieren, abschalten, je Auftragsart die Unterschriften (Techniker, Kunde) und einen Hinweis fürs Protokoll; Punkte mit Art (Häkchen, Messwert, Text), Einheit, Pflicht, Hilfetext, Reihenfolge, aktiv. Gelöscht wird nichts; eine laufende oder fertige QS behält ihre eigene Kopie der Punkte. Mitgeliefert: Reparatur PC/Notebook, Aufrüstung, PC-Bau, Controller-Umbau, Windows-Neuinstallation und Datenübernahme, Webseite-Übergabe, Einsatz vor Ort.
+- **Rechte:** „QS-Checklisten abhaken und mit Prüfprotokoll abschließen“ und „QS-Checklisten verwalten“ (Benutzer → Berechtigungen → IT-Tabelander PDF); dazu Leserecht auf Serviceaufträge, zum Anlegen Schreibrecht.
+
+## Werkstatt: Geräteannahmeschein
+
+- **Knopf „Geräteannahmeschein“** auf der Ticketkarte (Anfragen kommen als Ticket von der Website). Das PDF liegt danach in den Dokumenten des Tickets: eine Seite zum Ausdrucken und Unterschreiben.
+- **Inhalt:** Anfrage-Nr., Datum, Kundennummer; Kunde (Name, Adresse, Telefon, E-Mail – ohne Geschäftspartner leere Zeilen zum Ausfüllen); Gerät (Art, Marke/Modell, Seriennummer, Zubehör, Zustand/Schäden, Fehlerbeschreibung, sonst der Betreff des Tickets); „Zugangsdaten nötig“ und „Daten gesichert“ als Kästchen; eine leere Zeile für Passwort/PIN **nur auf Papier** (nie gespeichert, abschaltbar); Hinweise; Unterschriften IT-Tabelander und Kunde.
+- **Gerätedaten** sind Zusatzfelder am Ticket („Gerät: Art“, „Gerät: Marke und Modell“, …, „Zugangsdaten nötig“, „Daten vom Kunden gesichert“). Die Auswahl-Werte (Geräte-Arten, ja/nein/keine wichtigen Daten) lassen sich unter Einstellungen → Tickets → Zusatzfelder ändern; der Schein zeigt, was dort steht.
+- **Hinweise** in den Moduleinstellungen (Reiter „Werkstatt und QS“), je eine Fassung per Sie (Firmen) und per Du (Privatkunden und Anfragen ohne Geschäftspartner), ein Hinweis pro Zeile. Vorgabe nach den Textvorschlägen vom 26.11.2026: Datensicherung, Zugangsdaten, Fehlersuche 29 € (bei Auftrag angerechnet) und unverbindlicher Kostenvoranschlag, Abholfrist 4 Wochen, danach 2 € pro Tag, Herstellergarantie, Datenschutz, Nutzungsbedingungen bzw. AGB für Unternehmer.
 
 ## Automatischer Versand im Betrieb
 

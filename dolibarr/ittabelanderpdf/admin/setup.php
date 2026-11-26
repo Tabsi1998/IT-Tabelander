@@ -26,6 +26,7 @@ if (!$res) {
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 dol_include_once('/ittabelanderpdf/class/werkbankmailtemplates.class.php');
 dol_include_once('/ittabelanderpdf/class/werkbankunterlagen.class.php');
+dol_include_once('/ittabelanderpdf/lib/ittabelanderpdf.lib.php');
 
 /** @var DoliDB $db */
 /** @var Translate $langs */
@@ -175,6 +176,7 @@ if ($action === 'update_templates') {
 }
 $linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.$langs->trans('BackToModuleList').'</a>';
 print load_fiche_titre($langs->trans('WerkbankSetup'), $linkback, 'title_setup');
+print dol_get_fiche_head(ittabpdf_admin_prepare_head(), 'general', '', -1, '');
 
 print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
@@ -186,7 +188,7 @@ print '<input type="checkbox" name="ITTABPDF_PORTAL_ENABLED" value="1"'.(getDolG
 print '</td></tr>';
 foreach ($texts as $const => $label) {
 	print '<tr class="oddeven"><td class="titlefield">'.$langs->trans($label).'</td><td>';
-	print '<textarea name="'.$const.'" class="quatrevingtpercent" rows="2">'.dol_escape_htmltag(getDolGlobalString($const)).'</textarea>';
+	print '<textarea name="'.$const.'" class="quatrevingtpercent" rows="2">'.dol_escape_htmltag(getDolGlobalString($const), 0, 1).'</textarea>';
 	print '</td></tr>';
 }
 print '</table></div>';
@@ -314,5 +316,6 @@ if (!isModEnabled('knowledgemanagement')) {
 	print '<div class="opacitymedium">'.$langs->trans('WerkbankDocsSetupHelp').'</div>';
 }
 
+print dol_get_fiche_end();
 llxFooter();
 $db->close();
